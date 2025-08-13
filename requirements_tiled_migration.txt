@@ -1,0 +1,10 @@
+# Dependencias para migración a Tiled + PyTMX + pathfinding
+# FASE EXPERIMENTAL - No modificar requirements originales
+
+# Nuevas dependencias
+pytmx==3.32
+pathfinding==1.0.17
+
+# Dependencias existentes (para referencia)
+# pygame>=2.0.0
+# simpy>=4.0.0
