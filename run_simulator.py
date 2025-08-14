@@ -12,8 +12,126 @@ import simpy
 import json
 from datetime import datetime
 
+# ARREGLO CRÍTICO: Aplicar patch ANTES de importar las clases renderer
+try:
+    exec(open('direct_layout_patch.py', encoding='utf-8').read())
+    print("INFO: Patch TMX aplicado ANTES de imports")
+except FileNotFoundError:
+    print("Warning: Patch directo de layout no encontrado")
+
+# ARREGLO WH1: Aplicar arreglo para selección correcta de WH1
+try:
+    exec(open('fix_wh1_selection.py', encoding='utf-8').read())
+    print("INFO: Arreglo WH1 aplicado - Selección correcta habilitada")
+except FileNotFoundError:
+    print("Warning: Arreglo WH1 no encontrado")
+
+# SISTEMA TMX UNIFICADO: Activar bounds checking
+try:
+    from universal_bounds_checker import install_bounds_checking
+    bounds_checker = install_bounds_checking()
+    print("INFO: Sistema de bounds checking universal instalado")
+except ImportError:
+    print("Warning: Sistema de bounds checking no disponible")
+
+# FORZAR ACTIVACIÓN TMX: Asegurar que WH1 siempre se active
+try:
+    from force_tmx_activation import force_tmx_activation, patch_direct_layout_to_use_tmx
+    
+    # Activar TMX inmediatamente
+    tmx_success = force_tmx_activation()
+    visual_success = patch_direct_layout_to_use_tmx()
+    
+    if tmx_success and visual_success:
+        print("INFO: TMX ACTIVADO EXITOSAMENTE - Operarios usarán bounds correctos")
+        
+        # ALINEAR COORDENADAS TMX: Sincronizar visual con pathfinding
+        try:
+            from align_tmx_coordinates import patch_coordinate_systems
+            if patch_coordinate_systems():
+                print("INFO: COORDENADAS TMX ALINEADAS - Visual sincronizado con pathfinding")
+            else:
+                print("WARNING: No se pudieron alinear coordenadas TMX")
+        except ImportError:
+            print("WARNING: Align TMX coordinates no disponible")
+        
+        # CORREGIR VISUAL TMX REAL: Mostrar layout verdadero, no patrón de test
+        try:
+            from fix_tmx_visual_real import fix_tmx_visual_rendering
+            if fix_tmx_visual_rendering():
+                print("INFO: VISUAL TMX REAL CORREGIDO - Mostrando layout WH1 verdadero")
+            else:
+                print("WARNING: No se pudo corregir visual TMX real")
+        except ImportError:
+            print("WARNING: Fix TMX visual real no disponible")
+        
+        # FORZAR TEXTURAS TMX: Desactivar sistema legacy y usar solo TMX
+        try:
+            from force_tmx_textures import force_tmx_texture_system
+            if force_tmx_texture_system():
+                print("INFO: SISTEMA DE TEXTURAS TMX FORZADO - Solo TMX visible")
+            else:
+                print("WARNING: No se pudo forzar sistema TMX")
+        except ImportError:
+            print("WARNING: Force TMX textures no disponible")
+        
+        # ARREGLAR LAYOUT DE PANTALLA: Optimizar dimensiones y viewport
+        try:
+            from fix_screen_layout import fix_screen_layout
+            if fix_screen_layout():
+                print("INFO: LAYOUT DE PANTALLA OPTIMIZADO - Todo debería ser visible")
+            else:
+                print("WARNING: No se pudo optimizar layout de pantalla")
+        except ImportError:
+            print("WARNING: Fix screen layout no disponible")
+        
+        # ARREGLO INTEGRAL: Layout selection y posicionamiento de operarios
+        try:
+            from fix_layout_selection_and_positioning import apply_comprehensive_fixes
+            if apply_comprehensive_fixes():
+                print("INFO: LAYOUT SELECTION Y POSICIONAMIENTO CORREGIDOS")
+            else:
+                print("WARNING: Algunos arreglos integrales fallaron")
+        except ImportError:
+            print("WARNING: Arreglos integrales no disponibles")
+        
+        # FORZAR INICIALIZACIÓN DE OPERARIOS: Asegurar que aparezcan en estado visual
+        try:
+            from force_operator_initialization import ensure_operators_visible
+            ensure_operators_visible()
+            print("INFO: OPERARIOS FORZADOS A ESTADO VISUAL")
+        except ImportError:
+            print("WARNING: Force operator initialization no disponible")
+        
+        # PATCHEAR RENDERIZADO DE OPERARIOS: Solución completa y definitiva
+        try:
+            from fix_operator_rendering_complete import force_patch_operator_rendering, fix_screen_dimensions
+            
+            # Aplicar patch de renderizado mejorado
+            render_ok = force_patch_operator_rendering()
+            
+            if render_ok:
+                print("INFO: RENDERIZADO OPERARIOS CORREGIDO - Función mejorada aplicada")
+            else:
+                print("WARNING: No se pudo aplicar renderizado mejorado")
+                
+        except ImportError:
+            print("WARNING: Patch mejorado de renderizado no disponible")
+    else:
+        print("WARNING: TMX no se pudo activar completamente")
+        
+except ImportError:
+    print("Warning: Forzar activación TMX no disponible")
+
+# MONITOR EN TIEMPO REAL: Detectar violaciones de bounds
+try:
+    from realtime_bounds_monitor import start_realtime_monitoring
+    print("INFO: Monitor bounds en tiempo real disponible")
+except ImportError:
+    print("Warning: Monitor bounds no disponible")
+
 # Importaciones de módulos propios
-from config.window_config import VentanaConfiguracion
+from enhanced_config_window import EnhancedConfigWindow
 from config.settings import *
 from config.colors import *
 from simulation.warehouse import AlmacenMejorado
@@ -22,6 +140,9 @@ from visualization.state import inicializar_estado, actualizar_metricas_tiempo, 
 from visualization.original_renderer import RendererOriginal
 from visualization.original_dashboard import DashboardOriginal
 from utils.helpers import exportar_metricas, mostrar_metricas_consola
+from dynamic_pathfinding_integration import get_dynamic_pathfinding_wrapper
+
+print("INFO: Sistema TMX Visual activado")
 
 class SimuladorAlmacen:
     """Clase principal que coordina toda la simulación"""
@@ -49,12 +170,12 @@ class SimuladorAlmacen:
         self.reloj = pygame.time.Clock()
         self.renderer = RendererOriginal(self.pantalla)
         self.dashboard = DashboardOriginal()
-        
+    
     def obtener_configuracion(self):
         """Obtiene la configuración del usuario"""
         print("Abriendo ventana de configuracion...")
-        ventana_config = VentanaConfiguracion()
-        config = ventana_config.obtener_configuracion()
+        ventana_config = EnhancedConfigWindow()
+        config = ventana_config.mostrar()
         
         if config is None:
             print("Configuracion cancelada")
@@ -69,6 +190,46 @@ class SimuladorAlmacen:
         if not self.configuracion:
             print("Error: No hay configuracion valida")
             return False
+        
+        # Configurar pathfinding dinámico si se usa layout personalizado
+        if self.configuracion.get('use_dynamic_layout', False):
+            layout_path = self.configuracion.get('selected_layout_path')
+            if layout_path:
+                print(f"[SIMULADOR] Configurando layout dinamico: {layout_path}")
+                
+                # INICIALIZAR SISTEMA TMX UNIFICADO
+                try:
+                    from dynamic_layout_loader import DynamicLayoutLoader
+                    from tmx_coordinate_system import initialize_tmx_system
+                    
+                    loader = DynamicLayoutLoader("layouts")
+                    layout_data = loader.load_layout(layout_path)
+                    
+                    if layout_data:
+                        # Activar sistema TMX unificado
+                        success = initialize_tmx_system(layout_data)
+                        if success:
+                            print("[TMX_SYSTEM] Sistema TMX unificado ACTIVADO")
+                            print(f"[TMX_SYSTEM] Layout: {layout_data['info']['name']}")
+                            print(f"[TMX_SYSTEM] Bounds: {layout_data['info']['width']}x{layout_data['info']['height']}")
+                            print("[TMX_SYSTEM] Operarios respetarán límites TMX")
+                        else:
+                            print("[TMX_SYSTEM] Warning: No se pudo activar sistema TMX")
+                    else:
+                        print("[TMX_SYSTEM] Error: No se pudo cargar layout data")
+                        
+                except Exception as e:
+                    print(f"[TMX_SYSTEM] Error: {e}")
+                
+                # Configurar pathfinding wrapper (mantener compatibilidad)
+                wrapper = get_dynamic_pathfinding_wrapper()
+                if wrapper.initialize_with_layout(layout_path):
+                    print("[SIMULADOR] Layout dinamico configurado exitosamente para pathfinding")
+                    print("[SIMULADOR] OPERARIOS USARAN SISTEMA TMX PARA MOVIMIENTO")
+                else:
+                    print("[SIMULADOR] Warning: No se pudo cargar layout dinamico, usando layout por defecto")
+        else:
+            print("[SIMULADOR] Usando layout por defecto (no TMX)")
         
         self.env = simpy.Environment()
         
@@ -85,6 +246,9 @@ class SimuladorAlmacen:
             self.configuracion  # Pasar configuración completa
         )
         
+        # FORZAR INICIALIZACIÓN DE OPERARIOS EN ESTADO VISUAL
+        self._inicializar_operarios_en_estado_visual()
+        
         self.env.process(self._proceso_actualizacion_metricas())
         
         print(f"Simulacion creada:")
@@ -92,6 +256,8 @@ class SimuladorAlmacen:
         print(f"  - {self.almacen.total_tareas} tareas totales")
         print(f"  - Zona A: {len(self.almacen.tareas_zona_a)} tareas")
         print(f"  - Zona B: {len(self.almacen.tareas_zona_b)} tareas")
+        if self.configuracion.get('use_dynamic_layout', False):
+            print(f"  - Layout dinamico: {self.configuracion.get('selected_layout_path', 'N/A')}")
         return True
     
     def _proceso_actualizacion_metricas(self):
@@ -103,6 +269,16 @@ class SimuladorAlmacen:
     def ejecutar_bucle_principal(self):
         """Ejecuta el bucle principal de la simulación"""
         print("\nIniciando simulacion...")
+        
+        # INICIAR MONITOR EN TIEMPO REAL
+        try:
+            from realtime_bounds_monitor import start_realtime_monitoring
+            if start_realtime_monitoring():
+                print("INFO: Monitor de bounds en tiempo real iniciado")
+            else:
+                print("Warning: No se pudo iniciar monitor de bounds")
+        except ImportError:
+            print("Warning: Monitor de bounds no disponible")
         print("Controles disponibles:")
         print("  ESPACIO: Pausa/Reanuda")
         print("  R: Reiniciar")
@@ -113,6 +289,7 @@ class SimuladorAlmacen:
         print("  C: Diagnostico colisiones")
         print("  P: Diagnostico pasillos")
         print("  K: Diagnostico deadlocks")
+        print("  V: Reporte violaciones bounds")
         print("  F1: Debug navegacion")
         print("  +: Aumentar velocidad")
         print("  -: Disminuir velocidad")
@@ -182,6 +359,8 @@ class SimuladorAlmacen:
                 self._diagnosticar_pasillos()
             elif evento.key == pygame.K_k:  # K para diagnóstico de deadlocks
                 self._diagnosticar_deadlocks()
+            elif evento.key == pygame.K_v:  # V para reporte de violaciones de bounds
+                self._mostrar_reporte_violaciones()
         
         return True
     
@@ -231,6 +410,58 @@ class SimuladorAlmacen:
             print("Simulacion reiniciada exitosamente")
         else:
             print("Reinicio cancelado")
+    
+    def _inicializar_operarios_en_estado_visual(self):
+        """Forzar inicialización de operarios en estado visual"""
+        from visualization.state import estado_visual
+        from config.settings import POS_DEPOT
+        
+        if not self.configuracion:
+            return
+            
+        num_terrestres = self.configuracion.get('num_operarios_terrestres', 0)
+        num_montacargas = self.configuracion.get('num_montacargas', 0)
+        
+        print(f"Inicializando {num_terrestres} operarios terrestres y {num_montacargas} montacargas en estado visual...")
+        
+        # Limpiar operarios existentes
+        estado_visual["operarios"] = {}
+        
+        # Crear operarios terrestres
+        for i in range(1, num_terrestres + 1):
+            x = POS_DEPOT[0] - (i * 40)  # Espaciados horizontalmente
+            y = POS_DEPOT[1]
+            
+            estado_visual["operarios"][i] = {
+                'x': x,
+                'y': y,
+                'accion': 'En Estacionamiento',
+                'tareas_completadas': 0,
+                'direccion_x': 0,
+                'direccion_y': 0,
+                'tipo': 'terrestre'
+            }
+        
+        # Crear montacargas
+        for i in range(num_terrestres + 1, num_terrestres + num_montacargas + 1):
+            x = POS_DEPOT[0] - ((i - num_terrestres) * 40)
+            y = POS_DEPOT[1] + 60  # Más abajo que los terrestres
+            
+            estado_visual["operarios"][i] = {
+                'x': x,
+                'y': y,
+                'accion': 'En Estacionamiento',
+                'tareas_completadas': 0,
+                'direccion_x': 0,
+                'direccion_y': 0,
+                'tipo': 'montacargas'
+            }
+        
+        total_operarios = len(estado_visual["operarios"])
+        print(f"Operarios inicializados en estado visual: {total_operarios}")
+        
+        for op_id, op_data in estado_visual["operarios"].items():
+            print(f"  Operario {op_id}: {op_data['tipo']} en ({op_data['x']}, {op_data['y']})")
     
     def limpiar_recursos(self):
         """Limpia todos los recursos"""
@@ -413,6 +644,62 @@ class SimuladorAlmacen:
             print(f"[ERROR] Error en diagnóstico de deadlocks: {e}")
             import traceback
             traceback.print_exc()
+    
+    def _mostrar_reporte_violaciones(self):
+        """Mostrar reporte de violaciones de bounds detectadas"""
+        try:
+            from realtime_bounds_monitor import get_violations_report
+            
+            print("\n" + "="*60)
+            print("=== REPORTE VIOLACIONES DE BOUNDS ===")
+            print("="*60)
+            
+            report = get_violations_report()
+            
+            if report['total_violations'] == 0:
+                print("[OK] NO SE DETECTARON VIOLACIONES DE BOUNDS")
+                print("Los operarios han permanecido dentro del layout")
+            else:
+                print(f"[ALERT] {report['total_violations']} VIOLACIONES DETECTADAS")
+                
+                if 'by_operator' in report:
+                    print("\nViolaciones por operario:")
+                    for op_id, count in report['by_operator'].items():
+                        print(f"  Operario {op_id}: {count} violaciones")
+                
+                if 'violation_types' in report:
+                    print("\nTipos de violaciones:")
+                    for v_type, count in report['violation_types'].items():
+                        print(f"  {v_type}: {count} veces")
+                
+                if 'first_violation' in report and report['first_violation']:
+                    first = report['first_violation']
+                    print(f"\nPrimera violación:")
+                    print(f"  Operario: {first['operario_id']}")
+                    print(f"  Posición: ({first['position'][0]:.1f}, {first['position'][1]:.1f})")
+                    print(f"  Acción: {first['accion']}")
+                    print(f"  Tipo: {first['violation_type']}")
+                
+                if 'last_violation' in report and report['last_violation']:
+                    last = report['last_violation']
+                    print(f"\nÚltima violación:")
+                    print(f"  Operario: {last['operario_id']}")
+                    print(f"  Posición: ({last['position'][0]:.1f}, {last['position'][1]:.1f})")
+                    print(f"  Acción: {last['accion']}")
+                    print(f"  Tipo: {last['violation_type']}")
+            
+            # Mostrar estado TMX actual
+            from tmx_coordinate_system import tmx_coords
+            if tmx_coords.is_tmx_active():
+                bounds = tmx_coords.get_bounds()
+                print(f"\nBounds TMX activos: 0-{bounds['max_x']} x 0-{bounds['max_y']}")
+            else:
+                print("\n[WARNING] Sistema TMX no activo")
+            
+            print("="*60)
+            
+        except Exception as e:
+            print(f"[ERROR] Error obteniendo reporte de violaciones: {e}")
     
 
 def main():

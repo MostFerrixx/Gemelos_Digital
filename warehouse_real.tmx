@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.8" tiledversion="1.8.5" orientation="orthogonal" renderorder="right-down" 
+     width="63" height="30" 
+     tilewidth="30" tileheight="30" 
+     infinite="0" nextlayerid="2" nextobjectid="1">
+
+ <tileset firstgid="1" name="warehouse_tiles" tilewidth="30" tileheight="30" tilecount="4" columns="2">
+  <image source="warehouse_tiles.png" width="60" height="60"/>
+  <tile id="0">
+   <properties>
+    <property name="walkable" value="true"/>
+    <property name="type" value="floor"/>
+   </properties>
+  </tile>
+  <tile id="1">
+   <properties>
+    <property name="walkable" value="false"/>
+    <property name="type" value="rack"/>
+   </properties>
+  </tile>
+  <tile id="2">
+   <properties>
+    <property name="walkable" value="true"/>
+    <property name="type" value="depot"/>
+   </properties>
+  </tile>
+  <tile id="3">
+   <properties>
+    <property name="walkable" value="true"/>
+    <property name="type" value="inbound"/>
+   </properties>
+  </tile>
+ </tileset>
+
+ <layer id="1" name="Navigation" width="63" height="30">
+  <data encoding="csv">
+1,1,4,4,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,4,4,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,4,4,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,1,1,1,1,1,1,
+1,1,1,1,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,1,1,1,1,1,1,
+1,1,1,1,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,1,1,1,1,1,1,
+1,1,1,1,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,1,1,1,1,1,1,
+1,1,1,1,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,1,1,1,1,1,1,
+1,1,1,1,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,1,1,1,1,1,1,
+1,1,1,1,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,1,1,1,1,1,1,
+1,1,1,1,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,1,1,1,1,1,1,
+1,1,1,1,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,1,1,1,1,1,1,
+1,1,1,1,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,1,1,1,1,1,1,
+1,1,1,1,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,3,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,3,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,3,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+  </data>
+ </layer>
+
+ <objectgroup id="2" name="Locations">
+  <object id="40" name="depot" type="depot" x="1735" y="535" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="1750"/>
+    <property name="world_y" type="float" value="550"/>
+    <property name="grid_x" type="int" value="58"/>
+    <property name="grid_y" type="int" value="18"/>
+   </properties>
+  </object>
+  <object id="387" name="inbound" type="inbound" x="85" y="35" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="100"/>
+    <property name="world_y" type="float" value="50"/>
+    <property name="grid_x" type="int" value="3"/>
+    <property name="grid_y" type="int" value="1"/>
+   </properties>
+  </object>
+  <object id="732" name="picking_0" type="picking" x="140" y="180" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="155"/>
+    <property name="world_y" type="float" value="195"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="6"/>
+   </properties>
+  </object>
+  <object id="1082" name="picking_1" type="picking" x="140" y="218" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="155"/>
+    <property name="world_y" type="float" value="233"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="7"/>
+   </properties>
+  </object>
+  <object id="1433" name="picking_2" type="picking" x="140" y="256" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="155"/>
+    <property name="world_y" type="float" value="271"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="9"/>
+   </properties>
+  </object>
+  <object id="1784" name="picking_3" type="picking" x="140" y="294" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="155"/>
+    <property name="world_y" type="float" value="309"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="10"/>
+   </properties>
+  </object>
+  <object id="2136" name="picking_4" type="picking" x="140" y="332" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="155"/>
+    <property name="world_y" type="float" value="347"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="11"/>
+   </properties>
+  </object>
+  <object id="2488" name="picking_5" type="picking" x="140" y="370" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="155"/>
+    <property name="world_y" type="float" value="385"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="12"/>
+   </properties>
+  </object>
+  <object id="2840" name="picking_6" type="picking" x="140" y="408" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="155"/>
+    <property name="world_y" type="float" value="423"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="14"/>
+   </properties>
+  </object>
+  <object id="3192" name="picking_7" type="picking" x="140" y="446" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="155"/>
+    <property name="world_y" type="float" value="461"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="15"/>
+   </properties>
+  </object>
+  <object id="3544" name="picking_8" type="picking" x="146" y="180" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="161"/>
+    <property name="world_y" type="float" value="195"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="6"/>
+   </properties>
+  </object>
+  <object id="3895" name="picking_9" type="picking" x="146" y="218" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="161"/>
+    <property name="world_y" type="float" value="233"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="7"/>
+   </properties>
+  </object>
+  <object id="4246" name="picking_10" type="picking" x="146" y="256" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="161"/>
+    <property name="world_y" type="float" value="271"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="9"/>
+   </properties>
+  </object>
+  <object id="4598" name="picking_11" type="picking" x="146" y="294" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="161"/>
+    <property name="world_y" type="float" value="309"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="10"/>
+   </properties>
+  </object>
+  <object id="4951" name="picking_12" type="picking" x="146" y="332" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="161"/>
+    <property name="world_y" type="float" value="347"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="11"/>
+   </properties>
+  </object>
+  <object id="5304" name="picking_13" type="picking" x="146" y="370" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="161"/>
+    <property name="world_y" type="float" value="385"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="12"/>
+   </properties>
+  </object>
+  <object id="5657" name="picking_14" type="picking" x="146" y="408" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="161"/>
+    <property name="world_y" type="float" value="423"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="14"/>
+   </properties>
+  </object>
+  <object id="6010" name="picking_15" type="picking" x="146" y="446" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="161"/>
+    <property name="world_y" type="float" value="461"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="15"/>
+   </properties>
+  </object>
+  <object id="6363" name="picking_16" type="picking" x="152" y="180" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="167"/>
+    <property name="world_y" type="float" value="195"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="6"/>
+   </properties>
+  </object>
+  <object id="6715" name="picking_17" type="picking" x="152" y="218" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="167"/>
+    <property name="world_y" type="float" value="233"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="7"/>
+   </properties>
+  </object>
+  <object id="7067" name="picking_18" type="picking" x="152" y="256" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="167"/>
+    <property name="world_y" type="float" value="271"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="9"/>
+   </properties>
+  </object>
+  <object id="7419" name="picking_19" type="picking" x="152" y="294" width="30" height="30">
+   <properties>
+    <property name="world_x" type="float" value="167"/>
+    <property name="world_y" type="float" value="309"/>
+    <property name="grid_x" type="int" value="5"/>
+    <property name="grid_y" type="int" value="10"/>
+   </properties>
+  </object>
+
+ </objectgroup>
+</map>

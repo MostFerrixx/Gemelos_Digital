@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" renderorder="right-down" width="25" height="18" tilewidth="32" tileheight="32" nextlayerid="3" nextobjectid="6">
+ <tileset firstgid="1" name="warehouse_custom" tilewidth="32" tileheight="32" tilecount="3" columns="3">
+  <image source="warehouse_tileset.png" width="96" height="32"/>
+  <tile id="0">
+   <properties>
+    <property name="walkable" value="true"/>
+    <property name="type" value="floor"/>
+   </properties>
+  </tile>
+  <tile id="1">
+   <properties>
+    <property name="walkable" value="false"/>
+    <property name="type" value="rack"/>
+   </properties>
+  </tile>
+  <tile id="2">
+   <properties>
+    <property name="walkable" value="true"/>
+    <property name="type" value="corridor"/>
+   </properties>
+  </tile>
+ </tileset>
+ <layer id="1" name="Layout_Custom" width="25" height="18">
+  <data encoding="csv">
+3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
+3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,
+3,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,3,
+3,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,3,
+3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,
+3,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,3,
+3,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,3,
+3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,
+3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
+3,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,3,
+3,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,3,
+3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,
+3,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,3,
+3,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,2,2,1,1,3,
+3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,
+3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,
+3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,
+3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3
+  </data>
+ </layer>
+ <objectgroup id="2" name="Special_Locations">
+  <object id="1" name="Depot_Principal" type="depot" x="704" y="512" width="96" height="64"/>
+  <object id="2" name="Entrada_Main" type="inbound" x="32" y="32" width="96" height="32"/>
+  <object id="3" name="Picking_Zona1" type="picking" x="96" y="96" width="64" height="32"/>
+  <object id="4" name="Picking_Zona2" type="picking" x="320" y="96" width="64" height="32"/>
+  <object id="5" name="Picking_Zona3" type="picking" x="544" y="320" width="64" height="32"/>
+ </objectgroup>
+</map>
