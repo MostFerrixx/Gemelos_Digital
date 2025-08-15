@@ -12,135 +12,31 @@ import simpy
 import json
 from datetime import datetime
 
-# ARREGLO CRÍTICO: Aplicar patch ANTES de importar las clases renderer
-try:
-    exec(open('direct_layout_patch.py', encoding='utf-8').read())
-    print("INFO: Patch TMX aplicado ANTES de imports")
-except FileNotFoundError:
-    print("Warning: Patch directo de layout no encontrado")
-
-# ARREGLO WH1: Aplicar arreglo para selección correcta de WH1
-try:
-    exec(open('fix_wh1_selection.py', encoding='utf-8').read())
-    print("INFO: Arreglo WH1 aplicado - Selección correcta habilitada")
-except FileNotFoundError:
-    print("Warning: Arreglo WH1 no encontrado")
-
-# SISTEMA TMX UNIFICADO: Activar bounds checking
-try:
-    from universal_bounds_checker import install_bounds_checking
-    bounds_checker = install_bounds_checking()
-    print("INFO: Sistema de bounds checking universal instalado")
-except ImportError:
-    print("Warning: Sistema de bounds checking no disponible")
-
-# FORZAR ACTIVACIÓN TMX: Asegurar que WH1 siempre se active
-try:
-    from force_tmx_activation import force_tmx_activation, patch_direct_layout_to_use_tmx
-    
-    # Activar TMX inmediatamente
-    tmx_success = force_tmx_activation()
-    visual_success = patch_direct_layout_to_use_tmx()
-    
-    if tmx_success and visual_success:
-        print("INFO: TMX ACTIVADO EXITOSAMENTE - Operarios usarán bounds correctos")
-        
-        # ALINEAR COORDENADAS TMX: Sincronizar visual con pathfinding
-        try:
-            from align_tmx_coordinates import patch_coordinate_systems
-            if patch_coordinate_systems():
-                print("INFO: COORDENADAS TMX ALINEADAS - Visual sincronizado con pathfinding")
-            else:
-                print("WARNING: No se pudieron alinear coordenadas TMX")
-        except ImportError:
-            print("WARNING: Align TMX coordinates no disponible")
-        
-        # CORREGIR VISUAL TMX REAL: Mostrar layout verdadero, no patrón de test
-        try:
-            from fix_tmx_visual_real import fix_tmx_visual_rendering
-            if fix_tmx_visual_rendering():
-                print("INFO: VISUAL TMX REAL CORREGIDO - Mostrando layout WH1 verdadero")
-            else:
-                print("WARNING: No se pudo corregir visual TMX real")
-        except ImportError:
-            print("WARNING: Fix TMX visual real no disponible")
-        
-        # FORZAR TEXTURAS TMX: Desactivar sistema legacy y usar solo TMX
-        try:
-            from force_tmx_textures import force_tmx_texture_system
-            if force_tmx_texture_system():
-                print("INFO: SISTEMA DE TEXTURAS TMX FORZADO - Solo TMX visible")
-            else:
-                print("WARNING: No se pudo forzar sistema TMX")
-        except ImportError:
-            print("WARNING: Force TMX textures no disponible")
-        
-        # ARREGLAR LAYOUT DE PANTALLA: Optimizar dimensiones y viewport
-        try:
-            from fix_screen_layout import fix_screen_layout
-            if fix_screen_layout():
-                print("INFO: LAYOUT DE PANTALLA OPTIMIZADO - Todo debería ser visible")
-            else:
-                print("WARNING: No se pudo optimizar layout de pantalla")
-        except ImportError:
-            print("WARNING: Fix screen layout no disponible")
-        
-        # ARREGLO INTEGRAL: Layout selection y posicionamiento de operarios
-        try:
-            from fix_layout_selection_and_positioning import apply_comprehensive_fixes
-            if apply_comprehensive_fixes():
-                print("INFO: LAYOUT SELECTION Y POSICIONAMIENTO CORREGIDOS")
-            else:
-                print("WARNING: Algunos arreglos integrales fallaron")
-        except ImportError:
-            print("WARNING: Arreglos integrales no disponibles")
-        
-        # FORZAR INICIALIZACIÓN DE OPERARIOS: Asegurar que aparezcan en estado visual
-        try:
-            from force_operator_initialization import ensure_operators_visible
-            ensure_operators_visible()
-            print("INFO: OPERARIOS FORZADOS A ESTADO VISUAL")
-        except ImportError:
-            print("WARNING: Force operator initialization no disponible")
-        
-        # PATCHEAR RENDERIZADO DE OPERARIOS: Solución completa y definitiva
-        try:
-            from fix_operator_rendering_complete import force_patch_operator_rendering, fix_screen_dimensions
-            
-            # Aplicar patch de renderizado mejorado
-            render_ok = force_patch_operator_rendering()
-            
-            if render_ok:
-                print("INFO: RENDERIZADO OPERARIOS CORREGIDO - Función mejorada aplicada")
-            else:
-                print("WARNING: No se pudo aplicar renderizado mejorado")
-                
-        except ImportError:
-            print("WARNING: Patch mejorado de renderizado no disponible")
-    else:
-        print("WARNING: TMX no se pudo activar completamente")
-        
-except ImportError:
-    print("Warning: Forzar activación TMX no disponible")
-
-# MONITOR EN TIEMPO REAL: Detectar violaciones de bounds
-try:
-    from realtime_bounds_monitor import start_realtime_monitoring
-    print("INFO: Monitor bounds en tiempo real disponible")
-except ImportError:
-    print("Warning: Monitor bounds no disponible")
+print("=" * 70)
+print("SIMULADOR DE ALMACEN - SISTEMA CORE LIMPIO")
+print("=" * 70)
 
 # Importaciones de módulos propios
-from enhanced_config_window import EnhancedConfigWindow
+from config.window_config import VentanaConfiguracion
 from config.settings import *
 from config.colors import *
 from simulation.warehouse import AlmacenMejorado
 from simulation.operators import crear_operarios
+from simulation.layout_manager import LayoutManager
+
+# VERIFICACIÓN DE ENTORNO: Confirmar que cargamos el LayoutManager correcto
+print(f"[ENTORNO] Cargando LayoutManager desde: {LayoutManager.__module__}")
+try:
+    import simulation.layout_manager
+    print(f"[ENTORNO] Archivo LayoutManager: {simulation.layout_manager.__file__}")
+except AttributeError:
+    print(f"[ENTORNO] No se pudo obtener ruta del archivo LayoutManager")
+from simulation.pathfinder import Pathfinder
 from visualization.state import inicializar_estado, actualizar_metricas_tiempo, toggle_pausa, toggle_dashboard, estado_visual, limpiar_estado, aumentar_velocidad, disminuir_velocidad, obtener_velocidad_simulacion
 from visualization.original_renderer import RendererOriginal
 from visualization.original_dashboard import DashboardOriginal
 from utils.helpers import exportar_metricas, mostrar_metricas_consola
-from dynamic_pathfinding_integration import get_dynamic_pathfinding_wrapper
+# from dynamic_pathfinding_integration import get_dynamic_pathfinding_wrapper  # Eliminado en limpieza
 
 print("INFO: Sistema TMX Visual activado")
 
@@ -156,16 +52,33 @@ class SimuladorAlmacen:
         self.dashboard = None
         self.reloj = None
         self.corriendo = True
+        # Nuevos componentes de la arquitectura TMX
+        self.layout_manager = None
+        self.pathfinder = None
         
     def inicializar_pygame(self):
-        """Inicializa pygame y crea la ventana principal"""
-        pygame.init()
-        pygame.display.set_caption("Simulador de Almacen - Gemelo Digital (Modular)")
+        """Reinicializa pygame con dimensiones TMX exactas (ya inicializado en crear_simulacion)"""
+        pygame.display.set_caption("Simulador de Almacen - Gemelo Digital (TMX)")
         
-        self.pantalla = pygame.display.set_mode(
-            (ANCHO_PANTALLA, ALTO_PANTALLA), 
-            pygame.RESIZABLE
-        )
+        # IMPORTANTE: Este método se llama DESPUÉS de crear_simulacion()
+        # para que ya tengamos el layout_manager disponible
+        if not hasattr(self, 'layout_manager') or not self.layout_manager:
+            raise SystemExit("[FATAL ERROR] Debe cargar TMX antes de reinicializar pygame")
+        
+        # Calcular dimensiones exactas del mapa TMX
+        map_width = self.layout_manager.grid_width * self.layout_manager.tile_width
+        map_height = self.layout_manager.grid_height * self.layout_manager.tile_height
+        
+        print(f"[TMX WINDOW] Dimensiones calculadas desde TMX:")
+        print(f"  - Grilla: {self.layout_manager.grid_width}x{self.layout_manager.grid_height}")
+        print(f"  - Tile size: {self.layout_manager.tile_width}x{self.layout_manager.tile_height}")
+        print(f"  - Tamaño ventana: {map_width}x{map_height} (correspondencia 1:1)")
+        
+        # Crear ventana con dimensiones exactas del TMX (correspondencia 1:1)
+        self.pantalla = pygame.display.set_mode((map_width, map_height))
+        
+        print(f"[TMX WINDOW] Ventana creada: {map_width}x{map_height} píxeles")
+        print(f"[TMX WINDOW] Sin escalado - correspondencia 1:1 píxel TMX : píxel pantalla")
         
         self.reloj = pygame.time.Clock()
         self.renderer = RendererOriginal(self.pantalla)
@@ -174,8 +87,8 @@ class SimuladorAlmacen:
     def obtener_configuracion(self):
         """Obtiene la configuración del usuario"""
         print("Abriendo ventana de configuracion...")
-        ventana_config = EnhancedConfigWindow()
-        config = ventana_config.mostrar()
+        ventana_config = VentanaConfiguracion()
+        config = ventana_config.obtener_configuracion()
         
         if config is None:
             print("Configuracion cancelada")
@@ -191,59 +104,57 @@ class SimuladorAlmacen:
             print("Error: No hay configuracion valida")
             return False
         
-        # Configurar pathfinding dinámico si se usa layout personalizado
-        if self.configuracion.get('use_dynamic_layout', False):
-            layout_path = self.configuracion.get('selected_layout_path')
-            if layout_path:
-                print(f"[SIMULADOR] Configurando layout dinamico: {layout_path}")
-                
-                # INICIALIZAR SISTEMA TMX UNIFICADO
-                try:
-                    from dynamic_layout_loader import DynamicLayoutLoader
-                    from tmx_coordinate_system import initialize_tmx_system
-                    
-                    loader = DynamicLayoutLoader("layouts")
-                    layout_data = loader.load_layout(layout_path)
-                    
-                    if layout_data:
-                        # Activar sistema TMX unificado
-                        success = initialize_tmx_system(layout_data)
-                        if success:
-                            print("[TMX_SYSTEM] Sistema TMX unificado ACTIVADO")
-                            print(f"[TMX_SYSTEM] Layout: {layout_data['info']['name']}")
-                            print(f"[TMX_SYSTEM] Bounds: {layout_data['info']['width']}x{layout_data['info']['height']}")
-                            print("[TMX_SYSTEM] Operarios respetarán límites TMX")
-                        else:
-                            print("[TMX_SYSTEM] Warning: No se pudo activar sistema TMX")
-                    else:
-                        print("[TMX_SYSTEM] Error: No se pudo cargar layout data")
-                        
-                except Exception as e:
-                    print(f"[TMX_SYSTEM] Error: {e}")
-                
-                # Configurar pathfinding wrapper (mantener compatibilidad)
-                wrapper = get_dynamic_pathfinding_wrapper()
-                if wrapper.initialize_with_layout(layout_path):
-                    print("[SIMULADOR] Layout dinamico configurado exitosamente para pathfinding")
-                    print("[SIMULADOR] OPERARIOS USARAN SISTEMA TMX PARA MOVIMIENTO")
-                else:
-                    print("[SIMULADOR] Warning: No se pudo cargar layout dinamico, usando layout por defecto")
-        else:
-            print("[SIMULADOR] Usando layout por defecto (no TMX)")
+        # ARQUITECTURA TMX OBLIGATORIA - No hay fallback
+        print("[SIMULADOR] Inicializando arquitectura TMX (OBLIGATORIO)...")
+        
+        # IMPORTANTE: Inicializar pygame antes de cargar TMX (PyTMX lo requiere)
+        pygame.init()
+        pygame.display.set_mode((100, 100))  # Ventana temporal para inicializar display
+        
+        # 1. Inicializar LayoutManager con archivo TMX por defecto (OBLIGATORIO)
+        tmx_file = "C:\\Users\\ferri\\OneDrive\\Escritorio\\Gemelos Digital\\layouts\\WH1.tmx"
+        print(f"[TMX] Cargando layout: {tmx_file}")
+        
+        try:
+            self.layout_manager = LayoutManager(tmx_file)
+        except Exception as e:
+            print(f"[FATAL ERROR] No se pudo cargar archivo TMX: {e}")
+            print("[FATAL ERROR] El simulador requiere un archivo TMX válido para funcionar.")
+            print("[FATAL ERROR] Sistema legacy eliminado - sin fallback disponible.")
+            raise SystemExit(f"Error cargando TMX: {e}")
+        
+        # 2. Inicializar Pathfinder con collision_matrix del LayoutManager (OBLIGATORIO)
+        print("[TMX] Inicializando sistema de pathfinding...")
+        try:
+            self.pathfinder = Pathfinder(self.layout_manager.collision_matrix)
+        except Exception as e:
+            print(f"[FATAL ERROR] No se pudo inicializar pathfinder: {e}")
+            raise SystemExit(f"Error en pathfinder: {e}")
+        
+        print(f"[TMX] Arquitectura TMX inicializada exitosamente:")
+        print(f"  - Dimensiones: {self.layout_manager.grid_width}x{self.layout_manager.grid_height}")
+        print(f"  - Puntos de picking: {len(self.layout_manager.picking_points)}")
+        print(f"  - Puntos de depot: {len(self.layout_manager.depot_points)}")
         
         self.env = simpy.Environment()
         
+        # El LayoutManager y Pathfinder son OBLIGATORIOS
+        if not self.layout_manager or not self.pathfinder:
+            raise SystemExit("[FATAL ERROR] LayoutManager y Pathfinder son obligatorios")
+        
         self.almacen = AlmacenMejorado(
             self.env,
-            self.configuracion  # Pasar configuración completa
+            self.configuracion,
+            layout_manager=self.layout_manager  # OBLIGATORIO
         )
         
-        inicializar_estado(self.almacen, self.env, self.configuracion)
+        inicializar_estado(self.almacen, self.env, self.configuracion, layout_manager=self.layout_manager)
         
         procesos_operarios = crear_operarios(
             self.env,
             self.almacen,
-            self.configuracion  # Pasar configuración completa
+            self.configuracion,
+            pathfinder=self.pathfinder  # OBLIGATORIO
         )
         
         # FORZAR INICIALIZACIÓN DE OPERARIOS EN ESTADO VISUAL
@@ -254,10 +165,13 @@ class SimuladorAlmacen:
         print(f"Simulacion creada:")
         print(f"  - {len(procesos_operarios)} operarios")
         print(f"  - {self.almacen.total_tareas} tareas totales")
-        print(f"  - Zona A: {len(self.almacen.tareas_zona_a)} tareas")
-        print(f"  - Zona B: {len(self.almacen.tareas_zona_b)} tareas")
-        if self.configuracion.get('use_dynamic_layout', False):
-            print(f"  - Layout dinamico: {self.configuracion.get('selected_layout_path', 'N/A')}")
+        if hasattr(self.almacen, 'tareas_zona_a'):
+            print(f"  - Zona A: {len(self.almacen.tareas_zona_a)} tareas")
+            print(f"  - Zona B: {len(self.almacen.tareas_zona_b)} tareas")
+        if self.layout_manager:
+            print(f"  - Layout TMX: ACTIVO ({tmx_file})")
+        else:
+            print(f"  - Layout TMX: DESACTIVADO (usando legacy)")
         return True
     
     def _proceso_actualizacion_metricas(self):
@@ -270,27 +184,13 @@ class SimuladorAlmacen:
         """Ejecuta el bucle principal de la simulación"""
         print("\nIniciando simulacion...")
         
-        # INICIAR MONITOR EN TIEMPO REAL
-        try:
-            from realtime_bounds_monitor import start_realtime_monitoring
-            if start_realtime_monitoring():
-                print("INFO: Monitor de bounds en tiempo real iniciado")
-            else:
-                print("Warning: No se pudo iniciar monitor de bounds")
-        except ImportError:
-            print("Warning: Monitor de bounds no disponible")
+        # Monitor de bounds desactivado en limpieza
         print("Controles disponibles:")
         print("  ESPACIO: Pausa/Reanuda")
         print("  R: Reiniciar")
         print("  M: Mostrar metricas")
         print("  X: Exportar datos")
         print("  D: Toggle dashboard")
-        print("  N: Diagnostico navegacion")
-        print("  C: Diagnostico colisiones")
-        print("  P: Diagnostico pasillos")
-        print("  K: Diagnostico deadlocks")
-        print("  V: Reporte violaciones bounds")
-        print("  F1: Debug navegacion")
         print("  +: Aumentar velocidad")
         print("  -: Disminuir velocidad")
         print("  ESC: Salir")
@@ -349,24 +249,26 @@ class SimuladorAlmacen:
                 aumentar_velocidad()
             elif evento.key == pygame.K_MINUS or evento.key == pygame.K_KP_MINUS:  # Tecla - o -
                 disminuir_velocidad()
-            elif evento.key == pygame.K_n:  # N para diagnóstico de navegación
-                self._diagnosticar_navegacion()
-            elif evento.key == pygame.K_c:  # C para diagnóstico de colisiones
-                self._diagnosticar_colisiones()
-            elif evento.key == pygame.K_F1:  # F1 para activar debug
-                self._toggle_debug_navegacion()
-            elif evento.key == pygame.K_p:  # P para diagnóstico de pasillos
-                self._diagnosticar_pasillos()
-            elif evento.key == pygame.K_k:  # K para diagnóstico de deadlocks
-                self._diagnosticar_deadlocks()
-            elif evento.key == pygame.K_v:  # V para reporte de violaciones de bounds
-                self._mostrar_reporte_violaciones()
+            # Funciones de diagnóstico desactivadas en limpieza
         
         return True
     
     def _renderizar_frame(self):
         """Renderiza un frame completo"""
-        self.renderer.renderizar_frame_completo()
+        # Si tenemos layout_manager, usar el sistema TMX unificado (sin escalado)
+        if self.layout_manager:
+            # Limpiar pantalla
+            self.pantalla.fill((245, 245, 245))  # COLOR_FONDO
+            
+            # 1. Renderizar el mapa TMX de fondo (correspondencia 1:1)
+            self.layout_manager.render(self.pantalla)
+            
+            # 2. Renderizar operarios directamente (sin escalado - correspondencia 1:1)
+            # Las coordenadas en estado_visual ya están en píxeles TMX centrados
+            self.renderer.renderizar_operarios_solamente()
+        else:
+            # Sistema legacy
+            self.renderer.renderizar_frame_completo()
         
         if self.dashboard.visible and self.almacen and self.env:
             self.dashboard.actualizar_datos(self.env, self.almacen)
@@ -374,6 +276,28 @@ class SimuladorAlmacen:
         
         self.renderer.dibujar_mensaje_pausa()
         pygame.display.flip()
+    
+    def _renderizar_tmx_escalado(self):
+        """Renderiza el mapa TMX aplicando escalado para la ventana actual"""
+        if not self.layout_manager:
+            return
+        
+        from config.settings import ANCHO_PANTALLA, ALTO_PANTALLA
+        
+        # Calcular factores de escala
+        ancho_ventana, alto_ventana = self.pantalla.get_size()
+        factor_x = ancho_ventana / ANCHO_PANTALLA
+        factor_y = alto_ventana / ALTO_PANTALLA
+        
+        # Crear superficie temporal con tamaño lógico
+        temp_surface = pygame.Surface((ANCHO_PANTALLA, ALTO_PANTALLA))
+        
+        # Renderizar TMX en superficie temporal
+        self.layout_manager.render(temp_surface)
+        
+        # Escalar y dibujar en pantalla principal
+        scaled_surface = pygame.transform.scale(temp_surface, (ancho_ventana, alto_ventana))
+        self.pantalla.blit(scaled_surface, (0, 0))
     
     def _simulacion_activa(self):
         """Verifica si la simulación está activa"""
@@ -412,29 +336,62 @@ class SimuladorAlmacen:
             print("Reinicio cancelado")
     
     def _inicializar_operarios_en_estado_visual(self):
-        """Forzar inicialización de operarios en estado visual"""
+        """Inicialización de operarios con soporte TMX"""
         from visualization.state import estado_visual
-        from config.settings import POS_DEPOT
         
         if not self.configuracion:
             return
             
         num_terrestres = self.configuracion.get('num_operarios_terrestres', 0)
         num_montacargas = self.configuracion.get('num_montacargas', 0)
+        total_operarios = num_terrestres + num_montacargas
         
-        print(f"Inicializando {num_terrestres} operarios terrestres y {num_montacargas} montacargas en estado visual...")
+        print(f"Inicializando {num_terrestres} operarios terrestres y {num_montacargas} montacargas...")
         
         # Limpiar operarios existentes
         estado_visual["operarios"] = {}
         
-        # Crear operarios terrestres
+        # Obtener posiciones usando TMX (OBLIGATORIO)
+        if not self.layout_manager or not self.layout_manager.depot_points:
+            raise SystemExit("[FATAL ERROR] Se requiere LayoutManager con depot_points para inicializar operarios")
+        
+        # Usar depot points del TMX como posiciones iniciales
+        depot_point = self.layout_manager.depot_points[0]  # Primer punto de depot
+        pixel_positions = []
+        
+        # Distribuir operarios alrededor del depot en PÍXELES
+        for i in range(total_operarios):
+            # Calcular posición en grilla
+            grid_x = depot_point[0] + (i % 3)  # Distribuir en una grilla 3x3
+            grid_y = depot_point[1] + (i // 3)
+            
+            # Validar que la posición sea caminable
+            if not self.layout_manager.is_walkable(grid_x, grid_y):
+                # Buscar posición caminable cercana
+                fallback_pos = self.layout_manager.get_random_walkable_point()
+                if fallback_pos:
+                    grid_x, grid_y = fallback_pos
+                else:
+                    grid_x, grid_y = depot_point  # Último recurso: depot original
+            
+            # Convertir a píxeles (ÚNICA FUENTE DE VERDAD)
+            pixel_x, pixel_y = self.layout_manager.grid_to_pixel(grid_x, grid_y)
+            pixel_positions.append((pixel_x, pixel_y))
+        
+        print(f"[OPERARIOS] Posiciones calculadas desde TMX depot: {depot_point}")
+        print(f"[OPERARIOS] {len(pixel_positions)} operarios posicionados en píxeles")
+        
+        # Crear operarios terrestres - SOLO PÍXELES
         for i in range(1, num_terrestres + 1):
-            x = POS_DEPOT[0] - (i * 40)  # Espaciados horizontalmente
-            y = POS_DEPOT[1]
+            if i-1 < len(pixel_positions):
+                pixel_x, pixel_y = pixel_positions[i-1]
+            else:
+                pixel_x, pixel_y = pixel_positions[0]  # Usar primera posición como fallback
             
             estado_visual["operarios"][i] = {
-                'x': x,
-                'y': y,
+                'x': pixel_x,
+                'y': pixel_y,
+                # NO hay grid_x, grid_y - solo píxeles
                 'accion': 'En Estacionamiento',
                 'tareas_completadas': 0,
                 'direccion_x': 0,
@@ -442,14 +399,21 @@ class SimuladorAlmacen:
                 'tipo': 'terrestre'
             }
         
-        # Crear montacargas
+        # Crear montacargas - SOLO PÍXELES
         for i in range(num_terrestres + 1, num_terrestres + num_montacargas + 1):
-            x = POS_DEPOT[0] - ((i - num_terrestres) * 40)
-            y = POS_DEPOT[1] + 60  # Más abajo que los terrestres
+            idx = i - 1
+            if idx < len(pixel_positions):
+                pixel_x, pixel_y = pixel_positions[idx]
+                # Offset en píxeles para montacargas
+                pixel_y += self.layout_manager.tile_height
+            else:
+                pixel_x, pixel_y = pixel_positions[0]  # Usar primera posición como fallback
+                pixel_y += self.layout_manager.tile_height
             
             estado_visual["operarios"][i] = {
-                'x': x,
-                'y': y,
+                'x': pixel_x,
+                'y': pixel_y,
+                # NO hay grid_x, grid_y - solo píxeles
                 'accion': 'En Estacionamiento',
                 'tareas_completadas': 0,
                 'direccion_x': 0,
@@ -457,8 +421,8 @@ class SimuladorAlmacen:
                 'tipo': 'montacargas'
             }
         
-        total_operarios = len(estado_visual["operarios"])
-        print(f"Operarios inicializados en estado visual: {total_operarios}")
+        total_created = len(estado_visual["operarios"])
+        print(f"Operarios inicializados: {total_created}")
         
         for op_id, op_data in estado_visual["operarios"].items():
             print(f"  Operario {op_id}: {op_data['tipo']} en ({op_data['x']}, {op_data['y']})")
@@ -472,8 +436,7 @@ class SimuladorAlmacen:
     def ejecutar(self):
         """Método principal de ejecución"""
         try:
-            self.inicializar_pygame()
-            
+            # NUEVO ORDEN: Configuración → TMX → Pygame
             if not self.obtener_configuracion():
                 print("Configuracion cancelada. Saliendo...")
                 return
@@ -481,6 +444,9 @@ class SimuladorAlmacen:
             if not self.crear_simulacion():
                 print("Error al crear la simulacion. Saliendo...")
                 return
+            
+            # Inicializar pygame DESPUÉS de cargar TMX
+            self.inicializar_pygame()
             
             self.ejecutar_bucle_principal()
             
