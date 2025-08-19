@@ -153,7 +153,7 @@ class SimuladorAlmacen:
         
         print(f"Simulacion creada:")
         print(f"  - {len(procesos_operarios)} operarios")
-        print(f"  - {self.almacen.total_tareas} tareas totales")
+        print(f"  - {len(self.almacen.dispatcher.ordenes_pendientes)} órdenes pendientes ({self.almacen.dispatcher.total_lineas_orden} líneas)")
         if hasattr(self.almacen, 'tareas_zona_a'):
             print(f"  - Zona A: {len(self.almacen.tareas_zona_a)} tareas")
             print(f"  - Zona B: {len(self.almacen.tareas_zona_b)} tareas")
@@ -213,7 +213,7 @@ class SimuladorAlmacen:
             self.pantalla.blit(scaled_surface, (0, 0))  # Dibujar el mundo a la izquierda
 
             # 6. Dibujar el dashboard directamente en la pantalla, en el panel derecho
-            renderizar_dashboard(self.pantalla, self.window_size[0])
+            renderizar_dashboard(self.pantalla, self.window_size[0], self.almacen)
 
             # 7. Verificar si la simulación está completada
             if self._simulacion_activa() and not self.almacen.hay_tareas_pendientes():
