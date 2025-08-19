@@ -12,10 +12,6 @@ import simpy
 import json
 from datetime import datetime
 
-print("=" * 70)
-print("SIMULADOR DE ALMACEN - SISTEMA CORE LIMPIO")
-print("=" * 70)
-
 # Importaciones de módulos propios
 from config.window_config import VentanaConfiguracion
 from config.settings import *
@@ -24,21 +20,13 @@ from simulation.warehouse import AlmacenMejorado
 from simulation.operators import crear_operarios
 from simulation.layout_manager import LayoutManager
 
-# VERIFICACIÓN DE ENTORNO: Confirmar que cargamos el LayoutManager correcto
-print(f"[ENTORNO] Cargando LayoutManager desde: {LayoutManager.__module__}")
-try:
-    import simulation.layout_manager
-    print(f"[ENTORNO] Archivo LayoutManager: {simulation.layout_manager.__file__}")
-except AttributeError:
-    print(f"[ENTORNO] No se pudo obtener ruta del archivo LayoutManager")
 from simulation.pathfinder import Pathfinder
 from visualization.state import inicializar_estado, actualizar_metricas_tiempo, toggle_pausa, toggle_dashboard, estado_visual, limpiar_estado, aumentar_velocidad, disminuir_velocidad, obtener_velocidad_simulacion
-from visualization.original_renderer import RendererOriginal
+from visualization.original_renderer import RendererOriginal, renderizar_diagnostico_layout
 from visualization.original_dashboard import DashboardOriginal
 from utils.helpers import exportar_metricas, mostrar_metricas_consola
+from config.settings import SUPPORTED_RESOLUTIONS, LOGICAL_WIDTH, LOGICAL_HEIGHT
 # from dynamic_pathfinding_integration import get_dynamic_pathfinding_wrapper  # Eliminado en limpieza
-
-print("INFO: Sistema TMX Visual activado")
 
 class SimuladorAlmacen:
     """Clase principal que coordina toda la simulación"""
@@ -55,33 +43,32 @@ class SimuladorAlmacen:
         # Nuevos componentes de la arquitectura TMX
         self.layout_manager = None
         self.pathfinder = None
+        # Nuevos atributos para escalado dinámico
+        self.window_size = (0, 0)
+        self.virtual_surface = None
         
     def inicializar_pygame(self):
-        """Reinicializa pygame con dimensiones TMX exactas (ya inicializado en crear_simulacion)"""
-        pygame.display.set_caption("Simulador de Almacen - Gemelo Digital (TMX)")
+        PANEL_WIDTH = 400
+        # 1. Obtener la clave de resolución seleccionada por el usuario
+        resolution_key = self.configuracion.get('selected_resolution_key', "Pequeña (800x800)")
         
-        # IMPORTANTE: Este método se llama DESPUÉS de crear_simulacion()
-        # para que ya tengamos el layout_manager disponible
-        if not hasattr(self, 'layout_manager') or not self.layout_manager:
-            raise SystemExit("[FATAL ERROR] Debe cargar TMX antes de reinicializar pygame")
+        # 2. Buscar el tamaño (ancho, alto) en nuestro diccionario
+        self.window_size = SUPPORTED_RESOLUTIONS.get(resolution_key, (800, 800))
+
+        print(f"[DISPLAY] Resolución seleccionada por el usuario: '{resolution_key}' -> {self.window_size[0]}x{self.window_size[1]}")
+
+        # 3. Hacemos la ventana principal más ancha para acomodar el panel
+        main_window_width = self.window_size[0] + PANEL_WIDTH
+        main_window_height = self.window_size[1]
+        self.pantalla = pygame.display.set_mode((main_window_width, main_window_height), pygame.RESIZABLE)
+        pygame.display.set_caption("Simulador de Almacén - Gemelo Digital")
         
-        # Calcular dimensiones exactas del mapa TMX
-        map_width = self.layout_manager.grid_width * self.layout_manager.tile_width
-        map_height = self.layout_manager.grid_height * self.layout_manager.tile_height
-        
-        print(f"[TMX WINDOW] Dimensiones calculadas desde TMX:")
-        print(f"  - Grilla: {self.layout_manager.grid_width}x{self.layout_manager.grid_height}")
-        print(f"  - Tile size: {self.layout_manager.tile_width}x{self.layout_manager.tile_height}")
-        print(f"  - Tamaño ventana: {map_width}x{map_height} (correspondencia 1:1)")
-        
-        # Crear ventana con dimensiones exactas del TMX (correspondencia 1:1)
-        self.pantalla = pygame.display.set_mode((map_width, map_height))
-        
-        print(f"[TMX WINDOW] Ventana creada: {map_width}x{map_height} píxeles")
-        print(f"[TMX WINDOW] Sin escalado - correspondencia 1:1 píxel TMX : píxel pantalla")
+        # 4. La superficie virtual mantiene el tamaño lógico del mapa
+        self.virtual_surface = pygame.Surface((LOGICAL_WIDTH, LOGICAL_HEIGHT))
+        print(f"Ventana creada: {main_window_width}x{main_window_height}. Panel UI: {PANEL_WIDTH}px.")
         
         self.reloj = pygame.time.Clock()
-        self.renderer = RendererOriginal(self.pantalla)
+        self.renderer = RendererOriginal(self.virtual_surface)
         self.dashboard = DashboardOriginal()
     
     def obtener_configuracion(self):
@@ -96,6 +83,7 @@ class SimuladorAlmacen:
         
         self.configuracion = config
         print(f"Configuracion obtenida: {config}")
+        print(f"[DEBUG-RUNNER] Configuración recibida: {self.configuracion}")
         return True
     
     def crear_simulacion(self):
@@ -154,7 +142,8 @@ class SimuladorAlmacen:
             self.env,
             self.almacen,
             self.configuracion,
-            pathfinder=self.pathfinder  # OBLIGATORIO
+            pathfinder=self.pathfinder,  # OBLIGATORIO
+            layout_manager=self.layout_manager  # OBLIGATORIO
         )
         
         # FORZAR INICIALIZACIÓN DE OPERARIOS EN ESTADO VISUAL
@@ -172,6 +161,11 @@ class SimuladorAlmacen:
             print(f"  - Layout TMX: ACTIVO ({tmx_file})")
         else:
             print(f"  - Layout TMX: DESACTIVADO (usando legacy)")
+        
+        print("--- Verificación de Dimensiones del Layout ---")
+        print(f"Ancho en Grilla: {self.layout_manager.grid_width}, Ancho de Tile: {self.layout_manager.tile_width}")
+        print(f"Alto en Grilla: {self.layout_manager.grid_height}, Alto de Tile: {self.layout_manager.tile_height}")
+        print("------------------------------------------")
         return True
     
     def _proceso_actualizacion_metricas(self):
@@ -181,40 +175,56 @@ class SimuladorAlmacen:
             actualizar_metricas_tiempo()
     
     def ejecutar_bucle_principal(self):
-        """Ejecuta el bucle principal de la simulación"""
-        print("\nIniciando simulacion...")
+        """Bucle principal completo con simulación y renderizado de agentes."""
+        from visualization.original_renderer import renderizar_agentes, renderizar_dashboard
+        from visualization.state import estado_visual, obtener_velocidad_simulacion
         
-        # Monitor de bounds desactivado en limpieza
-        print("Controles disponibles:")
-        print("  ESPACIO: Pausa/Reanuda")
-        print("  R: Reiniciar")
-        print("  M: Mostrar metricas")
-        print("  X: Exportar datos")
-        print("  D: Toggle dashboard")
-        print("  +: Aumentar velocidad")
-        print("  -: Disminuir velocidad")
-        print("  ESC: Salir")
-        print()
-        
+        self.corriendo = True
         while self.corriendo:
-            for evento in pygame.event.get():
-                if not self._manejar_evento(evento):
-                    return False
-            
+            # 1. Manejar eventos
+            for event in pygame.event.get():
+                if not self._manejar_evento(event):
+                    self.corriendo = False
+
+            # 2. Avanzar simulación si no está pausada
             if not estado_visual["pausa"] and self._simulacion_activa():
+                velocidad = obtener_velocidad_simulacion()
                 try:
-                    # Aplicar factor de velocidad al paso de simulación
-                    velocidad = obtener_velocidad_simulacion()
-                    paso_ajustado = STEP_SIMULACION * velocidad
-                    self.env.run(until=self.env.now + paso_ajustado)
-                except simpy.core.EmptySchedule:
-                    print("Simulacion completada!")
-                    self._simulacion_completada()
+                    # Avanzar simulación con control de velocidad
+                    step_time = STEP_SIMULACION / velocidad
+                    self.env.run(until=self.env.now + step_time)
+                except Exception as e:
+                    print(f"Error en simulación: {e}")
+                    # Continuar sin detener el bucle
+
+            # 3. Limpiar la pantalla principal
+            self.pantalla.fill((240, 240, 240))  # Fondo gris claro
+
+            # 4. Dibujar el mundo de simulación en la superficie virtual
+            self.virtual_surface.fill((25, 25, 25))
+            if hasattr(self, 'layout_manager') and self.layout_manager:
+                self.renderer.renderizar_mapa_tmx(self.virtual_surface, self.layout_manager.tmx_data)
+                from visualization.original_renderer import renderizar_tareas_pendientes
+                renderizar_tareas_pendientes(self.virtual_surface, self.layout_manager)
+            renderizar_agentes(self.virtual_surface)
+
+            # 5. Escalar la superficie virtual al área de simulación en la pantalla
+            scaled_surface = pygame.transform.smoothscale(self.virtual_surface, self.window_size)
+            self.pantalla.blit(scaled_surface, (0, 0))  # Dibujar el mundo a la izquierda
+
+            # 6. Dibujar el dashboard directamente en la pantalla, en el panel derecho
+            renderizar_dashboard(self.pantalla, self.window_size[0])
+
+            # 7. Verificar si la simulación está completada
+            if self._simulacion_activa() and not self.almacen.hay_tareas_pendientes():
+                self._simulacion_completada()
+
+            # 8. Actualizar la pantalla
+            pygame.display.flip()
+            self.reloj.tick(30)
             
-            self._renderizar_frame()
-            self.reloj.tick(FPS)
-        
-        return True
+        print("Simulación terminada. Saliendo de Pygame.")
+        pygame.quit()
     
     def _manejar_evento(self, evento):
         """Maneja los eventos de pygame"""
@@ -265,7 +275,7 @@ class SimuladorAlmacen:
             
             # 2. Renderizar operarios directamente (sin escalado - correspondencia 1:1)
             # Las coordenadas en estado_visual ya están en píxeles TMX centrados
-            self.renderer.renderizar_operarios_solamente()
+            self.renderer.renderizar_operarios_solamente(self.layout_manager)
         else:
             # Sistema legacy
             self.renderer.renderizar_frame_completo()
@@ -277,27 +287,7 @@ class SimuladorAlmacen:
         self.renderer.dibujar_mensaje_pausa()
         pygame.display.flip()
     
-    def _renderizar_tmx_escalado(self):
-        """Renderiza el mapa TMX aplicando escalado para la ventana actual"""
-        if not self.layout_manager:
-            return
-        
-        from config.settings import ANCHO_PANTALLA, ALTO_PANTALLA
-        
-        # Calcular factores de escala
-        ancho_ventana, alto_ventana = self.pantalla.get_size()
-        factor_x = ancho_ventana / ANCHO_PANTALLA
-        factor_y = alto_ventana / ALTO_PANTALLA
-        
-        # Crear superficie temporal con tamaño lógico
-        temp_surface = pygame.Surface((ANCHO_PANTALLA, ALTO_PANTALLA))
-        
-        # Renderizar TMX en superficie temporal
-        self.layout_manager.render(temp_surface)
-        
-        # Escalar y dibujar en pantalla principal
-        scaled_surface = pygame.transform.scale(temp_surface, (ancho_ventana, alto_ventana))
-        self.pantalla.blit(scaled_surface, (0, 0))
+    # Unused debug method removed in final cleanup
     
     def _simulacion_activa(self):
         """Verifica si la simulación está activa"""
@@ -459,213 +449,7 @@ class SimuladorAlmacen:
         finally:
             self.limpiar_recursos()
     
-    def _diagnosticar_navegacion(self):
-        """Diagnóstico del sistema de navegación"""
-        try:
-            from utils.strict_lane_system import sistema_carriles_estricto
-            
-            if sistema_carriles_estricto:
-                estadisticas = sistema_carriles_estricto.obtener_estadisticas_carriles()
-                
-                print("\n" + "="*40)
-                print("=== DIAGNÓSTICO DE NAVEGACIÓN ===")
-                print("="*40)
-                print(f"Puntos válidos totales: {estadisticas['total_puntos_validos']}")
-                print(f"Conexiones totales: {estadisticas['total_conexiones']}")
-                print(f"Puntos actualmente ocupados: {estadisticas['puntos_ocupados']}")
-                print(f"Operarios activos: {estadisticas['operarios_activos']}")
-                print()
-                
-                if estadisticas['puntos_ocupados'] > estadisticas['operarios_activos'] * 2:
-                    print("[ALERTA] POSIBLE CONGESTIÓN DETECTADA")
-                else:
-                    print("[OK] No se detectó congestión")
-                
-                # Mostrar posiciones de operarios
-                from visualization.state import estado_visual
-                print("\nPOSICIONES DE OPERARIOS:")
-                for op_id, operario in estado_visual.get("operarios", {}).items():
-                    x, y = operario.get('x', 0), operario.get('y', 0)
-                    tipo = operario.get('tipo', 'desconocido')
-                    accion = operario.get('accion', 'Sin acción')
-                    print(f"  Operario {op_id} ({tipo}): ({x}, {y}) - {accion}")
-                
-                print("="*40)
-            else:
-                print("[ERROR] Sistema de carriles no disponible")
-        except Exception as e:
-            print(f"[ERROR] Error en diagnóstico de navegación: {e}")
-    
-    def _diagnosticar_colisiones(self):
-        """Diagnóstico del sistema de colisiones"""
-        try:
-            from utils.strict_lane_system import sistema_carriles_estricto
-            from utils.strict_lane_system import diagnosticar_colisiones
-            
-            print("\n" + "="*40)
-            print("=== DIAGNÓSTICO DE COLISIONES ===")
-            print("="*40)
-            
-            reporte = diagnosticar_colisiones()
-            if reporte:
-                print("[OK] Diagnóstico completado")
-            else:
-                print("[ERROR] No se pudo generar el diagnóstico")
-            
-            print("="*40)
-        except Exception as e:
-            print(f"[ERROR] Error en diagnóstico de colisiones: {e}")
-    
-    def _diagnosticar_pasillos(self):
-        """Diagnóstico específico de pasillos verticales"""
-        try:
-            import time
-            from utils.strict_lane_system import sistema_carriles_estricto
-            
-            print("\n" + "="*50)
-            print("=== DIAGNÓSTICO DE PASILLOS VERTICALES ===")
-            print("="*50)
-            
-            if sistema_carriles_estricto:
-                total_pasillos = len(sistema_carriles_estricto.pasillos_verticales)
-                pasillos_ocupados = len(sistema_carriles_estricto.pasillos_ocupados)
-                operarios_picking = len(sistema_carriles_estricto.operarios_en_picking)
-                
-                print(f"\n[PASILLOS] PASILLOS VERTICALES:")
-                print(f"  Total pasillos: {total_pasillos}")
-                print(f"  Pasillos ocupados: {pasillos_ocupados}")
-                print(f"  Operarios en picking: {operarios_picking}")
-                
-                if pasillos_ocupados > 0:
-                    print(f"\n[OCUPADOS] PASILLOS OCUPADOS:")
-                    for columna, operario_id in sistema_carriles_estricto.pasillos_ocupados.items():
-                        if operario_id in sistema_carriles_estricto.operarios_en_picking:
-                            picking_info = sistema_carriles_estricto.operarios_en_picking[operario_id]
-                            tiempo_picking = time.time() - picking_info['tiempo_inicio']
-                            print(f"  Pasillo {columna}: Operario {operario_id} (picking {tiempo_picking:.1f}s)")
-                        else:
-                            print(f"  Pasillo {columna}: Operario {operario_id}")
-                
-                print(f"\n[ANALISIS] ANÁLISIS DE CONFLICTOS:")
-                conflictos = 0
-                for columna in range(total_pasillos):
-                    if columna in sistema_carriles_estricto.pasillos_ocupados:
-                        # Verificar si hay operarios esperando para entrar
-                        from visualization.state import estado_visual
-                        for op_id, operario in estado_visual.get("operarios", {}).items():
-                            if operario.get('accion', '').startswith(f'Esperando pasillo {columna}'):
-                                conflictos += 1
-                
-                if conflictos == 0:
-                    print("  [OK] No se detectaron conflictos")
-                else:
-                    print(f"  [ALERTA] {conflictos} conflictos detectados")
-                
-                print(f"\n[RECOMENDACIONES] RECOMENDACIONES:")
-                if pasillos_ocupados / total_pasillos > 0.5:
-                    print("  [ALERTA] Alta ocupación de pasillos - considerar optimización")
-                else:
-                    print("  [OK] Sistema funcionando óptimamente")
-                
-            else:
-                print("[ERROR] Sistema de carriles no disponible")
-            
-            print("="*50)
-            
-        except Exception as e:
-            print(f"[ERROR] Error en diagnóstico de pasillos: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    def _toggle_debug_navegacion(self):
-        """Activa/desactiva el modo debug de navegación"""
-        print("[INFO] Función toggle debug no implementada actualmente")
-    
-    def _diagnosticar_deadlocks(self):
-        """Diagnóstico del sistema de deadlocks y negociación"""
-        try:
-            from utils.deadlock_resolver import obtener_diagnostico_deadlocks
-            
-            print("\n" + "="*50)
-            print("=== DIAGNÓSTICO DE DEADLOCKS Y NEGOCIACIÓN ===")
-            print("="*50)
-            
-            diagnostico = obtener_diagnostico_deadlocks()
-            
-            print(f"Operarios en espera: {diagnostico['operarios_esperando']}")
-            print(f"Operarios cediendo paso: {diagnostico['operarios_cediendo_paso']}")
-            print(f"Tiempo máximo de espera: {diagnostico['tiempo_espera_max']:.1f}s")
-            
-            if diagnostico['operarios_esperando'] == 0:
-                print("[OK] No hay operarios esperando")
-            elif diagnostico['tiempo_espera_max'] > 10.0:
-                print(f"[ALERTA] Tiempo de espera muy alto ({diagnostico['tiempo_espera_max']:.1f}s)")
-            
-            if diagnostico['operarios_cediendo_paso'] > 0:
-                print(f"[COOPERACION] {diagnostico['operarios_cediendo_paso']} operarios cediendo paso")
-            
-            print("="*50)
-            
-        except Exception as e:
-            print(f"[ERROR] Error en diagnóstico de deadlocks: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    def _mostrar_reporte_violaciones(self):
-        """Mostrar reporte de violaciones de bounds detectadas"""
-        try:
-            from realtime_bounds_monitor import get_violations_report
-            
-            print("\n" + "="*60)
-            print("=== REPORTE VIOLACIONES DE BOUNDS ===")
-            print("="*60)
-            
-            report = get_violations_report()
-            
-            if report['total_violations'] == 0:
-                print("[OK] NO SE DETECTARON VIOLACIONES DE BOUNDS")
-                print("Los operarios han permanecido dentro del layout")
-            else:
-                print(f"[ALERT] {report['total_violations']} VIOLACIONES DETECTADAS")
-                
-                if 'by_operator' in report:
-                    print("\nViolaciones por operario:")
-                    for op_id, count in report['by_operator'].items():
-                        print(f"  Operario {op_id}: {count} violaciones")
-                
-                if 'violation_types' in report:
-                    print("\nTipos de violaciones:")
-                    for v_type, count in report['violation_types'].items():
-                        print(f"  {v_type}: {count} veces")
-                
-                if 'first_violation' in report and report['first_violation']:
-                    first = report['first_violation']
-                    print(f"\nPrimera violación:")
-                    print(f"  Operario: {first['operario_id']}")
-                    print(f"  Posición: ({first['position'][0]:.1f}, {first['position'][1]:.1f})")
-                    print(f"  Acción: {first['accion']}")
-                    print(f"  Tipo: {first['violation_type']}")
-                
-                if 'last_violation' in report and report['last_violation']:
-                    last = report['last_violation']
-                    print(f"\nÚltima violación:")
-                    print(f"  Operario: {last['operario_id']}")
-                    print(f"  Posición: ({last['position'][0]:.1f}, {last['position'][1]:.1f})")
-                    print(f"  Acción: {last['accion']}")
-                    print(f"  Tipo: {last['violation_type']}")
-            
-            # Mostrar estado TMX actual
-            from tmx_coordinate_system import tmx_coords
-            if tmx_coords.is_tmx_active():
-                bounds = tmx_coords.get_bounds()
-                print(f"\nBounds TMX activos: 0-{bounds['max_x']} x 0-{bounds['max_y']}")
-            else:
-                print("\n[WARNING] Sistema TMX no activo")
-            
-            print("="*60)
-            
-        except Exception as e:
-            print(f"[ERROR] Error obteniendo reporte de violaciones: {e}")
+    # All unused debug methods removed in final cleanup
     
 
 def main():

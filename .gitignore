@@ -46,3 +46,35 @@ Thumbs.db
 # Entorno virtual
 venv/
 env/
+venv_tiled_experiment/
+
+# Logs y outputs temporales
+*.log
+logs/
+output/
+temp/
+tmp/
+
+# Archivos de configuración personal/temporal
+config_temp.json
+settings_local.py
+
+# Screenshots y videos de prueba
+screenshots/
+*.png
+!custom_textures/*.png
+!layouts/*.png
+!tilesets/*.png
+
+# Datos de prueba y archivos temporales de simulación
+test_data/
+simulation_output/
+*.csv
+
+# Cache de Pygame
+*.pycache
+.pygame_cache/
+
+# Windows específico
+desktop.ini
+ehthumbs.db
