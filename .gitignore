@@ -27,10 +27,18 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Simulación específica
-*.json
+# Simulación específica - archivos de salida
 metricas_*.json
 simulacion_completada_*.json
+
+# Archivos de configuración que SÍ queremos versionar
+!layouts/custom_tileset_mapping.json
+!layouts/layouts_personalizados.json
+!tilesets/tileset_metadata.json
+
+# Configuración de Claude Code
+.claude/
+*.local.json
 
 # IDE
 .vscode/

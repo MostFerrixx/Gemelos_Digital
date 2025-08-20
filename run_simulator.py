@@ -21,6 +21,7 @@ from simulation.operators import crear_operarios
 from simulation.layout_manager import LayoutManager
 
 from simulation.pathfinder import Pathfinder
+from simulation.route_calculator import RouteCalculator
 from visualization.state import inicializar_estado, actualizar_metricas_tiempo, toggle_pausa, toggle_dashboard, estado_visual, limpiar_estado, aumentar_velocidad, disminuir_velocidad, obtener_velocidad_simulacion
 from visualization.original_renderer import RendererOriginal, renderizar_diagnostico_layout
 from visualization.original_dashboard import DashboardOriginal
@@ -46,6 +47,10 @@ class SimuladorAlmacen:
         # Nuevos atributos para escalado dinámico
         self.window_size = (0, 0)
         self.virtual_surface = None
+        # Lista de procesos de operarios para verificación de finalización
+        self.procesos_operarios = []
+        # Bandera para evitar reportes repetidos
+        self.simulacion_finalizada_reportada = False
         
     def inicializar_pygame(self):
         PANEL_WIDTH = 400
@@ -100,7 +105,7 @@ class SimuladorAlmacen:
         pygame.display.set_mode((100, 100))  # Ventana temporal para inicializar display
         
         # 1. Inicializar LayoutManager con archivo TMX por defecto (OBLIGATORIO)
-        tmx_file = "C:\\Users\\ferri\\OneDrive\\Escritorio\\Gemelos Digital\\layouts\\WH1.tmx"
+        tmx_file = os.path.join(os.path.dirname(__file__), "layouts", "WH1.tmx")
         print(f"[TMX] Cargando layout: {tmx_file}")
         
         try:
@@ -115,6 +120,8 @@ class SimuladorAlmacen:
         print("[TMX] Inicializando sistema de pathfinding...")
         try:
             self.pathfinder = Pathfinder(self.layout_manager.collision_matrix)
+            # Crear RouteCalculator después del pathfinder
+            self.route_calculator = RouteCalculator(self.pathfinder)
         except Exception as e:
             print(f"[FATAL ERROR] No se pudo inicializar pathfinder: {e}")
             raise SystemExit(f"Error en pathfinder: {e}")
@@ -138,7 +145,10 @@ class SimuladorAlmacen:
         
         inicializar_estado(self.almacen, self.env, self.configuracion, layout_manager=self.layout_manager)
         
-        procesos_operarios = crear_operarios(
+        # Diagnóstico del RouteCalculator
+        self._diagnosticar_route_calculator()
+        
+        self.procesos_operarios = crear_operarios(
             self.env,
             self.almacen,
             self.configuracion,
@@ -152,8 +162,8 @@ class SimuladorAlmacen:
         self.env.process(self._proceso_actualizacion_metricas())
         
         print(f"Simulacion creada:")
-        print(f"  - {len(procesos_operarios)} operarios")
-        print(f"  - {len(self.almacen.dispatcher.ordenes_pendientes)} órdenes pendientes ({self.almacen.dispatcher.total_lineas_orden} líneas)")
+        print(f"  - {len(self.procesos_operarios)} operarios")
+        print(f"  - {len(self.almacen.dispatcher.lineas_pendientes)} líneas de orden pendientes")
         if hasattr(self.almacen, 'tareas_zona_a'):
             print(f"  - Zona A: {len(self.almacen.tareas_zona_a)} tareas")
             print(f"  - Zona B: {len(self.almacen.tareas_zona_b)} tareas")
@@ -171,7 +181,7 @@ class SimuladorAlmacen:
     def _proceso_actualizacion_metricas(self):
         """Proceso de actualización de métricas"""
         while True:
-            yield self.env.timeout(INTERVALO_ACTUALIZACION_METRICAS)
+            yield self.env.timeout(5.0)  # INTERVALO_ACTUALIZACION_METRICAS
             actualizar_metricas_tiempo()
     
     def ejecutar_bucle_principal(self):
@@ -186,16 +196,27 @@ class SimuladorAlmacen:
                 if not self._manejar_evento(event):
                     self.corriendo = False
 
-            # 2. Avanzar simulación si no está pausada
-            if not estado_visual["pausa"] and self._simulacion_activa():
-                velocidad = obtener_velocidad_simulacion()
-                try:
-                    # Avanzar simulación con control de velocidad
-                    step_time = STEP_SIMULACION / velocidad
-                    self.env.run(until=self.env.now + step_time)
-                except Exception as e:
-                    print(f"Error en simulación: {e}")
-                    # Continuar sin detener el bucle
+            # 2. Avance del motor de simulación SimPy
+            if not estado_visual["pausa"]:
+                if self._simulacion_activa():
+                    velocidad = obtener_velocidad_simulacion()
+                    try:
+                        # Avanzar simulación con control de velocidad
+                        step_time = 0.1 / velocidad  # STEP_SIMULACION
+                        self.env.run(until=self.env.now + step_time)
+                    except simpy.core.EmptySchedule:
+                        # Cuando no hay más eventos programados
+                        pass
+                    except Exception as e:
+                        print(f"Error en simulación: {e}")
+                        # Continuar sin detener el bucle
+                else: # Si la simulación ha terminado
+                    if not self.simulacion_finalizada_reportada:
+                        print("[SIMULADOR] Condición de finalización cumplida: No hay tareas pendientes y todos los agentes están ociosos.")
+                        print("Simulación completada y finalizada lógicamente.")
+                        # La función de reporte ahora solo se llama UNA VEZ
+                        self._simulacion_completada() 
+                        self.simulacion_finalizada_reportada = True
 
             # 3. Limpiar la pantalla principal
             self.pantalla.fill((240, 240, 240))  # Fondo gris claro
@@ -215,9 +236,7 @@ class SimuladorAlmacen:
             # 6. Dibujar el dashboard directamente en la pantalla, en el panel derecho
             renderizar_dashboard(self.pantalla, self.window_size[0], self.almacen)
 
-            # 7. Verificar si la simulación está completada
-            if self._simulacion_activa() and not self.almacen.hay_tareas_pendientes():
-                self._simulacion_completada()
+            # 7. La verificación de finalización ahora se maneja en el paso 2
 
             # 8. Actualizar la pantalla
             pygame.display.flip()
@@ -290,10 +309,12 @@ class SimuladorAlmacen:
     # Unused debug method removed in final cleanup
     
     def _simulacion_activa(self):
-        """Verifica si la simulación está activa"""
-        return (self.almacen is not None and 
-                self.env is not None and 
-                self.almacen.hay_tareas_pendientes())
+        """Verifica si la simulación está activa usando nueva lógica robusta"""
+        if self.almacen is None or self.env is None:
+            return False
+        
+        # Usar la nueva lógica centralizada de finalización
+        return not self.almacen.simulacion_ha_terminado(self.procesos_operarios)
     
     def _simulacion_completada(self):
         """Maneja la finalización de la simulación"""
@@ -318,6 +339,8 @@ class SimuladorAlmacen:
         limpiar_estado()
         self.almacen = None
         self.env = None
+        # Resetear bandera de reporte
+        self.simulacion_finalizada_reportada = False
         
         if self.obtener_configuracion():
             self.crear_simulacion()
@@ -416,6 +439,45 @@ class SimuladorAlmacen:
         
         for op_id, op_data in estado_visual["operarios"].items():
             print(f"  Operario {op_id}: {op_data['tipo']} en ({op_data['x']}, {op_data['y']})")
+    
+    def _diagnosticar_route_calculator(self):
+        """Método de diagnóstico para el RouteCalculator"""
+        print("\n--- DIAGNÓSTICO DEL CALCULADOR DE RUTAS ---")
+        if not self.almacen or not self.almacen.dispatcher:
+            print("El almacén o el dispatcher no están listos.")
+            return
+
+        # Tomar la posición inicial del primer depot como punto de partida
+        start_pos = self.layout_manager.depot_points[0]
+        print(f"Punto de partida para el diagnóstico: Depot en {start_pos}")
+
+        # Tomar una muestra de las líneas de orden pendientes
+        candidate_lines = self.almacen.dispatcher.lineas_pendientes[:20]
+        print(f"Analizando las primeras {len(candidate_lines)} líneas de orden...")
+
+        nearest_task_info = self.route_calculator.find_nearest_task(
+            start_pos, 
+            candidate_lines, 
+            self.almacen.inventory_manager
+        )
+
+        if nearest_task_info:
+            print("\n--- RESULTADO ---")
+            print("¡Cálculo exitoso!")
+            line = nearest_task_info['line']
+            loc = nearest_task_info['location']
+            dist = nearest_task_info['distance']
+            print(f"La tarea más cercana es para la orden '{line.order_id}' (SKU: {line.sku.id}).")
+            print(f"Ubicación óptima: {loc}")
+            print(f"Distancia de ruta real: {dist} pasos.")
+            
+            # Mostrar estadísticas del caché
+            cache_stats = self.route_calculator.get_cache_stats()
+            print(f"Estadísticas del caché: {cache_stats}")
+        else:
+            print("\n--- RESULTADO ---")
+            print("No se encontró ninguna tarea cercana accesible.")
+        print("-------------------------------------------\n")
     
     def limpiar_recursos(self):
         """Limpia todos los recursos"""
