@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'git'))
 import pygame
 import simpy
 import json
+import time
 from datetime import datetime
 
 # Importaciones de módulos propios
@@ -19,6 +20,8 @@ from config.colors import *
 from simulation.warehouse import AlmacenMejorado
 from simulation.operators import crear_operarios
 from simulation.layout_manager import LayoutManager
+from simulation.assignment_calculator import AssignmentCostCalculator
+from simulation.data_manager import DataManager
 
 from simulation.pathfinder import Pathfinder
 from simulation.route_calculator import RouteCalculator
@@ -89,6 +92,10 @@ class SimuladorAlmacen:
         self.configuracion = config
         print(f"Configuracion obtenida: {config}")
         print(f"[DEBUG-RUNNER] Configuración recibida: {self.configuracion}")
+        
+        # Crear el calculador de costos, pasándole las reglas de la UI
+        self.cost_calculator = AssignmentCostCalculator(self.configuracion['assignment_rules'])
+        
         return True
     
     def crear_simulacion(self):
@@ -137,10 +144,18 @@ class SimuladorAlmacen:
         if not self.layout_manager or not self.pathfinder:
             raise SystemExit("[FATAL ERROR] LayoutManager y Pathfinder son obligatorios")
         
+        # Crear DataManager para el plan maestro
+        layout_file = self.configuracion.get('layout_file', '')
+        sequence_file = self.configuracion.get('sequence_file', '')
+        self.data_manager = DataManager(layout_file, sequence_file)
+        
         self.almacen = AlmacenMejorado(
             self.env,
             self.configuracion,
-            layout_manager=self.layout_manager  # OBLIGATORIO
+            layout_manager=self.layout_manager,  # OBLIGATORIO
+            pathfinder=self.pathfinder,          # OBLIGATORIO
+            data_manager=self.data_manager,      # NUEVO V2.6
+            cost_calculator=self.cost_calculator # NUEVO V2.6
         )
         
         inicializar_estado(self.almacen, self.env, self.configuracion, layout_manager=self.layout_manager)
@@ -148,7 +163,7 @@ class SimuladorAlmacen:
         # Diagnóstico del RouteCalculator
         self._diagnosticar_route_calculator()
         
-        self.procesos_operarios = crear_operarios(
+        self.procesos_operarios, self.operarios = crear_operarios(
             self.env,
             self.almacen,
             self.configuracion,
@@ -161,12 +176,22 @@ class SimuladorAlmacen:
         
         self.env.process(self._proceso_actualizacion_metricas())
         
-        print(f"Simulacion creada:")
+        # Inicializar el almacén y crear órdenes
+        self.almacen._crear_catalogo_y_stock()
+        self.almacen._generar_flujo_ordenes()
+        
+        # Iniciar proceso del dispatcher V2.6 (CORREGIDO)
+        if hasattr(self.almacen, 'dispatcher') and hasattr(self.almacen.dispatcher, 'dispatcher_process'):
+            print("[SIMULADOR] Iniciando el proceso del Dispatcher V2.6...")
+            self.env.process(self.almacen.dispatcher.dispatcher_process(self.operarios))
+        else:
+            print("[ERROR] No se pudo encontrar el proceso de dispatcher V2.6 para iniciar.")
+        
+        print(f"Simulacion V2.6 creada:")
         print(f"  - {len(self.procesos_operarios)} operarios")
-        print(f"  - {len(self.almacen.dispatcher.lineas_pendientes)} líneas de orden pendientes")
-        if hasattr(self.almacen, 'tareas_zona_a'):
-            print(f"  - Zona A: {len(self.almacen.tareas_zona_a)} tareas")
-            print(f"  - Zona B: {len(self.almacen.tareas_zona_b)} tareas")
+        print(f"  - {len(self.almacen.dispatcher.lista_maestra_tareas)} tareas en lista maestra")
+        print(f"  - {self.almacen.total_ordenes} órdenes generadas")
+        print(f"  - Master Plan: {len(self.data_manager.puntos_de_picking_ordenados)} puntos de picking")
         if self.layout_manager:
             print(f"  - Layout TMX: ACTIVO ({tmx_file})")
         else:
@@ -182,7 +207,7 @@ class SimuladorAlmacen:
         """Proceso de actualización de métricas"""
         while True:
             yield self.env.timeout(5.0)  # INTERVALO_ACTUALIZACION_METRICAS
-            actualizar_metricas_tiempo()
+            actualizar_metricas_tiempo(estado_visual["operarios"])
     
     def ejecutar_bucle_principal(self):
         """Bucle principal completo con simulación y renderizado de agentes."""
@@ -234,7 +259,7 @@ class SimuladorAlmacen:
             self.pantalla.blit(scaled_surface, (0, 0))  # Dibujar el mundo a la izquierda
 
             # 6. Dibujar el dashboard directamente en la pantalla, en el panel derecho
-            renderizar_dashboard(self.pantalla, self.window_size[0], self.almacen)
+            renderizar_dashboard(self.pantalla, self.window_size[0], self.almacen, estado_visual["operarios"])
 
             # 7. La verificación de finalización ahora se maneja en el paso 2
 
@@ -314,7 +339,7 @@ class SimuladorAlmacen:
             return False
         
         # Usar la nueva lógica centralizada de finalización
-        return not self.almacen.simulacion_ha_terminado(self.procesos_operarios)
+        return not self.almacen.simulacion_ha_terminado()
     
     def _simulacion_completada(self):
         """Maneja la finalización de la simulación"""
@@ -441,8 +466,8 @@ class SimuladorAlmacen:
             print(f"  Operario {op_id}: {op_data['tipo']} en ({op_data['x']}, {op_data['y']})")
     
     def _diagnosticar_route_calculator(self):
-        """Método de diagnóstico para el RouteCalculator"""
-        print("\n--- DIAGNÓSTICO DEL CALCULADOR DE RUTAS ---")
+        """Método de diagnóstico para el RouteCalculator V2.6"""
+        print("\n--- DIAGNÓSTICO DEL CALCULADOR DE RUTAS V2.6 ---")
         if not self.almacen or not self.almacen.dispatcher:
             print("El almacén o el dispatcher no están listos.")
             return
@@ -451,32 +476,19 @@ class SimuladorAlmacen:
         start_pos = self.layout_manager.depot_points[0]
         print(f"Punto de partida para el diagnóstico: Depot en {start_pos}")
 
-        # Tomar una muestra de las líneas de orden pendientes
-        candidate_lines = self.almacen.dispatcher.lineas_pendientes[:20]
-        print(f"Analizando las primeras {len(candidate_lines)} líneas de orden...")
-
-        nearest_task_info = self.route_calculator.find_nearest_task(
-            start_pos, 
-            candidate_lines, 
-            self.almacen.inventory_manager
-        )
-
-        if nearest_task_info:
-            print("\n--- RESULTADO ---")
-            print("¡Cálculo exitoso!")
-            line = nearest_task_info['line']
-            loc = nearest_task_info['location']
-            dist = nearest_task_info['distance']
-            print(f"La tarea más cercana es para la orden '{line.order_id}' (SKU: {line.sku.id}).")
-            print(f"Ubicación óptima: {loc}")
-            print(f"Distancia de ruta real: {dist} pasos.")
+        # V2.6: Analizar tareas de la lista maestra en lugar de líneas pendientes
+        if hasattr(self.almacen.dispatcher, 'lista_maestra_tareas') and self.almacen.dispatcher.lista_maestra_tareas:
+            total_tareas = len(self.almacen.dispatcher.lista_maestra_tareas)
+            sample_size = min(10, total_tareas)
+            print(f"Analizando {sample_size} tareas de {total_tareas} en la lista maestra...")
             
-            # Mostrar estadísticas del caché
-            cache_stats = self.route_calculator.get_cache_stats()
-            print(f"Estadísticas del caché: {cache_stats}")
+            for i in range(sample_size):
+                tarea = self.almacen.dispatcher.lista_maestra_tareas[i]
+                print(f"  Tarea {i+1}: Seq {tarea.pick_sequence}, SKU {tarea.sku.id}, Pos {tarea.ubicacion}")
         else:
-            print("\n--- RESULTADO ---")
-            print("No se encontró ninguna tarea cercana accesible.")
+            print("No hay tareas en la lista maestra para diagnosticar")
+        
+        print("V2.6: RouteCalculator integrado con DataManager y AssignmentCostCalculator")
         print("-------------------------------------------\n")
     
     def limpiar_recursos(self):
@@ -511,6 +523,19 @@ class SimuladorAlmacen:
         finally:
             self.limpiar_recursos()
     
+    def _diagnosticar_data_manager(self):
+        print("\n--- DIAGNÓSTICO DEL DATA MANAGER ---")
+        config = self.configuracion
+        if config.get('layout_file') and config.get('sequence_file'):
+            data_manager = DataManager(config['layout_file'], config['sequence_file'])
+            if not data_manager.puntos_de_picking_ordenados:
+                print("  [FALLO] El DataManager no pudo cargar o procesar los puntos de picking.")
+            else:
+                print("  [ÉXITO] El DataManager se ha cargado correctamente.")
+        else:
+            print("  [ERROR] Faltan las rutas a los archivos tmx o sequence_csv en la configuración.")
+        print("------------------------------------\n")
+
     # All unused debug methods removed in final cleanup
     
 
