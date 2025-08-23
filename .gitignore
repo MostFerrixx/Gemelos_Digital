@@ -81,6 +81,11 @@ test_data/
 simulation_output/
 *.csv
 
+# Archivos de testing y debugging temporales
+test_*.py
+debug_*.py
+create_test_*.py
+
 # Cache de Pygame
 *.pycache
 .pygame_cache/
