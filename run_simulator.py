@@ -143,7 +143,7 @@ class SimuladorAlmacen:
             
             # Configuración de layout
             'layout_file': 'layouts/WH1.tmx',
-            'sequence_file': 'layouts/WH1_sequence.csv',
+            'sequence_file': 'layouts/Warehouse_Logic.xlsx',
             
             # Configuración de ventana
             'selected_resolution_key': 'Pequeña (800x800)',

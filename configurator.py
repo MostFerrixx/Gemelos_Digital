@@ -107,7 +107,7 @@ class ConfiguradorSimulador:
             
             # Layout y archivos
             self.ventana_config.layout_path_var.set(config.get('layout_file', 'layouts/WH1.tmx'))
-            self.ventana_config.sequence_path_var.set(config.get('sequence_file', 'layouts/WH1_sequence.csv'))
+            self.ventana_config.sequence_path_var.set(config.get('sequence_file', 'layouts/Warehouse_Logic.xlsx'))
             
             # Resolución
             self.ventana_config.resolution_var.set(config.get('selected_resolution_key', 'Pequeña (800x800)'))

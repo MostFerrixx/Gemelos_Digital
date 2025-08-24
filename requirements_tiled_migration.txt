@@ -4,6 +4,8 @@
 # Nuevas dependencias
 pytmx==3.32
 pathfinding==1.0.17
+pandas>=2.0.0
+openpyxl>=3.1.0
 
 # Dependencias existentes (para referencia)
 # pygame>=2.0.0
