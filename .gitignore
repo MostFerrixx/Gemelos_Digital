@@ -66,6 +66,7 @@ temp/
 tmp/
 
 # Archivos de configuración personal/temporal
+config.json
 config_temp.json
 settings_local.py
 
@@ -85,6 +86,16 @@ simulation_output/
 test_*.py
 debug_*.py
 create_test_*.py
+
+# Archivos de configuración temporal de layouts
+*_backup.csv
+*backup*.csv
+test*.csv
+test*.tmx
+
+# Archivos CSV de secuencias (excepto los principales)
+!layouts/WH1_sequence.csv
+!layouts/*_sequence.csv
 
 # Cache de Pygame
 *.pycache

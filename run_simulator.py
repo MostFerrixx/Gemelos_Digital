@@ -14,7 +14,6 @@ import time
 from datetime import datetime
 
 # Importaciones de módulos propios
-from config.window_config import VentanaConfiguracion
 from config.settings import *
 from config.colors import *
 from simulation.warehouse import AlmacenMejorado
@@ -79,24 +78,107 @@ class SimuladorAlmacen:
         self.renderer = RendererOriginal(self.virtual_surface)
         self.dashboard = DashboardOriginal()
     
-    def obtener_configuracion(self):
-        """Obtiene la configuración del usuario"""
-        print("Abriendo ventana de configuracion...")
-        ventana_config = VentanaConfiguracion()
-        config = ventana_config.obtener_configuracion()
+    def cargar_configuracion(self):
+        """Carga la configuración desde config.json o usa defaults hardcodeados"""
+        config_path = os.path.join(os.path.dirname(__file__), "config.json")
         
-        if config is None:
-            print("Configuracion cancelada")
-            return False
-        
-        self.configuracion = config
-        print(f"Configuracion obtenida: {config}")
-        print(f"[DEBUG-RUNNER] Configuración recibida: {self.configuracion}")
-        
-        # Crear el calculador de costos, pasándole las reglas de la UI
-        self.cost_calculator = AssignmentCostCalculator(self.configuracion['assignment_rules'])
-        
-        return True
+        try:
+            # Intentar cargar config.json
+            if os.path.exists(config_path):
+                print(f"[CONFIG] Cargando configuración desde: {config_path}")
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    self.configuracion = json.load(f)
+                
+                # Sanitizar assignment_rules: convertir claves str a int
+                if 'assignment_rules' in self.configuracion and self.configuracion['assignment_rules']:
+                    sanitized_rules = {}
+                    for agent_type, rules in self.configuracion['assignment_rules'].items():
+                        sanitized_rules[agent_type] = {int(k): v for k, v in rules.items()}
+                    self.configuracion['assignment_rules'] = sanitized_rules
+                
+                print("[CONFIG] Configuración cargada exitosamente desde archivo JSON")
+            else:
+                print("[CONFIG] config.json no encontrado, usando configuración por defecto")
+                self.configuracion = self._get_default_config()
+                print("[CONFIG] Configuración por defecto cargada")
+            
+            # Crear el calculador de costos
+            self.cost_calculator = AssignmentCostCalculator(self.configuracion['assignment_rules'])
+            
+            # Mostrar resumen de configuración cargada
+            self._mostrar_resumen_config()
+            
+            return True
+            
+        except json.JSONDecodeError as e:
+            print(f"[CONFIG ERROR] Error al parsear config.json: {e}")
+            print("[CONFIG] Usando configuración por defecto como fallback")
+            self.configuracion = self._get_default_config()
+            self.cost_calculator = AssignmentCostCalculator(self.configuracion['assignment_rules'])
+            return True
+            
+        except Exception as e:
+            print(f"[CONFIG ERROR] Error inesperado cargando configuración: {e}")
+            print("[CONFIG] Usando configuración por defecto como fallback")
+            self.configuracion = self._get_default_config()
+            self.cost_calculator = AssignmentCostCalculator(self.configuracion['assignment_rules'])
+            return True
+    
+    def _get_default_config(self) -> dict:
+        """Retorna la configuración por defecto hardcodeada"""
+        return {
+            # Configuración de tareas de picking
+            'total_ordenes': 300,
+            'distribucion_tipos': {
+                'pequeno': {'porcentaje': 60, 'volumen': 5},
+                'mediano': {'porcentaje': 30, 'volumen': 25},
+                'grande': {'porcentaje': 10, 'volumen': 80}
+            },
+            'capacidad_carro': 150,
+            
+            # Configuración de estrategias
+            'strategy': 'Zoning and Snake',
+            'batching_strategy': 'Orden por Orden (Línea Base)',
+            'dispatch_strategy': 'Ejecución de Plan (Filtro por Prioridad)',
+            
+            # Configuración de layout
+            'layout_file': 'layouts/WH1.tmx',
+            'sequence_file': 'layouts/WH1_sequence.csv',
+            
+            # Configuración de ventana
+            'selected_resolution_key': 'Pequeña (800x800)',
+            
+            # Configuración de operarios
+            'num_operarios_terrestres': 1,
+            'num_montacargas': 1,
+            'num_operarios_total': 2,
+            'capacidad_montacargas': 1000,
+            
+            # Configuración de asignación de recursos
+            'assignment_rules': {
+                "GroundOperator": {1: 1},
+                "Forklift": {1: 2, 2: 1, 3: 1, 4: 1, 5: 1}
+            },
+            
+            # Compatibilidad con código existente
+            'tareas_zona_a': 0,
+            'tareas_zona_b': 0,
+            'num_operarios': 2
+        }
+    
+    def _mostrar_resumen_config(self):
+        """Muestra un resumen de la configuración cargada"""
+        config = self.configuracion
+        print("\n" + "="*50)
+        print("CONFIGURACIÓN DE SIMULACIÓN CARGADA")
+        print("="*50)
+        print(f"Total de órdenes: {config.get('total_ordenes', 'N/A')}")
+        print(f"Operarios terrestres: {config.get('num_operarios_terrestres', 'N/A')}")
+        print(f"Montacargas: {config.get('num_montacargas', 'N/A')}")
+        print(f"Estrategia de despacho: {config.get('dispatch_strategy', 'N/A')}")
+        print(f"Layout: {config.get('layout_file', 'N/A')}")
+        print(f"Secuencia: {config.get('sequence_file', 'N/A')}")
+        print("="*50 + "\n")
     
     def crear_simulacion(self):
         """Crea una nueva simulación"""
@@ -498,11 +580,13 @@ class SimuladorAlmacen:
         print("Recursos liberados. Hasta luego!")
     
     def ejecutar(self):
-        """Método principal de ejecución"""
+        """Método principal de ejecución - Modo automatizado sin UI"""
         try:
-            # NUEVO ORDEN: Configuración → TMX → Pygame
-            if not self.obtener_configuracion():
-                print("Configuracion cancelada. Saliendo...")
+            # NUEVO ORDEN: Configuración JSON → TMX → Pygame → Simulación
+            print("[SIMULATOR] Iniciando en modo automatizado (sin UI de configuración)")
+            
+            if not self.cargar_configuracion():
+                print("Error al cargar configuracion. Saliendo...")
                 return
             
             if not self.crear_simulacion():
@@ -511,6 +595,9 @@ class SimuladorAlmacen:
             
             # Inicializar pygame DESPUÉS de cargar TMX
             self.inicializar_pygame()
+            
+            print("[SIMULATOR] Iniciando bucle principal de simulación...")
+            print("[SIMULATOR] Presiona ESC para salir, SPACE para pausar, R para reiniciar")
             
             self.ejecutar_bucle_principal()
             
@@ -540,12 +627,19 @@ class SimuladorAlmacen:
     
 
 def main():
-    """Función principal"""
+    """Función principal - Modo automatizado"""
     print("="*60)
     print("SIMULADOR DE ALMACEN - GEMELO DIGITAL")
-    print("Sistema de Navegación Inteligente v2.0")
-    print("Version Modular Refactorizada")
+    print("Sistema de Navegación Inteligente v2.6")
+    print("Modo Automatizado - Sin UI de Configuración")
     print("="*60)
+    print()
+    print("INSTRUCCIONES:")
+    print("1. Use 'python configurator.py' para crear/modificar configuraciones")
+    print("2. Use 'python run_simulator.py' para ejecutar simulaciones automáticamente")
+    print()
+    print("El simulador buscará 'config.json' en el directorio actual.")
+    print("Si no existe, usará configuración por defecto.")
     print()
     
     simulador = SimuladorAlmacen()
