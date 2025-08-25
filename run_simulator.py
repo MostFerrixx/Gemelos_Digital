@@ -215,11 +215,6 @@ class SimuladorAlmacen:
             print(f"[FATAL ERROR] No se pudo inicializar pathfinder: {e}")
             raise SystemExit(f"Error en pathfinder: {e}")
         
-        print(f"[TMX] Arquitectura TMX inicializada exitosamente:")
-        print(f"  - Dimensiones: {self.layout_manager.grid_width}x{self.layout_manager.grid_height}")
-        print(f"  - Puntos de picking: {len(self.layout_manager.picking_points)}")
-        print(f"  - Puntos de depot: {len(self.layout_manager.depot_points)}")
-        
         self.env = simpy.Environment()
         
         # El LayoutManager y Pathfinder son OBLIGATORIOS
@@ -230,6 +225,11 @@ class SimuladorAlmacen:
         layout_file = self.configuracion.get('layout_file', '')
         sequence_file = self.configuracion.get('sequence_file', '')
         self.data_manager = DataManager(layout_file, sequence_file)
+        
+        print(f"[TMX] Arquitectura TMX inicializada exitosamente:")
+        print(f"  - Dimensiones: {self.layout_manager.grid_width}x{self.layout_manager.grid_height}")
+        print(f"  - Puntos de picking: {len(self.layout_manager.picking_points)}")
+        print(f"  - OutboundStaging areas: {len(self.data_manager.outbound_staging_locations)}")
         
         self.almacen = AlmacenMejorado(
             self.env,
@@ -472,11 +472,11 @@ class SimuladorAlmacen:
         estado_visual["operarios"] = {}
         
         # Obtener posiciones usando TMX (OBLIGATORIO)
-        if not self.layout_manager or not self.layout_manager.depot_points:
-            raise SystemExit("[FATAL ERROR] Se requiere LayoutManager con depot_points para inicializar operarios")
+        if not self.almacen.data_manager or not self.almacen.data_manager.outbound_staging_locations:
+            raise SystemExit("[FATAL ERROR] Se requiere DataManager con outbound_staging_locations para inicializar operarios")
         
-        # Usar depot points del TMX como posiciones iniciales
-        depot_point = self.layout_manager.depot_points[0]  # Primer punto de depot
+        # Usar outbound staging del DataManager como posiciones iniciales
+        depot_point = self.almacen.data_manager.outbound_staging_locations[1]  # Staging ID 1
         pixel_positions = []
         
         # Distribuir operarios alrededor del depot en PÍXELES
@@ -555,7 +555,7 @@ class SimuladorAlmacen:
             return
 
         # Tomar la posición inicial del primer depot como punto de partida
-        start_pos = self.layout_manager.depot_points[0]
+        start_pos = self.almacen.data_manager.outbound_staging_locations[1]
         print(f"Punto de partida para el diagnóstico: Depot en {start_pos}")
 
         # V2.6: Analizar tareas de la lista maestra en lugar de líneas pendientes

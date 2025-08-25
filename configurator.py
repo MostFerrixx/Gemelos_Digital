@@ -120,6 +120,15 @@ class ConfiguradorSimulador:
             self.ventana_config.assignment_rules = assignment_rules
             self.ventana_config._update_assignment_display()
             
+            # Distribución de OutboundStaging
+            outbound_staging_distribution = config.get('outbound_staging_distribution', {
+                "1": 100, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0
+            })
+            for staging_id, percentage in outbound_staging_distribution.items():
+                if staging_id in self.ventana_config.outbound_staging_vars:
+                    self.ventana_config.outbound_staging_vars[staging_id].set(percentage)
+            self.ventana_config._validar_staging_distribution()
+            
             # Actualizar validaciones y resúmenes
             self.ventana_config.validar_porcentajes()
             self.ventana_config.actualizar_total()
@@ -259,11 +268,21 @@ class ConfiguradorSimulador:
             op_terrestres = self.ventana_config.num_operarios_terrestres.get()
             montacargas = self.ventana_config.num_montacargas.get()
             
-            return self.ventana_config._validar_configuracion_picking(
+            # Validar configuración de picking
+            picking_valid = self.ventana_config._validar_configuracion_picking(
                 total_ordenes, pct_pequeno, pct_mediano, pct_grande,
                 vol_pequeno, vol_mediano, vol_grande, capacidad_carro,
                 op_terrestres, montacargas, op_terrestres + montacargas
             )
+            
+            # Validar distribución de OutboundStaging
+            staging_valid = self.ventana_config._validar_staging_distribution()
+            
+            if not staging_valid:
+                messagebox.showerror("Error de Configuración", 
+                                   "La distribución de Outbound Staging debe sumar exactamente 100%.")
+            
+            return picking_valid and staging_valid
         except Exception as e:
             messagebox.showerror("Error de Validación", f"Error validando configuración: {str(e)}")
             return False
@@ -319,6 +338,12 @@ class ConfiguradorSimulador:
             
             # Configuración de asignación de recursos
             'assignment_rules': self.ventana_config.assignment_rules.copy(),
+            
+            # Configuración de distribución de OutboundStaging
+            'outbound_staging_distribution': {
+                str(i): self.ventana_config.outbound_staging_vars[str(i)].get()
+                for i in range(1, 8)
+            },
             
             # Compatibilidad con código existente
             'tareas_zona_a': 0,
