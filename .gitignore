@@ -104,3 +104,7 @@ test*.tmx
 # Windows específico
 desktop.ini
 ehthumbs.db
+
+# Archivos temporales de Microsoft Office
+~$*
+*.tmp

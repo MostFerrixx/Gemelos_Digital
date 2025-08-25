@@ -30,8 +30,7 @@ class ConfiguradorSimulador:
         # Crear el configurador principal pasando la ventana raíz
         self.ventana_config = VentanaConfiguracion(self.root)
         
-        # Reemplazar los botones originales con los nuevos
-        self._modificar_botones()
+        # Los botones ahora se manejan directamente en window_config.py
         
         # Intentar cargar configuración existente al inicio
         self._cargar_configuracion_existente()
@@ -136,39 +135,6 @@ class ConfiguradorSimulador:
         except Exception as e:
             print(f"[CONFIGURATOR ERROR] Error poblando UI desde config: {e}")
             raise
-    
-    def _modificar_botones(self):
-        """Modifica los botones del configurador para añadir funcionalidad de guardado"""
-        # Limpiar frame de botones existente
-        for widget in self.ventana_config.bottom_frame.winfo_children():
-            if isinstance(widget, ttk.Frame):
-                for btn_widget in widget.winfo_children():
-                    if isinstance(btn_widget, ttk.Button):
-                        btn_widget.destroy()
-        
-        # Crear nuevo frame de botones
-        frame_botones = ttk.Frame(self.ventana_config.bottom_frame)
-        frame_botones.pack(pady=10)
-        
-        # Botón guardar configuración
-        btn_guardar = ttk.Button(frame_botones, text="Guardar Configuración", 
-                                command=self.guardar_configuracion, width=20)
-        btn_guardar.pack(side=tk.LEFT, padx=5)
-        
-        # Botón cargar defaults
-        btn_defaults = ttk.Button(frame_botones, text="Cargar Defaults", 
-                                 command=self.cargar_defaults, width=15)
-        btn_defaults.pack(side=tk.LEFT, padx=5)
-        
-        # Botón probar configuración (lanza simulador)
-        btn_probar = ttk.Button(frame_botones, text="Probar Configuración", 
-                               command=self.probar_configuracion, width=18)
-        btn_probar.pack(side=tk.LEFT, padx=5)
-        
-        # Botón salir
-        btn_salir = ttk.Button(frame_botones, text="Salir", 
-                              command=self.salir, width=10)
-        btn_salir.pack(side=tk.LEFT, padx=5)
     
     def guardar_configuracion(self):
         """Guarda la configuración actual en config.json"""
