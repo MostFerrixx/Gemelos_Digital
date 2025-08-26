@@ -117,3 +117,8 @@ simulation_report_*.pdf
 
 # Archivos temporales de tour mixto
 operators_tour_mixto.py
+
+# Archivos de prueba y test de analytics
+test_*.xlsx
+heatmap_*.xlsx
+*_test_*.xlsx
