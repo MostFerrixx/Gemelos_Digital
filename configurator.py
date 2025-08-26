@@ -98,6 +98,7 @@ class ConfiguradorSimulador:
             self.ventana_config.num_operarios_terrestres.set(config.get('num_operarios_terrestres', 1))
             self.ventana_config.num_montacargas.set(config.get('num_montacargas', 1))
             self.ventana_config.capacidad_montacargas.set(config.get('capacidad_montacargas', 1000))
+            self.ventana_config.tiempo_descarga_por_tarea.set(config.get('tiempo_descarga_por_tarea', 5))
             
             # Estrategias
             self.ventana_config.strategy_var.set(config.get('strategy', 'Zoning and Snake'))

@@ -30,6 +30,8 @@ MANIFEST
 # Simulación específica - archivos de salida
 metricas_*.json
 simulacion_completada_*.json
+raw_events_*.json
+simulation_report_*.xlsx
 
 # Archivos de configuración que SÍ queremos versionar
 !layouts/custom_tileset_mapping.json
@@ -108,3 +110,10 @@ ehthumbs.db
 # Archivos temporales de Microsoft Office
 ~$*
 *.tmp
+
+# Reportes y archivos de salida adicionales
+*.pdf
+simulation_report_*.pdf
+
+# Archivos temporales de tour mixto
+operators_tour_mixto.py

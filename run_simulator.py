@@ -18,6 +18,7 @@ from config.settings import *
 from config.colors import *
 from simulation.warehouse import AlmacenMejorado
 from simulation.operators import crear_operarios
+from git.analytics_engine import AnalyticsEngine
 from simulation.layout_manager import LayoutManager
 from simulation.assignment_calculator import AssignmentCostCalculator
 from simulation.data_manager import DataManager
@@ -436,6 +437,31 @@ class SimuladorAlmacen:
             archivo = f"simulacion_completada_{timestamp}.json"
             exportar_metricas(self.almacen, archivo)
             print(f"Resultados guardados en: {archivo}")
+            
+            # Exportar eventos crudos para analíticas avanzadas
+            archivo_eventos = self.almacen.exportar_eventos_crudos()
+            if archivo_eventos:
+                print(f"Eventos detallados guardados en: {archivo_eventos}")
+            
+            # Generar reporte ejecutivo en Excel usando AnalyticsEngine
+            try:
+                print("[ANALYTICS] Generando reporte ejecutivo...")
+                analytics_engine = AnalyticsEngine(self.almacen.event_log, self.configuracion)
+                analytics_engine.process_events()
+                
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                excel_filename = f"simulation_report_{timestamp}.xlsx"
+                archivo_excel = analytics_engine.export_to_excel(excel_filename)
+                
+                if archivo_excel:
+                    print(f"Reporte ejecutivo generado: {archivo_excel}")
+                else:
+                    print("Error al generar reporte ejecutivo")
+                    
+            except Exception as e:
+                print(f"Error al generar reporte de analíticas: {e}")
+                import traceback
+                traceback.print_exc()
         
         print("\nPresiona R para reiniciar o ESC para salir")
     
