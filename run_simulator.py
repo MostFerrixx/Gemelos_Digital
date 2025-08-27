@@ -11,6 +11,7 @@ import pygame
 import simpy
 import json
 import time
+import subprocess
 from datetime import datetime
 
 # Importaciones de módulos propios
@@ -18,7 +19,7 @@ from config.settings import *
 from config.colors import *
 from simulation.warehouse import AlmacenMejorado
 from simulation.operators import crear_operarios
-from git.analytics_engine import AnalyticsEngine
+from analytics_engine import AnalyticsEngine
 from simulation.layout_manager import LayoutManager
 from simulation.assignment_calculator import AssignmentCostCalculator
 from simulation.data_manager import DataManager
@@ -425,45 +426,164 @@ class SimuladorAlmacen:
         return not self.almacen.simulacion_ha_terminado()
     
     def _simulacion_completada(self):
-        """Maneja la finalización de la simulación"""
-        print("\n" + "="*50)
-        print("SIMULACION COMPLETADA")
-        print("="*50)
+        """Maneja la finalización de la simulación con pipeline automatizado"""
+        print("\n" + "="*70)
+        print("SIMULACION COMPLETADA - INICIANDO PIPELINE DE ANALITICAS")
+        print("="*70)
         
-        if self.almacen:
-            mostrar_metricas_consola(self.almacen)
-            
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            archivo = f"simulacion_completada_{timestamp}.json"
-            exportar_metricas(self.almacen, archivo)
-            print(f"Resultados guardados en: {archivo}")
-            
-            # Exportar eventos crudos para analíticas avanzadas
-            archivo_eventos = self.almacen.exportar_eventos_crudos()
-            if archivo_eventos:
-                print(f"Eventos detallados guardados en: {archivo_eventos}")
-            
-            # Generar reporte ejecutivo en Excel usando AnalyticsEngine
-            try:
-                print("[ANALYTICS] Generando reporte ejecutivo...")
-                analytics_engine = AnalyticsEngine(self.almacen.event_log, self.configuracion)
-                analytics_engine.process_events()
-                
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                excel_filename = f"simulation_report_{timestamp}.xlsx"
-                archivo_excel = analytics_engine.export_to_excel(excel_filename)
-                
-                if archivo_excel:
-                    print(f"Reporte ejecutivo generado: {archivo_excel}")
-                else:
-                    print("Error al generar reporte ejecutivo")
-                    
-            except Exception as e:
-                print(f"Error al generar reporte de analíticas: {e}")
-                import traceback
-                traceback.print_exc()
+        if not self.almacen:
+            print("Error: No hay datos del almacén para procesar")
+            return
         
+        # Mostrar métricas básicas
+        mostrar_metricas_consola(self.almacen)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Crear estructura de directorios organizados
+        output_base_dir = "output"
+        output_dir = os.path.join(output_base_dir, f"simulation_{timestamp}")
+        
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+            print(f"[SETUP] Directorio de salida creado: {output_dir}")
+        except Exception as e:
+            print(f"[ERROR] No se pudo crear directorio de salida: {e}")
+            # Fallback: usar directorio actual
+            output_dir = "."
+        
+        archivos_generados = []
+        
+        # 1. Exportar métricas JSON básicas
+        archivo_json = os.path.join(output_dir, f"simulacion_completada_{timestamp}.json")
+        exportar_metricas(self.almacen, archivo_json)
+        archivos_generados.append(archivo_json)
+        print(f"[1/4] Métricas JSON guardadas: {archivo_json}")
+        
+        # 2. Exportar eventos crudos (modificar almacén para usar output_dir)
+        archivo_eventos = self._exportar_eventos_crudos_organizado(output_dir, timestamp)
+        if archivo_eventos:
+            archivos_generados.append(archivo_eventos)
+            print(f"[2/4] Eventos detallados guardados: {archivo_eventos}")
+        
+        # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine → Excel
+        print("[3/4] Simulación completada. Generando reporte de Excel...")
+        try:
+            # Usar el método __init__ original con eventos y configuración en memoria
+            analytics_engine = AnalyticsEngine(self.almacen.event_log, self.configuracion)
+            analytics_engine.process_events()
+            
+            # Generar archivo Excel con ruta organizada
+            excel_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.xlsx")
+            archivo_excel = analytics_engine.export_to_excel(excel_filename)
+            
+            if archivo_excel:
+                archivos_generados.append(archivo_excel)
+                print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
+                
+                # 4. PIPELINE AUTOMATIZADO: Visualizer → PNG
+                print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
+                self._ejecutar_visualizador(archivo_excel, timestamp, output_dir)
+                
+            else:
+                print("[ERROR] No se pudo generar el reporte de Excel")
+                
+        except Exception as e:
+            print(f"[ERROR] Error en pipeline de analíticas: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Resumen final
+        print("\n" + "="*70)
+        print("PROCESO COMPLETADO")
+        print("="*70)
+        print("Archivos generados:")
+        for i, archivo in enumerate(archivos_generados, 1):
+            print(f"  {i}. {archivo}")
+        print("="*70)
         print("\nPresiona R para reiniciar o ESC para salir")
+    
+    def _exportar_eventos_crudos_organizado(self, output_dir: str, timestamp: str):
+        """Exporta eventos crudos a directorio organizado"""
+        import json
+        
+        filename = os.path.join(output_dir, f"raw_events_{timestamp}.json")
+        
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(self.almacen.event_log, f, indent=2, ensure_ascii=False)
+            print(f"[ANALYTICS] Eventos exportados a: {filename} ({len(self.almacen.event_log)} eventos)")
+            return filename
+        except Exception as e:
+            print(f"[ANALYTICS] Error exportando eventos: {e}")
+            return None
+    
+    def _ejecutar_visualizador(self, excel_path: str, timestamp: str, output_dir: str):
+        """Ejecuta visualizer.py automáticamente usando subprocess"""
+        try:
+            # Construir rutas dinámicamente
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            visualizer_path = os.path.join(script_dir, "visualizer.py")
+            tmx_path = os.path.join(script_dir, self.configuracion.get('layout_file', 'layouts/WH1.tmx'))
+            output_filename = os.path.join(output_dir, f"warehouse_heatmap_{timestamp}.png")
+            
+            # Verificar que los archivos existen
+            if not os.path.exists(visualizer_path):
+                print(f"[ERROR] visualizer.py no encontrado en: {visualizer_path}")
+                return
+            
+            if not os.path.exists(tmx_path):
+                print(f"[ERROR] Archivo TMX no encontrado: {tmx_path}")
+                return
+            
+            if not os.path.exists(excel_path):
+                print(f"[ERROR] Archivo Excel no encontrado: {excel_path}")
+                return
+            
+            # Construir comando para visualizer.py
+            cmd = [
+                sys.executable,  # Python ejecutable actual
+                visualizer_path,
+                "--excel_path", excel_path,
+                "--tmx_path", tmx_path,
+                "--output_path", output_filename,
+                "--layer_name", "Capa de patrones 1",  # Nombre de capa TMX conocido
+                "--pixel_scale", "16"  # Escala por defecto
+            ]
+            
+            print(f"[VISUALIZER] Ejecutando comando: {' '.join(cmd)}")
+            
+            # Ejecutar visualizer.py de forma robusta
+            result = subprocess.run(
+                cmd,
+                cwd=script_dir,  # Ejecutar en el directorio del script
+                capture_output=True,
+                text=True,
+                timeout=300  # Timeout de 5 minutos
+            )
+            
+            if result.returncode == 0:
+                print(f"[4/4] Imagen de heatmap generada exitosamente: {output_filename}")
+                # Mostrar output del visualizer si es útil
+                if result.stdout:
+                    # Filtrar solo las líneas importantes del output
+                    lines = result.stdout.split('\n')
+                    for line in lines:
+                        if '[VISUALIZER]' in line or 'PROCESAMIENTO COMPLETADO' in line:
+                            print(f"  {line}")
+            else:
+                print(f"[ERROR] visualizer.py falló con código: {result.returncode}")
+                if result.stderr:
+                    print(f"[ERROR] Error del visualizer: {result.stderr}")
+                if result.stdout:
+                    print(f"[ERROR] Output del visualizer: {result.stdout}")
+                    
+        except subprocess.TimeoutExpired:
+            print("[ERROR] visualizer.py tomó demasiado tiempo (>5 min) - proceso terminado")
+        except Exception as e:
+            print(f"[ERROR] Error ejecutando visualizer.py: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _reiniciar_simulacion(self):
         """Reinicia la simulación"""
