@@ -308,19 +308,23 @@ class AnalyticsEngine:
         for _, event in task_events.iterrows():
             if 'data' in event and event['data']:
                 try:
-                    # Buscar coordenadas en task_ubicacion
+                    # Buscar coordenadas en task_ubicacion O location (ambos formatos de evento)
+                    ubicacion = None
                     if 'task_ubicacion' in event['data']:
                         ubicacion = event['data']['task_ubicacion']
-                        tiempo_picking = event['data'].get('tiempo_picking', 0)
-                        
-                        if isinstance(ubicacion, list) and len(ubicacion) >= 2 and tiempo_picking > 0:
-                            x, y = int(ubicacion[0]), int(ubicacion[1])
-                            # Verificar que las coordenadas estén dentro del rango válido
-                            if 0 <= x < warehouse_width and 0 <= y < warehouse_height:
-                                # Buscar la fila correspondiente e incrementar tiempo_trabajo
-                                mask = (heatmap_df['x'] == x) & (heatmap_df['y'] == y)
-                                heatmap_df.loc[mask, 'tiempo_trabajo'] += tiempo_picking
-                                trabajo_count += 1
+                    elif 'location' in event['data']:
+                        ubicacion = event['data']['location']
+                    
+                    tiempo_picking = event['data'].get('tiempo_picking', 0)
+                    
+                    if ubicacion and isinstance(ubicacion, list) and len(ubicacion) >= 2 and tiempo_picking > 0:
+                        x, y = int(ubicacion[0]), int(ubicacion[1])
+                        # Verificar que las coordenadas estén dentro del rango válido
+                        if 0 <= x < warehouse_width and 0 <= y < warehouse_height:
+                            # Buscar la fila correspondiente e incrementar tiempo_trabajo
+                            mask = (heatmap_df['x'] == x) & (heatmap_df['y'] == y)
+                            heatmap_df.loc[mask, 'tiempo_trabajo'] += tiempo_picking
+                            trabajo_count += 1
                 except (ValueError, TypeError, IndexError):
                     # Saltar eventos con coordenadas o tiempo malformados
                     continue

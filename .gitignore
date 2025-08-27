@@ -122,3 +122,11 @@ operators_tour_mixto.py
 test_*.xlsx
 heatmap_*.xlsx
 *_test_*.xlsx
+
+# Archivos de testing del protocolo de rechazo
+test_rejection_*.log
+test_final_*.log
+config_test_*.json
+
+# Archivos de warehouse heatmap
+warehouse_heatmap_*.png
