@@ -102,7 +102,6 @@ class ConfiguradorSimulador:
             
             # Estrategias
             self.ventana_config.strategy_var.set(config.get('strategy', 'Zoning and Snake'))
-            self.ventana_config.batching_strategy_var.set(config.get('batching_strategy', 'Orden por Orden (Línea Base)'))
             self.ventana_config.dispatch_strategy_var.set(config.get('dispatch_strategy', 'Ejecución de Plan (Filtro por Prioridad)'))
             
             # Layout y archivos
@@ -287,7 +286,6 @@ class ConfiguradorSimulador:
             
             # Configuración de estrategias
             'strategy': self.ventana_config.strategy_var.get(),
-            'batching_strategy': self.ventana_config.batching_strategy_var.get(),
             'dispatch_strategy': self.ventana_config.dispatch_strategy_var.get(),
             
             # Configuración de layout (convertir a rutas relativas)

@@ -146,7 +146,6 @@ class SimuladorAlmacen:
             
             # Configuración de estrategias
             'strategy': 'Zoning and Snake',
-            'batching_strategy': 'Orden por Orden (Línea Base)',
             'dispatch_strategy': 'Ejecución de Plan (Filtro por Prioridad)',
             
             # Configuración de layout
@@ -633,6 +632,9 @@ class SimuladorAlmacen:
                     self.order_dashboard_process.start()
                     print("Dashboard de Órdenes abierto en proceso separado - Presiona 'O' nuevamente para cerrar")
                     
+                    # NUEVO: Enviar estado completo inicial inmediatamente después del arranque
+                    self._enviar_estado_completo_inicial()
+                    
                 except ImportError as e:
                     print(f"Error importando launch_dashboard_process: {e}")
                 except Exception as e:
@@ -667,6 +669,58 @@ class SimuladorAlmacen:
                 print(f"Error cerrando dashboard: {e}")
                 self.order_dashboard_process = None
                 self.dashboard_data_queue = None
+    
+    def _enviar_estado_completo_inicial(self):
+        """
+        NUEVO: Envía el estado completo de todas las WorkOrders al dashboard recién iniciado
+        Protocolo anti-condición de carrera: full_state antes que deltas
+        """
+        if (self.dashboard_data_queue and 
+            self.almacen and 
+            self.almacen.dispatcher):
+            
+            try:
+                # Obtener estado completo actual (activas + históricas)
+                lista_viva = self.almacen.dispatcher.lista_maestra_work_orders
+                lista_historica = self.almacen.dispatcher.work_orders_completadas_historicas
+                lista_completa = lista_viva + lista_historica
+                
+                # Generar snapshot completo de todas las WorkOrders
+                full_state_data = []
+                for work_order in lista_completa:
+                    wo_state = {
+                        "id": work_order.id,
+                        "order_id": work_order.order_id,
+                        "tour_id": work_order.tour_id,
+                        "sku_id": work_order.sku.id if work_order.sku else "N/A",
+                        "status": work_order.status,
+                        "ubicacion": work_order.ubicacion,
+                        "level": work_order.level,
+                        "cantidad_restante": work_order.cantidad_restante,
+                        "volumen_restante": work_order.calcular_volumen_restante(),
+                        "assigned_agent_id": work_order.assigned_agent_id
+                    }
+                    full_state_data.append(wo_state)
+                
+                # Crear mensaje de estado completo con formato estructurado
+                import time
+                full_state_message = {
+                    'type': 'full_state',
+                    'timestamp': time.time(),
+                    'data': full_state_data
+                }
+                
+                # Enviar estado completo inicial
+                self.dashboard_data_queue.put_nowait(full_state_message)
+                print(f"[COMMS-PROTOCOL] ✅ Estado completo inicial enviado: {len(full_state_data)} WorkOrders")
+                
+                # Inicializar cache de estado para deltas futuros
+                self.dashboard_last_state = {}
+                for work_order_data in full_state_data:
+                    self.dashboard_last_state[work_order_data['id']] = work_order_data
+                
+            except Exception as e:
+                print(f"[COMMS-PROTOCOL] ❌ Error enviando estado completo inicial: {e}")
     
     def _actualizar_dashboard_ordenes(self):
         """Enviar datos actualizados al dashboard de órdenes si está activo"""
@@ -704,6 +758,8 @@ class SimuladorAlmacen:
                     # Crear snapshot del estado actual
                     wo_state = {
                         "id": work_order.id,
+                        "order_id": work_order.order_id,
+                        "tour_id": work_order.tour_id,
                         "sku_id": work_order.sku.id if work_order.sku else "N/A",
                         "status": work_order.status,
                         "ubicacion": work_order.ubicacion,
@@ -729,17 +785,25 @@ class SimuladorAlmacen:
                 
                 print(f"[COMMS-LINK] 🔄 Delta calculado: {len(delta_updates)} cambios de {len(lista_completa)} total ({len(lista_viva)} activas + {len(lista_historica)} históricas)")
                 
-                # PASO 3: Enviar solo deltas (si hay cambios)
+                # PASO 3: Enviar deltas con formato estructurado (si hay cambios)
                 if delta_updates:
                     try:
-                        self.dashboard_data_queue.put_nowait(delta_updates)
-                        print(f"[COMMS-LINK] ✅ Delta enviado exitosamente ({len(delta_updates)} WorkOrders cambiadas)")
+                        # NUEVO: Envolver deltas en formato de protocolo estructurado
+                        import time
+                        delta_message = {
+                            'type': 'delta',
+                            'timestamp': time.time(),
+                            'data': delta_updates
+                        }
+                        
+                        self.dashboard_data_queue.put_nowait(delta_message)
+                        print(f"[COMMS-PROTOCOL] ✅ Delta enviado exitosamente ({len(delta_updates)} WorkOrders cambiadas)")
                     except Exception as e:
-                        print(f"[COMMS-LINK] ⚠️  Error enviando delta: {e} (Cola posiblemente llena)")
+                        print(f"[COMMS-PROTOCOL] ⚠️  Error enviando delta: {e} (Cola posiblemente llena)")
                         pass
                 else:
                     # No hay cambios, no enviar nada
-                    print("[COMMS-LINK] 📍 Sin cambios - no se envían datos")
+                    print("[COMMS-PROTOCOL] 📍 Sin cambios - no se envían datos")
                 
                 # PASO 4: Actualizar estado anterior para próxima comparación
                 self.dashboard_last_state = estado_actual

@@ -140,3 +140,11 @@ documentacion_temporal/
 # Añadiendo patrones adicionales para evitar commits accidentales de configuraciones locales
 config_*.json
 *.config.json
+
+# Archivos temporales del dashboard de órdenes
+dashboard_*.log
+order_dashboard_*.tmp
+
+# Archivos de prueba de estrategias
+strategy_test_*.py
+*_strategy_test.py
