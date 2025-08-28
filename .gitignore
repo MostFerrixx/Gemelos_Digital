@@ -130,3 +130,13 @@ config_test_*.json
 
 # Archivos de warehouse heatmap
 warehouse_heatmap_*.png
+
+# Directorio de prompts y documentación temporal
+Promts/
+prompts/
+documentacion_temporal/
+
+# Archivos de configuración específicos del usuario (ya existía config.json)
+# Añadiendo patrones adicionales para evitar commits accidentales de configuraciones locales
+config_*.json
+*.config.json

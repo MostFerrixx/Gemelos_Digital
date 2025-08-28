@@ -13,12 +13,14 @@ import json
 import time
 import subprocess
 from datetime import datetime
+import multiprocessing
+from multiprocessing import Queue
 
 # Importaciones de módulos propios
 from config.settings import *
 from config.colors import *
 from simulation.warehouse import AlmacenMejorado
-from simulation.operators import crear_operarios
+from simulation.operators_workorder import crear_operarios
 from analytics_engine import AnalyticsEngine
 from simulation.layout_manager import LayoutManager
 from simulation.assignment_calculator import AssignmentCostCalculator
@@ -45,6 +47,8 @@ class SimuladorAlmacen:
         self.dashboard = None
         self.reloj = None
         self.corriendo = True
+        self.order_dashboard_process = None  # Proceso del dashboard de órdenes
+        self.dashboard_data_queue = None     # Cola para comunicación con el dashboard
         # Nuevos componentes de la arquitectura TMX
         self.layout_manager = None
         self.pathfinder = None
@@ -55,6 +59,8 @@ class SimuladorAlmacen:
         self.procesos_operarios = []
         # Bandera para evitar reportes repetidos
         self.simulacion_finalizada_reportada = False
+        # NUEVO: Cache de estado anterior para delta updates del dashboard
+        self.dashboard_last_state = {}
         
     def inicializar_pygame(self):
         PANEL_WIDTH = 400
@@ -273,7 +279,7 @@ class SimuladorAlmacen:
         
         print(f"Simulacion V2.6 creada:")
         print(f"  - {len(self.procesos_operarios)} operarios")
-        print(f"  - {len(self.almacen.dispatcher.lista_maestra_tareas)} tareas en lista maestra")
+        print(f"  - {len(self.almacen.dispatcher.lista_maestra_work_orders)} WorkOrders en lista maestra")
         print(f"  - {self.almacen.total_ordenes} órdenes generadas")
         print(f"  - Master Plan: {len(self.data_manager.puntos_de_picking_ordenados)} puntos de picking")
         if self.layout_manager:
@@ -345,6 +351,9 @@ class SimuladorAlmacen:
             # 6. Dibujar el dashboard directamente en la pantalla, en el panel derecho
             renderizar_dashboard(self.pantalla, self.window_size[0], self.almacen, estado_visual["operarios"])
 
+            # 6.5. Enviar datos al dashboard de órdenes si está activo
+            self._actualizar_dashboard_ordenes()
+
             # 7. La verificación de finalización ahora se maneja en el paso 2
 
             # 8. Actualizar la pantalla
@@ -387,6 +396,8 @@ class SimuladorAlmacen:
                 aumentar_velocidad()
             elif evento.key == pygame.K_MINUS or evento.key == pygame.K_KP_MINUS:  # Tecla - o -
                 disminuir_velocidad()
+            elif evento.key == pygame.K_o:  # Tecla O para Dashboard de Órdenes
+                self.toggle_order_dashboard()
             # Funciones de diagnóstico desactivadas en limpieza
         
         return True
@@ -601,6 +612,155 @@ class SimuladorAlmacen:
         else:
             print("Reinicio cancelado")
     
+    def toggle_order_dashboard(self):
+        """Alternar visibilidad del dashboard de órdenes (multiproceso)"""
+        if self.order_dashboard_process is None or not self.order_dashboard_process.is_alive():
+            # Crear proceso del dashboard si no existe
+            if self.almacen:
+                try:
+                    from git.visualization.order_dashboard import launch_dashboard_process
+                    
+                    # Crear cola para comunicación
+                    self.dashboard_data_queue = Queue()
+                    
+                    # Crear proceso separado para el dashboard
+                    self.order_dashboard_process = multiprocessing.Process(
+                        target=launch_dashboard_process,
+                        args=(self.dashboard_data_queue,)
+                    )
+                    
+                    # Iniciar el proceso
+                    self.order_dashboard_process.start()
+                    print("Dashboard de Órdenes abierto en proceso separado - Presiona 'O' nuevamente para cerrar")
+                    
+                except ImportError as e:
+                    print(f"Error importando launch_dashboard_process: {e}")
+                except Exception as e:
+                    print(f"Error creando dashboard: {e}")
+            else:
+                print("No hay simulación activa para mostrar órdenes")
+        else:
+            # NUEVO: Cierre graceful del proceso dashboard
+            try:
+                if self.order_dashboard_process.is_alive():
+                    # Enviar mensaje de cierre por la cola
+                    if self.dashboard_data_queue:
+                        try:
+                            self.dashboard_data_queue.put_nowait('__EXIT_COMMAND__')
+                            print("[DASHBOARD] Comando de cierre enviado")
+                        except:
+                            pass  # Cola llena, proceder con terminación
+                    
+                    # Esperar cierre graceful
+                    self.order_dashboard_process.join(timeout=3)
+                    
+                    # Si no responde, terminación forzada
+                    if self.order_dashboard_process.is_alive():
+                        print("[DASHBOARD] Timeout - forzando terminación")
+                        self.order_dashboard_process.terminate()
+                        self.order_dashboard_process.join(timeout=1)
+                        
+                self.order_dashboard_process = None
+                self.dashboard_data_queue = None
+                print("Dashboard de Órdenes cerrado correctamente")
+            except Exception as e:
+                print(f"Error cerrando dashboard: {e}")
+                self.order_dashboard_process = None
+                self.dashboard_data_queue = None
+    
+    def _actualizar_dashboard_ordenes(self):
+        """Enviar datos actualizados al dashboard de órdenes si está activo"""
+        # INSTRUMENTACIÓN: Verificar enlace de comunicación
+        print(f"[COMMS-LINK] Verificando enlace... Proceso dashboard existe: {self.order_dashboard_process is not None}")
+        
+        if (self.order_dashboard_process and 
+            self.order_dashboard_process.is_alive() and 
+            self.dashboard_data_queue and 
+            self.almacen and 
+            self.almacen.dispatcher):
+            
+            # INSTRUMENTACIÓN: Estado del proceso y cola
+            is_alive_status = self.order_dashboard_process.is_alive()
+            queue_size = self.dashboard_data_queue.qsize() if hasattr(self.dashboard_data_queue, 'qsize') else "unknown"
+            print(f"[COMMS-LINK] └─ Proceso dashboard vivo: {is_alive_status}. Cola size: {queue_size}. Intentando enviar datos...")
+            
+            if not is_alive_status:
+                print("[COMMS-LINK] └─ ¡ERROR! El proceso se reporta como no vivo. No se enviarán datos.")
+                return
+            
+            try:
+                # OPTIMIZADO: Sistema de delta updates para reducir latencia
+                
+                # PASO 1: Obtener ambas listas (activas + históricas)
+                lista_viva = self.almacen.dispatcher.lista_maestra_work_orders
+                lista_historica = self.almacen.dispatcher.work_orders_completadas_historicas
+                lista_completa = lista_viva + lista_historica
+                
+                # PASO 2: Calcular deltas (solo WorkOrders que cambiaron)
+                delta_updates = []
+                estado_actual = {}
+                
+                for work_order in lista_completa:
+                    # Crear snapshot del estado actual
+                    wo_state = {
+                        "id": work_order.id,
+                        "sku_id": work_order.sku.id if work_order.sku else "N/A",
+                        "status": work_order.status,
+                        "ubicacion": work_order.ubicacion,
+                        "level": work_order.level,
+                        "cantidad_restante": work_order.cantidad_restante,
+                        "volumen_restante": work_order.calcular_volumen_restante(),
+                        "assigned_agent_id": work_order.assigned_agent_id
+                    }
+                    
+                    estado_actual[work_order.id] = wo_state
+                    
+                    # Comparar con estado anterior
+                    estado_anterior = self.dashboard_last_state.get(work_order.id)
+                    
+                    # Si es nueva o cambió algún campo relevante, añadir al delta
+                    if (estado_anterior is None or
+                        estado_anterior["status"] != wo_state["status"] or
+                        estado_anterior["cantidad_restante"] != wo_state["cantidad_restante"] or
+                        estado_anterior["assigned_agent_id"] != wo_state["assigned_agent_id"] or
+                        estado_anterior["volumen_restante"] != wo_state["volumen_restante"]):
+                        
+                        delta_updates.append(wo_state)
+                
+                print(f"[COMMS-LINK] 🔄 Delta calculado: {len(delta_updates)} cambios de {len(lista_completa)} total ({len(lista_viva)} activas + {len(lista_historica)} históricas)")
+                
+                # PASO 3: Enviar solo deltas (si hay cambios)
+                if delta_updates:
+                    try:
+                        self.dashboard_data_queue.put_nowait(delta_updates)
+                        print(f"[COMMS-LINK] ✅ Delta enviado exitosamente ({len(delta_updates)} WorkOrders cambiadas)")
+                    except Exception as e:
+                        print(f"[COMMS-LINK] ⚠️  Error enviando delta: {e} (Cola posiblemente llena)")
+                        pass
+                else:
+                    # No hay cambios, no enviar nada
+                    print("[COMMS-LINK] 📍 Sin cambios - no se envían datos")
+                
+                # PASO 4: Actualizar estado anterior para próxima comparación
+                self.dashboard_last_state = estado_actual
+                    
+            except Exception as e:
+                # Error en serialización - no crítico
+                print(f"[COMMS-LINK] ❌ Error crítico en serialización: {e}")
+                pass
+        else:
+            # INSTRUMENTACIÓN: Diagnóstico cuando no se envían datos
+            if not self.order_dashboard_process:
+                print("[COMMS-LINK] └─ No hay proceso dashboard creado")
+            elif not self.order_dashboard_process.is_alive():
+                print("[COMMS-LINK] └─ Proceso dashboard no está vivo")
+            elif not self.dashboard_data_queue:
+                print("[COMMS-LINK] └─ No hay cola de datos")
+            elif not self.almacen:
+                print("[COMMS-LINK] └─ No hay almacén inicializado")
+            elif not self.almacen.dispatcher:
+                print("[COMMS-LINK] └─ No hay dispatcher inicializado")
+    
     def _inicializar_operarios_en_estado_visual(self):
         """Inicialización de operarios con soporte TMX"""
         from visualization.state import estado_visual
@@ -705,14 +865,14 @@ class SimuladorAlmacen:
         print(f"Punto de partida para el diagnóstico: Depot en {start_pos}")
 
         # V2.6: Analizar tareas de la lista maestra en lugar de líneas pendientes
-        if hasattr(self.almacen.dispatcher, 'lista_maestra_tareas') and self.almacen.dispatcher.lista_maestra_tareas:
-            total_tareas = len(self.almacen.dispatcher.lista_maestra_tareas)
-            sample_size = min(10, total_tareas)
-            print(f"Analizando {sample_size} tareas de {total_tareas} en la lista maestra...")
+        if hasattr(self.almacen.dispatcher, 'lista_maestra_work_orders') and self.almacen.dispatcher.lista_maestra_work_orders:
+            total_work_orders = len(self.almacen.dispatcher.lista_maestra_work_orders)
+            sample_size = min(10, total_work_orders)
+            print(f"Analizando {sample_size} WorkOrders de {total_work_orders} en la lista maestra...")
             
             for i in range(sample_size):
-                tarea = self.almacen.dispatcher.lista_maestra_tareas[i]
-                print(f"  Tarea {i+1}: Seq {tarea.pick_sequence}, SKU {tarea.sku.id}, Pos {tarea.ubicacion}")
+                work_order = self.almacen.dispatcher.lista_maestra_work_orders[i]
+                print(f"  WorkOrder {i+1}: Seq {work_order.pick_sequence}, SKU {work_order.sku.id}, Pos {work_order.ubicacion}")
         else:
             print("No hay tareas en la lista maestra para diagnosticar")
         
