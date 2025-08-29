@@ -305,31 +305,47 @@ class SimuladorAlmacen:
         
         self.corriendo = True
         while self.corriendo:
-            # 1. Manejar eventos
+            # 1. Manejar eventos (siempre)
             for event in pygame.event.get():
                 if not self._manejar_evento(event):
                     self.corriendo = False
 
-            # 2. Avance del motor de simulación SimPy
-            if not estado_visual["pausa"]:
-                if self._simulacion_activa():
-                    velocidad = obtener_velocidad_simulacion()
-                    try:
-                        # Avanzar simulación con control de velocidad
-                        step_time = 0.1 / velocidad  # STEP_SIMULACION
-                        self.env.run(until=self.env.now + step_time)
-                    except simpy.core.EmptySchedule:
-                        # Cuando no hay más eventos programados
-                        pass
-                    except Exception as e:
-                        print(f"Error en simulación: {e}")
-                        # Continuar sin detener el bucle
-                else: # Si la simulación ha terminado
-                    if not self.simulacion_finalizada_reportada:
+            # 2. Lógica de Simulación (SOLO si no ha finalizado)
+            if not self.simulacion_finalizada_reportada:
+                if not estado_visual["pausa"]:
+                    if self._simulacion_activa():
+                        velocidad = obtener_velocidad_simulacion()
+                        try:
+                            # Avanzar simulación con control de velocidad
+                            step_time = 0.1 / velocidad  # STEP_SIMULACION
+                            self.env.run(until=self.env.now + step_time)
+                        except simpy.core.EmptySchedule:
+                            # Cuando no hay más eventos programados
+                            pass
+                        except Exception as e:
+                            print(f"Error en simulación: {e}")
+                            # Continuar sin detener el bucle
+                        
+                        # Dashboard updates SOLO durante simulación activa
+                        self._actualizar_dashboard_ordenes()
+                    else: # Si la simulación ha terminado
                         print("[SIMULADOR] Condición de finalización cumplida: No hay tareas pendientes y todos los agentes están ociosos.")
                         print("Simulación completada y finalizada lógicamente.")
                         # La función de reporte ahora solo se llama UNA VEZ
                         self._simulacion_completada() 
+                        
+                        # Dashboard final update UNA VEZ
+                        self._actualizar_dashboard_ordenes()
+                        
+                        # Enviar comando de finalización al Dashboard de Órdenes
+                        if self.order_dashboard_process and self.order_dashboard_process.is_alive():
+                            print("[PIPELINE] Enviando comando de hibernación al Dashboard de Órdenes...")
+                            try:
+                                self.dashboard_data_queue.put('__SIMULATION_ENDED__')
+                            except Exception as e:
+                                print(f"[ERROR] No se pudo enviar el comando de hibernación al dashboard: {e}")
+                        
+                        # Marcar como finalizada para evitar repetición
                         self.simulacion_finalizada_reportada = True
 
             # 3. Limpiar la pantalla principal
@@ -349,9 +365,6 @@ class SimuladorAlmacen:
 
             # 6. Dibujar el dashboard directamente en la pantalla, en el panel derecho
             renderizar_dashboard(self.pantalla, self.window_size[0], self.almacen, estado_visual["operarios"])
-
-            # 6.5. Enviar datos al dashboard de órdenes si está activo
-            self._actualizar_dashboard_ordenes()
 
             # 7. La verificación de finalización ahora se maneja en el paso 2
 
@@ -634,6 +647,14 @@ class SimuladorAlmacen:
                     
                     # NUEVO: Enviar estado completo inicial inmediatamente después del arranque
                     self._enviar_estado_completo_inicial()
+                    
+                    # SYNC FIX: Verificar si simulación ya terminó y enviar comando de hibernación
+                    if self.simulacion_finalizada_reportada:
+                        try:
+                            self.dashboard_data_queue.put('__SIMULATION_ENDED__')
+                            print("[DASHBOARD-SYNC] Comando __SIMULATION_ENDED__ enviado a dashboard post-simulación")
+                        except Exception as e:
+                            print(f"[DASHBOARD-SYNC] Error enviando comando de hibernación: {e}")
                     
                 except ImportError as e:
                     print(f"Error importando launch_dashboard_process: {e}")

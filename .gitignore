@@ -153,3 +153,13 @@ strategy_test_*.py
 ui_cleanup_*.log
 legacy_*.bak
 *_deprecated.py
+
+# Archivos temporales del Dashboard Golden Master
+dashboard_debug_*.log
+ui_command_*.tmp
+sort_test_*.py
+*_tclerror.log
+
+# Archivos de testing de ordenamiento interactivo
+interactive_sort_test_*.py
+treeview_test_*.log
