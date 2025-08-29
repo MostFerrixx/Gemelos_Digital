@@ -148,3 +148,8 @@ order_dashboard_*.tmp
 # Archivos de prueba de estrategias
 strategy_test_*.py
 *_strategy_test.py
+
+# Archivos de limpieza de UI obsoleta
+ui_cleanup_*.log
+legacy_*.bak
+*_deprecated.py
