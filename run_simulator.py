@@ -110,8 +110,7 @@ class SimuladorAlmacen:
                 self.configuracion = self._get_default_config()
                 print("[CONFIG] Configuración por defecto cargada")
             
-            # Crear el calculador de costos
-            self.cost_calculator = AssignmentCostCalculator(self.configuracion['assignment_rules'])
+            # Nota: cost_calculator se creará después de inicializar data_manager
             
             # Mostrar resumen de configuración cargada
             self._mostrar_resumen_config()
@@ -122,14 +121,12 @@ class SimuladorAlmacen:
             print(f"[CONFIG ERROR] Error al parsear config.json: {e}")
             print("[CONFIG] Usando configuración por defecto como fallback")
             self.configuracion = self._get_default_config()
-            self.cost_calculator = AssignmentCostCalculator(self.configuracion['assignment_rules'])
             return True
             
         except Exception as e:
             print(f"[CONFIG ERROR] Error inesperado cargando configuración: {e}")
             print("[CONFIG] Usando configuración por defecto como fallback")
             self.configuracion = self._get_default_config()
-            self.cost_calculator = AssignmentCostCalculator(self.configuracion['assignment_rules'])
             return True
     
     def _get_default_config(self) -> dict:
@@ -233,6 +230,9 @@ class SimuladorAlmacen:
         sequence_file = self.configuracion.get('sequence_file', '')
         self.data_manager = DataManager(layout_file, sequence_file)
         
+        # Crear el calculador de costos después de inicializar data_manager
+        self.cost_calculator = AssignmentCostCalculator(self.data_manager)
+        
         print(f"[TMX] Arquitectura TMX inicializada exitosamente:")
         print(f"  - Dimensiones: {self.layout_manager.grid_width}x{self.layout_manager.grid_height}")
         print(f"  - Puntos de picking: {len(self.layout_manager.picking_points)}")
@@ -260,8 +260,8 @@ class SimuladorAlmacen:
             layout_manager=self.layout_manager  # OBLIGATORIO
         )
         
-        # FORZAR INICIALIZACIÓN DE OPERARIOS EN ESTADO VISUAL
-        self._inicializar_operarios_en_estado_visual()
+        # INICIALIZAR ESTADO VISUAL DE AGENTES REALES
+        self._inicializar_operarios_en_estado_visual(self.operarios)
         
         self.env.process(self._proceso_actualizacion_metricas())
         
@@ -409,6 +409,7 @@ class SimuladorAlmacen:
             elif evento.key == pygame.K_MINUS or evento.key == pygame.K_KP_MINUS:  # Tecla - o -
                 disminuir_velocidad()
             elif evento.key == pygame.K_o:  # Tecla O para Dashboard de Órdenes
+                print(f"[DEBUG-DASHBOARD] Intento de abrir dashboard. Estado de self.almacen: {'Existe' if self.almacen else 'No Existe'}")
                 self.toggle_order_dashboard()
             # Funciones de diagnóstico desactivadas en limpieza
         
@@ -716,7 +717,7 @@ class SimuladorAlmacen:
                         "sku_id": work_order.sku.id if work_order.sku else "N/A",
                         "status": work_order.status,
                         "ubicacion": work_order.ubicacion,
-                        "level": work_order.level,
+                        "work_area": work_order.work_area,
                         "cantidad_restante": work_order.cantidad_restante,
                         "volumen_restante": work_order.calcular_volumen_restante(),
                         "assigned_agent_id": work_order.assigned_agent_id
@@ -732,6 +733,8 @@ class SimuladorAlmacen:
                 }
                 
                 # Enviar estado completo inicial
+                print(f"[DEBUG-SENDER] Enviando datos de WO (full_state): {len(full_state_data)} WorkOrders, primeras 2: {full_state_data[:2] if full_state_data else 'VACIO'}")
+                print(f"[DEBUG-SENDER] Enviando datos de WO: {full_state_message}")
                 self.dashboard_data_queue.put_nowait(full_state_message)
                 print(f"[COMMS-PROTOCOL] ✅ Estado completo inicial enviado: {len(full_state_data)} WorkOrders")
                 
@@ -757,10 +760,10 @@ class SimuladorAlmacen:
             # INSTRUMENTACIÓN: Estado del proceso y cola
             is_alive_status = self.order_dashboard_process.is_alive()
             queue_size = self.dashboard_data_queue.qsize() if hasattr(self.dashboard_data_queue, 'qsize') else "unknown"
-            print(f"[COMMS-LINK] └─ Proceso dashboard vivo: {is_alive_status}. Cola size: {queue_size}. Intentando enviar datos...")
+            print(f"[COMMS-LINK] |-- Proceso dashboard vivo: {is_alive_status}. Cola size: {queue_size}. Intentando enviar datos...")
             
             if not is_alive_status:
-                print("[COMMS-LINK] └─ ¡ERROR! El proceso se reporta como no vivo. No se enviarán datos.")
+                print("[COMMS-LINK] |-- ¡ERROR! El proceso se reporta como no vivo. No se enviarán datos.")
                 return
             
             try:
@@ -784,7 +787,7 @@ class SimuladorAlmacen:
                         "sku_id": work_order.sku.id if work_order.sku else "N/A",
                         "status": work_order.status,
                         "ubicacion": work_order.ubicacion,
-                        "level": work_order.level,
+                        "work_area": work_order.work_area,
                         "cantidad_restante": work_order.cantidad_restante,
                         "volumen_restante": work_order.calcular_volumen_restante(),
                         "assigned_agent_id": work_order.assigned_agent_id
@@ -817,6 +820,8 @@ class SimuladorAlmacen:
                             'data': delta_updates
                         }
                         
+                        print(f"[DEBUG-SENDER] Enviando datos de WO (delta): {len(delta_updates)} WorkOrders, primeras 2: {delta_updates[:2] if delta_updates else 'VACIO'}")
+                        print(f"[DEBUG-SENDER] Enviando datos de WO: {delta_message}")
                         self.dashboard_data_queue.put_nowait(delta_message)
                         print(f"[COMMS-PROTOCOL] ✅ Delta enviado exitosamente ({len(delta_updates)} WorkOrders cambiadas)")
                     except Exception as e:
@@ -836,43 +841,39 @@ class SimuladorAlmacen:
         else:
             # INSTRUMENTACIÓN: Diagnóstico cuando no se envían datos
             if not self.order_dashboard_process:
-                print("[COMMS-LINK] └─ No hay proceso dashboard creado")
+                print("[COMMS-LINK] |-- No hay proceso dashboard creado")
             elif not self.order_dashboard_process.is_alive():
-                print("[COMMS-LINK] └─ Proceso dashboard no está vivo")
+                print("[COMMS-LINK] |-- Proceso dashboard no está vivo")
             elif not self.dashboard_data_queue:
-                print("[COMMS-LINK] └─ No hay cola de datos")
+                print("[COMMS-LINK] |-- No hay cola de datos")
             elif not self.almacen:
-                print("[COMMS-LINK] └─ No hay almacén inicializado")
+                print("[COMMS-LINK] |-- No hay almacén inicializado")
             elif not self.almacen.dispatcher:
-                print("[COMMS-LINK] └─ No hay dispatcher inicializado")
+                print("[COMMS-LINK] |-- No hay dispatcher inicializado")
     
-    def _inicializar_operarios_en_estado_visual(self):
-        """Inicialización de operarios con soporte TMX"""
+    def _inicializar_operarios_en_estado_visual(self, agentes):
+        """Inicializa estado visual basándose en agentes reales creados"""
         from visualization.state import estado_visual
         
-        if not self.configuracion:
+        if not agentes:
+            print("[VISUAL-STATE] No hay agentes para inicializar en estado visual")
             return
-            
-        num_terrestres = self.configuracion.get('num_operarios_terrestres', 0)
-        num_montacargas = self.configuracion.get('num_montacargas', 0)
-        total_operarios = num_terrestres + num_montacargas
         
-        print(f"Inicializando {num_terrestres} operarios terrestres y {num_montacargas} montacargas...")
+        print(f"[VISUAL-STATE] Inicializando estado visual para {len(agentes)} agentes reales...")
         
-        # Limpiar operarios existentes
+        # Limpiar estado visual existente
         estado_visual["operarios"] = {}
         
         # Obtener posiciones usando TMX (OBLIGATORIO)
         if not self.almacen.data_manager or not self.almacen.data_manager.outbound_staging_locations:
-            raise SystemExit("[FATAL ERROR] Se requiere DataManager con outbound_staging_locations para inicializar operarios")
+            raise SystemExit("[FATAL ERROR] Se requiere DataManager con outbound_staging_locations para inicializar estado visual")
         
         # Usar outbound staging del DataManager como posiciones iniciales
         depot_point = self.almacen.data_manager.outbound_staging_locations[1]  # Staging ID 1
-        pixel_positions = []
         
-        # Distribuir operarios alrededor del depot en PÍXELES
-        for i in range(total_operarios):
-            # Calcular posición en grilla
+        # Crear entradas de estado visual para cada agente real
+        for i, agente in enumerate(agentes):
+            # Calcular posición en grilla para distribución visual
             grid_x = depot_point[0] + (i % 3)  # Distribuir en una grilla 3x3
             grid_y = depot_point[1] + (i // 3)
             
@@ -885,58 +886,30 @@ class SimuladorAlmacen:
                 else:
                     grid_x, grid_y = depot_point  # Último recurso: depot original
             
-            # Convertir a píxeles (ÚNICA FUENTE DE VERDAD)
+            # Convertir a píxeles
             pixel_x, pixel_y = self.layout_manager.grid_to_pixel(grid_x, grid_y)
-            pixel_positions.append((pixel_x, pixel_y))
-        
-        print(f"[OPERARIOS] Posiciones calculadas desde TMX depot: {depot_point}")
-        print(f"[OPERARIOS] {len(pixel_positions)} operarios posicionados en píxeles")
-        
-        # Crear operarios terrestres - SOLO PÍXELES
-        for i in range(1, num_terrestres + 1):
-            if i-1 < len(pixel_positions):
-                pixel_x, pixel_y = pixel_positions[i-1]
-            else:
-                pixel_x, pixel_y = pixel_positions[0]  # Usar primera posición como fallback
             
-            estado_visual["operarios"][i] = {
+            # Offset para Forklifts
+            if agente.type == "Forklift":
+                pixel_y += self.layout_manager.tile_height
+            
+            # Mapear tipo de agente a tipo visual
+            tipo_visual = 'terrestre' if agente.type == 'GroundOperator' else 'montacargas'
+            
+            # Crear entrada en estado visual usando el ID real del agente
+            estado_visual["operarios"][agente.id] = {
                 'x': pixel_x,
                 'y': pixel_y,
-                # NO hay grid_x, grid_y - solo píxeles
                 'accion': 'En Estacionamiento',
                 'tareas_completadas': 0,
                 'direccion_x': 0,
                 'direccion_y': 0,
-                'tipo': 'terrestre'
+                'tipo': tipo_visual
             }
-        
-        # Crear montacargas - SOLO PÍXELES
-        for i in range(num_terrestres + 1, num_terrestres + num_montacargas + 1):
-            idx = i - 1
-            if idx < len(pixel_positions):
-                pixel_x, pixel_y = pixel_positions[idx]
-                # Offset en píxeles para montacargas
-                pixel_y += self.layout_manager.tile_height
-            else:
-                pixel_x, pixel_y = pixel_positions[0]  # Usar primera posición como fallback
-                pixel_y += self.layout_manager.tile_height
             
-            estado_visual["operarios"][i] = {
-                'x': pixel_x,
-                'y': pixel_y,
-                # NO hay grid_x, grid_y - solo píxeles
-                'accion': 'En Estacionamiento',
-                'tareas_completadas': 0,
-                'direccion_x': 0,
-                'direccion_y': 0,
-                'tipo': 'montacargas'
-            }
+            print(f"  [VISUAL-STATE] {agente.id} ({agente.type}) -> posición ({pixel_x}, {pixel_y})")
         
-        total_created = len(estado_visual["operarios"])
-        print(f"Operarios inicializados: {total_created}")
-        
-        for op_id, op_data in estado_visual["operarios"].items():
-            print(f"  Operario {op_id}: {op_data['tipo']} en ({op_data['x']}, {op_data['y']})")
+        print(f"[VISUAL-STATE] Estado visual inicializado para {len(estado_visual['operarios'])} agentes reales")
     
     def _diagnosticar_route_calculator(self):
         """Método de diagnóstico para el RouteCalculator V2.6"""

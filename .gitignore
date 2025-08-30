@@ -163,3 +163,19 @@ sort_test_*.py
 # Archivos de testing de ordenamiento interactivo
 interactive_sort_test_*.py
 treeview_test_*.log
+
+# Archivos de debugging V5.0.0 - OrderDashboard
+[DEBUG-*]*.log
+[DASHBOARD-*]*.log
+audit_*.txt
+debug_session_*.log
+
+# Archivos temporales de refactoring WorkArea
+workarea_migration_*.log
+level_to_workarea_*.bak
+*_migration_backup.*
+
+# Archivos de testing de comunicación multiproceso
+multiprocess_test_*.py
+queue_debug_*.log
+dashboard_comm_*.tmp
