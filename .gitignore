@@ -179,3 +179,22 @@ level_to_workarea_*.bak
 multiprocess_test_*.py
 queue_debug_*.log
 dashboard_comm_*.tmp
+
+# Archivos de simulación y logs temporales (V5.3.0)
+simulation_logs.txt
+simulation_output.txt
+configurator_logs.txt
+*_logs.txt
+*_final_logs.txt
+
+# Archivos de configuración de testing realtime (V5.3.0)
+test_realistic_time_*.json
+test_config_*.json
+*_time_config.json
+
+# Archivos temporales del sistema
+nul
+
+# Assets temporales y screenshots
+assets/screenshots/
+assets/temp/
