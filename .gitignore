@@ -198,3 +198,19 @@ nul
 # Assets temporales y screenshots
 assets/screenshots/
 assets/temp/
+
+# TrafficManager y sistema de colisiones - archivos de prueba y debug
+traffic_test_*.py
+collision_debug_*.log
+traffic_manager_test_*.json
+cell_occupation_*.log
+
+# Archivos temporales de audit y desarrollo
+audit_*.md
+audit_*.txt
+development_notes_*.md
+
+# Archivos de testing unitario temporales
+unittest_*.py
+test_traffic_*.py
+*_unit_test.py

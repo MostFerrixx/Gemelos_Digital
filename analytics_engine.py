@@ -108,15 +108,15 @@ class AnalyticsEngine:
         if self.events_df is None or self.events_df.empty:
             return pd.DataFrame()
         
-        # Tiempo total de simulación
+        # Tiempo total de simulación - CORREGIDO: timestamps están en segundos
         tiempo_inicio = self.events_df['timestamp'].min()
         tiempo_fin = self.events_df['timestamp'].max()
         tiempo_total_sim = tiempo_fin - tiempo_inicio
-        tiempo_total_horas = tiempo_total_sim / 60  # Asumir que timestamp está en minutos
+        tiempo_total_horas = tiempo_total_sim / 3600  # CORREGIDO: Convertir segundos a horas
         
-        # Total de tareas completadas
-        task_completed_events = self.events_df[self.events_df['event_type'] == 'task_completed']
-        total_tareas_completadas = len(task_completed_events)
+        # Total de tareas completadas - CORREGIDO: usar work_order_completed
+        work_order_completed_events = self.events_df[self.events_df['event_type'] == 'work_order_completed']
+        total_tareas_completadas = len(work_order_completed_events)
         
         # Productividad (Tareas/Hora)
         if tiempo_total_horas > 0:
@@ -148,13 +148,13 @@ class AnalyticsEngine:
     
     def _calculate_agent_performance(self) -> pd.DataFrame:
         """
-        Calcula las métricas de rendimiento por agente usando reconstrucción de estados.
-        Nueva lógica precisa basada en eventos discharge_completed.
+        REFACTOR: Calcula las métricas de rendimiento por agente usando agregación simple
+        de los nuevos eventos ricos (trip_completed, operation_completed, work_order_completed).
         
         Returns:
             DataFrame con métricas de rendimiento por agente
         """
-        print("[ANALYTICS-ENGINE] Calculando rendimiento de agentes con lógica refactorizada...")
+        print("[ANALYTICS-ENGINE] Calculando rendimiento de agentes con nueva lógica simplificada...")
         
         if self.events_df is None or self.events_df.empty:
             return pd.DataFrame()
@@ -167,45 +167,41 @@ class AnalyticsEngine:
         performance_data = []
         
         for agent_id in agent_ids:
-            # Filtrar y ordenar eventos por agente
-            agent_events = self.events_df[self.events_df['agent_id'] == agent_id].sort_values('timestamp')
+            # Filtrar eventos por agente
+            agent_events = self.events_df[self.events_df['agent_id'] == agent_id]
             
-            # Tareas completadas por agente
-            task_events = agent_events[agent_events['event_type'] == 'task_completed']
-            tareas_completadas = len(task_events)
+            # NUEVA LÓGICA: Contar work_orders completadas por agente
+            work_order_events = agent_events[agent_events['event_type'] == 'work_order_completed']
+            tareas_completadas = len(work_order_events)
             
-            # Tiempo de picking (suma directa de tiempos de picking)
+            # NUEVA LÓGICA: Sumar duraciones de trip_completed para tiempo de viaje
+            trip_events = agent_events[agent_events['event_type'] == 'trip_completed']
+            tiempo_viaje_total = 0
+            for _, event in trip_events.iterrows():
+                if 'data' in event and event['data'] and 'duration' in event['data']:
+                    tiempo_viaje_total += event['data']['duration']
+            
+            # NUEVA LÓGICA: Sumar duraciones de operation_completed para tiempo de picking
+            operation_events = agent_events[agent_events['event_type'] == 'operation_completed']
             tiempo_picking_total = 0
-            if not task_events.empty:
-                for _, event in task_events.iterrows():
-                    if 'data' in event and event['data'] and 'tiempo_picking' in event['data']:
-                        tiempo_picking_total += event['data']['tiempo_picking']
+            for _, event in operation_events.iterrows():
+                if 'data' in event and event['data'] and 'duration' in event['data']:
+                    tiempo_picking_total += event['data']['duration']
             
-            # Tiempo de viaje (diferencias entre eventos agent_moved)
-            tiempo_viaje = 0
-            move_events = agent_events[agent_events['event_type'] == 'agent_moved']
-            if not move_events.empty and not agent_events.empty:
-                agent_events_with_diff = agent_events.copy()
-                agent_events_with_diff['time_diff'] = agent_events_with_diff['timestamp'].diff()
-                move_events_with_diff = agent_events_with_diff[agent_events_with_diff['event_type'] == 'agent_moved']
-                tiempo_viaje = move_events_with_diff['time_diff'].fillna(0).sum()
-            
-            # NUEVA MÉTRICA: Tiempo de descarga (suma de tiempos de discharge_completed)
+            # Tiempo de descarga (mantener lógica existente para discharge_completed)
             tiempo_descarga_total = 0
             discharge_completed_events = agent_events[agent_events['event_type'] == 'discharge_completed']
-            if not discharge_completed_events.empty:
-                for _, event in discharge_completed_events.iterrows():
-                    if 'data' in event and event['data'] and 'tiempo_total_descarga' in event['data']:
-                        # Convertir de segundos a minutos para consistencia con otros tiempos
-                        tiempo_descarga_total += event['data']['tiempo_total_descarga'] / 60
+            for _, event in discharge_completed_events.iterrows():
+                if 'data' in event and event['data'] and 'tiempo_total_descarga' in event['data']:
+                    tiempo_descarga_total += event['data']['tiempo_total_descarga'] / 60  # Segundos a minutos
             
-            # CORREGIDO: Tiempo_Total_Activo = Viaje + Picking + Descarga
-            tiempo_total_activo = tiempo_viaje + tiempo_picking_total + tiempo_descarga_total
+            # Calcular tiempo total activo
+            tiempo_total_activo = tiempo_viaje_total + tiempo_picking_total + tiempo_descarga_total
             
-            # CORREGIDO: Tiempo_Ocioso = Tiempo_Total_Simulacion - Tiempo_Total_Activo
+            # Calcular tiempo ocioso
             tiempo_ocioso = max(0, tiempo_total_simulacion - tiempo_total_activo)
             
-            # Utilización de capacidad (de eventos de descarga)
+            # Utilización de capacidad (mantener lógica existente)
             discharge_events = agent_events[agent_events['event_type'] == 'discharge_started']
             utilizacion_capacidad_promedio = 0
             if not discharge_events.empty:
@@ -223,9 +219,11 @@ class AnalyticsEngine:
             # Determinar tipo de agente
             agent_type = "Desconocido"
             if not agent_events.empty:
-                first_event = agent_events.iloc[0]
-                if 'data' in first_event and first_event['data'] and 'agent_type' in first_event['data']:
-                    agent_type = first_event['data']['agent_type']
+                # Buscar en cualquier evento que tenga agent_type en data
+                for _, event in agent_events.iterrows():
+                    if 'data' in event and event['data'] and 'agent_type' in event['data']:
+                        agent_type = event['data']['agent_type']
+                        break
             
             performance_data.append({
                 'Agent_ID': agent_id,
@@ -233,15 +231,15 @@ class AnalyticsEngine:
                 'Tareas_Completadas': tareas_completadas,
                 'Tiempo_Total_Activo': round(tiempo_total_activo, 2),
                 'Tiempo_Picking': round(tiempo_picking_total, 2),
-                'Tiempo_Viaje': round(tiempo_viaje, 2),
-                'Tiempo_Descarga': round(tiempo_descarga_total, 2),  # NUEVA COLUMNA
+                'Tiempo_Viaje': round(tiempo_viaje_total, 2),
+                'Tiempo_Descarga': round(tiempo_descarga_total, 2),
                 'Tiempo_Ocioso': round(tiempo_ocioso, 2),
                 'Utilizacion_Capacidad_Promedio_Pct': round(utilizacion_capacidad_promedio, 2),
                 'Eventos_Totales': len(agent_events)
             })
         
         performance_df = pd.DataFrame(performance_data)
-        print(f"[ANALYTICS-ENGINE] Rendimiento refactorizado calculado para {len(performance_df)} agentes")
+        print(f"[ANALYTICS-ENGINE] Rendimiento simplificado calculado para {len(performance_df)} agentes")
         return performance_df
     
     def _calculate_heatmap_data(self) -> pd.DataFrame:

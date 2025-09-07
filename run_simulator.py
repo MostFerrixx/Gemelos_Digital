@@ -295,7 +295,7 @@ class SimuladorAlmacen:
     def _proceso_actualizacion_metricas(self):
         """Proceso de actualización de métricas"""
         while True:
-            yield self.env.timeout(5.0)  # INTERVALO_ACTUALIZACION_METRICAS
+            yield self.almacen.adelantar_tiempo(5.0)  # INTERVALO_ACTUALIZACION_METRICAS
             actualizar_metricas_tiempo(estado_visual["operarios"])
     
     def ejecutar_bucle_principal(self):
@@ -314,11 +314,9 @@ class SimuladorAlmacen:
             if not self.simulacion_finalizada_reportada:
                 if not estado_visual["pausa"]:
                     if self._simulacion_activa():
-                        velocidad = obtener_velocidad_simulacion()
                         try:
-                            # Avanzar simulación con control de velocidad
-                            step_time = 0.1 / velocidad  # STEP_SIMULACION
-                            self.env.run(until=self.env.now + step_time)
+                            # REFACTOR V5.3.1: Procesar el siguiente evento disponible sin forzar tiempo
+                            self.env.step()
                         except simpy.core.EmptySchedule:
                             # Cuando no hay más eventos programados
                             pass
