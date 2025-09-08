@@ -15,6 +15,8 @@ import subprocess
 from datetime import datetime
 import multiprocessing
 from multiprocessing import Queue
+import argparse
+import logging
 
 # Importaciones de módulos propios
 from config.settings import *
@@ -38,7 +40,7 @@ from config.settings import SUPPORTED_RESOLUTIONS, LOGICAL_WIDTH, LOGICAL_HEIGHT
 class SimuladorAlmacen:
     """Clase principal que coordina toda la simulación"""
     
-    def __init__(self):
+    def __init__(self, headless_mode=False):
         self.configuracion = None
         self.almacen = None
         self.env = None
@@ -47,7 +49,11 @@ class SimuladorAlmacen:
         self.dashboard = None
         self.reloj = None
         self.corriendo = True
+        self.headless_mode = headless_mode  # Nuevo: modo headless
         self.order_dashboard_process = None  # Proceso del dashboard de órdenes
+        # REFACTOR: Infraestructura de multiproceso para SimPy Productor
+        self.visual_event_queue = None       # Cola de eventos visuales
+        self.simulation_process = None       # Proceso de simulación SimPy
         self.dashboard_data_queue = None     # Cola para comunicación con el dashboard
         # Nuevos componentes de la arquitectura TMX
         self.layout_manager = None
@@ -62,7 +68,14 @@ class SimuladorAlmacen:
         # NUEVO: Cache de estado anterior para delta updates del dashboard
         self.dashboard_last_state = {}
         
+        # REFACTOR FINAL: Motor de visualización tipo "replay"
+        self.event_buffer = []           # Buffer de eventos recibidos del productor
+        self.playback_time = 0.0         # Reloj de reproducción interno
+        self.factor_aceleracion = 1.0    # Factor de velocidad de reproducción
+        
     def inicializar_pygame(self):
+        # REFACTOR: Pygame ya está inicializado en crear_simulacion(), solo configurar ventana
+        
         PANEL_WIDTH = 400
         # 1. Obtener la clave de resolución seleccionada por el usuario
         resolution_key = self.configuracion.get('selected_resolution_key', "Pequeña (800x800)")
@@ -193,9 +206,18 @@ class SimuladorAlmacen:
         # ARQUITECTURA TMX OBLIGATORIA - No hay fallback
         print("[SIMULADOR] Inicializando arquitectura TMX (OBLIGATORIO)...")
         
-        # IMPORTANTE: Inicializar pygame antes de cargar TMX (PyTMX lo requiere)
-        pygame.init()
-        pygame.display.set_mode((100, 100))  # Ventana temporal para inicializar display
+        # REFACTOR: Inicialización condicional de pygame según el modo de ejecución
+        import os  # Mover import al nivel superior
+        if self.headless_mode:
+            # En modo headless, usar driver dummy para evitar ventanas
+            os.environ['SDL_VIDEODRIVER'] = 'dummy'  # Usar driver dummy sin ventanas
+            pygame.init()
+            # Crear superficie dummy mínima para TMX sin mostrar ventana
+            pygame.display.set_mode((1, 1), pygame.NOFRAME)
+        else:
+            # En modo visual, inicializar pygame completamente para TMX
+            pygame.init()
+            pygame.display.set_mode((100, 100))  # Ventana temporal para TMX
         
         # 1. Inicializar LayoutManager con archivo TMX por defecto (OBLIGATORIO)
         tmx_file = os.path.join(os.path.dirname(__file__), "layouts", "WH1.tmx")
@@ -294,9 +316,19 @@ class SimuladorAlmacen:
     
     def _proceso_actualizacion_metricas(self):
         """Proceso de actualización de métricas"""
-        while True:
+        # AUDIT: Importar logging para el proceso de métricas
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # AUDIT: Log de inicio del proceso de métricas (modo headless)
+        logger.info("Iniciando proceso de métricas de dashboard...")
+        
+        while not self.almacen.simulacion_ha_terminado():
             yield self.almacen.adelantar_tiempo(5.0)  # INTERVALO_ACTUALIZACION_METRICAS
             actualizar_metricas_tiempo(estado_visual["operarios"])
+        
+        # BUGFIX: Log INFO después de que el bucle termine
+        logger.info("Proceso de métricas de dashboard finalizado: la simulación ha terminado.")
     
     def ejecutar_bucle_principal(self):
         """Bucle principal completo con simulación y renderizado de agentes."""
@@ -373,6 +405,391 @@ class SimuladorAlmacen:
         print("Simulación terminada. Saliendo de Pygame.")
         pygame.quit()
     
+    def _ejecutar_bucle_headless(self):
+        """Bucle de ejecución headless para máxima velocidad"""
+        print("="*60)
+        print("MODO HEADLESS ACTIVADO - Ejecutando en modo máxima velocidad")
+        print("="*60)
+        print("Ejecutando en modo Headless...")
+        
+        try:
+            # BUGFIX: En lugar de env.run() indefinido, ejecutar hasta que la simulación termine
+            # Ejecutar eventos SimPy hasta que todas las WorkOrders estén completadas
+            while not self.almacen.simulacion_ha_terminado():
+                # Avanzar la simulación en pequeños pasos
+                try:
+                    # Usar un timeout pequeño para permitir verificar la condición de terminación
+                    self.env.run(until=self.env.now + 1.0)
+                except simpy.core.EmptySchedule:
+                    # No hay más eventos programados, pero verificar si la simulación realmente terminó
+                    if self.almacen.simulacion_ha_terminado():
+                        break
+                    else:
+                        # Si no terminó pero no hay eventos, algo está mal
+                        print("Advertencia: No hay eventos programados pero la simulación no ha terminado")
+                        break
+            
+            print("Simulación Headless completada.")
+            
+            # Llamar a analíticas al finalizar
+            self._simulacion_completada()
+            
+        except KeyboardInterrupt:
+            print("\nInterrupción del usuario en modo headless. Saliendo...")
+        except Exception as e:
+            print(f"Error en modo headless: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            print("Modo headless finalizado.")
+    
+    def _ejecutar_bucle_consumidor(self):
+        """
+        BUGFIX PASO 1: Motor de playback_time para restaurar control de velocidad
+        
+        Este bucle implementa un reloj de reproducción sincronizado que:
+        1. Lee eventos del productor y los almacena con timestamps
+        2. Avanza el playback_time según factor_aceleracion (teclas +/-)
+        3. Procesa eventos del buffer solo cuando su timestamp <= playback_time
+        """
+        print("[CONSUMIDOR-PLAYBACK] Iniciando bucle con motor de playback_time sincronizado...")
+        import queue
+        import time
+        from visualization.original_renderer import renderizar_agentes, renderizar_dashboard, renderizar_tareas_pendientes
+        from visualization.state import estado_visual
+        
+        # Estado de visualización
+        simulacion_activa = True
+        self.metricas_actuales = {}  # Estado de métricas del dashboard
+        
+        # Resetear el reloj de reproducción
+        self.playback_time = 0.0
+        
+        self.corriendo = True
+        while self.corriendo and simulacion_activa:
+            # INSTRUMENTACIÓN: Registro del tiempo de inicio del frame
+            frame_start_time = time.time()
+            # 1. AVANZAR RELOJ DE REPRODUCCIÓN (CONTROLADO POR FACTOR_ACELERACION)
+            delta_time = self.reloj.tick(60) / 1000.0  # Delta en segundos (60 FPS base)
+            self.playback_time += delta_time * self.factor_aceleracion
+            
+            # 2. Manejar eventos de usuario (Pygame)
+            for event in pygame.event.get():
+                if not self._manejar_evento(event):
+                    self.corriendo = False
+            
+            # 3. LLENAR BUFFER: Recibir todos los eventos disponibles del productor
+            eventos_recibidos = 0
+            try:
+                while True:  # Drenar la cola completamente
+                    try:
+                        mensaje = self.visual_event_queue.get_nowait()
+                        eventos_recibidos += 1
+                        
+                        # Asignar timestamp del productor, o tiempo actual si no tiene
+                        if 'timestamp' not in mensaje or mensaje['timestamp'] is None:
+                            # Los eventos sin timestamp se procesan inmediatamente
+                            mensaje['timestamp'] = self.playback_time - 0.001
+                        
+                        # Agregar evento al buffer ordenado por timestamp
+                        self.event_buffer.append(mensaje)
+                        
+                    except queue.Empty:
+                        break
+            except Exception as e:
+                print(f"[ERROR-CONSUMIDOR] Error llenando buffer: {e}")
+            
+            # Ordenar buffer por timestamp para procesamiento cronológico
+            self.event_buffer.sort(key=lambda x: x.get('timestamp', 0))
+            
+            # 4. PROCESAMIENTO DE BUFFER SINCRONIZADO (CAMBIO PRINCIPAL)
+            eventos_procesados = 0
+            eventos_procesados_este_frame = 0
+            while self.event_buffer and self.event_buffer[0]['timestamp'] <= self.playback_time:
+                # Sacar el primer evento del buffer
+                mensaje = self.event_buffer.pop(0)
+                eventos_procesados += 1
+                eventos_procesados_este_frame += 1
+                
+                # Procesar evento según su tipo
+                if mensaje['type'] == 'estado_agente':
+                    agent_id = mensaje['agent_id']
+                    data = mensaje['data']
+                    
+                    # Actualizar estado_visual global directamente
+                    if agent_id not in estado_visual["operarios"]:
+                        estado_visual["operarios"][agent_id] = {
+                            'x': 100, 'y': 100, 'tipo': 'terrestre',
+                            'accion': 'Iniciando', 'status': 'idle',
+                            'tareas_completadas': 0, 'direccion_x': 0, 'direccion_y': 0
+                        }
+                    estado_visual["operarios"][agent_id].update(data)
+                    
+                    # Convertir posición de grilla a píxeles
+                    if 'position' in data and hasattr(self, 'layout_manager') and self.layout_manager:
+                        pos = data['position']
+                        if isinstance(pos, tuple) and len(pos) == 2:
+                            pixel_x, pixel_y = self.layout_manager.grid_to_pixel(pos[0], pos[1])
+                            estado_visual["operarios"][agent_id]['x'] = pixel_x
+                            estado_visual["operarios"][agent_id]['y'] = pixel_y
+                
+                elif mensaje['type'] == 'work_order_update':
+                    # Procesar eventos de WorkOrder
+                    work_order_data = mensaje['data']
+                    work_order_id = work_order_data['id']
+                    estado_visual["work_orders"][work_order_id] = work_order_data.copy()
+                    print(f"[PLAYBACK-WO] WorkOrder {work_order_id}: {work_order_data['status']} @ {self.playback_time:.1f}s")
+                
+                elif mensaje['type'] == 'metricas_dashboard':
+                    # Procesar métricas del dashboard
+                    metricas = mensaje['data']
+                    self.metricas_actuales = metricas
+                    print(f"[PLAYBACK-METRICAS] T={self.playback_time:.1f}s (sim:{metricas['tiempo']:.1f}s), Completadas:{metricas['wos_completadas']}, Factor:{self.factor_aceleracion:.1f}x")
+                    
+                    # Actualizar dashboard de órdenes si está activo
+                    self._actualizar_dashboard_ordenes()
+                
+                elif mensaje['type'] == 'simulation_completed':
+                    print(f"[PLAYBACK] Simulación completada a los {self.playback_time:.1f}s de reproducción")
+                    simulacion_activa = False
+                    
+                elif mensaje['type'] == 'simulation_error':
+                    print(f"[PLAYBACK] Error: {mensaje['error']}")
+                    simulacion_activa = False
+            
+            # 5. RENDERIZADO
+            if self.corriendo:
+                # Limpiar la pantalla principal
+                self.pantalla.fill((240, 240, 240))
+
+                # Dibujar el mundo de simulación en la superficie virtual
+                self.virtual_surface.fill((25, 25, 25))
+                if hasattr(self, 'layout_manager') and self.layout_manager:
+                    self.renderer.renderizar_mapa_tmx(self.virtual_surface, self.layout_manager.tmx_data)
+                    renderizar_tareas_pendientes(self.virtual_surface, self.layout_manager)
+                renderizar_agentes(self.virtual_surface)
+
+                # Escalar la superficie virtual al área de simulación en la pantalla
+                scaled_surface = pygame.transform.smoothscale(self.virtual_surface, self.window_size)
+                self.pantalla.blit(scaled_surface, (0, 0))
+
+                # Renderizar dashboard
+                renderizar_dashboard(self.pantalla, self.window_size[0], self.metricas_actuales, estado_visual["operarios"])
+
+                # HUD de motor de playback mejorado
+                self._renderizar_hud_playback_motor(eventos_recibidos, eventos_procesados_este_frame, len(self.event_buffer))
+
+                # Actualizar pantalla
+                pygame.display.flip()
+            
+            # INSTRUMENTACIÓN: Logging de rendimiento de frames
+            frame_end_time = time.time()
+            frame_duration_ms = (frame_end_time - frame_start_time) * 1000
+            if frame_duration_ms > 16:  # Un frame debería durar ~16ms para 60 FPS
+                print(f"[PERF-WARN] Frame largo detectado: {frame_duration_ms:.2f} ms. Eventos procesados: {eventos_procesados_este_frame}. Buffer: {len(self.event_buffer)}. Playback Time: {self.playback_time:.2f}s")
+        
+        # PIPELINE DE ANALÍTICAS AL FINALIZAR
+        print("[CONSUMIDOR-FINAL] Finalizando simulación e iniciando pipeline de analíticas...")
+        
+        # Esperar a que termine el proceso SimPy
+        if self.simulation_process and self.simulation_process.is_alive():
+            print("[CONSUMIDOR-FINAL] Esperando finalización del proceso SimPy...")
+            logger.info("[PROCESS-LIFECYCLE] Esperando join del proceso principal de simulación (timeout=10s)")
+            self.simulation_process.join(timeout=10)
+            if self.simulation_process.is_alive():
+                print("[CONSUMIDOR-FINAL] Forzando terminación del proceso SimPy...")
+                logger.info("[PROCESS-LIFECYCLE] Proceso principal no terminó en 10s, forzando terminate()")
+                self.simulation_process.terminate()
+                logger.info("[PROCESS-LIFECYCLE] Esperando join después de terminate() (timeout=5s)")
+                self.simulation_process.join(timeout=5)
+                logger.info("[PROCESS-LIFECYCLE] Join post-terminate completado")
+            else:
+                logger.info("[PROCESS-LIFECYCLE] Proceso principal terminado exitosamente via join()")
+        
+        # Cerrar Dashboard de Órdenes si está abierto
+        if self.order_dashboard_process and self.order_dashboard_process.is_alive():
+            print("[CONSUMIDOR-FINAL] Cerrando Dashboard de Órdenes...")
+            try:
+                if self.dashboard_data_queue:
+                    self.dashboard_data_queue.put_nowait('__EXIT_COMMAND__')
+            except:
+                pass
+            logger.info("[PROCESS-LIFECYCLE] Esperando join del proceso Dashboard de Órdenes (timeout=3s)")
+            self.order_dashboard_process.join(timeout=3)
+            if self.order_dashboard_process.is_alive():
+                logger.info("[PROCESS-LIFECYCLE] Dashboard no terminó en 3s, forzando terminate()")
+                self.order_dashboard_process.terminate()
+            else:
+                logger.info("[PROCESS-LIFECYCLE] Proceso Dashboard de Órdenes terminado exitosamente via join()")
+        
+        # Reportar finalización (las analíticas ya se procesaron en el productor)
+        print("[CONSUMIDOR-FINAL] Pipeline de analíticas completado en el proceso productor.")
+        print("[CONSUMIDOR-FINAL] Revise el directorio 'output/' para los archivos generados.")
+        
+        print("[CONSUMIDOR-FINAL] Bucle de consumidor terminado.")
+        pygame.quit()
+    
+    def _crear_almacen_mock(self):
+        """Crea un mock del almacén para el dashboard cuando no hay datos del productor"""
+        class AlmacenMock:
+            def __init__(self):
+                self.tareas_completadas_count = 0
+                self.total_tareas = 0
+                self.tareas_zona_a = []
+                self.tareas_zona_b = []
+                self.num_operarios_total = 4
+                self.num_traspaletas = 2
+                self.num_montacargas = 2
+                self.traspaletas = MockResource(2)
+                self.montacargas = MockResource(2)
+                
+            def get_workorders_completadas(self):
+                return []
+                
+            def get_workorders_pendientes(self):
+                return []
+                
+            def calcular_progreso_workorders(self):
+                return (0.0, 0, 0)  # progreso_porcentaje, cantidad_recogida, cantidad_total
+                
+            def simulacion_ha_terminado(self):
+                return False
+                
+        class MockResource:
+            def __init__(self, capacity):
+                self.capacity = capacity
+                self.users = []
+                
+        return AlmacenMock()
+    
+    def _renderizar_replay_frame(self, operarios_visual, eventos_recibidos, eventos_procesados):
+        """Renderiza un frame del motor de replay"""
+        # Limpiar pantalla
+        self.pantalla.fill((240, 240, 240))  # Fondo gris claro
+        
+        # Renderizar mapa TMX si está disponible
+        if hasattr(self, 'layout_manager') and self.layout_manager:
+            # Renderizar en superficie virtual primero
+            self.virtual_surface.fill((25, 25, 25))
+            self.renderer.renderizar_mapa_tmx(self.virtual_surface, self.layout_manager.tmx_data)
+            
+            # Renderizar agentes en superficie virtual
+            self._renderizar_agentes_replay(self.virtual_surface, operarios_visual)
+            
+            # Escalar a pantalla principal
+            scaled_surface = pygame.transform.smoothscale(self.virtual_surface, self.window_size)
+            self.pantalla.blit(scaled_surface, (0, 0))
+        else:
+            # Renderizado simple sin mapa
+            self._renderizar_agentes_replay(self.pantalla, operarios_visual)
+        
+        # HUD de información del motor de replay
+        self._renderizar_hud_replay(eventos_recibidos, eventos_procesados, len(operarios_visual))
+        
+        # Actualizar pantalla
+        pygame.display.flip()
+    
+    def _renderizar_agentes_replay(self, surface, operarios_visual):
+        """Renderiza los agentes en la superficie especificada"""
+        for agent_id, data in operarios_visual.items():
+            x = data.get('x', 100)
+            y = data.get('y', 100)
+            tipo = data.get('tipo', 'terrestre')
+            
+            # Color según tipo
+            color = (0, 150, 255) if tipo == 'montacargas' else (255, 100, 0)  # Azul o naranja
+            
+            # Dibujar agente como círculo
+            pygame.draw.circle(surface, color, (int(x), int(y)), 8)
+            
+            # Dibujar ID del agente
+            font = pygame.font.Font(None, 16)
+            texto = font.render(agent_id[-1], True, (255, 255, 255))  # Solo último carácter
+            surface.blit(texto, (int(x) - 5, int(y) - 20))
+    
+    def _renderizar_hud_replay(self, eventos_recibidos, eventos_procesados, agentes_activos):
+        """Renderiza el HUD del motor de replay"""
+        font = pygame.font.Font(None, 24)
+        textos = [
+            f"MOTOR DE REPLAY (PRODUCTOR-CONSUMIDOR)",
+            f"Tiempo de reproducción: {self.playback_time:.1f}s",
+            f"Velocidad: {self.factor_aceleracion:.1f}x",
+            f"Buffer: {len(self.event_buffer)} eventos",
+            f"Recibidos: {eventos_recibidos} | Procesados: {eventos_procesados}",
+            f"Agentes activos: {agentes_activos}",
+            f"PID SimPy: {self.simulation_process.pid}",
+            f"",
+            f"Controles: +/- (velocidad), ESC (salir)"
+        ]
+        
+        for i, texto in enumerate(textos):
+            superficie_texto = font.render(texto, True, (50, 50, 50))
+            self.pantalla.blit(superficie_texto, (10, 10 + i * 25))
+    
+    def _renderizar_hud_replay_mejorado(self, eventos_recibidos, agentes_activos):
+        """Renderiza el HUD del motor de replay mejorado"""
+        from visualization.state import estado_visual
+        
+        font = pygame.font.Font(None, 20)
+        y_offset = self.window_size[1] - 120  # Esquina inferior izquierda
+        
+        textos = [
+            f"MOTOR DE REPLAY v2.0",
+            f"Tiempo: {self.playback_time:.1f}s | Velocidad: {self.factor_aceleracion:.1f}x",
+            f"Eventos/frame: {eventos_recibidos} | Agentes: {agentes_activos}",
+            f"WorkOrders: {len(estado_visual['work_orders']) if 'work_orders' in estado_visual else 0}",
+            f"Controles: +/- velocidad, O dashboard, ESC salir"
+        ]
+        
+        for i, texto in enumerate(textos):
+            superficie_texto = font.render(texto, True, (80, 80, 80))
+            self.pantalla.blit(superficie_texto, (10, y_offset + i * 20))
+    
+    def _renderizar_hud_playback_motor(self, eventos_recibidos, eventos_procesados, buffer_size):
+        """Renderiza el HUD del motor de playback sincronizado"""
+        from visualization.state import estado_visual
+        
+        font = pygame.font.Font(None, 18)
+        y_offset = self.window_size[1] - 140  # Esquina inferior izquierda
+        
+        # Calcular ratio de sincronización
+        sync_ratio = eventos_procesados / max(1, eventos_recibidos) if eventos_recibidos > 0 else 1.0
+        
+        textos = [
+            f"MOTOR PLAYBACK v1.0 - CONTROL DE VELOCIDAD",
+            f"Playback Time: {self.playback_time:.2f}s | Factor: {self.factor_aceleracion:.1f}x",
+            f"Eventos: Recibidos:{eventos_recibidos} Procesados:{eventos_procesados} Buffer:{buffer_size}",
+            f"Sincronización: {sync_ratio:.2f} | Agentes: {len(estado_visual.get('operarios', {}))}",
+            f"WorkOrders: {len(estado_visual.get('work_orders', {}))}",
+            f"TECLAS: +/- para cambiar velocidad | ESC salir",
+            f"ESTADO: {'REPRODUCIENDO' if buffer_size > 0 or eventos_recibidos > 0 else 'EN ESPERA'}"
+        ]
+        
+        for i, texto in enumerate(textos):
+            color = (0, 255, 0) if i == 1 else (80, 80, 80)  # Resaltar tiempo de playback
+            superficie_texto = font.render(texto, True, color)
+            self.pantalla.blit(superficie_texto, (10, y_offset + i * 18))
+    
+    def _finalizar_replay_engine(self):
+        """Finaliza el motor de replay y limpia recursos"""
+        print(f"[REPLAY-ENGINE] Finalizando motor de replay...")
+        print(f"[REPLAY-ENGINE] Eventos restantes en buffer: {len(self.event_buffer)}")
+        
+        # Cleanup del proceso SimPy
+        if self.simulation_process and self.simulation_process.is_alive():
+            print("[REPLAY-ENGINE] Esperando finalización del proceso SimPy...")
+            logger.info("[PROCESS-LIFECYCLE] [REPLAY] Esperando join del proceso principal (timeout=10s)")
+            self.simulation_process.join(timeout=10)
+            if self.simulation_process.is_alive():
+                print("[REPLAY-ENGINE] Forzando terminación del proceso SimPy...")
+                logger.info("[PROCESS-LIFECYCLE] [REPLAY] Proceso no terminó en 10s, forzando terminate()")
+            else:
+                logger.info("[PROCESS-LIFECYCLE] [REPLAY] Proceso principal terminado exitosamente via join()")
+                self.simulation_process.terminate()
+        
+        print("[REPLAY-ENGINE] Motor de replay terminado.")
+        pygame.quit()
+    
     def _manejar_evento(self, evento):
         """Maneja los eventos de pygame"""
         if evento.type == pygame.QUIT:
@@ -403,9 +820,21 @@ class SimuladorAlmacen:
                 self.dashboard.visible = visible
                 print(f"Dashboard {'mostrado' if visible else 'oculto'}")
             elif evento.key == pygame.K_EQUALS or evento.key == pygame.K_KP_PLUS:  # Tecla + o +
-                aumentar_velocidad()
+                # REFACTOR FINAL: Control de velocidad local del motor de replay
+                factores = [0.5, 1.0, 2.0, 5.0, 10.0, 20.0]
+                if self.factor_aceleracion in factores and factores.index(self.factor_aceleracion) < len(factores) - 1:
+                    self.factor_aceleracion = factores[factores.index(self.factor_aceleracion) + 1]
+                else:
+                    self.factor_aceleracion = factores[-1]
+                print(f"[REPLAY] Velocidad de reproducción: {self.factor_aceleracion:.1f}x")
             elif evento.key == pygame.K_MINUS or evento.key == pygame.K_KP_MINUS:  # Tecla - o -
-                disminuir_velocidad()
+                # REFACTOR FINAL: Control de velocidad local del motor de replay
+                factores = [0.5, 1.0, 2.0, 5.0, 10.0, 20.0]
+                if self.factor_aceleracion in factores and factores.index(self.factor_aceleracion) > 0:
+                    self.factor_aceleracion = factores[factores.index(self.factor_aceleracion) - 1]
+                else:
+                    self.factor_aceleracion = factores[0]
+                print(f"[REPLAY] Velocidad de reproducción: {self.factor_aceleracion:.1f}x")
             elif evento.key == pygame.K_o:  # Tecla O para Dashboard de Órdenes
                 print(f"[DEBUG-DASHBOARD] Intento de abrir dashboard. Estado de self.almacen: {'Existe' if self.almacen else 'No Existe'}")
                 self.toggle_order_dashboard()
@@ -634,14 +1063,21 @@ class SimuladorAlmacen:
                     # Crear cola para comunicación
                     self.dashboard_data_queue = Queue()
                     
+                    # AUDIT: Instrumentar creación de proceso Dashboard
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info("Creando proceso Dashboard de Órdenes...")
+                    
                     # Crear proceso separado para el dashboard
                     self.order_dashboard_process = multiprocessing.Process(
                         target=launch_dashboard_process,
                         args=(self.dashboard_data_queue,)
                     )
                     
-                    # Iniciar el proceso
+                    # AUDIT: Log antes de iniciar proceso Dashboard
+                    logger.info("Iniciando proceso Dashboard...")
                     self.order_dashboard_process.start()
+                    logger.info(f"Proceso Dashboard iniciado (PID: {self.order_dashboard_process.pid})")
                     print("Dashboard de Órdenes abierto en proceso separado - Presiona 'O' nuevamente para cerrar")
                     
                     # NUEVO: Enviar estado completo inicial inmediatamente después del arranque
@@ -674,13 +1110,19 @@ class SimuladorAlmacen:
                             pass  # Cola llena, proceder con terminación
                     
                     # Esperar cierre graceful
+                    logger.info("[PROCESS-LIFECYCLE] Esperando cierre graceful del Dashboard (timeout=3s)")
                     self.order_dashboard_process.join(timeout=3)
                     
                     # Si no responde, terminación forzada
                     if self.order_dashboard_process.is_alive():
                         print("[DASHBOARD] Timeout - forzando terminación")
+                        logger.info("[PROCESS-LIFECYCLE] Dashboard timeout, forzando terminate()")
                         self.order_dashboard_process.terminate()
+                        logger.info("[PROCESS-LIFECYCLE] Esperando join post-terminate Dashboard (timeout=1s)")
                         self.order_dashboard_process.join(timeout=1)
+                        logger.info("[PROCESS-LIFECYCLE] Join post-terminate Dashboard completado")
+                    else:
+                        logger.info("[PROCESS-LIFECYCLE] Dashboard terminado exitosamente via join()")
                         
                 self.order_dashboard_process = None
                 self.dashboard_data_queue = None
@@ -935,8 +1377,359 @@ class SimuladorAlmacen:
         print("V2.6: RouteCalculator integrado con DataManager y AssignmentCostCalculator")
         print("-------------------------------------------\n")
     
+    def ejecutar(self):
+        """Método principal de ejecución - Modo automatizado sin UI"""
+        try:
+            # NUEVO ORDEN: Configuración JSON → TMX → Pygame → Simulación
+            print("[SIMULATOR] Iniciando en modo automatizado (sin UI de configuración)")
+            
+            if not self.cargar_configuracion():
+                print("Error al cargar configuracion. Saliendo...")
+                return
+            
+            if not self.crear_simulacion():
+                print("Error al crear la simulacion. Saliendo...")
+                return
+            
+            # BIFURCACIÓN PRINCIPAL: Headless vs Visual vs Multiproceso
+            if self.headless_mode:
+                # Modo headless: máxima velocidad sin interfaz gráfica
+                self._ejecutar_bucle_headless()
+            else:
+                # REFACTOR: Modo visual con arquitectura Productor-Consumidor
+                print("[SIMULATOR] Iniciando modo visual con multiproceso...")
+                
+                # 1. Crear cola de comunicación
+                self.visual_event_queue = multiprocessing.Queue()
+                
+                # 2. Lanzar proceso de simulación SimPy
+                print("[SIMULATOR] Lanzando proceso de simulación SimPy...")
+                logger.info("[PROCESS-LIFECYCLE] Creando proceso principal de simulación (visual mode)")
+                self.simulation_process = multiprocessing.Process(
+                    target=_run_simulation_process_static,
+                    args=(self.visual_event_queue, self.configuracion)
+                )
+                logger.info("[PROCESS-LIFECYCLE] Iniciando proceso principal de simulación")
+                self.simulation_process.start()
+                print(f"[SIMULATOR] Proceso SimPy iniciado (PID: {self.simulation_process.pid})")
+                logger.info(f"[PROCESS-LIFECYCLE] Proceso principal de simulación iniciado exitosamente (PID: {self.simulation_process.pid})")
+                
+                # 3. Inicializar interfaz Pygame
+                self.inicializar_pygame()
+                
+                print("[SIMULATOR] Iniciando bucle principal de visualización...")
+                print("[SIMULATOR] Presiona ESC para salir, SPACE para pausar")
+                
+                # 4. Ejecutar bucle de visualización como Consumidor
+                self._ejecutar_bucle_consumidor()
+            
+        except KeyboardInterrupt:
+            print("\nInterrupcion del usuario. Saliendo...")
+        except Exception as e:
+            print(f"Error inesperado: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            self.limpiar_recursos()
+
     def limpiar_recursos(self):
-        """Limpia todos los recursos"""
+        """Limpia todos los recursos incluyendo procesos"""
+        if self.simulation_process and self.simulation_process.is_alive():
+            print("[CLEANUP] Terminando proceso de simulación...")
+            self.simulation_process.terminate()
+            self.simulation_process.join(timeout=5)
+        
+        limpiar_estado()
+        pygame.quit()
+        print("Recursos liberados. Hasta luego!")
+
+def _run_simulation_process_static(visual_event_queue, configuracion):
+    """
+    REFACTOR: Función estática para proceso separado de simulación SimPy
+    
+    Esta función ejecuta en un proceso hijo y contiene toda la lógica
+    de inicialización y ejecución de SimPy, enviando eventos de estado
+    a través de la cola de multiproceso.
+    
+    NOTA: Debe ser función estática para evitar problemas de pickle
+    """
+    # AUDIT: Configurar logging al inicio del proceso simulation_producer
+    import logging
+    logging.basicConfig(
+        level=logging.DEBUG,  # AUDIT: Cambiar a DEBUG para ver todos los logs
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    logger = logging.getLogger(__name__)
+    
+    # AUDIT: Log de inicio del proceso productor de simulación
+    logger.info("Iniciando proceso productor de simulación...")
+    
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'git'))
+    
+    import pygame
+    import simpy
+    from simulation.warehouse import AlmacenMejorado
+    from simulation.operators_workorder import crear_operarios
+    from simulation.layout_manager import LayoutManager
+    from simulation.assignment_calculator import AssignmentCostCalculator
+    from simulation.data_manager import DataManager
+    from simulation.pathfinder import Pathfinder
+    from simulation.route_calculator import RouteCalculator
+    
+    try:
+        print("[PROCESO-SIMPY] Iniciando proceso de simulación separado...")
+        
+        # ARQUITECTURA TMX OBLIGATORIA - Inicialización en proceso hijo
+        print("[PROCESO-SIMPY] Inicializando arquitectura TMX...")
+        
+        # REFACTOR: PyTMX requiere pygame display inicializado - usar driver dummy para proceso multiproceso
+        import os
+        os.environ['SDL_VIDEODRIVER'] = 'dummy'  # Usar driver dummy para evitar ventanas en proceso hijo
+        pygame.init()
+        pygame.display.set_mode((1, 1), pygame.NOFRAME)  # Superficie dummy mínima
+        
+        # 1. Inicializar LayoutManager
+        tmx_file = os.path.join(os.path.dirname(__file__), "layouts", "WH1.tmx")
+        print(f"[PROCESO-SIMPY] Cargando layout: {tmx_file}")
+        layout_manager = LayoutManager(tmx_file)
+        
+        # 2. Inicializar Pathfinder
+        print("[PROCESO-SIMPY] Inicializando pathfinding...")
+        pathfinder = Pathfinder(layout_manager.collision_matrix)
+        route_calculator = RouteCalculator(pathfinder)
+        
+        # 3. Crear entorno SimPy
+        env = simpy.Environment()
+        
+        # 4. Crear DataManager
+        layout_file = configuracion.get('layout_file', '')
+        sequence_file = configuracion.get('sequence_file', '')
+        data_manager = DataManager(layout_file, sequence_file)
+        
+        # 5. Crear calculador de costos
+        cost_calculator = AssignmentCostCalculator(data_manager)
+        
+        # 6. REFACTOR: Crear AlmacenMejorado con cola de eventos
+        print("[PROCESO-SIMPY] Creando AlmacenMejorado con cola de eventos...")
+        almacen = AlmacenMejorado(
+            env,
+            configuracion,
+            layout_manager=layout_manager,
+            pathfinder=pathfinder,
+            data_manager=data_manager,
+            cost_calculator=cost_calculator,
+            visual_event_queue=visual_event_queue  # NUEVO: Pasar cola
+        )
+        
+        # 7. Inicializar estado visual EN EL PROCESO HIJO (con cola)
+        from visualization.state import inicializar_estado_con_cola
+        inicializar_estado_con_cola(almacen, env, configuracion, 
+                                   layout_manager, visual_event_queue)
+        
+        # 8. Crear operarios
+        print("[PROCESO-SIMPY] Creando operarios...")
+        procesos_operarios, operarios = crear_operarios(
+            env, almacen, configuracion,
+            pathfinder=pathfinder, layout_manager=layout_manager
+        )
+        
+        # 9. Proceso de actualización de métricas simple
+        def proceso_actualizacion_metricas():
+            while True:
+                yield almacen.adelantar_tiempo(5.0)
+                # Las métricas ahora se envían vía cola
+                pass
+        
+        env.process(proceso_actualizacion_metricas())
+        
+        # 10. Inicializar almacén y crear órdenes
+        almacen._crear_catalogo_y_stock()
+        almacen._generar_flujo_ordenes()
+        
+        # 11. Proceso de envío de estado del almacén para el dashboard
+        def enviar_estado_almacen():
+            while True:
+                try:
+                    # Crear estado del almacén para el dashboard
+                    estado_almacen = {
+                        'tareas_completadas_count': almacen.tareas_completadas_count,
+                        'total_tareas': getattr(almacen, 'total_tareas', len(almacen.dispatcher.lista_maestra_work_orders) if hasattr(almacen, 'dispatcher') else 0),
+                        'tareas_zona_a': [],  # Simplificado por ahora
+                        'tareas_zona_b': [],  # Simplificado por ahora
+                        'num_operarios_total': almacen.num_operarios_total,
+                        'tiempo_simulacion': env.now
+                    }
+                    
+                    visual_event_queue.put({
+                        'type': 'almacen_state',
+                        'data': estado_almacen,
+                        'timestamp': env.now
+                    })
+                except Exception as e:
+                    print(f"[ERROR-ESTADO] Error enviando estado del almacén: {e}")
+                
+                yield env.timeout(5.0)  # Enviar cada 5 segundos simulados
+        
+        env.process(enviar_estado_almacen())
+
+        # 12. NUEVO: Proceso de métricas del dashboard
+        def proceso_metricas_dashboard(env, almacen, event_queue):
+            """
+            Proceso SimPy que calcula y emite métricas para el dashboard periódicamente
+            """
+            # AUDIT: Log de inicio del proceso de métricas
+            logger.info("Iniciando proceso de métricas de dashboard...")
+            
+            while True:
+                # AUDIT: Log DEBUG en cada iteración del bucle
+                logger.debug("Proceso de métricas de dashboard: Tick de ejecución.")
+                
+                try:
+                    # a. Calcular Métricas del almacén
+                    tiempo = env.now
+                    wos_completadas = almacen.tareas_completadas_count
+                    wos_pendientes = len(almacen.dispatcher.lista_maestra_work_orders) if hasattr(almacen, 'dispatcher') and almacen.dispatcher.lista_maestra_work_orders else 0
+                    wos_totales = wos_completadas + wos_pendientes
+                    progreso = (wos_completadas / wos_totales * 100) if wos_totales > 0 else 0.0
+                    
+                    # b. Construir el Mensaje
+                    mensaje = {
+                        'type': 'metricas_dashboard',
+                        'data': {
+                            'tiempo': tiempo,
+                            'wos_completadas': wos_completadas,
+                            'wos_pendientes': wos_pendientes,
+                            'wos_totales': wos_totales,
+                            'progreso': progreso,
+                            'timestamp': env.now
+                        }
+                    }
+                    
+                    # c. Enviar el Mensaje a la cola
+                    print(f"[METRICAS-DASHBOARD] T={tiempo:.1f}s - Completadas:{wos_completadas}, Pendientes:{wos_pendientes}, Progreso:{progreso:.1f}%")
+                    event_queue.put(mensaje)
+                    
+                except Exception as e:
+                    print(f"[ERROR-METRICAS] Error calculando métricas del dashboard: {e}")
+                
+                # d. Esperar intervalo antes de próxima actualización
+                yield env.timeout(1.0)  # Actualizar cada 1 segundo simulado
+        
+        # Lanzar el proceso de métricas junto con otros procesos
+        print("[PROCESO-SIMPY] LANZANDO PROCESO DE METRICAS DEL DASHBOARD")
+        env.process(proceso_metricas_dashboard(env, almacen, visual_event_queue))
+        print("[PROCESO-SIMPY] Proceso de metricas registrado en SimPy")
+        
+        # 12. Iniciar dispatcher
+        if hasattr(almacen, 'dispatcher'):
+            print("[PROCESO-SIMPY] Iniciando dispatcher V2.6...")
+            env.process(almacen.dispatcher.dispatcher_process(operarios))
+        
+        print(f"[PROCESO-SIMPY] Simulación creada: {len(procesos_operarios)} agentes")
+        print("[PROCESO-SIMPY] EJECUTANDO SIMULACIÓN CON env.run()...")
+        
+        # AUDIT: Log antes de la llamada a env.run()
+        logger.info("Iniciando bucle de eventos principal de SimPy...")
+        
+        # 12. EJECUTAR SIMULACIÓN COMPLETA
+        env.run()
+        
+        # AUDIT: Log inmediatamente después de la llamada a env.run()
+        logger.info("Bucle de eventos principal de SimPy ha finalizado. Procediendo a la limpieza...")
+        
+        print("[PROCESO-SIMPY] Simulación completada.")
+        
+        # 13. Procesar analíticas en el proceso productor y enviar resultados
+        print("[PROCESO-SIMPY] Procesando analíticas en proceso productor...")
+        try:
+            # Importar el pipeline de analíticas
+            from analytics_engine import AnalyticsEngine
+            from datetime import datetime
+            import os
+            
+            def mostrar_metricas_consola_productor(almacen):
+                print(f"Tareas completadas: {almacen.tareas_completadas_count}")
+                print(f"Tiempo total de simulación: {env.now:.2f}")
+                
+            mostrar_metricas_consola_productor(almacen)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # Crear estructura de directorios organizados
+            output_base_dir = "output"
+            output_dir = os.path.join(output_base_dir, f"simulation_{timestamp}")
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # Pipeline automatizado: AnalyticsEngine → Excel
+            excel_filename = f"analytics_warehouse_{timestamp}.xlsx"
+            excel_path = os.path.join(output_dir, excel_filename)
+            
+            analytics_engine = AnalyticsEngine(almacen.event_log, configuracion)
+            analytics_engine.process_events()
+            
+            # Exportar a Excel
+            archivo_excel = analytics_engine.export_to_excel(excel_filename)
+            print(f"[PROCESO-SIMPY] Excel generado: {archivo_excel}")
+            
+            # Enviar evento de finalización con información de archivos generados
+            visual_event_queue.put({
+                'type': 'simulation_completed',
+                'timestamp': env.now,
+                'message': 'Simulación SimPy completada exitosamente',
+                'analytics_completed': True,
+                'excel_file': archivo_excel,
+                'output_dir': output_dir
+            })
+            
+        except Exception as e:
+            print(f"[ERROR-PROCESO-SIMPY] Error en pipeline de analíticas: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Enviar evento de finalización aunque fallen las analíticas
+            visual_event_queue.put({
+                'type': 'simulation_completed',
+                'timestamp': env.now,
+                'message': 'Simulación completada con errores en analíticas',
+                'analytics_completed': False,
+                'error': str(e)
+            })
+        
+    except Exception as e:
+        print(f"[ERROR-PROCESO-SIMPY] Error en proceso de simulación: {e}")
+        import traceback
+        traceback.print_exc()
+        # Enviar evento de error
+        visual_event_queue.put({
+            'type': 'simulation_error',
+            'error': str(e),
+            'message': 'Error en proceso de simulación SimPy'
+        })
+    finally:
+        # AUDIT: Log final del proceso productor de simulación
+        logger.info("Proceso productor de simulación finalizado limpiamente.")
+        print("[PROCESO-SIMPY] Proceso de simulación terminado.")
+
+# Retornar a la clase SimuladorAlmacen (continuación)
+
+    def _run_simulation_process(self, visual_event_queue, configuracion):
+        """Wrapper para llamar a la función estática"""
+        _run_simulation_process_static(visual_event_queue, configuracion)
+    
+    def _proceso_actualizacion_metricas_subprocess(self):
+        """Versión del proceso de métricas para el subprocess"""
+        # Esta función no es usada en la versión static, pero se deja por compatibilidad
+        pass
+    
+    def limpiar_recursos(self):
+        """Limpia todos los recursos incluyendo procesos"""
+        if self.simulation_process and self.simulation_process.is_alive():
+            print("[CLEANUP] Terminando proceso de simulación...")
+            self.simulation_process.terminate()
+            self.simulation_process.join(timeout=5)
+        
         limpiar_estado()
         pygame.quit()
         print("Recursos liberados. Hasta luego!")
@@ -955,13 +1748,37 @@ class SimuladorAlmacen:
                 print("Error al crear la simulacion. Saliendo...")
                 return
             
-            # Inicializar pygame DESPUÉS de cargar TMX
-            self.inicializar_pygame()
-            
-            print("[SIMULATOR] Iniciando bucle principal de simulación...")
-            print("[SIMULATOR] Presiona ESC para salir, SPACE para pausar, R para reiniciar")
-            
-            self.ejecutar_bucle_principal()
+            # BIFURCACIÓN PRINCIPAL: Headless vs Visual vs Multiproceso
+            if self.headless_mode:
+                # Modo headless: máxima velocidad sin interfaz gráfica
+                self._ejecutar_bucle_headless()
+            else:
+                # REFACTOR: Modo visual con arquitectura Productor-Consumidor
+                print("[SIMULATOR] Iniciando modo visual con multiproceso...")
+                
+                # 1. Crear cola de comunicación
+                self.visual_event_queue = multiprocessing.Queue()
+                
+                # 2. Lanzar proceso de simulación SimPy
+                print("[SIMULATOR] Lanzando proceso de simulación SimPy...")
+                logger.info("[PROCESS-LIFECYCLE] Creando proceso principal de simulación (visual mode)")
+                self.simulation_process = multiprocessing.Process(
+                    target=_run_simulation_process_static,
+                    args=(self.visual_event_queue, self.configuracion)
+                )
+                logger.info("[PROCESS-LIFECYCLE] Iniciando proceso principal de simulación")
+                self.simulation_process.start()
+                print(f"[SIMULATOR] Proceso SimPy iniciado (PID: {self.simulation_process.pid})")
+                logger.info(f"[PROCESS-LIFECYCLE] Proceso principal de simulación iniciado exitosamente (PID: {self.simulation_process.pid})")
+                
+                # 3. Inicializar interfaz Pygame
+                self.inicializar_pygame()
+                
+                print("[SIMULATOR] Iniciando bucle principal de visualización...")
+                print("[SIMULATOR] Presiona ESC para salir, SPACE para pausar")
+                
+                # 4. Ejecutar bucle de visualización como Consumidor
+                self._ejecutar_bucle_consumidor()
             
         except KeyboardInterrupt:
             print("\nInterrupcion del usuario. Saliendo...")
@@ -989,22 +1806,35 @@ class SimuladorAlmacen:
     
 
 def main():
-    """Función principal - Modo automatizado"""
+    """Función principal - Modo automatizado con soporte headless"""
+    # Configurar argparse
+    parser = argparse.ArgumentParser(description='Digital Twin Warehouse Simulator')
+    parser.add_argument('--headless', action='store_true', 
+                       help='Ejecuta la simulación en modo headless (sin UI)')
+    args = parser.parse_args()
+    
     print("="*60)
     print("SIMULADOR DE ALMACEN - GEMELO DIGITAL")
     print("Sistema de Navegación Inteligente v2.6")
-    print("Modo Automatizado - Sin UI de Configuración")
+    if args.headless:
+        print("Modo HEADLESS - Máxima Velocidad")
+    else:
+        print("Modo Visual - Con Interfaz Gráfica")
     print("="*60)
     print()
-    print("INSTRUCCIONES:")
-    print("1. Use 'python configurator.py' para crear/modificar configuraciones")
-    print("2. Use 'python run_simulator.py' para ejecutar simulaciones automáticamente")
-    print()
-    print("El simulador buscará 'config.json' en el directorio actual.")
-    print("Si no existe, usará configuración por defecto.")
-    print()
     
-    simulador = SimuladorAlmacen()
+    if not args.headless:
+        print("INSTRUCCIONES:")
+        print("1. Use 'python configurator.py' para crear/modificar configuraciones")
+        print("2. Use 'python run_simulator.py' para modo visual")
+        print("3. Use 'python run_simulator.py --headless' para modo de máxima velocidad")
+        print()
+        print("El simulador buscará 'config.json' en el directorio actual.")
+        print("Si no existe, usará configuración por defecto.")
+        print()
+    
+    # Crear simulador con modo headless si se especificó
+    simulador = SimuladorAlmacen(headless_mode=args.headless)
     simulador.ejecutar()
 
 if __name__ == "__main__":

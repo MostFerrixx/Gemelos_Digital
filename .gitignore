@@ -214,3 +214,14 @@ development_notes_*.md
 unittest_*.py
 test_traffic_*.py
 *_unit_test.py
+
+# Archivos de debugging de proceso lifecycle (AUDIT V6.2.0)
+*_lifecycle_audit.log
+process_debug_*.log
+deadlock_analysis_*.txt
+headless_debug_*.log
+
+# Archivos temporales de testing headless
+test_headless_*.py
+headless_test_*.log
+timeout_test_*.py
