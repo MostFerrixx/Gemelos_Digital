@@ -18,6 +18,63 @@ from multiprocessing import Queue
 import argparse
 import logging
 
+
+# === BUFFER GLOBAL DE EVENTOS PARA REPLAY ===
+# Variable global que acumula eventos en modo headless
+_replay_events_buffer = []
+
+def inicializar_buffer_replay():
+    """Inicializa el búfer de eventos para replay"""
+    global _replay_events_buffer
+    _replay_events_buffer = []
+    print("[REPLAY-BUFFER] Buffer de eventos inicializado")
+
+def obtener_buffer_replay():
+    """Obtiene el búfer actual de eventos"""
+    global _replay_events_buffer
+    return _replay_events_buffer
+
+def agregar_evento_replay(evento):
+    """Agrega un evento al búfer de replay"""
+    global _replay_events_buffer
+    _replay_events_buffer.append(evento)
+
+def volcar_replay_a_archivo(archivo_salida, configuracion, buffer_eventos=None):
+    """Vuelca el búfer completo a un archivo .jsonl"""
+    global _replay_events_buffer
+    
+    # Usar el buffer pasado como parámetro o el global como fallback
+    eventos_a_volcar = buffer_eventos if buffer_eventos is not None else _replay_events_buffer
+    
+    try:
+        with open(archivo_salida, 'w', encoding='utf-8') as f:
+            # Escribir metadata de la simulación primero
+            metadata = {
+                'event_type': 'SIMULATION_START',
+                'timestamp': 0,
+                'config': configuracion,
+                'total_events_captured': len(eventos_a_volcar)
+            }
+            f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
+            
+            # Escribir todos los eventos
+            for evento in eventos_a_volcar:
+                f.write(json.dumps(evento, ensure_ascii=False) + '\n')
+            
+            # Escribir evento final
+            final_event = {
+                'event_type': 'SIMULATION_END',
+                'timestamp': eventos_a_volcar[-1]['timestamp'] if eventos_a_volcar else 0
+            }
+            f.write(json.dumps(final_event, ensure_ascii=False) + '\n')
+            
+        print(f"[REPLAY-BUFFER] {len(eventos_a_volcar)} eventos guardados en {archivo_salida}")
+        return True
+        
+    except Exception as e:
+        print(f"[REPLAY-BUFFER] ERROR al escribir archivo: {e}")
+        return False
+
 # Importaciones de módulos propios
 from config.settings import *
 from config.colors import *
@@ -50,6 +107,10 @@ class SimuladorAlmacen:
         self.reloj = None
         self.corriendo = True
         self.headless_mode = headless_mode  # Nuevo: modo headless
+        
+        # BUGFIX: Inicializar buffer de replay lo antes posible para modo headless
+        if headless_mode:
+            inicializar_buffer_replay()
         self.order_dashboard_process = None  # Proceso del dashboard de órdenes
         # REFACTOR: Infraestructura de multiproceso para SimPy Productor
         self.visual_event_queue = None       # Cola de eventos visuales
@@ -215,9 +276,11 @@ class SimuladorAlmacen:
             # Crear superficie dummy mínima para TMX sin mostrar ventana
             pygame.display.set_mode((1, 1), pygame.NOFRAME)
         else:
-            # En modo visual, inicializar pygame completamente para TMX
-            pygame.init()
-            pygame.display.set_mode((100, 100))  # Ventana temporal para TMX
+            # En modo visual, NO inicializar pygame aquí - ya está inicializado en proceso principal
+            # Solo configurar el entorno para TMX
+            if not pygame.get_init():
+                pygame.init()
+                pygame.display.set_mode((100, 100))  # Ventana temporal para TMX
         
         # 1. Inicializar LayoutManager con archivo TMX por defecto (OBLIGATORIO)
         tmx_file = os.path.join(os.path.dirname(__file__), "layouts", "WH1.tmx")
@@ -431,8 +494,11 @@ class SimuladorAlmacen:
             
             print("Simulación Headless completada.")
             
-            # Llamar a analíticas al finalizar
-            self._simulacion_completada()
+            # Obtener el buffer de eventos antes de llamar a analíticas
+            buffer_eventos_capturados = obtener_buffer_replay()
+            
+            # Llamar a analíticas al finalizar, pasando el buffer de eventos
+            self._simulacion_completada_con_buffer(buffer_eventos_capturados)
             
         except KeyboardInterrupt:
             print("\nInterrupción del usuario en modo headless. Saliendo...")
@@ -462,6 +528,10 @@ class SimuladorAlmacen:
         simulacion_activa = True
         self.metricas_actuales = {}  # Estado de métricas del dashboard
         
+        # [AUDIT-BACKPRESSURE] Instrumentación del Consumidor
+        eventos_procesados_total = 0
+        ultimo_reporte_tiempo = time.time()
+        
         # Resetear el reloj de reproducción
         self.playback_time = 0.0
         
@@ -480,6 +550,12 @@ class SimuladorAlmacen:
             
             # 3. LLENAR BUFFER: Recibir todos los eventos disponibles del productor
             eventos_recibidos = 0
+            
+            # [AUDIT-BACKPRESSURE] Monitorear cola antes del drenado
+            queue_size_before_drain = self.visual_event_queue.qsize()
+            if queue_size_before_drain > 0:
+                print(f"[CONSUMIDOR-AUDIT] Iniciando drenado de cola. Tamaño: {queue_size_before_drain}")
+            
             try:
                 while True:  # Drenar la cola completamente
                     try:
@@ -496,6 +572,12 @@ class SimuladorAlmacen:
                         
                     except queue.Empty:
                         break
+                
+                # [AUDIT-BACKPRESSURE] Reportar drenado completado
+                if eventos_recibidos > 0:
+                    queue_size_after_drain = self.visual_event_queue.qsize()
+                    print(f"[CONSUMIDOR-AUDIT] Drenado completado. Eventos recibidos: {eventos_recibidos}, Cola restante: {queue_size_after_drain}")
+                    
             except Exception as e:
                 print(f"[ERROR-CONSUMIDOR] Error llenando buffer: {e}")
             
@@ -505,11 +587,20 @@ class SimuladorAlmacen:
             # 4. PROCESAMIENTO DE BUFFER SINCRONIZADO (CAMBIO PRINCIPAL)
             eventos_procesados = 0
             eventos_procesados_este_frame = 0
+            
+            # [AUDIT-BACKPRESSURE] Reportar estado periódicamente
+            tiempo_actual = time.time()
+            if tiempo_actual - ultimo_reporte_tiempo >= 2.0:  # Cada 2 segundos
+                buffer_size = len(self.event_buffer)
+                queue_size = self.visual_event_queue.qsize()
+                print(f"[CONSUMIDOR-AUDIT] Reporte periódico: Buffer: {buffer_size} eventos, Cola: {queue_size}, Procesados totales: {eventos_procesados_total}")
+                ultimo_reporte_tiempo = tiempo_actual
             while self.event_buffer and self.event_buffer[0]['timestamp'] <= self.playback_time:
                 # Sacar el primer evento del buffer
                 mensaje = self.event_buffer.pop(0)
                 eventos_procesados += 1
                 eventos_procesados_este_frame += 1
+                eventos_procesados_total += 1
                 
                 # Procesar evento según su tipo
                 if mensaje['type'] == 'estado_agente':
@@ -594,17 +685,11 @@ class SimuladorAlmacen:
         # Esperar a que termine el proceso SimPy
         if self.simulation_process and self.simulation_process.is_alive():
             print("[CONSUMIDOR-FINAL] Esperando finalización del proceso SimPy...")
-            logger.info("[PROCESS-LIFECYCLE] Esperando join del proceso principal de simulación (timeout=10s)")
             self.simulation_process.join(timeout=10)
             if self.simulation_process.is_alive():
                 print("[CONSUMIDOR-FINAL] Forzando terminación del proceso SimPy...")
-                logger.info("[PROCESS-LIFECYCLE] Proceso principal no terminó en 10s, forzando terminate()")
                 self.simulation_process.terminate()
-                logger.info("[PROCESS-LIFECYCLE] Esperando join después de terminate() (timeout=5s)")
                 self.simulation_process.join(timeout=5)
-                logger.info("[PROCESS-LIFECYCLE] Join post-terminate completado")
-            else:
-                logger.info("[PROCESS-LIFECYCLE] Proceso principal terminado exitosamente via join()")
         
         # Cerrar Dashboard de Órdenes si está abierto
         if self.order_dashboard_process and self.order_dashboard_process.is_alive():
@@ -614,13 +699,9 @@ class SimuladorAlmacen:
                     self.dashboard_data_queue.put_nowait('__EXIT_COMMAND__')
             except:
                 pass
-            logger.info("[PROCESS-LIFECYCLE] Esperando join del proceso Dashboard de Órdenes (timeout=3s)")
             self.order_dashboard_process.join(timeout=3)
             if self.order_dashboard_process.is_alive():
-                logger.info("[PROCESS-LIFECYCLE] Dashboard no terminó en 3s, forzando terminate()")
                 self.order_dashboard_process.terminate()
-            else:
-                logger.info("[PROCESS-LIFECYCLE] Proceso Dashboard de Órdenes terminado exitosamente via join()")
         
         # Reportar finalización (las analíticas ya se procesaron en el productor)
         print("[CONSUMIDOR-FINAL] Pipeline de analíticas completado en el proceso productor.")
@@ -778,13 +859,9 @@ class SimuladorAlmacen:
         # Cleanup del proceso SimPy
         if self.simulation_process and self.simulation_process.is_alive():
             print("[REPLAY-ENGINE] Esperando finalización del proceso SimPy...")
-            logger.info("[PROCESS-LIFECYCLE] [REPLAY] Esperando join del proceso principal (timeout=10s)")
             self.simulation_process.join(timeout=10)
             if self.simulation_process.is_alive():
                 print("[REPLAY-ENGINE] Forzando terminación del proceso SimPy...")
-                logger.info("[PROCESS-LIFECYCLE] [REPLAY] Proceso no terminó en 10s, forzando terminate()")
-            else:
-                logger.info("[PROCESS-LIFECYCLE] [REPLAY] Proceso principal terminado exitosamente via join()")
                 self.simulation_process.terminate()
         
         print("[REPLAY-ENGINE] Motor de replay terminado.")
@@ -916,6 +993,104 @@ class SimuladorAlmacen:
         if archivo_eventos:
             archivos_generados.append(archivo_eventos)
             print(f"[2/4] Eventos detallados guardados: {archivo_eventos}")
+        
+        # 2.5. VOLCADO DE REPLAY BUFFER (Solo en modo headless)
+        if self.headless_mode:
+            archivo_replay = os.path.join(output_dir, f"replay_events_{timestamp}.jsonl")
+            try:
+                volcar_replay_a_archivo(archivo_replay, self.configuracion)
+                archivos_generados.append(archivo_replay)
+                print(f"[2.5/4] Eventos de replay guardados: {archivo_replay}")
+            except Exception as e:
+                print(f"[ERROR] Error volcando eventos de replay: {e}")
+        
+        # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine → Excel
+        print("[3/4] Simulación completada. Generando reporte de Excel...")
+        try:
+            # Usar el método __init__ original con eventos y configuración en memoria
+            analytics_engine = AnalyticsEngine(self.almacen.event_log, self.configuracion)
+            analytics_engine.process_events()
+            
+            # Generar archivo Excel con ruta organizada
+            excel_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.xlsx")
+            archivo_excel = analytics_engine.export_to_excel(excel_filename)
+            
+            if archivo_excel:
+                archivos_generados.append(archivo_excel)
+                print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
+                
+                # 4. PIPELINE AUTOMATIZADO: Visualizer → PNG
+                print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
+                self._ejecutar_visualizador(archivo_excel, timestamp, output_dir)
+                
+            else:
+                print("[ERROR] No se pudo generar el reporte de Excel")
+                
+        except Exception as e:
+            print(f"[ERROR] Error en pipeline de analíticas: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Resumen final
+        print("\n" + "="*70)
+        print("PROCESO COMPLETADO")
+        print("="*70)
+        print("Archivos generados:")
+        for i, archivo in enumerate(archivos_generados, 1):
+            print(f"  {i}. {archivo}")
+        print("="*70)
+        print("\nPresiona R para reiniciar o ESC para salir")
+    
+    def _simulacion_completada_con_buffer(self, buffer_eventos):
+        """Maneja la finalización de la simulación con buffer de eventos específico"""
+        print("\n" + "="*70)
+        print("SIMULACION COMPLETADA - INICIANDO PIPELINE DE ANALITICAS")
+        print("="*70)
+        
+        if not self.almacen:
+            print("Error: No hay datos del almacén para procesar")
+            return
+        
+        # Mostrar métricas básicas
+        mostrar_metricas_consola(self.almacen)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Crear estructura de directorios organizados
+        output_base_dir = "output"
+        output_dir = os.path.join(output_base_dir, f"simulation_{timestamp}")
+        
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+            print(f"[SETUP] Directorio de salida creado: {output_dir}")
+        except Exception as e:
+            print(f"[ERROR] No se pudo crear directorio de salida: {e}")
+            # Fallback: usar directorio actual
+            output_dir = "."
+        
+        archivos_generados = []
+        
+        # 1. Exportar métricas JSON básicas
+        archivo_json = os.path.join(output_dir, f"simulacion_completada_{timestamp}.json")
+        exportar_metricas(self.almacen, archivo_json)
+        archivos_generados.append(archivo_json)
+        print(f"[1/4] Métricas JSON guardadas: {archivo_json}")
+        
+        # 2. Exportar eventos crudos (modificar almacén para usar output_dir)
+        archivo_eventos = self._exportar_eventos_crudos_organizado(output_dir, timestamp)
+        if archivo_eventos:
+            archivos_generados.append(archivo_eventos)
+            print(f"[2/4] Eventos detallados guardados: {archivo_eventos}")
+        
+        # 2.5. VOLCADO DE REPLAY BUFFER (Con buffer específico)
+        if self.headless_mode and buffer_eventos is not None:
+            archivo_replay = os.path.join(output_dir, f"replay_events_{timestamp}.jsonl")
+            try:
+                volcar_replay_a_archivo(archivo_replay, self.configuracion, buffer_eventos)
+                archivos_generados.append(archivo_replay)
+                print(f"[2.5/4] Eventos de replay guardados: {archivo_replay}")
+            except Exception as e:
+                print(f"[ERROR] Error volcando eventos de replay: {e}")
         
         # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine → Excel
         print("[3/4] Simulación completada. Generando reporte de Excel...")
@@ -1064,9 +1239,7 @@ class SimuladorAlmacen:
                     self.dashboard_data_queue = Queue()
                     
                     # AUDIT: Instrumentar creación de proceso Dashboard
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.info("Creando proceso Dashboard de Órdenes...")
+                    print("[DASHBOARD] Creando proceso Dashboard de Órdenes...")
                     
                     # Crear proceso separado para el dashboard
                     self.order_dashboard_process = multiprocessing.Process(
@@ -1075,9 +1248,9 @@ class SimuladorAlmacen:
                     )
                     
                     # AUDIT: Log antes de iniciar proceso Dashboard
-                    logger.info("Iniciando proceso Dashboard...")
+                    print("[DASHBOARD] Iniciando proceso Dashboard...")
                     self.order_dashboard_process.start()
-                    logger.info(f"Proceso Dashboard iniciado (PID: {self.order_dashboard_process.pid})")
+                    print(f"[DASHBOARD] Proceso Dashboard iniciado (PID: {self.order_dashboard_process.pid})")
                     print("Dashboard de Órdenes abierto en proceso separado - Presiona 'O' nuevamente para cerrar")
                     
                     # NUEVO: Enviar estado completo inicial inmediatamente después del arranque
@@ -1110,19 +1283,16 @@ class SimuladorAlmacen:
                             pass  # Cola llena, proceder con terminación
                     
                     # Esperar cierre graceful
-                    logger.info("[PROCESS-LIFECYCLE] Esperando cierre graceful del Dashboard (timeout=3s)")
                     self.order_dashboard_process.join(timeout=3)
                     
                     # Si no responde, terminación forzada
                     if self.order_dashboard_process.is_alive():
                         print("[DASHBOARD] Timeout - forzando terminación")
-                        logger.info("[PROCESS-LIFECYCLE] Dashboard timeout, forzando terminate()")
                         self.order_dashboard_process.terminate()
-                        logger.info("[PROCESS-LIFECYCLE] Esperando join post-terminate Dashboard (timeout=1s)")
                         self.order_dashboard_process.join(timeout=1)
-                        logger.info("[PROCESS-LIFECYCLE] Join post-terminate Dashboard completado")
+                        print("[PROCESS-LIFECYCLE] Join post-terminate Dashboard completado")
                     else:
-                        logger.info("[PROCESS-LIFECYCLE] Dashboard terminado exitosamente via join()")
+                        print("[PROCESS-LIFECYCLE] Dashboard terminado exitosamente via join()")
                         
                 self.order_dashboard_process = None
                 self.dashboard_data_queue = None
@@ -1404,23 +1574,25 @@ class SimuladorAlmacen:
                 
                 # 2. Lanzar proceso de simulación SimPy
                 print("[SIMULATOR] Lanzando proceso de simulación SimPy...")
-                logger.info("[PROCESS-LIFECYCLE] Creando proceso principal de simulación (visual mode)")
                 self.simulation_process = multiprocessing.Process(
                     target=_run_simulation_process_static,
                     args=(self.visual_event_queue, self.configuracion)
                 )
-                logger.info("[PROCESS-LIFECYCLE] Iniciando proceso principal de simulación")
                 self.simulation_process.start()
                 print(f"[SIMULATOR] Proceso SimPy iniciado (PID: {self.simulation_process.pid})")
-                logger.info(f"[PROCESS-LIFECYCLE] Proceso principal de simulación iniciado exitosamente (PID: {self.simulation_process.pid})")
                 
-                # 3. Inicializar interfaz Pygame
+                # 3. ESPERAR un poco para que el proceso hijo configure SDL primero
+                import time
+                time.sleep(0.5)
+                print("[SIMULATOR] Inicializando interfaz pygame en proceso principal...")
+                
+                # 4. Inicializar interfaz Pygame DESPUÉS del proceso hijo
                 self.inicializar_pygame()
                 
                 print("[SIMULATOR] Iniciando bucle principal de visualización...")
                 print("[SIMULATOR] Presiona ESC para salir, SPACE para pausar")
                 
-                # 4. Ejecutar bucle de visualización como Consumidor
+                # 5. Ejecutar bucle de visualización como Consumidor
                 self._ejecutar_bucle_consumidor()
             
         except KeyboardInterrupt:
@@ -1487,9 +1659,12 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
         
         # REFACTOR: PyTMX requiere pygame display inicializado - usar driver dummy para proceso multiproceso
         import os
+        # Configurar SDL para evitar conflictos con proceso padre
         os.environ['SDL_VIDEODRIVER'] = 'dummy'  # Usar driver dummy para evitar ventanas en proceso hijo
+        os.environ['SDL_AUDIODRIVER'] = 'dummy'  # También desactivar audio para evitar conflictos
         pygame.init()
-        pygame.display.set_mode((1, 1), pygame.NOFRAME)  # Superficie dummy mínima
+        # Usar flags específicos para proceso hijo
+        pygame.display.set_mode((1, 1), pygame.NOFRAME | pygame.HIDDEN)  # Superficie dummy mínima
         
         # 1. Inicializar LayoutManager
         tmx_file = os.path.join(os.path.dirname(__file__), "layouts", "WH1.tmx")
@@ -1673,6 +1848,12 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
             archivo_excel = analytics_engine.export_to_excel(excel_filename)
             print(f"[PROCESO-SIMPY] Excel generado: {archivo_excel}")
             
+            # [AUDIT-BACKPRESSURE] Instrumentación del Productor (simulation_completed)
+            import time
+            queue_size_before = visual_event_queue.qsize()
+            put_start_time = time.time()
+            print(f"[PRODUCTOR-AUDIT] SIMULATION_COMPLETED: Intentando poner evento. Tamaño actual de la cola: {queue_size_before}")
+            
             # Enviar evento de finalización con información de archivos generados
             visual_event_queue.put({
                 'type': 'simulation_completed',
@@ -1682,6 +1863,11 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
                 'excel_file': archivo_excel,
                 'output_dir': output_dir
             })
+            
+            put_end_time = time.time()
+            put_duration_ms = (put_end_time - put_start_time) * 1000
+            queue_size_after = visual_event_queue.qsize()
+            print(f"[PRODUCTOR-AUDIT] SIMULATION_COMPLETED: Evento puesto con éxito. Duración: {put_duration_ms:.2f}ms. Tamaño nueva cola: {queue_size_after}")
             
         except Exception as e:
             print(f"[ERROR-PROCESO-SIMPY] Error en pipeline de analíticas: {e}")
@@ -1733,61 +1919,6 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
         limpiar_estado()
         pygame.quit()
         print("Recursos liberados. Hasta luego!")
-    
-    def ejecutar(self):
-        """Método principal de ejecución - Modo automatizado sin UI"""
-        try:
-            # NUEVO ORDEN: Configuración JSON → TMX → Pygame → Simulación
-            print("[SIMULATOR] Iniciando en modo automatizado (sin UI de configuración)")
-            
-            if not self.cargar_configuracion():
-                print("Error al cargar configuracion. Saliendo...")
-                return
-            
-            if not self.crear_simulacion():
-                print("Error al crear la simulacion. Saliendo...")
-                return
-            
-            # BIFURCACIÓN PRINCIPAL: Headless vs Visual vs Multiproceso
-            if self.headless_mode:
-                # Modo headless: máxima velocidad sin interfaz gráfica
-                self._ejecutar_bucle_headless()
-            else:
-                # REFACTOR: Modo visual con arquitectura Productor-Consumidor
-                print("[SIMULATOR] Iniciando modo visual con multiproceso...")
-                
-                # 1. Crear cola de comunicación
-                self.visual_event_queue = multiprocessing.Queue()
-                
-                # 2. Lanzar proceso de simulación SimPy
-                print("[SIMULATOR] Lanzando proceso de simulación SimPy...")
-                logger.info("[PROCESS-LIFECYCLE] Creando proceso principal de simulación (visual mode)")
-                self.simulation_process = multiprocessing.Process(
-                    target=_run_simulation_process_static,
-                    args=(self.visual_event_queue, self.configuracion)
-                )
-                logger.info("[PROCESS-LIFECYCLE] Iniciando proceso principal de simulación")
-                self.simulation_process.start()
-                print(f"[SIMULATOR] Proceso SimPy iniciado (PID: {self.simulation_process.pid})")
-                logger.info(f"[PROCESS-LIFECYCLE] Proceso principal de simulación iniciado exitosamente (PID: {self.simulation_process.pid})")
-                
-                # 3. Inicializar interfaz Pygame
-                self.inicializar_pygame()
-                
-                print("[SIMULATOR] Iniciando bucle principal de visualización...")
-                print("[SIMULATOR] Presiona ESC para salir, SPACE para pausar")
-                
-                # 4. Ejecutar bucle de visualización como Consumidor
-                self._ejecutar_bucle_consumidor()
-            
-        except KeyboardInterrupt:
-            print("\nInterrupcion del usuario. Saliendo...")
-        except Exception as e:
-            print(f"Error inesperado: {e}")
-            import traceback
-            traceback.print_exc()
-        finally:
-            self.limpiar_recursos()
     
     def _diagnosticar_data_manager(self):
         print("\n--- DIAGNÓSTICO DEL DATA MANAGER ---")

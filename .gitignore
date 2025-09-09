@@ -225,3 +225,20 @@ headless_debug_*.log
 test_headless_*.py
 headless_test_*.log
 timeout_test_*.py
+
+# Archivos de auditoría de serialización y replay (V6.2.1)
+replay_events_*.jsonl
+*_audit_*.log
+orchestration_audit_*.txt
+serialization_debug_*.py
+json_debug_*.log
+
+# Archivos temporales de bugfix de WorkOrder serialization
+workorder_serialization_*.py
+event_buffer_debug_*.log
+*_serialization_test.py
+
+# Archivos de verificación temporal CPA (Change Acceptance Testing)
+cpa_test_*.py
+bugfix_verification_*.txt
+acceptance_test_*.log
