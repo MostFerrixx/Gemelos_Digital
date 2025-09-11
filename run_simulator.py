@@ -19,45 +19,21 @@ import argparse
 import logging
 
 
-# === BUFFER GLOBAL DE EVENTOS PARA REPLAY ===
-# Variable global que acumula eventos en modo headless
-_replay_events_buffer = []
+# === BUFFER DE EVENTOS PARA REPLAY ===
+# REFACTOR: Buffer centralizado ahora manejado por instancia de ReplayBuffer en SimuladorAlmacen
 
-def inicializar_buffer_replay():
-    """Inicializa el búfer de eventos para replay"""
-    global _replay_events_buffer
-    print(f"[REPLAY-BUFFER-RESET] Buffer reiniciado. Eventos perdidos: {len(_replay_events_buffer)}")
-    # Solo mostrar stack trace si se pierden eventos importantes
-    if len(_replay_events_buffer) > 10:
-        import traceback
-        print("[REPLAY-BUFFER-RESET] CRÍTICO: Se están perdiendo muchos eventos!")
-        traceback.print_stack()
-    _replay_events_buffer = []
-    print(f"[AUDIT-ID] Buffer inicializado con id: {id(_replay_events_buffer)}")
-    print("[REPLAY-BUFFER] Buffer de eventos inicializado")
 
-def obtener_buffer_replay():
-    """Obtiene el búfer actual de eventos"""
-    global _replay_events_buffer
-    return _replay_events_buffer
 
-def agregar_evento_replay(evento):
+def agregar_evento_replay(buffer, evento):
     """Agrega un evento al búfer de replay"""
-    global _replay_events_buffer
-    _replay_events_buffer.append(evento)
-    # DEBUG: Imprimir conteo de eventos work_order_update en buffer
-    wo_count = sum(1 for e in _replay_events_buffer if e.get('type') == 'work_order_update')
-    if evento.get('type') == 'work_order_update':
-        print(f"[AUDIT-ID] Agregando a buffer id: {id(_replay_events_buffer)}")
-        print(f"[REPLAY-BUFFER-DEBUG] Agregado work_order_update. Total en buffer: {wo_count}/{len(_replay_events_buffer)}")
+    buffer.add_event(evento)
 
-def volcar_replay_a_archivo(archivo_salida, configuracion, almacen=None):
+def volcar_replay_a_archivo(buffer, archivo_salida, configuracion, almacen=None):
     """Vuelca el búfer completo a un archivo .jsonl"""
-    global _replay_events_buffer
     
-    # BUGFIX: Siempre usar buffer global - ignorar parámetro buffer_eventos
-    eventos_a_volcar = _replay_events_buffer
-    print(f"[VOLCADO-FIX] Forzando uso de buffer global con {len(_replay_events_buffer)} eventos")
+    # REFACTOR: Usar la instancia de ReplayBuffer recibida como parámetro
+    eventos_a_volcar = buffer.get_events()
+    print(f"[VOLCADO-REFACTOR] Usando ReplayBuffer con {len(eventos_a_volcar)} eventos")
     
     # Contar eventos para volcado (logging mínimo)
     wo_events = [e for e in eventos_a_volcar if e.get('type') == 'work_order_update']
@@ -123,6 +99,7 @@ from visualization.original_dashboard import DashboardOriginal
 from utils.helpers import exportar_metricas, mostrar_metricas_consola
 from config.settings import SUPPORTED_RESOLUTIONS, LOGICAL_WIDTH, LOGICAL_HEIGHT
 # from dynamic_pathfinding_integration import get_dynamic_pathfinding_wrapper  # Eliminado en limpieza
+from simulation_buffer import ReplayBuffer
 
 class SimuladorAlmacen:
     """Clase principal que coordina toda la simulación"""
@@ -138,9 +115,10 @@ class SimuladorAlmacen:
         self.corriendo = True
         self.headless_mode = headless_mode  # Nuevo: modo headless
         
-        # BUGFIX: Inicializar buffer de replay lo antes posible para modo headless
-        if headless_mode:
-            inicializar_buffer_replay()
+        # REFACTOR: Nueva instancia de ReplayBuffer para estado explícito
+        self.replay_buffer = ReplayBuffer()
+        
+        # REFACTOR: Buffer de replay ahora manejado por self.replay_buffer
         self.order_dashboard_process = None  # Proceso del dashboard de órdenes
         # REFACTOR: Infraestructura de multiproceso para SimPy Productor
         self.visual_event_queue = None       # Cola de eventos visuales
@@ -359,7 +337,8 @@ class SimuladorAlmacen:
             layout_manager=self.layout_manager,  # OBLIGATORIO
             pathfinder=self.pathfinder,          # OBLIGATORIO
             data_manager=self.data_manager,      # NUEVO V2.6
-            cost_calculator=self.cost_calculator # NUEVO V2.6
+            cost_calculator=self.cost_calculator, # NUEVO V2.6
+            simulador=self  # REFACTOR: Pasar referencia del simulador
         )
         
         inicializar_estado(self.almacen, self.env, self.configuracion, layout_manager=self.layout_manager)
@@ -371,6 +350,7 @@ class SimuladorAlmacen:
             self.env,
             self.almacen,
             self.configuracion,
+            simulador=self,
             pathfinder=self.pathfinder,  # OBLIGATORIO
             layout_manager=self.layout_manager  # OBLIGATORIO
         )
@@ -518,7 +498,7 @@ class SimuladorAlmacen:
                     # AUDIT: Diagnóstico periódico del buffer cada 10 pasos
                     step_counter += 1
                     if step_counter % 10 == 0:
-                        buffer_size = len(_replay_events_buffer)
+                        buffer_size = len(self.replay_buffer.get_events())
                         print(f"[AUDIT-BUFFER] Paso {step_counter}: Buffer tiene {buffer_size} eventos")
                         
                 except simpy.core.EmptySchedule:
@@ -532,8 +512,7 @@ class SimuladorAlmacen:
             
             print("Simulación Headless completada.")
             
-            # BUGFIX: NO capturar buffer temprano, usar el global actualizado en _simulacion_completada_con_buffer
-            # buffer_eventos_capturados = obtener_buffer_replay()  # ← COMENTADO
+            # REFACTOR: Buffer ahora manejado por self.replay_buffer
             
             # Llamar a analíticas al finalizar, SIN pasar buffer específico
             self._simulacion_completada_con_buffer(None)
@@ -1038,10 +1017,10 @@ class SimuladorAlmacen:
             archivo_replay = os.path.join(output_dir, f"replay_events_{timestamp}.jsonl")
             try:
                 # BUGFIX: Verificar estado del buffer inmediatamente antes del volcado
-                buffer_size = len(_replay_events_buffer)
+                buffer_size = len(self.replay_buffer.get_events())
                 print(f"[VOLCADO-DEBUG] Buffer actual tiene {buffer_size} eventos antes del volcado")
                 
-                volcar_replay_a_archivo(archivo_replay, self.configuracion, self.almacen)
+                volcar_replay_a_archivo(self.replay_buffer, archivo_replay, self.configuracion, self.almacen)
                 archivos_generados.append(archivo_replay)
                 print(f"[2.5/4] Eventos de replay guardados: {archivo_replay}")
             except Exception as e:
@@ -1132,18 +1111,19 @@ class SimuladorAlmacen:
             archivo_replay = os.path.join(output_dir, f"replay_events_{timestamp}.jsonl")
             try:
                 # AUDIT: Estado crítico del buffer antes de volcado
-                buffer_size = len(_replay_events_buffer)
-                print(f"[AUDIT-ID] Volcando buffer con id: {id(_replay_events_buffer)}")
+                eventos = self.replay_buffer.get_events()
+                buffer_size = len(eventos)
+                print(f"[AUDIT-ID] Volcando buffer con id: {id(self.replay_buffer)}")
                 print(f"[AUDIT-CRITICAL] JUSTO ANTES DE VOLCADO: Buffer contiene {buffer_size} eventos")
                 
                 # Mostrar tipos de eventos en buffer para diagnóstico
                 event_types = {}
-                for event in _replay_events_buffer:
+                for event in eventos:
                     event_type = event.get('type', 'unknown')
                     event_types[event_type] = event_types.get(event_type, 0) + 1
                 print(f"[AUDIT-CRITICAL] Tipos de eventos: {event_types}")
                 
-                volcar_replay_a_archivo(archivo_replay, self.configuracion, self.almacen)
+                volcar_replay_a_archivo(self.replay_buffer, archivo_replay, self.configuracion, self.almacen)
                 archivos_generados.append(archivo_replay)
                 print(f"[2.5/4] Eventos de replay guardados: {archivo_replay}")
             except Exception as e:
@@ -1755,6 +1735,7 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
             pathfinder=pathfinder,
             data_manager=data_manager,
             cost_calculator=cost_calculator,
+            simulador=None,  # En proceso hijo no hay simulador principal
             visual_event_queue=visual_event_queue  # NUEVO: Pasar cola
         )
         
@@ -1767,6 +1748,7 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
         print("[PROCESO-SIMPY] Creando operarios...")
         procesos_operarios, operarios = crear_operarios(
             env, almacen, configuracion,
+            simulador=None,  # TODO: En proceso hijo no hay referencia al simulador principal
             pathfinder=pathfinder, layout_manager=layout_manager
         )
         
@@ -2094,6 +2076,8 @@ def ejecutar_modo_replay(jsonl_file_path):
     
     # Inicializar motor de playback
     playback_time = 0.0
+    replay_speed = 1.0
+    velocidades_permitidas = [0.25, 0.5, 1.0, 2.0, 4.0, 8.0]
     processed_event_indices = set()  # Trackear eventos ya procesados
     
     print(f"[REPLAY] Motor de playback inicializado - {len(eventos)} eventos total")
@@ -2108,10 +2092,22 @@ def ejecutar_modo_replay(jsonl_file_path):
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     corriendo = False
+                elif event.key == pygame.K_PLUS or event.key == pygame.K_KP_PLUS:
+                    # Aumentar velocidad al siguiente nivel
+                    current_index = velocidades_permitidas.index(replay_speed) if replay_speed in velocidades_permitidas else 2
+                    if current_index < len(velocidades_permitidas) - 1:
+                        replay_speed = velocidades_permitidas[current_index + 1]
+                        print(f"[REPLAY] Velocidad aumentada a {replay_speed:.2f}x")
+                elif event.key == pygame.K_MINUS or event.key == pygame.K_KP_MINUS:
+                    # Disminuir velocidad al nivel anterior
+                    current_index = velocidades_permitidas.index(replay_speed) if replay_speed in velocidades_permitidas else 2
+                    if current_index > 0:
+                        replay_speed = velocidades_permitidas[current_index - 1]
+                        print(f"[REPLAY] Velocidad disminuida a {replay_speed:.2f}x")
         
         # Avanzar tiempo de playback usando delta time
         delta_time = reloj.get_time() / 1000.0  # Convertir ms a segundos
-        playback_time += delta_time
+        playback_time += delta_time * replay_speed
         
         # Obtener lote de eventos para el tiempo actual
         eventos_a_procesar = []
@@ -2217,7 +2213,7 @@ def ejecutar_modo_replay(jsonl_file_path):
         
         # Mostrar información de replay en la parte superior del almacén
         font = pygame.font.Font(None, 20)
-        info_text = font.render(f"REPLAY: Tiempo {playback_time:.2f}s | Eventos {len(processed_event_indices)}/{len(eventos)}", True, (255, 255, 255))
+        info_text = font.render(f"REPLAY: Tiempo {playback_time:.2f}s | Velocidad: {replay_speed:.2f}x | Eventos {len(processed_event_indices)}/{len(eventos)}", True, (255, 255, 255))
         pantalla.blit(info_text, (10, 10))
         
         pygame.display.flip()

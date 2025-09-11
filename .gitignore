@@ -288,3 +288,16 @@ config_*test*.json
 config_*backup*.json
 config_*validation*.json
 *test_config*.json
+
+# Archivos temporales de refactoring del sistema de buffer de replay (V6.4.0)
+*_buffer_test.py
+replay_buffer_*.py
+buffer_migration_*.log
+*_replay_debug.py
+evento_replay_*.json
+buffer_audit_*.log
+
+# Archivos temporales de speed control testing
+speed_control_test_*.py
+replay_speed_debug_*.log
+velocity_test_*.py
