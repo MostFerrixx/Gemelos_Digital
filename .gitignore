@@ -242,3 +242,49 @@ event_buffer_debug_*.log
 cpa_test_*.py
 bugfix_verification_*.txt
 acceptance_test_*.log
+
+# Archivos de auditoría y logs de debugging extensivos (V6.3.0)
+*audit*.log
+*audit*.txt
+debug_*.log
+*_run.log
+*_test*.log
+headless_*.log
+smoke_test*.log
+test_*.log
+*final*.log
+*refactor*.log
+*validation*.log
+*diagnosis*.log
+
+# Archivos backup y versiones revertidas
+*_backup*.py
+*_reverted.py
+*_BACKUP*.py
+*BACKUP*.py
+*_BROKEN_*.py
+
+# Archivos de salida de simulación temporal
+raw_events_*.json
+simulation_report_*.pdf
+simulation_report_*.xlsx
+simulacion_completada_*.json
+warehouse_heatmap_*.png
+heatmap_*.png
+heatmap_*.xlsx
+
+# Directorio temporal de eventos
+temp_wo_events/
+
+# Archivos temporales de pruebas y análisis
+analyze_workorders.py
+sample_new_events.json
+
+# Archivos nulos del sistema
+nul
+
+# Archivos de configuración de testing adicionales
+config_*test*.json
+config_*backup*.json
+config_*validation*.json
+*test_config*.json

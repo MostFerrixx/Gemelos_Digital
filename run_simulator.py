@@ -26,7 +26,14 @@ _replay_events_buffer = []
 def inicializar_buffer_replay():
     """Inicializa el búfer de eventos para replay"""
     global _replay_events_buffer
+    print(f"[REPLAY-BUFFER-RESET] Buffer reiniciado. Eventos perdidos: {len(_replay_events_buffer)}")
+    # Solo mostrar stack trace si se pierden eventos importantes
+    if len(_replay_events_buffer) > 10:
+        import traceback
+        print("[REPLAY-BUFFER-RESET] CRÍTICO: Se están perdiendo muchos eventos!")
+        traceback.print_stack()
     _replay_events_buffer = []
+    print(f"[AUDIT-ID] Buffer inicializado con id: {id(_replay_events_buffer)}")
     print("[REPLAY-BUFFER] Buffer de eventos inicializado")
 
 def obtener_buffer_replay():
@@ -38,13 +45,27 @@ def agregar_evento_replay(evento):
     """Agrega un evento al búfer de replay"""
     global _replay_events_buffer
     _replay_events_buffer.append(evento)
+    # DEBUG: Imprimir conteo de eventos work_order_update en buffer
+    wo_count = sum(1 for e in _replay_events_buffer if e.get('type') == 'work_order_update')
+    if evento.get('type') == 'work_order_update':
+        print(f"[AUDIT-ID] Agregando a buffer id: {id(_replay_events_buffer)}")
+        print(f"[REPLAY-BUFFER-DEBUG] Agregado work_order_update. Total en buffer: {wo_count}/{len(_replay_events_buffer)}")
 
-def volcar_replay_a_archivo(archivo_salida, configuracion, buffer_eventos=None):
+def volcar_replay_a_archivo(archivo_salida, configuracion, almacen=None):
     """Vuelca el búfer completo a un archivo .jsonl"""
     global _replay_events_buffer
     
-    # Usar el buffer pasado como parámetro o el global como fallback
-    eventos_a_volcar = buffer_eventos if buffer_eventos is not None else _replay_events_buffer
+    # BUGFIX: Siempre usar buffer global - ignorar parámetro buffer_eventos
+    eventos_a_volcar = _replay_events_buffer
+    print(f"[VOLCADO-FIX] Forzando uso de buffer global con {len(_replay_events_buffer)} eventos")
+    
+    # Contar eventos para volcado (logging mínimo)
+    wo_events = [e for e in eventos_a_volcar if e.get('type') == 'work_order_update']
+    estado_events = [e for e in eventos_a_volcar if e.get('type') == 'estado_agente']
+    print(f"[REPLAY-EXPORT] Volcando {len(wo_events)} work_order_update + {len(estado_events)} estado_agente de {len(eventos_a_volcar)} total")
+    
+    # ELIMINADO: Sistema de respaldo artificial que causaba replay errático
+    # Los eventos reales del headless son de alta fidelidad y ya no necesitan respaldo sintético
     
     try:
         with open(archivo_salida, 'w', encoding='utf-8') as f:
@@ -55,6 +76,15 @@ def volcar_replay_a_archivo(archivo_salida, configuracion, buffer_eventos=None):
                 'config': configuracion,
                 'total_events_captured': len(eventos_a_volcar)
             }
+            
+            # BUGFIX: Añadir total de WorkOrders al evento SIMULATION_START
+            if almacen and hasattr(almacen, 'dispatcher') and hasattr(almacen.dispatcher, 'work_orders_total_inicial'):
+                total_work_orders = almacen.dispatcher.work_orders_total_inicial
+                metadata['total_work_orders'] = total_work_orders
+                print(f"[REPLAY-METADATA] Añadido total_work_orders: {total_work_orders} al evento SIMULATION_START")
+            else:
+                print(f"[REPLAY-METADATA] WARNING: No se pudo obtener total de WorkOrders del almacen")
+            
             f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
             
             # Escribir todos los eventos
@@ -478,11 +508,19 @@ class SimuladorAlmacen:
         try:
             # BUGFIX: En lugar de env.run() indefinido, ejecutar hasta que la simulación termine
             # Ejecutar eventos SimPy hasta que todas las WorkOrders estén completadas
+            step_counter = 0
             while not self.almacen.simulacion_ha_terminado():
                 # Avanzar la simulación en pequeños pasos
                 try:
                     # Usar un timeout pequeño para permitir verificar la condición de terminación
                     self.env.run(until=self.env.now + 1.0)
+                    
+                    # AUDIT: Diagnóstico periódico del buffer cada 10 pasos
+                    step_counter += 1
+                    if step_counter % 10 == 0:
+                        buffer_size = len(_replay_events_buffer)
+                        print(f"[AUDIT-BUFFER] Paso {step_counter}: Buffer tiene {buffer_size} eventos")
+                        
                 except simpy.core.EmptySchedule:
                     # No hay más eventos programados, pero verificar si la simulación realmente terminó
                     if self.almacen.simulacion_ha_terminado():
@@ -494,11 +532,11 @@ class SimuladorAlmacen:
             
             print("Simulación Headless completada.")
             
-            # Obtener el buffer de eventos antes de llamar a analíticas
-            buffer_eventos_capturados = obtener_buffer_replay()
+            # BUGFIX: NO capturar buffer temprano, usar el global actualizado en _simulacion_completada_con_buffer
+            # buffer_eventos_capturados = obtener_buffer_replay()  # ← COMENTADO
             
-            # Llamar a analíticas al finalizar, pasando el buffer de eventos
-            self._simulacion_completada_con_buffer(buffer_eventos_capturados)
+            # Llamar a analíticas al finalizar, SIN pasar buffer específico
+            self._simulacion_completada_con_buffer(None)
             
         except KeyboardInterrupt:
             print("\nInterrupción del usuario en modo headless. Saliendo...")
@@ -995,15 +1033,21 @@ class SimuladorAlmacen:
             print(f"[2/4] Eventos detallados guardados: {archivo_eventos}")
         
         # 2.5. VOLCADO DE REPLAY BUFFER (Solo en modo headless)
+        print(f"[DEBUG] Verificando headless_mode: {self.headless_mode}")
         if self.headless_mode:
             archivo_replay = os.path.join(output_dir, f"replay_events_{timestamp}.jsonl")
             try:
-                volcar_replay_a_archivo(archivo_replay, self.configuracion)
+                # BUGFIX: Verificar estado del buffer inmediatamente antes del volcado
+                buffer_size = len(_replay_events_buffer)
+                print(f"[VOLCADO-DEBUG] Buffer actual tiene {buffer_size} eventos antes del volcado")
+                
+                volcar_replay_a_archivo(archivo_replay, self.configuracion, self.almacen)
                 archivos_generados.append(archivo_replay)
                 print(f"[2.5/4] Eventos de replay guardados: {archivo_replay}")
             except Exception as e:
-                print(f"[ERROR] Error volcando eventos de replay: {e}")
-        
+                print(f"[ERROR] Fallo crítico al volcar el replay: {e}")
+        else:
+            print(f"[DEBUG] No se volca replay porque headless_mode es False")
         # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine → Excel
         print("[3/4] Simulación completada. Generando reporte de Excel...")
         try:
@@ -1082,15 +1126,30 @@ class SimuladorAlmacen:
             archivos_generados.append(archivo_eventos)
             print(f"[2/4] Eventos detallados guardados: {archivo_eventos}")
         
-        # 2.5. VOLCADO DE REPLAY BUFFER (Con buffer específico)
-        if self.headless_mode and buffer_eventos is not None:
+        # 2.5. VOLCADO DE REPLAY BUFFER (Solo en modo headless)
+        print(f"[DEBUG] Verificando headless_mode: {self.headless_mode}")
+        if self.headless_mode:
             archivo_replay = os.path.join(output_dir, f"replay_events_{timestamp}.jsonl")
             try:
-                volcar_replay_a_archivo(archivo_replay, self.configuracion, buffer_eventos)
+                # AUDIT: Estado crítico del buffer antes de volcado
+                buffer_size = len(_replay_events_buffer)
+                print(f"[AUDIT-ID] Volcando buffer con id: {id(_replay_events_buffer)}")
+                print(f"[AUDIT-CRITICAL] JUSTO ANTES DE VOLCADO: Buffer contiene {buffer_size} eventos")
+                
+                # Mostrar tipos de eventos en buffer para diagnóstico
+                event_types = {}
+                for event in _replay_events_buffer:
+                    event_type = event.get('type', 'unknown')
+                    event_types[event_type] = event_types.get(event_type, 0) + 1
+                print(f"[AUDIT-CRITICAL] Tipos de eventos: {event_types}")
+                
+                volcar_replay_a_archivo(archivo_replay, self.configuracion, self.almacen)
                 archivos_generados.append(archivo_replay)
                 print(f"[2.5/4] Eventos de replay guardados: {archivo_replay}")
             except Exception as e:
-                print(f"[ERROR] Error volcando eventos de replay: {e}")
+                print(f"[ERROR] Fallo crítico al volcar el replay: {e}")
+        else:
+            print(f"[DEBUG] No se volca replay porque headless_mode es False")
         
         # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine → Excel
         print("[3/4] Simulación completada. Generando reporte de Excel...")
@@ -1936,37 +1995,290 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
     # All unused debug methods removed in final cleanup
     
 
+def ejecutar_modo_replay(jsonl_file_path):
+    """
+    Ejecuta el modo replay cargando y visualizando eventos desde un archivo .jsonl
+    """
+    print(f"[REPLAY] Cargando archivo: {jsonl_file_path}")
+    
+    # Cargar todos los eventos del archivo .jsonl en memoria
+    eventos = []
+    simulation_start_event = None
+    initial_work_orders = []
+    total_work_orders_fijo = None
+    
+    try:
+        with open(jsonl_file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        event = json.loads(line)
+                        
+                        if event.get('event_type') == 'SIMULATION_START':
+                            simulation_start_event = event
+                            initial_work_orders = event.get('initial_work_orders', [])
+                            # BUGFIX: Leer total fijo de WorkOrders del evento SIMULATION_START
+                            total_work_orders_fijo = event.get('total_work_orders', None)
+                            if total_work_orders_fijo is not None:
+                                print(f"[REPLAY] Encontrado total_work_orders fijo: {total_work_orders_fijo}")
+                            else:
+                                print(f"[REPLAY] WARNING: total_work_orders no encontrado en SIMULATION_START (replay antiguo)")
+                            print(f"[REPLAY] Encontrado SIMULATION_START con {len(initial_work_orders)} WorkOrders iniciales")
+                        elif event.get('event_type') != 'SIMULATION_END':
+                            eventos.append(event)
+                            
+                    except json.JSONDecodeError as e:
+                        print(f"[REPLAY] Error parseando línea: {e}")
+                        continue
+        
+        print(f"[REPLAY] {len(eventos)} eventos cargados exitosamente")
+        
+    except Exception as e:
+        print(f"[REPLAY ERROR] No se pudo cargar archivo de replay: {e}")
+        return 1
+    
+    # Inicializar pygame
+    pygame.init()
+    
+    # Crear ventana con espacio para dashboard
+    warehouse_width = 960
+    dashboard_width = 380
+    window_width = warehouse_width + dashboard_width
+    window_height = 1000
+    window_size = (window_width, window_height)
+    pantalla = pygame.display.set_mode(window_size)
+    pygame.display.set_caption("Simulador de Almacén - Modo Replay")
+    reloj = pygame.time.Clock()
+    
+    # Cargar configuración desde el evento SIMULATION_START
+    configuracion = simulation_start_event.get('config', {}) if simulation_start_event else {}
+    
+    # Inicializar arquitectura TMX básica (necesaria para renderizado)
+    from simulation.layout_manager import LayoutManager
+    from visualization.original_renderer import RendererOriginal
+    from visualization.state import inicializar_estado, estado_visual
+    
+    # Cargar TMX
+    tmx_file = os.path.join(os.path.dirname(__file__), "layouts", "WH1.tmx")
+    layout_manager = LayoutManager(tmx_file)
+    
+    # Crear superficies
+    virtual_surface = pygame.Surface((warehouse_width, warehouse_width))  # Superficie virtual para el mapa
+    renderer = RendererOriginal(virtual_surface)
+    
+    # Inicializar estado visual básico
+    inicializar_estado(None, None, configuracion, layout_manager)
+    
+    # Configurar estado inicial con WorkOrders si están disponibles
+    if initial_work_orders:
+        for wo in initial_work_orders:
+            estado_visual["work_orders"][wo['id']] = wo.copy()
+        print(f"[REPLAY] {len(initial_work_orders)} WorkOrders cargadas en estado inicial")
+    
+    # Procesar primer evento para obtener posiciones iniciales de agentes
+    agentes_iniciales = {}
+    for evento in eventos[:10]:  # Solo mirar los primeros eventos
+        if evento.get('type') == 'estado_agente':
+            agent_id = evento.get('agent_id')
+            data = evento.get('data', {})
+            if agent_id and 'position' in data:
+                agentes_iniciales[agent_id] = data
+    
+    # Configurar agentes en estado visual
+    for agent_id, data in agentes_iniciales.items():
+        estado_visual["operarios"][agent_id] = data.copy()
+    
+    print(f"[REPLAY] {len(agentes_iniciales)} agentes encontrados en estado inicial")
+    print("[REPLAY] Iniciando bucle de visualización...")
+    
+    # Inicializar motor de playback
+    playback_time = 0.0
+    processed_event_indices = set()  # Trackear eventos ya procesados
+    
+    print(f"[REPLAY] Motor de playback inicializado - {len(eventos)} eventos total")
+    
+    # Bucle principal de replay con motor temporal
+    corriendo = True
+    while corriendo:
+        # Manejar eventos de pygame
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                corriendo = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    corriendo = False
+        
+        # Avanzar tiempo de playback usando delta time
+        delta_time = reloj.get_time() / 1000.0  # Convertir ms a segundos
+        playback_time += delta_time
+        
+        # Obtener lote de eventos para el tiempo actual
+        eventos_a_procesar = []
+        for i, evento in enumerate(eventos):
+            if i not in processed_event_indices:
+                event_timestamp = evento.get('timestamp', 0.0)
+                # BUGFIX: Manejar timestamps None
+                if event_timestamp is None:
+                    event_timestamp = 0.0
+                if event_timestamp <= playback_time:
+                    eventos_a_procesar.append((i, evento))
+        
+        # Actualizar estado de agentes con eventos procesados
+        for event_index, evento in eventos_a_procesar:
+            processed_event_indices.add(event_index)
+            
+            if evento.get('type') == 'estado_agente':
+                agent_id = evento.get('agent_id')
+                event_data = evento.get('data', {})
+                
+                if agent_id and event_data:
+                    # Inicializar agente si no existe
+                    if agent_id not in estado_visual["operarios"]:
+                        estado_visual["operarios"][agent_id] = {}
+                    
+                    # CRÍTICO: Usar .update() para fusionar datos sin perder claves existentes
+                    estado_visual["operarios"][agent_id].update(event_data)
+                    
+                    # BUGFIX: Extraer WorkOrders anidadas en tour_details
+                    tour_details = event_data.get('tour_details', [])
+                    if tour_details:
+                        # Inicializar diccionario work_orders si no existe
+                        if 'work_orders' not in estado_visual:
+                            estado_visual['work_orders'] = {}
+                        
+                        # Extraer cada WorkOrder de la lista tour_details
+                        for work_order in tour_details:
+                            wo_id = work_order.get('id')
+                            if wo_id:
+                                estado_visual['work_orders'][wo_id] = work_order.copy()
+            
+            elif evento.get('type') == 'work_order_update':
+                # Procesar actualización de Work Order
+                work_order_data = evento.get('data', {})
+                work_order_id = work_order_data.get('id')
+                
+                if work_order_id:
+                    # Actualizar Work Order en estado visual
+                    if 'work_orders' not in estado_visual:
+                        estado_visual['work_orders'] = {}
+                    estado_visual['work_orders'][work_order_id] = work_order_data.copy()
+        
+        # Limpiar pantalla
+        pantalla.fill((240, 240, 240))
+        virtual_surface.fill((25, 25, 25))
+        
+        # Renderizar mapa TMX
+        if hasattr(layout_manager, 'tmx_data') and layout_manager.tmx_data:
+            renderer.renderizar_mapa_tmx(virtual_surface, layout_manager.tmx_data)
+        
+        # Renderizar agentes con posiciones actualizadas
+        from visualization.original_renderer import renderizar_agentes
+        if estado_visual.get("operarios"):
+            # CRÍTICO: Convertir diccionario a lista para renderizar_agentes
+            operarios_a_renderizar = []
+            for agent_id, agent_data in estado_visual["operarios"].items():
+                agente = agent_data.copy()
+                agente['id'] = agent_id  # Asegurar que el ID esté presente
+                operarios_a_renderizar.append(agente)
+            
+            renderizar_agentes(virtual_surface, operarios_a_renderizar, layout_manager)
+        
+        # Escalar y mostrar superficie virtual del almacén
+        scaled_warehouse = pygame.transform.smoothscale(virtual_surface, (warehouse_width, window_height))
+        pantalla.blit(scaled_warehouse, (0, 0))
+        
+        # Renderizar Dashboard de Agentes
+        from visualization.original_renderer import renderizar_dashboard
+        
+        # Preparar métricas para el dashboard
+        # Contar WorkOrders completadas según contrato de renderizar_dashboard
+        work_orders = estado_visual.get('work_orders', {})
+        wos_completadas = sum(1 for wo in work_orders.values() if wo.get('status') == 'completed')
+        
+        # BUGFIX: Usar total fijo de WorkOrders si está disponible
+        total_wos_a_usar = total_work_orders_fijo if total_work_orders_fijo is not None else len(work_orders)
+        
+        metricas = {
+            'tiempo': playback_time,
+            'wos_completadas': wos_completadas,
+            'total_wos': total_wos_a_usar
+        }
+        
+        # Preparar operarios para el dashboard (convertir a formato esperado)
+        operarios_dashboard = []
+        for agent_id, agent_data in estado_visual.get('operarios', {}).items():
+            operario = agent_data.copy()
+            operario['id'] = agent_id
+            operarios_dashboard.append(operario)
+        
+        # Renderizar dashboard en el lado derecho
+        renderizar_dashboard(pantalla, warehouse_width, metricas, operarios_dashboard)
+        
+        # Mostrar información de replay en la parte superior del almacén
+        font = pygame.font.Font(None, 20)
+        info_text = font.render(f"REPLAY: Tiempo {playback_time:.2f}s | Eventos {len(processed_event_indices)}/{len(eventos)}", True, (255, 255, 255))
+        pantalla.blit(info_text, (10, 10))
+        
+        pygame.display.flip()
+        reloj.tick(30)  # 30 FPS
+    
+    pygame.quit()
+    print("[REPLAY] Modo replay terminado")
+    return 0
+
+
 def main():
     """Función principal - Modo automatizado con soporte headless"""
     # Configurar argparse
     parser = argparse.ArgumentParser(description='Digital Twin Warehouse Simulator')
     parser.add_argument('--headless', action='store_true', 
                        help='Ejecuta la simulación en modo headless (sin UI)')
+    parser.add_argument('--replay', type=str, metavar='FILE.jsonl',
+                       help='Ejecuta en modo Replay Viewer consumiendo un archivo .jsonl')
     args = parser.parse_args()
     
     print("="*60)
     print("SIMULADOR DE ALMACEN - GEMELO DIGITAL")
     print("Sistema de Navegación Inteligente v2.6")
-    if args.headless:
+    
+    if args.replay:
+        print("Modo REPLAY VIEWER - Visualización de Archivo .jsonl")
+        print(f"Archivo: {args.replay}")
+    elif args.headless:
         print("Modo HEADLESS - Máxima Velocidad")
     else:
         print("Modo Visual - Con Interfaz Gráfica")
     print("="*60)
     print()
     
-    if not args.headless:
+    if args.replay:
+        # MODO REPLAY VIEWER
+        if not os.path.exists(args.replay):
+            print(f"Error: Archivo de replay no encontrado: {args.replay}")
+            return 1
+        
+        print(f"[SIMULATOR] Iniciando en modo replay viewer")
+        return ejecutar_modo_replay(args.replay)
+        
+    elif args.headless:
+        # MODO HEADLESS (existente)
+        simulador = SimuladorAlmacen(headless_mode=True)
+        simulador.ejecutar()
+    else:
+        # MODO VISUAL (existente)
         print("INSTRUCCIONES:")
         print("1. Use 'python configurator.py' para crear/modificar configuraciones")
         print("2. Use 'python run_simulator.py' para modo visual")
         print("3. Use 'python run_simulator.py --headless' para modo de máxima velocidad")
+        print("4. Use 'python run_simulator.py --replay archivo.jsonl' para modo replay viewer")
         print()
         print("El simulador buscará 'config.json' en el directorio actual.")
         print("Si no existe, usará configuración por defecto.")
         print()
-    
-    # Crear simulador con modo headless si se especificó
-    simulador = SimuladorAlmacen(headless_mode=args.headless)
-    simulador.ejecutar()
+        
+        simulador = SimuladorAlmacen(headless_mode=False)
+        simulador.ejecutar()
 
 if __name__ == "__main__":
     main()
