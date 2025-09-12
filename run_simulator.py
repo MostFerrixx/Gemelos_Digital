@@ -2192,6 +2192,8 @@ def ejecutar_modo_replay(jsonl_file_path):
     order_dashboard_process = None
     dashboard_data_queue = None
     dashboard_last_state = {}  # Cache para detección de cambios
+    dashboard_initialized = False  # REFACTOR: Flag para evitar re-inicialización
+    last_processed_wo_events = set()  # REFACTOR: Track eventos WO ya procesados para deltas
     
     # Bucle principal de replay con motor temporal
     corriendo = True
@@ -2236,25 +2238,52 @@ def ejecutar_modo_replay(jsonl_file_path):
                             order_dashboard_process.start()
                             print(f"[REPLAY-DASHBOARD] Dashboard abierto (PID: {order_dashboard_process.pid})")
                             
-                            # Enviar estado inicial
-                            work_orders = estado_visual.get('work_orders', {})
-                            if work_orders:
-                                full_state_data = list(work_orders.values())
+                            # REFACTOR: Marcar dashboard como inicializado y enviar estado inicial UNA VEZ
+                            dashboard_initialized = True
+                            
+                            # BUGFIX: Reconstruir estado inicial filtrado por playback_time
+                            estado_reconstruido = {}
+                            
+                            # Procesar TODOS los eventos desde el principio, filtrando por playback_time
+                            for evento in eventos:
+                                event_timestamp = evento.get('timestamp', 0.0)
+                                if event_timestamp is None:
+                                    event_timestamp = 0.0
                                 
-                                # AUDIT: Conteo de WorkOrders por estado antes de enviar
-                                estado_counts = {}
-                                for wo in full_state_data:
-                                    status = wo.get('status', 'unknown')
-                                    estado_counts[status] = estado_counts.get(status, 0) + 1
+                                # CRITICAL: Solo procesar eventos cuyo timestamp <= playback_time actual
+                                if event_timestamp <= playback_time:
+                                    # Procesar evento SIMULATION_START (WorkOrders iniciales)
+                                    if evento.get('event_type') == 'SIMULATION_START':
+                                        # Inicializar con WorkOrders del metadata
+                                        if initial_work_orders:
+                                            for wo in initial_work_orders:
+                                                estado_reconstruido[wo['id']] = wo.copy()
+                                    
+                                    # Procesar eventos work_order_update
+                                    elif evento.get('type') == 'work_order_update':
+                                        work_order_data = evento.get('data', {})
+                                        work_order_id = work_order_data.get('id')
+                                        
+                                        if work_order_id:
+                                            if work_order_id in estado_reconstruido:
+                                                estado_reconstruido[work_order_id].update(work_order_data)
+                                            else:
+                                                estado_reconstruido[work_order_id] = work_order_data.copy()
+                            
+                            if estado_reconstruido:
+                                full_state_data = list(estado_reconstruido.values())
                                 
-                                print(f"[AUDIT-DASHBOARD] === DIAGNÓSTICO DE ESTADO INICIAL ===")
-                                print(f"[AUDIT-DASHBOARD] Tiempo de playback actual: {playback_time:.2f}s")
-                                print(f"[AUDIT-DASHBOARD] Total WorkOrders en estado_visual: {len(full_state_data)}")
-                                print(f"[AUDIT-DASHBOARD] Conteo por estado:")
-                                for status, count in estado_counts.items():
-                                    print(f"[AUDIT-DASHBOARD]   {status}: {count}")
-                                print(f"[AUDIT-DASHBOARD] Origen de datos: estado_visual['work_orders'] (COMPLETO)")
-                                print(f"[AUDIT-DASHBOARD] =======================================")
+                                # AUDIT: Sonda DEBUG-EMISOR - Instrumentar estado antes del envio
+                                status_summary = {}
+                                for wo_data in full_state_data:
+                                    status = wo_data.get('status', 'unknown')
+                                    status_summary[status] = status_summary.get(status, 0) + 1
+                                
+                                # AUDIT: Sonda de comparación temporal - detectar desacoplamiento
+                                import time
+                                real_time = time.time()
+                                print(f"[DEBUG-EMISOR] REPLAY enviando {len(full_state_data)} WorkOrders. Estados: {status_summary}. Playback_time: {playback_time}")
+                                print(f"[TEMPORAL-AUDIT] WorkOrder_States_Time: {playback_time:.3f} | RealTime: {real_time:.3f}")
                                 
                                 full_state_message = {
                                     'type': 'full_state',
@@ -2289,6 +2318,8 @@ def ejecutar_modo_replay(jsonl_file_path):
                             order_dashboard_process = None
                             dashboard_data_queue = None
                             dashboard_last_state = {}
+                            dashboard_initialized = False  # REFACTOR: Reset flag
+                            last_processed_wo_events = set()  # REFACTOR: Reset tracking
                             print("[REPLAY-DASHBOARD] Dashboard cerrado")
                             
                         except Exception as e:
@@ -2316,6 +2347,13 @@ def ejecutar_modo_replay(jsonl_file_path):
             if evento.get('type') == 'estado_agente':
                 agent_id = evento.get('agent_id')
                 event_data = evento.get('data', {})
+                event_timestamp = evento.get('timestamp', 0.0)
+                
+                # AUDIT: Sonda de comparación temporal - eventos visuales
+                import time
+                real_time = time.time()
+                if agent_id and 'position' in event_data:  # Solo loggear eventos de movimiento
+                    print(f"[TEMPORAL-AUDIT] Visual_Agent_Movement: {event_timestamp:.3f} | Playback_time: {playback_time:.3f} | Agent: {agent_id}")
                 
                 if agent_id and event_data:
                     # Inicializar agente si no existe
@@ -2342,6 +2380,16 @@ def ejecutar_modo_replay(jsonl_file_path):
                 # Procesar actualización de Work Order
                 work_order_data = evento.get('data', {})
                 work_order_id = work_order_data.get('id')
+                event_timestamp = evento.get('timestamp', 0.0)
+                
+                # AUDIT: Sonda de comparación temporal - eventos WorkOrder
+                import time
+                real_time = time.time()
+                status = work_order_data.get('status', 'unknown')
+                # BUGFIX: Manejar timestamp None
+                if event_timestamp is None:
+                    event_timestamp = 0.0
+                print(f"[TEMPORAL-AUDIT] WorkOrder_Update: {event_timestamp:.3f} | Playback_time: {playback_time:.3f} | WO: {work_order_id} | Status: {status}")
                 
                 if work_order_id:
                     # Actualizar Work Order en estado visual
@@ -2349,32 +2397,35 @@ def ejecutar_modo_replay(jsonl_file_path):
                         estado_visual['work_orders'] = {}
                     estado_visual['work_orders'][work_order_id] = work_order_data.copy()
         
-        # Enviar datos actualizados al Dashboard de Órdenes (si está activo)
-        if order_dashboard_process and order_dashboard_process.is_alive() and dashboard_data_queue:
+        # REFACTOR: Sistema de delta updates optimizado para Dashboard de Órdenes
+        if order_dashboard_process and order_dashboard_process.is_alive() and dashboard_data_queue and dashboard_initialized:
             try:
-                work_orders = estado_visual.get('work_orders', {})
-                if work_orders:
-                    # Calcular deltas (solo WorkOrders que cambiaron)
-                    delta_updates = []
+                # Detectar nuevos eventos work_order_update desde el último frame
+                new_wo_events = []
+                for event_index, evento in eventos_a_procesar:
+                    if evento.get('type') == 'work_order_update' and event_index not in last_processed_wo_events:
+                        new_wo_events.append(evento)
+                        last_processed_wo_events.add(event_index)
+                
+                # Enviar deltas solo si hay nuevos eventos WorkOrder
+                if new_wo_events:
+                    delta_data = []
+                    for evento in new_wo_events:
+                        work_order_data = evento.get('data', {})
+                        if work_order_data and work_order_data.get('id'):
+                            delta_data.append(work_order_data.copy())
                     
-                    for work_order_id, work_order_data in work_orders.items():
-                        # Comparar con estado anterior para detectar cambios
-                        if (work_order_id not in dashboard_last_state or 
-                            dashboard_last_state[work_order_id] != work_order_data):
-                            delta_updates.append(work_order_data.copy())
-                            dashboard_last_state[work_order_id] = work_order_data.copy()
-                    
-                    # Enviar solo si hay cambios
-                    if delta_updates:
+                    if delta_data:
                         delta_message = {
                             'type': 'delta_update',
                             'timestamp': playback_time,
-                            'data': delta_updates
+                            'data': delta_data
                         }
                         dashboard_data_queue.put_nowait(delta_message)
+                        print(f"[DELTA-UPDATE] Enviado {len(delta_data)} WorkOrder updates al dashboard")
                         
             except Exception as e:
-                print(f"[REPLAY-DASHBOARD] Error enviando datos: {e}")
+                print(f"[REPLAY-DASHBOARD] Error enviando deltas: {e}")
         
         # Limpiar pantalla
         pantalla.fill((240, 240, 240))

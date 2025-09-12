@@ -312,3 +312,11 @@ dashboard_replay_test_*.log
 
 # Archivos de salida de testing temporal
 *_test_output.txt
+
+# Archivos de auditoría temporal y debugging (V6.6.1)
+[TEMPORAL-AUDIT]*.log
+[DEBUG-EMISOR]*.log
+[DEBUG-RECEPTOR]*.log
+*temporal_audit*.txt
+*debugging_output*.txt
+diagnostico_*.txt
