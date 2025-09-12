@@ -320,3 +320,15 @@ dashboard_replay_test_*.log
 *temporal_audit*.txt
 *debugging_output*.txt
 diagnostico_*.txt
+
+# Archivos temporales de testing y certificación (V6.7.0)
+replay_output.txt
+*_output.txt
+*_verification.txt
+*_certification.txt
+*_final_verification.txt
+*_audit_*.log
+test_*.log
+test_*.txt
+*_diagnostico.txt
+*_test_output.log
