@@ -549,6 +549,9 @@ class SimuladorAlmacen:
         eventos_procesados_total = 0
         ultimo_reporte_tiempo = time.time()
         
+        # AUDIT: Variable de control para verificación de datos única
+        datos_verificados = False
+        
         # Resetear el reloj de reproducción
         self.playback_time = 0.0
         
@@ -652,7 +655,9 @@ class SimuladorAlmacen:
                     # Procesar métricas del dashboard
                     metricas = mensaje['data']
                     self.metricas_actuales = metricas
-                    print(f"[PLAYBACK-METRICAS] T={self.playback_time:.1f}s (sim:{metricas['tiempo']:.1f}s), Completadas:{metricas['wos_completadas']}, Factor:{self.factor_aceleracion:.1f}x")
+                    workorders_c = metricas.get('workorders_completadas', metricas.get('wos_completadas', 0))  # Backwards compatibility
+                    tareas_c = metricas.get('tareas_completadas', 0)
+                    print(f"[PLAYBACK-METRICAS] T={self.playback_time:.1f}s (sim:{metricas['tiempo']:.1f}s), WOs:{workorders_c}, Tareas:{tareas_c}, Factor:{self.factor_aceleracion:.1f}x")
                     
                     # Actualizar dashboard de órdenes si está activo
                     self._actualizar_dashboard_ordenes()
@@ -689,6 +694,9 @@ class SimuladorAlmacen:
 
                 # Actualizar pantalla
                 pygame.display.flip()
+            
+            # DASHBOARD: Actualizar dashboard de órdenes en modo replay
+            self._actualizar_dashboard_ordenes_replay()
             
             # INSTRUMENTACIÓN: Logging de rendimiento de frames
             frame_end_time = time.time()
@@ -930,6 +938,12 @@ class SimuladorAlmacen:
                     self.factor_aceleracion = factores[0]
                 print(f"[REPLAY] Velocidad de reproducción: {self.factor_aceleracion:.1f}x")
             elif evento.key == pygame.K_o:  # Tecla O para Dashboard de Órdenes
+                print("[DIAGNOSTICO-TECLA] Tecla 'O' detectada.")
+                # ESCRIBIR TAMBIÉN A ARCHIVO PARA GARANTIZAR CAPTURA
+                with open('diagnostico_tecla_o.txt', 'a', encoding='utf-8') as f:
+                    import time
+                    f.write(f"[{time.strftime('%H:%M:%S')}] DIAGNOSTICO-TECLA: Tecla 'O' detectada.\n")
+                    f.write(f"[{time.strftime('%H:%M:%S')}] Estado almacen: {'Existe' if self.almacen else 'No Existe'}\n")
                 print(f"[DEBUG-DASHBOARD] Intento de abrir dashboard. Estado de self.almacen: {'Existe' if self.almacen else 'No Existe'}")
                 self.toggle_order_dashboard()
             # Funciones de diagnóstico desactivadas en limpieza
@@ -1293,7 +1307,12 @@ class SimuladorAlmacen:
                     print("Dashboard de Órdenes abierto en proceso separado - Presiona 'O' nuevamente para cerrar")
                     
                     # NUEVO: Enviar estado completo inicial inmediatamente después del arranque
-                    self._enviar_estado_completo_inicial()
+                    if self.almacen and self.almacen.dispatcher:
+                        # Modo simulación activa
+                        self._enviar_estado_completo_inicial()
+                    else:
+                        # Modo replay
+                        self._enviar_estado_completo_inicial_replay()
                     
                     # SYNC FIX: Verificar si simulación ya terminó y enviar comando de hibernación
                     if self.simulacion_finalizada_reportada:
@@ -1499,6 +1518,88 @@ class SimuladorAlmacen:
                 print("[COMMS-LINK] |-- No hay almacén inicializado")
             elif not self.almacen.dispatcher:
                 print("[COMMS-LINK] |-- No hay dispatcher inicializado")
+    
+    def _enviar_estado_completo_inicial_replay(self):
+        """
+        REPLAY: Envía el estado completo de WorkOrders desde estado_visual al dashboard recién iniciado
+        Adaptado específicamente para modo replay
+        """
+        if self.dashboard_data_queue:
+            try:
+                from visualization.state import estado_visual
+                
+                # Obtener WorkOrders desde estado_visual (datos del replay)
+                work_orders = estado_visual.get('work_orders', {})
+                
+                # Generar snapshot completo
+                full_state_data = []
+                for work_order_id, work_order_data in work_orders.items():
+                    full_state_data.append(work_order_data)
+                
+                # Crear mensaje de estado completo
+                import time
+                full_state_message = {
+                    'type': 'full_state',
+                    'timestamp': time.time(),
+                    'data': full_state_data
+                }
+                
+                # Enviar estado completo inicial
+                self.dashboard_data_queue.put_nowait(full_state_message)
+                print(f"[REPLAY-DASHBOARD] Estado completo inicial enviado: {len(full_state_data)} WorkOrders")
+                
+                # Inicializar cache para deltas futuros
+                self.dashboard_last_state = {}
+                for work_order_data in full_state_data:
+                    self.dashboard_last_state[work_order_data['id']] = work_order_data.copy()
+                
+            except Exception as e:
+                print(f"[REPLAY-DASHBOARD] Error enviando estado inicial: {e}")
+    
+    def _actualizar_dashboard_ordenes_replay(self):
+        """
+        REPLAY: Enviar datos actualizados al dashboard usando estado_visual
+        Adaptado específicamente para modo replay
+        """
+        if (self.order_dashboard_process and 
+            self.order_dashboard_process.is_alive() and 
+            self.dashboard_data_queue):
+            
+            try:
+                from visualization.state import estado_visual
+                
+                # Obtener WorkOrders actuales desde estado_visual
+                work_orders = estado_visual.get('work_orders', {})
+                
+                # Calcular deltas (solo WorkOrders que cambiaron)
+                delta_updates = []
+                estado_actual = {}
+                
+                for work_order_id, work_order_data in work_orders.items():
+                    estado_actual[work_order_id] = work_order_data.copy()
+                    
+                    # Comparar con estado anterior para detectar cambios
+                    if (work_order_id not in self.dashboard_last_state or 
+                        self.dashboard_last_state[work_order_id] != work_order_data):
+                        delta_updates.append(work_order_data)
+                
+                # Enviar solo si hay cambios
+                if delta_updates:
+                    import time
+                    delta_message = {
+                        'type': 'delta_update',
+                        'timestamp': time.time(),
+                        'data': delta_updates
+                    }
+                    
+                    self.dashboard_data_queue.put_nowait(delta_message)
+                    print(f"[REPLAY-DASHBOARD] Delta enviado: {len(delta_updates)} WorkOrders actualizadas")
+                    
+                    # Actualizar cache
+                    self.dashboard_last_state = estado_actual.copy()
+                
+            except Exception as e:
+                print(f"[REPLAY-DASHBOARD] Error actualizando dashboard: {e}")
     
     def _inicializar_operarios_en_estado_visual(self, agentes):
         """Inicializa estado visual basándose en agentes reales creados"""
@@ -1804,19 +1905,23 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
                 logger.debug("Proceso de métricas de dashboard: Tick de ejecución.")
                 
                 try:
-                    # a. Calcular Métricas del almacén
+                    # a. Calcular Métricas del almacén - DUAL COUNTERS
                     tiempo = env.now
-                    wos_completadas = almacen.tareas_completadas_count
-                    wos_pendientes = len(almacen.dispatcher.lista_maestra_work_orders) if hasattr(almacen, 'dispatcher') and almacen.dispatcher.lista_maestra_work_orders else 0
-                    wos_totales = wos_completadas + wos_pendientes
-                    progreso = (wos_completadas / wos_totales * 100) if wos_totales > 0 else 0.0
                     
-                    # b. Construir el Mensaje
+                    # Contadores duales: WorkOrders y Tareas (PickingTasks)
+                    workorders_completadas = almacen.workorders_completadas_count  # Contador real de WorkOrders
+                    tareas_completadas = almacen.tareas_completadas_count  # Contador legacy de PickingTasks
+                    wos_pendientes = len(almacen.dispatcher.lista_maestra_work_orders) if hasattr(almacen, 'dispatcher') and almacen.dispatcher.lista_maestra_work_orders else 0
+                    wos_totales = workorders_completadas + wos_pendientes
+                    progreso = (workorders_completadas / wos_totales * 100) if wos_totales > 0 else 0.0
+                    
+                    # b. Construir el Mensaje - DUAL METRICS
                     mensaje = {
                         'type': 'metricas_dashboard',
                         'data': {
                             'tiempo': tiempo,
-                            'wos_completadas': wos_completadas,
+                            'workorders_completadas': workorders_completadas,  # KPI principal
+                            'tareas_completadas': tareas_completadas,  # Métrica granular
                             'wos_pendientes': wos_pendientes,
                             'wos_totales': wos_totales,
                             'progreso': progreso,
@@ -1825,7 +1930,7 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
                     }
                     
                     # c. Enviar el Mensaje a la cola
-                    print(f"[METRICAS-DASHBOARD] T={tiempo:.1f}s - Completadas:{wos_completadas}, Pendientes:{wos_pendientes}, Progreso:{progreso:.1f}%")
+                    print(f"[METRICAS-DASHBOARD] T={tiempo:.1f}s - WOs:{workorders_completadas}, Tareas:{tareas_completadas}, Pendientes:{wos_pendientes}, Progreso:{progreso:.1f}%")
                     event_queue.put(mensaje)
                     
                 except Exception as e:
@@ -1981,6 +2086,7 @@ def ejecutar_modo_replay(jsonl_file_path):
     """
     Ejecuta el modo replay cargando y visualizando eventos desde un archivo .jsonl
     """
+    import multiprocessing
     print(f"[REPLAY] Cargando archivo: {jsonl_file_path}")
     
     # Cargar todos los eventos del archivo .jsonl en memoria
@@ -2082,6 +2188,11 @@ def ejecutar_modo_replay(jsonl_file_path):
     
     print(f"[REPLAY] Motor de playback inicializado - {len(eventos)} eventos total")
     
+    # Variables para gestión del Dashboard de Órdenes en modo replay
+    order_dashboard_process = None
+    dashboard_data_queue = None
+    dashboard_last_state = {}  # Cache para detección de cambios
+    
     # Bucle principal de replay con motor temporal
     corriendo = True
     while corriendo:
@@ -2104,6 +2215,84 @@ def ejecutar_modo_replay(jsonl_file_path):
                     if current_index > 0:
                         replay_speed = velocidades_permitidas[current_index - 1]
                         print(f"[REPLAY] Velocidad disminuida a {replay_speed:.2f}x")
+                elif event.key == pygame.K_o:
+                    # Tecla 'O' para toggle Dashboard de Órdenes
+                    print("[REPLAY-DASHBOARD] Tecla 'O' detectada - Toggle dashboard")
+                    if order_dashboard_process is None or not order_dashboard_process.is_alive():
+                        # Abrir dashboard
+                        try:
+                            from git.visualization.order_dashboard import launch_dashboard_process
+                            from multiprocessing import Queue
+                            
+                            # Crear cola para comunicación
+                            dashboard_data_queue = Queue()
+                            
+                            # Crear proceso separado para el dashboard
+                            order_dashboard_process = multiprocessing.Process(
+                                target=launch_dashboard_process,
+                                args=(dashboard_data_queue,)
+                            )
+                            
+                            order_dashboard_process.start()
+                            print(f"[REPLAY-DASHBOARD] Dashboard abierto (PID: {order_dashboard_process.pid})")
+                            
+                            # Enviar estado inicial
+                            work_orders = estado_visual.get('work_orders', {})
+                            if work_orders:
+                                full_state_data = list(work_orders.values())
+                                
+                                # AUDIT: Conteo de WorkOrders por estado antes de enviar
+                                estado_counts = {}
+                                for wo in full_state_data:
+                                    status = wo.get('status', 'unknown')
+                                    estado_counts[status] = estado_counts.get(status, 0) + 1
+                                
+                                print(f"[AUDIT-DASHBOARD] === DIAGNÓSTICO DE ESTADO INICIAL ===")
+                                print(f"[AUDIT-DASHBOARD] Tiempo de playback actual: {playback_time:.2f}s")
+                                print(f"[AUDIT-DASHBOARD] Total WorkOrders en estado_visual: {len(full_state_data)}")
+                                print(f"[AUDIT-DASHBOARD] Conteo por estado:")
+                                for status, count in estado_counts.items():
+                                    print(f"[AUDIT-DASHBOARD]   {status}: {count}")
+                                print(f"[AUDIT-DASHBOARD] Origen de datos: estado_visual['work_orders'] (COMPLETO)")
+                                print(f"[AUDIT-DASHBOARD] =======================================")
+                                
+                                full_state_message = {
+                                    'type': 'full_state',
+                                    'timestamp': playback_time,
+                                    'data': full_state_data
+                                }
+                                dashboard_data_queue.put_nowait(full_state_message)
+                                print(f"[REPLAY-DASHBOARD] Estado inicial enviado: {len(full_state_data)} WorkOrders")
+                                
+                                # Actualizar cache
+                                dashboard_last_state = {wo['id']: wo.copy() for wo in full_state_data}
+                            
+                        except ImportError as e:
+                            print(f"[REPLAY-DASHBOARD] Error importando dashboard: {e}")
+                        except Exception as e:
+                            print(f"[REPLAY-DASHBOARD] Error abriendo dashboard: {e}")
+                    else:
+                        # Cerrar dashboard
+                        try:
+                            if dashboard_data_queue:
+                                try:
+                                    dashboard_data_queue.put_nowait('__EXIT_COMMAND__')
+                                except:
+                                    pass
+                            
+                            order_dashboard_process.join(timeout=3)
+                            
+                            if order_dashboard_process.is_alive():
+                                order_dashboard_process.terminate()
+                                order_dashboard_process.join(timeout=1)
+                            
+                            order_dashboard_process = None
+                            dashboard_data_queue = None
+                            dashboard_last_state = {}
+                            print("[REPLAY-DASHBOARD] Dashboard cerrado")
+                            
+                        except Exception as e:
+                            print(f"[REPLAY-DASHBOARD] Error cerrando dashboard: {e}")
         
         # Avanzar tiempo de playback usando delta time
         delta_time = reloj.get_time() / 1000.0  # Convertir ms a segundos
@@ -2160,6 +2349,33 @@ def ejecutar_modo_replay(jsonl_file_path):
                         estado_visual['work_orders'] = {}
                     estado_visual['work_orders'][work_order_id] = work_order_data.copy()
         
+        # Enviar datos actualizados al Dashboard de Órdenes (si está activo)
+        if order_dashboard_process and order_dashboard_process.is_alive() and dashboard_data_queue:
+            try:
+                work_orders = estado_visual.get('work_orders', {})
+                if work_orders:
+                    # Calcular deltas (solo WorkOrders que cambiaron)
+                    delta_updates = []
+                    
+                    for work_order_id, work_order_data in work_orders.items():
+                        # Comparar con estado anterior para detectar cambios
+                        if (work_order_id not in dashboard_last_state or 
+                            dashboard_last_state[work_order_id] != work_order_data):
+                            delta_updates.append(work_order_data.copy())
+                            dashboard_last_state[work_order_id] = work_order_data.copy()
+                    
+                    # Enviar solo si hay cambios
+                    if delta_updates:
+                        delta_message = {
+                            'type': 'delta_update',
+                            'timestamp': playback_time,
+                            'data': delta_updates
+                        }
+                        dashboard_data_queue.put_nowait(delta_message)
+                        
+            except Exception as e:
+                print(f"[REPLAY-DASHBOARD] Error enviando datos: {e}")
+        
         # Limpiar pantalla
         pantalla.fill((240, 240, 240))
         virtual_surface.fill((25, 25, 25))
@@ -2187,17 +2403,30 @@ def ejecutar_modo_replay(jsonl_file_path):
         # Renderizar Dashboard de Agentes
         from visualization.original_renderer import renderizar_dashboard
         
-        # Preparar métricas para el dashboard
+        # Preparar métricas para el dashboard - DUAL COUNTERS
         # Contar WorkOrders completadas según contrato de renderizar_dashboard
         work_orders = estado_visual.get('work_orders', {})
-        wos_completadas = sum(1 for wo in work_orders.values() if wo.get('status') == 'completed')
+        workorders_completadas = sum(1 for wo in work_orders.values() if wo.get('status') == 'completed')
+        
+        # Contar tareas completadas procesando los eventos acumulados hasta playback_time
+        tareas_completadas = 0
+        for evento in eventos:
+            # BUGFIX: Validación defensiva contra timestamp None que causaba TypeError
+            timestamp = evento.get('timestamp', 0)
+            if timestamp is None:
+                timestamp = 0  # Fallback seguro
+            
+            if timestamp <= playback_time:
+                if evento.get('type') == 'task_completed' or evento.get('type') == 'operation_completed':
+                    tareas_completadas += 1
         
         # BUGFIX: Usar total fijo de WorkOrders si está disponible
         total_wos_a_usar = total_work_orders_fijo if total_work_orders_fijo is not None else len(work_orders)
         
         metricas = {
             'tiempo': playback_time,
-            'wos_completadas': wos_completadas,
+            'workorders_completadas': workorders_completadas,  # KPI principal
+            'tareas_completadas': tareas_completadas,  # Métrica granular
             'total_wos': total_wos_a_usar
         }
         
@@ -2216,8 +2445,36 @@ def ejecutar_modo_replay(jsonl_file_path):
         info_text = font.render(f"REPLAY: Tiempo {playback_time:.2f}s | Velocidad: {replay_speed:.2f}x | Eventos {len(processed_event_indices)}/{len(eventos)}", True, (255, 255, 255))
         pantalla.blit(info_text, (10, 10))
         
+        # Mostrar información de controles y dashboard
+        controls_text = font.render("CONTROLES: +/- velocidad | ESC salir | O dashboard", True, (255, 255, 255))
+        pantalla.blit(controls_text, (10, 35))
+        
+        dashboard_status = "Dashboard: ACTIVO" if (order_dashboard_process and order_dashboard_process.is_alive()) else "Dashboard: INACTIVO"
+        dashboard_text = font.render(dashboard_status, True, (0, 255, 0) if (order_dashboard_process and order_dashboard_process.is_alive()) else (128, 128, 128))
+        pantalla.blit(dashboard_text, (10, 60))
+        
         pygame.display.flip()
         reloj.tick(30)  # 30 FPS
+    
+    # Limpieza del Dashboard de Órdenes antes de salir
+    if order_dashboard_process and order_dashboard_process.is_alive():
+        try:
+            print("[REPLAY-DASHBOARD] Cerrando dashboard antes de salir...")
+            if dashboard_data_queue:
+                try:
+                    dashboard_data_queue.put_nowait('__EXIT_COMMAND__')
+                except:
+                    pass  # Cola llena, proceder con terminación
+            
+            order_dashboard_process.join(timeout=3)
+            
+            if order_dashboard_process.is_alive():
+                order_dashboard_process.terminate()
+                order_dashboard_process.join(timeout=1)
+            
+            print("[REPLAY-DASHBOARD] Dashboard cerrado correctamente")
+        except Exception as e:
+            print(f"[REPLAY-DASHBOARD] Error cerrando dashboard: {e}")
     
     pygame.quit()
     print("[REPLAY] Modo replay terminado")

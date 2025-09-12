@@ -301,3 +301,14 @@ buffer_audit_*.log
 speed_control_test_*.py
 replay_speed_debug_*.log
 velocity_test_*.py
+
+# Archivos temporales de testing del dashboard en modo replay (V6.6.0)
+test_replay_dashboard.py
+test_replay_manual.py
+replay_test_output.txt
+*_replay_test.py
+diagnostico_tecla_*.txt
+dashboard_replay_test_*.log
+
+# Archivos de salida de testing temporal
+*_test_output.txt
