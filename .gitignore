@@ -332,3 +332,22 @@ test_*.log
 test_*.txt
 *_diagnostico.txt
 *_test_output.log
+
+# Archivos de auditoría arquitectónica y diagnóstico crítico (V6.8.0)
+*_diagnostic.txt
+*_output_full.txt
+*_keyboard_test.txt
+probe_output_*.txt
+producer_diagnostic.txt
+refactored_*_test.txt
+*_replay_test.txt
+
+# Archivos temporales de testing de replay avanzado
+new_replay.jsonl
+*_replay*.jsonl
+test_replay_*.jsonl
+
+# Assets temporales de desarrollo y screenshots
+assets/temp/
+assets/screenshots/
+assets/debug/

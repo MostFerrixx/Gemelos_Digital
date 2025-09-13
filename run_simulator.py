@@ -28,7 +28,7 @@ def agregar_evento_replay(buffer, evento):
     """Agrega un evento al búfer de replay"""
     buffer.add_event(evento)
 
-def volcar_replay_a_archivo(buffer, archivo_salida, configuracion, almacen=None):
+def volcar_replay_a_archivo(buffer, archivo_salida, configuracion, almacen=None, initial_work_orders_snapshot=None):
     """Vuelca el búfer completo a un archivo .jsonl"""
     
     # REFACTOR: Usar la instancia de ReplayBuffer recibida como parámetro
@@ -60,6 +60,13 @@ def volcar_replay_a_archivo(buffer, archivo_salida, configuracion, almacen=None)
                 print(f"[REPLAY-METADATA] Añadido total_work_orders: {total_work_orders} al evento SIMULATION_START")
             else:
                 print(f"[REPLAY-METADATA] WARNING: No se pudo obtener total de WorkOrders del almacen")
+            
+            # REFACTOR: Usar instantanea capturada en t=0 en lugar de estado al final
+            if initial_work_orders_snapshot and len(initial_work_orders_snapshot) > 0:
+                metadata['initial_work_orders'] = initial_work_orders_snapshot
+                print(f"[REPLAY-METADATA] Añadidas {len(initial_work_orders_snapshot)} initial_work_orders desde instantanea t=0")
+            else:
+                print(f"[REPLAY-METADATA] WARNING: No se recibio instantanea inicial de WorkOrders")
             
             f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
             
@@ -555,6 +562,20 @@ class SimuladorAlmacen:
         # Resetear el reloj de reproducción
         self.playback_time = 0.0
         
+        # SONDA 3: Estado antes de iniciar el bucle principal de renderizado
+        print(f"\n=== SONDA 3: ANTES DEL BUCLE PRINCIPAL DE RENDERIZADO ===")
+        print(f"Work Orders en estado_visual: {len(estado_visual.get('work_orders', {}))}")
+        for wo_id, wo_data in estado_visual.get('work_orders', {}).items():
+            print(f"  WO {wo_id}: status={wo_data.get('status', 'unknown')}")
+        print(f"Operarios en estado_visual: {len(estado_visual.get('operarios', {}))}")
+        for op_id, op_data in estado_visual.get('operarios', {}).items():
+            print(f"  Operario {op_id}: status={op_data.get('status', 'unknown')}, accion={op_data.get('accion', 'unknown')}")
+        print(f"Playback time: {self.playback_time}")
+        print(f"Buffer de eventos: {len(self.event_buffer)} eventos")
+        if self.event_buffer:
+            print(f"  Primer evento: timestamp={self.event_buffer[0].get('timestamp', 'unknown')}, tipo={self.event_buffer[0].get('type', 'unknown')}")
+        print("=========================================\n")
+        
         self.corriendo = True
         while self.corriendo and simulacion_activa:
             # INSTRUMENTACIÓN: Registro del tiempo de inicio del frame
@@ -1034,7 +1055,9 @@ class SimuladorAlmacen:
                 buffer_size = len(self.replay_buffer.get_events())
                 print(f"[VOLCADO-DEBUG] Buffer actual tiene {buffer_size} eventos antes del volcado")
                 
-                volcar_replay_a_archivo(self.replay_buffer, archivo_replay, self.configuracion, self.almacen)
+                # REFACTOR: Pasar instantanea inicial capturada en t=0
+                initial_snapshot = getattr(self.almacen, 'initial_work_orders_snapshot', None)
+                volcar_replay_a_archivo(self.replay_buffer, archivo_replay, self.configuracion, self.almacen, initial_snapshot)
                 archivos_generados.append(archivo_replay)
                 print(f"[2.5/4] Eventos de replay guardados: {archivo_replay}")
             except Exception as e:
@@ -1137,7 +1160,9 @@ class SimuladorAlmacen:
                     event_types[event_type] = event_types.get(event_type, 0) + 1
                 print(f"[AUDIT-CRITICAL] Tipos de eventos: {event_types}")
                 
-                volcar_replay_a_archivo(self.replay_buffer, archivo_replay, self.configuracion, self.almacen)
+                # REFACTOR: Pasar instantanea inicial capturada en t=0
+                initial_snapshot = getattr(self.almacen, 'initial_work_orders_snapshot', None)
+                volcar_replay_a_archivo(self.replay_buffer, archivo_replay, self.configuracion, self.almacen, initial_snapshot)
                 archivos_generados.append(archivo_replay)
                 print(f"[2.5/4] Eventos de replay guardados: {archivo_replay}")
             except Exception as e:
@@ -2163,6 +2188,13 @@ def ejecutar_modo_replay(jsonl_file_path):
         for wo in initial_work_orders:
             estado_visual["work_orders"][wo['id']] = wo.copy()
         print(f"[REPLAY] {len(initial_work_orders)} WorkOrders cargadas en estado inicial")
+        
+        # SONDA 1: Estado después de procesar initial_work_orders del SIMULATION_START
+        print(f"\n=== SONDA 1: DESPUÉS DE PROCESAR INITIAL_WORK_ORDERS ===")
+        print(f"Work Orders cargadas: {len(estado_visual['work_orders'])}")
+        for wo_id, wo_data in estado_visual["work_orders"].items():
+            print(f"  WO {wo_id}: status={wo_data.get('status', 'unknown')}")
+        print("=========================================\n")
     
     # Procesar primer evento para obtener posiciones iniciales de agentes
     agentes_iniciales = {}
@@ -2194,6 +2226,11 @@ def ejecutar_modo_replay(jsonl_file_path):
     dashboard_last_state = {}  # Cache para detección de cambios
     dashboard_initialized = False  # REFACTOR: Flag para evitar re-inicialización
     last_processed_wo_events = set()  # REFACTOR: Track eventos WO ya procesados para deltas
+    
+    # AUDIT: Auto-trigger para capturar estado del dashboard después de 3 segundos
+    import time
+    auto_trigger_time = time.time() + 3.0
+    auto_triggered = False
     
     # Bucle principal de replay con motor temporal
     corriendo = True
@@ -2273,6 +2310,14 @@ def ejecutar_modo_replay(jsonl_file_path):
                             if estado_reconstruido:
                                 full_state_data = list(estado_reconstruido.values())
                                 
+                                # SONDA 2: Estado después de procesar eventos work_order_update en timestamp=0
+                                if playback_time == 0.0:
+                                    print(f"\n=== SONDA 2: DESPUÉS DE PROCESAR EVENTOS TIMESTAMP=0 ===")
+                                    print(f"Work Orders reconstruidas: {len(estado_reconstruido)}")
+                                    for wo_id, wo_data in estado_reconstruido.items():
+                                        print(f"  WO {wo_id}: status={wo_data.get('status', 'unknown')}")
+                                    print("=========================================\n")
+                                
                                 # AUDIT: Sonda DEBUG-EMISOR - Instrumentar estado antes del envio
                                 status_summary = {}
                                 for wo_data in full_state_data:
@@ -2290,6 +2335,20 @@ def ejecutar_modo_replay(jsonl_file_path):
                                     'timestamp': playback_time,
                                     'data': full_state_data
                                 }
+                                # AUDIT: Verificar estados en el momento de activacion del dashboard
+                                status_count = {}
+                                for wo_data in full_state_data:
+                                    status = wo_data.get('status', 'unknown')
+                                    status_count[status] = status_count.get(status, 0) + 1
+                                print(f"\n=== AUDIT: ESTADO AL PRESIONAR 'O' ===")
+                                print(f"Total WorkOrders: {len(full_state_data)}")
+                                print(f"Estados encontrados: {status_count}")
+                                print(f"Playback time actual: {playback_time}")
+                                if full_state_data:
+                                    print(f"Primera WO: {full_state_data[0]['id']} = {full_state_data[0].get('status', 'unknown')}")
+                                    print(f"Ultima WO: {full_state_data[-1]['id']} = {full_state_data[-1].get('status', 'unknown')}")
+                                print("===================================\n")
+                                
                                 dashboard_data_queue.put_nowait(full_state_message)
                                 print(f"[REPLAY-DASHBOARD] Estado inicial enviado: {len(full_state_data)} WorkOrders")
                                 
@@ -2324,6 +2383,112 @@ def ejecutar_modo_replay(jsonl_file_path):
                             
                         except Exception as e:
                             print(f"[REPLAY-DASHBOARD] Error cerrando dashboard: {e}")
+        
+        # AUDIT: Auto-trigger para capturar estado del dashboard
+        if not auto_triggered and time.time() >= auto_trigger_time:
+            print("[AUDIT-AUTO] Auto-triggering dashboard apertura para capturar estado...")
+            auto_triggered = True
+            # Simular tecla 'O' presionada
+            if order_dashboard_process is None or not order_dashboard_process.is_alive():
+                # Abrir dashboard
+                try:
+                    from git.visualization.order_dashboard import launch_dashboard_process
+                    from multiprocessing import Queue
+                    
+                    # Crear cola para comunicación
+                    dashboard_data_queue = Queue()
+                    
+                    # Crear proceso separado para el dashboard
+                    order_dashboard_process = multiprocessing.Process(
+                        target=launch_dashboard_process,
+                        args=(dashboard_data_queue,)
+                    )
+                    
+                    order_dashboard_process.start()
+                    print(f"[AUDIT-AUTO] Dashboard abierto automáticamente (PID: {order_dashboard_process.pid})")
+                    
+                    # REFACTOR: Marcar dashboard como inicializado y enviar estado inicial UNA VEZ
+                    dashboard_initialized = True
+                    
+                    # BUGFIX: Reconstruir estado inicial filtrado por playback_time
+                    estado_reconstruido = {}
+                    
+                    # Procesar TODOS los eventos desde el principio, filtrando por playback_time
+                    for evento in eventos:
+                        event_timestamp = evento.get('timestamp', 0.0)
+                        if event_timestamp is None:
+                            event_timestamp = 0.0
+                        
+                        # CRITICAL: Solo procesar eventos cuyo timestamp <= playback_time actual
+                        if event_timestamp <= playback_time:
+                            # Procesar evento SIMULATION_START (WorkOrders iniciales)
+                            if evento.get('event_type') == 'SIMULATION_START':
+                                # Inicializar con WorkOrders del metadata
+                                if initial_work_orders:
+                                    for wo in initial_work_orders:
+                                        estado_reconstruido[wo['id']] = wo.copy()
+                            
+                            # Procesar eventos work_order_update
+                            elif evento.get('type') == 'work_order_update':
+                                work_order_data = evento.get('data', {})
+                                work_order_id = work_order_data.get('id')
+                                
+                                if work_order_id:
+                                    if work_order_id in estado_reconstruido:
+                                        estado_reconstruido[work_order_id].update(work_order_data)
+                                    else:
+                                        estado_reconstruido[work_order_id] = work_order_data.copy()
+                    
+                    if estado_reconstruido:
+                        full_state_data = list(estado_reconstruido.values())
+                        
+                        # SONDA 2: Estado después de procesar eventos work_order_update en timestamp=0
+                        if playback_time == 0.0:
+                            print(f"\n=== SONDA 2: DESPUÉS DE PROCESAR EVENTOS TIMESTAMP=0 ===")
+                            print(f"Work Orders reconstruidas: {len(estado_reconstruido)}")
+                            for wo_id, wo_data in estado_reconstruido.items():
+                                print(f"  WO {wo_id}: status={wo_data.get('status', 'unknown')}")
+                            print("=========================================\n")
+                        
+                        # AUDIT: Sonda DEBUG-EMISOR - Instrumentar estado antes del envio
+                        status_summary = {}
+                        for wo_data in full_state_data:
+                            status = wo_data.get('status', 'unknown')
+                            status_summary[status] = status_summary.get(status, 0) + 1
+                        
+                        # AUDIT: Sonda de comparación temporal - detectar desacoplamiento
+                        real_time = time.time()
+                        print(f"[DEBUG-EMISOR] REPLAY enviando {len(full_state_data)} WorkOrders. Estados: {status_summary}. Playback_time: {playback_time}")
+                        print(f"[TEMPORAL-AUDIT] WorkOrder_States_Time: {playback_time:.3f} | RealTime: {real_time:.3f}")
+                        
+                        full_state_message = {
+                            'type': 'full_state',
+                            'timestamp': playback_time,
+                            'data': full_state_data
+                        }
+                        # AUDIT: Verificar estados en el momento de activacion del dashboard
+                        status_count = {}
+                        for wo_data in full_state_data:
+                            status = wo_data.get('status', 'unknown')
+                            status_count[status] = status_count.get(status, 0) + 1
+                        print(f"\n=== AUDIT: ESTADO AL PRESIONAR 'O' (AUTO) ===")
+                        print(f"Total WorkOrders: {len(full_state_data)}")
+                        print(f"Estados encontrados: {status_count}")
+                        print(f"Playback time actual: {playback_time}")
+                        if full_state_data:
+                            print(f"Primera WO: {full_state_data[0]['id']} = {full_state_data[0].get('status', 'unknown')}")
+                            print(f"Ultima WO: {full_state_data[-1]['id']} = {full_state_data[-1].get('status', 'unknown')}")
+                        print("===================================\n")
+                        
+                        dashboard_data_queue.put_nowait(full_state_message)
+                        print(f"[AUDIT-AUTO] Estado inicial enviado: {len(full_state_data)} WorkOrders")
+                        
+                        # Terminar replay después de capturar audit
+                        print("[AUDIT-AUTO] Terminando replay después de capturar datos de auditoría")
+                        corriendo = False
+                        
+                except Exception as e:
+                    print(f"[AUDIT-AUTO] Error abriendo dashboard automáticamente: {e}")
         
         # Avanzar tiempo de playback usando delta time
         delta_time = reloj.get_time() / 1000.0  # Convertir ms a segundos

@@ -1,0 +1,18 @@
+{
+  "GroundOperator_1": {
+    "Zone_A": 1,
+    "Zone_B": 99,
+    "default_zone": 99
+  },
+  "GroundOperator_2": {
+    "Zone_B": 1,
+    "Zone_A": 99,
+    "default_zone": 99
+  },
+  "Default": {
+    "Zone_A": 10,
+    "Zone_B": 10,
+    "Zone_C": 10,
+    "default_zone": 1
+  }
+}
