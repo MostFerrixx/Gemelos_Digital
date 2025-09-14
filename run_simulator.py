@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Ejecutor del Simulador de Almacen - Version simplificada sin caracteres problemáticos.
+Ejecutor del Simulador de Almacen - Version simplificada sin caracteres problematicos.
 """
 
 import sys
@@ -25,27 +25,27 @@ import logging
 
 
 def agregar_evento_replay(buffer, evento):
-    """Agrega un evento al búfer de replay"""
+    """Agrega un evento al bufer de replay"""
     buffer.add_event(evento)
 
 def volcar_replay_a_archivo(buffer, archivo_salida, configuracion, almacen=None, initial_work_orders_snapshot=None):
-    """Vuelca el búfer completo a un archivo .jsonl"""
+    """Vuelca el bufer completo a un archivo .jsonl"""
     
-    # REFACTOR: Usar la instancia de ReplayBuffer recibida como parámetro
+    # REFACTOR: Usar la instancia de ReplayBuffer recibida como parametro
     eventos_a_volcar = buffer.get_events()
     print(f"[VOLCADO-REFACTOR] Usando ReplayBuffer con {len(eventos_a_volcar)} eventos")
     
-    # Contar eventos para volcado (logging mínimo)
+    # Contar eventos para volcado (logging minimo)
     wo_events = [e for e in eventos_a_volcar if e.get('type') == 'work_order_update']
     estado_events = [e for e in eventos_a_volcar if e.get('type') == 'estado_agente']
     print(f"[REPLAY-EXPORT] Volcando {len(wo_events)} work_order_update + {len(estado_events)} estado_agente de {len(eventos_a_volcar)} total")
     
-    # ELIMINADO: Sistema de respaldo artificial que causaba replay errático
-    # Los eventos reales del headless son de alta fidelidad y ya no necesitan respaldo sintético
+    # ELIMINADO: Sistema de respaldo artificial que causaba replay erratico
+    # Los eventos reales del headless son de alta fidelidad y ya no necesitan respaldo sintetico
     
     try:
         with open(archivo_salida, 'w', encoding='utf-8') as f:
-            # Escribir metadata de la simulación primero
+            # Escribir metadata de la simulacion primero
             metadata = {
                 'event_type': 'SIMULATION_START',
                 'timestamp': 0,
@@ -53,18 +53,18 @@ def volcar_replay_a_archivo(buffer, archivo_salida, configuracion, almacen=None,
                 'total_events_captured': len(eventos_a_volcar)
             }
             
-            # BUGFIX: Añadir total de WorkOrders al evento SIMULATION_START
+            # BUGFIX: Anadir total de WorkOrders al evento SIMULATION_START
             if almacen and hasattr(almacen, 'dispatcher') and hasattr(almacen.dispatcher, 'work_orders_total_inicial'):
                 total_work_orders = almacen.dispatcher.work_orders_total_inicial
                 metadata['total_work_orders'] = total_work_orders
-                print(f"[REPLAY-METADATA] Añadido total_work_orders: {total_work_orders} al evento SIMULATION_START")
+                print(f"[REPLAY-METADATA] Anadido total_work_orders: {total_work_orders} al evento SIMULATION_START")
             else:
                 print(f"[REPLAY-METADATA] WARNING: No se pudo obtener total de WorkOrders del almacen")
             
             # REFACTOR: Usar instantanea capturada en t=0 en lugar de estado al final
             if initial_work_orders_snapshot and len(initial_work_orders_snapshot) > 0:
                 metadata['initial_work_orders'] = initial_work_orders_snapshot
-                print(f"[REPLAY-METADATA] Añadidas {len(initial_work_orders_snapshot)} initial_work_orders desde instantanea t=0")
+                print(f"[REPLAY-METADATA] Anadidas {len(initial_work_orders_snapshot)} initial_work_orders desde instantanea t=0")
             else:
                 print(f"[REPLAY-METADATA] WARNING: No se recibio instantanea inicial de WorkOrders")
             
@@ -88,7 +88,7 @@ def volcar_replay_a_archivo(buffer, archivo_salida, configuracion, almacen=None,
         print(f"[REPLAY-BUFFER] ERROR al escribir archivo: {e}")
         return False
 
-# Importaciones de módulos propios
+# Importaciones de modulos propios
 from config.settings import *
 from config.colors import *
 from simulation.warehouse import AlmacenMejorado
@@ -109,7 +109,7 @@ from config.settings import SUPPORTED_RESOLUTIONS, LOGICAL_WIDTH, LOGICAL_HEIGHT
 from simulation_buffer import ReplayBuffer
 
 class SimuladorAlmacen:
-    """Clase principal que coordina toda la simulación"""
+    """Clase principal que coordina toda la simulacion"""
     
     def __init__(self, headless_mode=False):
         self.configuracion = None
@@ -122,52 +122,52 @@ class SimuladorAlmacen:
         self.corriendo = True
         self.headless_mode = headless_mode  # Nuevo: modo headless
         
-        # REFACTOR: Nueva instancia de ReplayBuffer para estado explícito
+        # REFACTOR: Nueva instancia de ReplayBuffer para estado explicito
         self.replay_buffer = ReplayBuffer()
         
         # REFACTOR: Buffer de replay ahora manejado por self.replay_buffer
-        self.order_dashboard_process = None  # Proceso del dashboard de órdenes
+        self.order_dashboard_process = None  # Proceso del dashboard de ordenes
         # REFACTOR: Infraestructura de multiproceso para SimPy Productor
         self.visual_event_queue = None       # Cola de eventos visuales
-        self.simulation_process = None       # Proceso de simulación SimPy
-        self.dashboard_data_queue = None     # Cola para comunicación con el dashboard
+        self.simulation_process = None       # Proceso de simulacion SimPy
+        self.dashboard_data_queue = None     # Cola para comunicacion con el dashboard
         # Nuevos componentes de la arquitectura TMX
         self.layout_manager = None
         self.pathfinder = None
-        # Nuevos atributos para escalado dinámico
+        # Nuevos atributos para escalado dinamico
         self.window_size = (0, 0)
         self.virtual_surface = None
-        # Lista de procesos de operarios para verificación de finalización
+        # Lista de procesos de operarios para verificacion de finalizacion
         self.procesos_operarios = []
         # Bandera para evitar reportes repetidos
         self.simulacion_finalizada_reportada = False
         # NUEVO: Cache de estado anterior para delta updates del dashboard
         self.dashboard_last_state = {}
         
-        # REFACTOR FINAL: Motor de visualización tipo "replay"
+        # REFACTOR FINAL: Motor de visualizacion tipo "replay"
         self.event_buffer = []           # Buffer de eventos recibidos del productor
-        self.playback_time = 0.0         # Reloj de reproducción interno
-        self.factor_aceleracion = 1.0    # Factor de velocidad de reproducción
+        self.playback_time = 0.0         # Reloj de reproduccion interno
+        self.factor_aceleracion = 1.0    # Factor de velocidad de reproduccion
         
     def inicializar_pygame(self):
-        # REFACTOR: Pygame ya está inicializado en crear_simulacion(), solo configurar ventana
+        # REFACTOR: Pygame ya esta inicializado en crear_simulacion(), solo configurar ventana
         
         PANEL_WIDTH = 400
-        # 1. Obtener la clave de resolución seleccionada por el usuario
-        resolution_key = self.configuracion.get('selected_resolution_key', "Pequeña (800x800)")
+        # 1. Obtener la clave de resolucion seleccionada por el usuario
+        resolution_key = self.configuracion.get('selected_resolution_key', "Pequena (800x800)")
         
-        # 2. Buscar el tamaño (ancho, alto) en nuestro diccionario
+        # 2. Buscar el tamano (ancho, alto) en nuestro diccionario
         self.window_size = SUPPORTED_RESOLUTIONS.get(resolution_key, (800, 800))
 
-        print(f"[DISPLAY] Resolución seleccionada por el usuario: '{resolution_key}' -> {self.window_size[0]}x{self.window_size[1]}")
+        print(f"[DISPLAY] Resolucion seleccionada por el usuario: '{resolution_key}' -> {self.window_size[0]}x{self.window_size[1]}")
 
-        # 3. Hacemos la ventana principal más ancha para acomodar el panel
+        # 3. Hacemos la ventana principal mas ancha para acomodar el panel
         main_window_width = self.window_size[0] + PANEL_WIDTH
         main_window_height = self.window_size[1]
         self.pantalla = pygame.display.set_mode((main_window_width, main_window_height), pygame.RESIZABLE)
-        pygame.display.set_caption("Simulador de Almacén - Gemelo Digital")
+        pygame.display.set_caption("Simulador de Almacen - Gemelo Digital")
         
-        # 4. La superficie virtual mantiene el tamaño lógico del mapa
+        # 4. La superficie virtual mantiene el tamano logico del mapa
         self.virtual_surface = pygame.Surface((LOGICAL_WIDTH, LOGICAL_HEIGHT))
         print(f"Ventana creada: {main_window_width}x{main_window_height}. Panel UI: {PANEL_WIDTH}px.")
         
@@ -176,13 +176,13 @@ class SimuladorAlmacen:
         self.dashboard = DashboardOriginal()
     
     def cargar_configuracion(self):
-        """Carga la configuración desde config.json o usa defaults hardcodeados"""
+        """Carga la configuracion desde config.json o usa defaults hardcodeados"""
         config_path = os.path.join(os.path.dirname(__file__), "config.json")
         
         try:
             # Intentar cargar config.json
             if os.path.exists(config_path):
-                print(f"[CONFIG] Cargando configuración desde: {config_path}")
+                print(f"[CONFIG] Cargando configuracion desde: {config_path}")
                 with open(config_path, 'r', encoding='utf-8') as f:
                     self.configuracion = json.load(f)
                 
@@ -193,35 +193,35 @@ class SimuladorAlmacen:
                         sanitized_rules[agent_type] = {int(k): v for k, v in rules.items()}
                     self.configuracion['assignment_rules'] = sanitized_rules
                 
-                print("[CONFIG] Configuración cargada exitosamente desde archivo JSON")
+                print("[CONFIG] Configuracion cargada exitosamente desde archivo JSON")
             else:
-                print("[CONFIG] config.json no encontrado, usando configuración por defecto")
+                print("[CONFIG] config.json no encontrado, usando configuracion por defecto")
                 self.configuracion = self._get_default_config()
-                print("[CONFIG] Configuración por defecto cargada")
+                print("[CONFIG] Configuracion por defecto cargada")
             
-            # Nota: cost_calculator se creará después de inicializar data_manager
+            # Nota: cost_calculator se creara despues de inicializar data_manager
             
-            # Mostrar resumen de configuración cargada
+            # Mostrar resumen de configuracion cargada
             self._mostrar_resumen_config()
             
             return True
             
         except json.JSONDecodeError as e:
             print(f"[CONFIG ERROR] Error al parsear config.json: {e}")
-            print("[CONFIG] Usando configuración por defecto como fallback")
+            print("[CONFIG] Usando configuracion por defecto como fallback")
             self.configuracion = self._get_default_config()
             return True
             
         except Exception as e:
-            print(f"[CONFIG ERROR] Error inesperado cargando configuración: {e}")
-            print("[CONFIG] Usando configuración por defecto como fallback")
+            print(f"[CONFIG ERROR] Error inesperado cargando configuracion: {e}")
+            print("[CONFIG] Usando configuracion por defecto como fallback")
             self.configuracion = self._get_default_config()
             return True
     
     def _get_default_config(self) -> dict:
-        """Retorna la configuración por defecto hardcodeada"""
+        """Retorna la configuracion por defecto hardcodeada"""
         return {
-            # Configuración de tareas de picking
+            # Configuracion de tareas de picking
             'total_ordenes': 300,
             'distribucion_tipos': {
                 'pequeno': {'porcentaje': 60, 'volumen': 5},
@@ -230,42 +230,42 @@ class SimuladorAlmacen:
             },
             'capacidad_carro': 150,
             
-            # Configuración de estrategias
+            # Configuracion de estrategias
             'strategy': 'Zoning and Snake',
-            'dispatch_strategy': 'Ejecución de Plan (Filtro por Prioridad)',
+            'dispatch_strategy': 'Ejecucion de Plan (Filtro por Prioridad)',
             
-            # Configuración de layout
+            # Configuracion de layout
             'layout_file': 'layouts/WH1.tmx',
             'sequence_file': 'layouts/Warehouse_Logic.xlsx',
             
-            # Configuración de ventana
-            'selected_resolution_key': 'Pequeña (800x800)',
+            # Configuracion de ventana
+            'selected_resolution_key': 'Pequena (800x800)',
             
-            # Configuración de operarios
+            # Configuracion de operarios
             'num_operarios_terrestres': 1,
             'num_montacargas': 1,
             'num_operarios_total': 2,
             'capacidad_montacargas': 1000,
             
-            # Configuración de asignación de recursos
+            # Configuracion de asignacion de recursos
             'assignment_rules': {
                 "GroundOperator": {1: 1},
                 "Forklift": {1: 2, 2: 1, 3: 1, 4: 1, 5: 1}
             },
             
-            # Compatibilidad con código existente
+            # Compatibilidad con codigo existente
             'tareas_zona_a': 0,
             'tareas_zona_b': 0,
             'num_operarios': 2
         }
     
     def _mostrar_resumen_config(self):
-        """Muestra un resumen de la configuración cargada"""
+        """Muestra un resumen de la configuracion cargada"""
         config = self.configuracion
         print("\n" + "="*50)
-        print("CONFIGURACIÓN DE SIMULACIÓN CARGADA")
+        print("CONFIGURACION DE SIMULACION CARGADA")
         print("="*50)
-        print(f"Total de órdenes: {config.get('total_ordenes', 'N/A')}")
+        print(f"Total de ordenes: {config.get('total_ordenes', 'N/A')}")
         print(f"Operarios terrestres: {config.get('num_operarios_terrestres', 'N/A')}")
         print(f"Montacargas: {config.get('num_montacargas', 'N/A')}")
         print(f"Estrategia de despacho: {config.get('dispatch_strategy', 'N/A')}")
@@ -274,7 +274,7 @@ class SimuladorAlmacen:
         print("="*50 + "\n")
     
     def crear_simulacion(self):
-        """Crea una nueva simulación"""
+        """Crea una nueva simulacion"""
         if not self.configuracion:
             print("Error: No hay configuracion valida")
             return False
@@ -282,16 +282,16 @@ class SimuladorAlmacen:
         # ARQUITECTURA TMX OBLIGATORIA - No hay fallback
         print("[SIMULADOR] Inicializando arquitectura TMX (OBLIGATORIO)...")
         
-        # REFACTOR: Inicialización condicional de pygame según el modo de ejecución
+        # REFACTOR: Inicializacion condicional de pygame segun el modo de ejecucion
         import os  # Mover import al nivel superior
         if self.headless_mode:
             # En modo headless, usar driver dummy para evitar ventanas
             os.environ['SDL_VIDEODRIVER'] = 'dummy'  # Usar driver dummy sin ventanas
             pygame.init()
-            # Crear superficie dummy mínima para TMX sin mostrar ventana
+            # Crear superficie dummy minima para TMX sin mostrar ventana
             pygame.display.set_mode((1, 1), pygame.NOFRAME)
         else:
-            # En modo visual, NO inicializar pygame aquí - ya está inicializado en proceso principal
+            # En modo visual, NO inicializar pygame aqui - ya esta inicializado en proceso principal
             # Solo configurar el entorno para TMX
             if not pygame.get_init():
                 pygame.init()
@@ -305,7 +305,7 @@ class SimuladorAlmacen:
             self.layout_manager = LayoutManager(tmx_file)
         except Exception as e:
             print(f"[FATAL ERROR] No se pudo cargar archivo TMX: {e}")
-            print("[FATAL ERROR] El simulador requiere un archivo TMX válido para funcionar.")
+            print("[FATAL ERROR] El simulador requiere un archivo TMX valido para funcionar.")
             print("[FATAL ERROR] Sistema legacy eliminado - sin fallback disponible.")
             raise SystemExit(f"Error cargando TMX: {e}")
         
@@ -313,7 +313,7 @@ class SimuladorAlmacen:
         print("[TMX] Inicializando sistema de pathfinding...")
         try:
             self.pathfinder = Pathfinder(self.layout_manager.collision_matrix)
-            # Crear RouteCalculator después del pathfinder
+            # Crear RouteCalculator despues del pathfinder
             self.route_calculator = RouteCalculator(self.pathfinder)
         except Exception as e:
             print(f"[FATAL ERROR] No se pudo inicializar pathfinder: {e}")
@@ -330,7 +330,7 @@ class SimuladorAlmacen:
         sequence_file = self.configuracion.get('sequence_file', '')
         self.data_manager = DataManager(layout_file, sequence_file)
         
-        # Crear el calculador de costos después de inicializar data_manager
+        # Crear el calculador de costos despues de inicializar data_manager
         self.cost_calculator = AssignmentCostCalculator(self.data_manager)
         
         print(f"[TMX] Arquitectura TMX inicializada exitosamente:")
@@ -350,7 +350,7 @@ class SimuladorAlmacen:
         
         inicializar_estado(self.almacen, self.env, self.configuracion, layout_manager=self.layout_manager)
         
-        # Diagnóstico del RouteCalculator
+        # Diagnostico del RouteCalculator
         self._diagnosticar_route_calculator()
         
         self.procesos_operarios, self.operarios = crear_operarios(
@@ -367,7 +367,7 @@ class SimuladorAlmacen:
         
         self.env.process(self._proceso_actualizacion_metricas())
         
-        # Inicializar el almacén y crear órdenes
+        # Inicializar el almacen y crear ordenes
         self.almacen._crear_catalogo_y_stock()
         self.almacen._generar_flujo_ordenes()
         
@@ -381,37 +381,37 @@ class SimuladorAlmacen:
         print(f"Simulacion V2.6 creada:")
         print(f"  - {len(self.procesos_operarios)} operarios")
         print(f"  - {len(self.almacen.dispatcher.lista_maestra_work_orders)} WorkOrders en lista maestra")
-        print(f"  - {self.almacen.total_ordenes} órdenes generadas")
+        print(f"  - {self.almacen.total_ordenes} ordenes generadas")
         print(f"  - Master Plan: {len(self.data_manager.puntos_de_picking_ordenados)} puntos de picking")
         if self.layout_manager:
             print(f"  - Layout TMX: ACTIVO ({tmx_file})")
         else:
             print(f"  - Layout TMX: DESACTIVADO (usando legacy)")
         
-        print("--- Verificación de Dimensiones del Layout ---")
+        print("--- Verificacion de Dimensiones del Layout ---")
         print(f"Ancho en Grilla: {self.layout_manager.grid_width}, Ancho de Tile: {self.layout_manager.tile_width}")
         print(f"Alto en Grilla: {self.layout_manager.grid_height}, Alto de Tile: {self.layout_manager.tile_height}")
         print("------------------------------------------")
         return True
     
     def _proceso_actualizacion_metricas(self):
-        """Proceso de actualización de métricas"""
-        # AUDIT: Importar logging para el proceso de métricas
+        """Proceso de actualizacion de metricas"""
+        # AUDIT: Importar logging para el proceso de metricas
         import logging
         logger = logging.getLogger(__name__)
         
-        # AUDIT: Log de inicio del proceso de métricas (modo headless)
-        logger.info("Iniciando proceso de métricas de dashboard...")
+        # AUDIT: Log de inicio del proceso de metricas (modo headless)
+        logger.info("Iniciando proceso de metricas de dashboard...")
         
         while not self.almacen.simulacion_ha_terminado():
             yield self.almacen.adelantar_tiempo(5.0)  # INTERVALO_ACTUALIZACION_METRICAS
             actualizar_metricas_tiempo(estado_visual["operarios"])
         
-        # BUGFIX: Log INFO después de que el bucle termine
-        logger.info("Proceso de métricas de dashboard finalizado: la simulación ha terminado.")
+        # BUGFIX: Log INFO despues de que el bucle termine
+        logger.info("Proceso de metricas de dashboard finalizado: la simulacion ha terminado.")
     
     def ejecutar_bucle_principal(self):
-        """Bucle principal completo con simulación y renderizado de agentes."""
+        """Bucle principal completo con simulacion y renderizado de agentes."""
         from visualization.original_renderer import renderizar_agentes, renderizar_dashboard
         from visualization.state import estado_visual, obtener_velocidad_simulacion
         
@@ -422,7 +422,7 @@ class SimuladorAlmacen:
                 if not self._manejar_evento(event):
                     self.corriendo = False
 
-            # 2. Lógica de Simulación (SOLO si no ha finalizado)
+            # 2. Logica de Simulacion (SOLO si no ha finalizado)
             if not self.simulacion_finalizada_reportada:
                 if not estado_visual["pausa"]:
                     if self._simulacion_activa():
@@ -430,38 +430,38 @@ class SimuladorAlmacen:
                             # REFACTOR V5.3.1: Procesar el siguiente evento disponible sin forzar tiempo
                             self.env.step()
                         except simpy.core.EmptySchedule:
-                            # Cuando no hay más eventos programados
+                            # Cuando no hay mas eventos programados
                             pass
                         except Exception as e:
-                            print(f"Error en simulación: {e}")
+                            print(f"Error en simulacion: {e}")
                             # Continuar sin detener el bucle
                         
-                        # Dashboard updates SOLO durante simulación activa
+                        # Dashboard updates SOLO durante simulacion activa
                         self._actualizar_dashboard_ordenes()
-                    else: # Si la simulación ha terminado
-                        print("[SIMULADOR] Condición de finalización cumplida: No hay tareas pendientes y todos los agentes están ociosos.")
-                        print("Simulación completada y finalizada lógicamente.")
-                        # La función de reporte ahora solo se llama UNA VEZ
+                    else: # Si la simulacion ha terminado
+                        print("[SIMULADOR] Condicion de finalizacion cumplida: No hay tareas pendientes y todos los agentes estan ociosos.")
+                        print("Simulacion completada y finalizada logicamente.")
+                        # La funcion de reporte ahora solo se llama UNA VEZ
                         self._simulacion_completada() 
                         
                         # Dashboard final update UNA VEZ
                         self._actualizar_dashboard_ordenes()
                         
-                        # Enviar comando de finalización al Dashboard de Órdenes
+                        # Enviar comando de finalizacion al Dashboard de Ordenes
                         if self.order_dashboard_process and self.order_dashboard_process.is_alive():
-                            print("[PIPELINE] Enviando comando de hibernación al Dashboard de Órdenes...")
+                            print("[PIPELINE] Enviando comando de hibernacion al Dashboard de Ordenes...")
                             try:
                                 self.dashboard_data_queue.put('__SIMULATION_ENDED__')
                             except Exception as e:
-                                print(f"[ERROR] No se pudo enviar el comando de hibernación al dashboard: {e}")
+                                print(f"[ERROR] No se pudo enviar el comando de hibernacion al dashboard: {e}")
                         
-                        # Marcar como finalizada para evitar repetición
+                        # Marcar como finalizada para evitar repeticion
                         self.simulacion_finalizada_reportada = True
 
             # 3. Limpiar la pantalla principal
             self.pantalla.fill((240, 240, 240))  # Fondo gris claro
 
-            # 4. Dibujar el mundo de simulación en la superficie virtual
+            # 4. Dibujar el mundo de simulacion en la superficie virtual
             self.virtual_surface.fill((25, 25, 25))
             if hasattr(self, 'layout_manager') and self.layout_manager:
                 self.renderer.renderizar_mapa_tmx(self.virtual_surface, self.layout_manager.tmx_data)
@@ -469,63 +469,63 @@ class SimuladorAlmacen:
                 renderizar_tareas_pendientes(self.virtual_surface, self.layout_manager)
             renderizar_agentes(self.virtual_surface)
 
-            # 5. Escalar la superficie virtual al área de simulación en la pantalla
+            # 5. Escalar la superficie virtual al area de simulacion en la pantalla
             scaled_surface = pygame.transform.smoothscale(self.virtual_surface, self.window_size)
             self.pantalla.blit(scaled_surface, (0, 0))  # Dibujar el mundo a la izquierda
 
             # 6. Dibujar el dashboard directamente en la pantalla, en el panel derecho
             renderizar_dashboard(self.pantalla, self.window_size[0], self.almacen, estado_visual["operarios"])
 
-            # 7. La verificación de finalización ahora se maneja en el paso 2
+            # 7. La verificacion de finalizacion ahora se maneja en el paso 2
 
             # 8. Actualizar la pantalla
             pygame.display.flip()
             self.reloj.tick(30)
             
-        print("Simulación terminada. Saliendo de Pygame.")
+        print("Simulacion terminada. Saliendo de Pygame.")
         pygame.quit()
     
     def _ejecutar_bucle_headless(self):
-        """Bucle de ejecución headless para máxima velocidad"""
+        """Bucle de ejecucion headless para maxima velocidad"""
         print("="*60)
-        print("MODO HEADLESS ACTIVADO - Ejecutando en modo máxima velocidad")
+        print("MODO HEADLESS ACTIVADO - Ejecutando en modo maxima velocidad")
         print("="*60)
         print("Ejecutando en modo Headless...")
         
         try:
-            # BUGFIX: En lugar de env.run() indefinido, ejecutar hasta que la simulación termine
-            # Ejecutar eventos SimPy hasta que todas las WorkOrders estén completadas
+            # BUGFIX: En lugar de env.run() indefinido, ejecutar hasta que la simulacion termine
+            # Ejecutar eventos SimPy hasta que todas las WorkOrders esten completadas
             step_counter = 0
             while not self.almacen.simulacion_ha_terminado():
-                # Avanzar la simulación en pequeños pasos
+                # Avanzar la simulacion en pequenos pasos
                 try:
-                    # Usar un timeout pequeño para permitir verificar la condición de terminación
+                    # Usar un timeout pequeno para permitir verificar la condicion de terminacion
                     self.env.run(until=self.env.now + 1.0)
                     
-                    # AUDIT: Diagnóstico periódico del buffer cada 10 pasos
+                    # AUDIT: Diagnostico periodico del buffer cada 10 pasos
                     step_counter += 1
                     if step_counter % 10 == 0:
                         buffer_size = len(self.replay_buffer.get_events())
                         print(f"[AUDIT-BUFFER] Paso {step_counter}: Buffer tiene {buffer_size} eventos")
                         
                 except simpy.core.EmptySchedule:
-                    # No hay más eventos programados, pero verificar si la simulación realmente terminó
+                    # No hay mas eventos programados, pero verificar si la simulacion realmente termino
                     if self.almacen.simulacion_ha_terminado():
                         break
                     else:
-                        # Si no terminó pero no hay eventos, algo está mal
-                        print("Advertencia: No hay eventos programados pero la simulación no ha terminado")
+                        # Si no termino pero no hay eventos, algo esta mal
+                        print("Advertencia: No hay eventos programados pero la simulacion no ha terminado")
                         break
             
-            print("Simulación Headless completada.")
+            print("Simulacion Headless completada.")
             
             # REFACTOR: Buffer ahora manejado por self.replay_buffer
             
-            # Llamar a analíticas al finalizar, SIN pasar buffer específico
+            # Llamar a analiticas al finalizar, SIN pasar buffer especifico
             self._simulacion_completada_con_buffer(None)
             
         except KeyboardInterrupt:
-            print("\nInterrupción del usuario en modo headless. Saliendo...")
+            print("\nInterrupcion del usuario en modo headless. Saliendo...")
         except Exception as e:
             print(f"Error en modo headless: {e}")
             import traceback
@@ -537,9 +537,9 @@ class SimuladorAlmacen:
         """
         BUGFIX PASO 1: Motor de playback_time para restaurar control de velocidad
         
-        Este bucle implementa un reloj de reproducción sincronizado que:
+        Este bucle implementa un reloj de reproduccion sincronizado que:
         1. Lee eventos del productor y los almacena con timestamps
-        2. Avanza el playback_time según factor_aceleracion (teclas +/-)
+        2. Avanza el playback_time segun factor_aceleracion (teclas +/-)
         3. Procesa eventos del buffer solo cuando su timestamp <= playback_time
         """
         print("[CONSUMIDOR-PLAYBACK] Iniciando bucle con motor de playback_time sincronizado...")
@@ -548,18 +548,18 @@ class SimuladorAlmacen:
         from visualization.original_renderer import renderizar_agentes, renderizar_dashboard, renderizar_tareas_pendientes
         from visualization.state import estado_visual
         
-        # Estado de visualización
+        # Estado de visualizacion
         simulacion_activa = True
-        self.metricas_actuales = {}  # Estado de métricas del dashboard
+        self.metricas_actuales = {}  # Estado de metricas del dashboard
         
-        # [AUDIT-BACKPRESSURE] Instrumentación del Consumidor
+        # [AUDIT-BACKPRESSURE] Instrumentacion del Consumidor
         eventos_procesados_total = 0
         ultimo_reporte_tiempo = time.time()
         
-        # AUDIT: Variable de control para verificación de datos única
+        # AUDIT: Variable de control para verificacion de datos unica
         datos_verificados = False
         
-        # Resetear el reloj de reproducción
+        # Resetear el reloj de reproduccion
         self.playback_time = 0.0
         
         # SONDA 3: Estado antes de iniciar el bucle principal de renderizado
@@ -578,9 +578,9 @@ class SimuladorAlmacen:
         
         self.corriendo = True
         while self.corriendo and simulacion_activa:
-            # INSTRUMENTACIÓN: Registro del tiempo de inicio del frame
+            # INSTRUMENTACION: Registro del tiempo de inicio del frame
             frame_start_time = time.time()
-            # 1. AVANZAR RELOJ DE REPRODUCCIÓN (CONTROLADO POR FACTOR_ACELERACION)
+            # 1. AVANZAR RELOJ DE REPRODUCCION (CONTROLADO POR FACTOR_ACELERACION)
             delta_time = self.reloj.tick(60) / 1000.0  # Delta en segundos (60 FPS base)
             self.playback_time += delta_time * self.factor_aceleracion
             
@@ -595,7 +595,7 @@ class SimuladorAlmacen:
             # [AUDIT-BACKPRESSURE] Monitorear cola antes del drenado
             queue_size_before_drain = self.visual_event_queue.qsize()
             if queue_size_before_drain > 0:
-                print(f"[CONSUMIDOR-AUDIT] Iniciando drenado de cola. Tamaño: {queue_size_before_drain}")
+                print(f"[CONSUMIDOR-AUDIT] Iniciando drenado de cola. Tamano: {queue_size_before_drain}")
             
             try:
                 while True:  # Drenar la cola completamente
@@ -622,19 +622,19 @@ class SimuladorAlmacen:
             except Exception as e:
                 print(f"[ERROR-CONSUMIDOR] Error llenando buffer: {e}")
             
-            # Ordenar buffer por timestamp para procesamiento cronológico
+            # Ordenar buffer por timestamp para procesamiento cronologico
             self.event_buffer.sort(key=lambda x: x.get('timestamp', 0))
             
             # 4. PROCESAMIENTO DE BUFFER SINCRONIZADO (CAMBIO PRINCIPAL)
             eventos_procesados = 0
             eventos_procesados_este_frame = 0
             
-            # [AUDIT-BACKPRESSURE] Reportar estado periódicamente
+            # [AUDIT-BACKPRESSURE] Reportar estado periodicamente
             tiempo_actual = time.time()
             if tiempo_actual - ultimo_reporte_tiempo >= 2.0:  # Cada 2 segundos
                 buffer_size = len(self.event_buffer)
                 queue_size = self.visual_event_queue.qsize()
-                print(f"[CONSUMIDOR-AUDIT] Reporte periódico: Buffer: {buffer_size} eventos, Cola: {queue_size}, Procesados totales: {eventos_procesados_total}")
+                print(f"[CONSUMIDOR-AUDIT] Reporte periodico: Buffer: {buffer_size} eventos, Cola: {queue_size}, Procesados totales: {eventos_procesados_total}")
                 ultimo_reporte_tiempo = tiempo_actual
             while self.event_buffer and self.event_buffer[0]['timestamp'] <= self.playback_time:
                 # Sacar el primer evento del buffer
@@ -643,7 +643,7 @@ class SimuladorAlmacen:
                 eventos_procesados_este_frame += 1
                 eventos_procesados_total += 1
                 
-                # Procesar evento según su tipo
+                # Procesar evento segun su tipo
                 if mensaje['type'] == 'estado_agente':
                     agent_id = mensaje['agent_id']
                     data = mensaje['data']
@@ -657,7 +657,7 @@ class SimuladorAlmacen:
                         }
                     estado_visual["operarios"][agent_id].update(data)
                     
-                    # Convertir posición de grilla a píxeles
+                    # Convertir posicion de grilla a pixeles
                     if 'position' in data and hasattr(self, 'layout_manager') and self.layout_manager:
                         pos = data['position']
                         if isinstance(pos, tuple) and len(pos) == 2:
@@ -673,18 +673,18 @@ class SimuladorAlmacen:
                     print(f"[PLAYBACK-WO] WorkOrder {work_order_id}: {work_order_data['status']} @ {self.playback_time:.1f}s")
                 
                 elif mensaje['type'] == 'metricas_dashboard':
-                    # Procesar métricas del dashboard
+                    # Procesar metricas del dashboard
                     metricas = mensaje['data']
                     self.metricas_actuales = metricas
                     workorders_c = metricas.get('workorders_completadas', metricas.get('wos_completadas', 0))  # Backwards compatibility
                     tareas_c = metricas.get('tareas_completadas', 0)
                     print(f"[PLAYBACK-METRICAS] T={self.playback_time:.1f}s (sim:{metricas['tiempo']:.1f}s), WOs:{workorders_c}, Tareas:{tareas_c}, Factor:{self.factor_aceleracion:.1f}x")
                     
-                    # Actualizar dashboard de órdenes si está activo
+                    # Actualizar dashboard de ordenes si esta activo
                     self._actualizar_dashboard_ordenes()
                 
                 elif mensaje['type'] == 'simulation_completed':
-                    print(f"[PLAYBACK] Simulación completada a los {self.playback_time:.1f}s de reproducción")
+                    print(f"[PLAYBACK] Simulacion completada a los {self.playback_time:.1f}s de reproduccion")
                     simulacion_activa = False
                     
                 elif mensaje['type'] == 'simulation_error':
@@ -696,14 +696,14 @@ class SimuladorAlmacen:
                 # Limpiar la pantalla principal
                 self.pantalla.fill((240, 240, 240))
 
-                # Dibujar el mundo de simulación en la superficie virtual
+                # Dibujar el mundo de simulacion en la superficie virtual
                 self.virtual_surface.fill((25, 25, 25))
                 if hasattr(self, 'layout_manager') and self.layout_manager:
                     self.renderer.renderizar_mapa_tmx(self.virtual_surface, self.layout_manager.tmx_data)
                     renderizar_tareas_pendientes(self.virtual_surface, self.layout_manager)
                 renderizar_agentes(self.virtual_surface)
 
-                # Escalar la superficie virtual al área de simulación en la pantalla
+                # Escalar la superficie virtual al area de simulacion en la pantalla
                 scaled_surface = pygame.transform.smoothscale(self.virtual_surface, self.window_size)
                 self.pantalla.blit(scaled_surface, (0, 0))
 
@@ -716,30 +716,30 @@ class SimuladorAlmacen:
                 # Actualizar pantalla
                 pygame.display.flip()
             
-            # DASHBOARD: Actualizar dashboard de órdenes en modo replay
+            # DASHBOARD: Actualizar dashboard de ordenes en modo replay
             self._actualizar_dashboard_ordenes_replay()
             
-            # INSTRUMENTACIÓN: Logging de rendimiento de frames
+            # INSTRUMENTACION: Logging de rendimiento de frames
             frame_end_time = time.time()
             frame_duration_ms = (frame_end_time - frame_start_time) * 1000
-            if frame_duration_ms > 16:  # Un frame debería durar ~16ms para 60 FPS
+            if frame_duration_ms > 16:  # Un frame deberia durar ~16ms para 60 FPS
                 print(f"[PERF-WARN] Frame largo detectado: {frame_duration_ms:.2f} ms. Eventos procesados: {eventos_procesados_este_frame}. Buffer: {len(self.event_buffer)}. Playback Time: {self.playback_time:.2f}s")
         
-        # PIPELINE DE ANALÍTICAS AL FINALIZAR
-        print("[CONSUMIDOR-FINAL] Finalizando simulación e iniciando pipeline de analíticas...")
+        # PIPELINE DE ANALITICAS AL FINALIZAR
+        print("[CONSUMIDOR-FINAL] Finalizando simulacion e iniciando pipeline de analiticas...")
         
         # Esperar a que termine el proceso SimPy
         if self.simulation_process and self.simulation_process.is_alive():
-            print("[CONSUMIDOR-FINAL] Esperando finalización del proceso SimPy...")
+            print("[CONSUMIDOR-FINAL] Esperando finalizacion del proceso SimPy...")
             self.simulation_process.join(timeout=10)
             if self.simulation_process.is_alive():
-                print("[CONSUMIDOR-FINAL] Forzando terminación del proceso SimPy...")
+                print("[CONSUMIDOR-FINAL] Forzando terminacion del proceso SimPy...")
                 self.simulation_process.terminate()
                 self.simulation_process.join(timeout=5)
         
-        # Cerrar Dashboard de Órdenes si está abierto
+        # Cerrar Dashboard de Ordenes si esta abierto
         if self.order_dashboard_process and self.order_dashboard_process.is_alive():
-            print("[CONSUMIDOR-FINAL] Cerrando Dashboard de Órdenes...")
+            print("[CONSUMIDOR-FINAL] Cerrando Dashboard de Ordenes...")
             try:
                 if self.dashboard_data_queue:
                     self.dashboard_data_queue.put_nowait('__EXIT_COMMAND__')
@@ -749,15 +749,15 @@ class SimuladorAlmacen:
             if self.order_dashboard_process.is_alive():
                 self.order_dashboard_process.terminate()
         
-        # Reportar finalización (las analíticas ya se procesaron en el productor)
-        print("[CONSUMIDOR-FINAL] Pipeline de analíticas completado en el proceso productor.")
+        # Reportar finalizacion (las analiticas ya se procesaron en el productor)
+        print("[CONSUMIDOR-FINAL] Pipeline de analiticas completado en el proceso productor.")
         print("[CONSUMIDOR-FINAL] Revise el directorio 'output/' para los archivos generados.")
         
         print("[CONSUMIDOR-FINAL] Bucle de consumidor terminado.")
         pygame.quit()
     
     def _crear_almacen_mock(self):
-        """Crea un mock del almacén para el dashboard cuando no hay datos del productor"""
+        """Crea un mock del almacen para el dashboard cuando no hay datos del productor"""
         class AlmacenMock:
             def __init__(self):
                 self.tareas_completadas_count = 0
@@ -794,7 +794,7 @@ class SimuladorAlmacen:
         # Limpiar pantalla
         self.pantalla.fill((240, 240, 240))  # Fondo gris claro
         
-        # Renderizar mapa TMX si está disponible
+        # Renderizar mapa TMX si esta disponible
         if hasattr(self, 'layout_manager') and self.layout_manager:
             # Renderizar en superficie virtual primero
             self.virtual_surface.fill((25, 25, 25))
@@ -810,7 +810,7 @@ class SimuladorAlmacen:
             # Renderizado simple sin mapa
             self._renderizar_agentes_replay(self.pantalla, operarios_visual)
         
-        # HUD de información del motor de replay
+        # HUD de informacion del motor de replay
         self._renderizar_hud_replay(eventos_recibidos, eventos_procesados, len(operarios_visual))
         
         # Actualizar pantalla
@@ -823,15 +823,15 @@ class SimuladorAlmacen:
             y = data.get('y', 100)
             tipo = data.get('tipo', 'terrestre')
             
-            # Color según tipo
+            # Color segun tipo
             color = (0, 150, 255) if tipo == 'montacargas' else (255, 100, 0)  # Azul o naranja
             
-            # Dibujar agente como círculo
+            # Dibujar agente como circulo
             pygame.draw.circle(surface, color, (int(x), int(y)), 8)
             
             # Dibujar ID del agente
             font = pygame.font.Font(None, 16)
-            texto = font.render(agent_id[-1], True, (255, 255, 255))  # Solo último carácter
+            texto = font.render(agent_id[-1], True, (255, 255, 255))  # Solo ultimo caracter
             surface.blit(texto, (int(x) - 5, int(y) - 20))
     
     def _renderizar_hud_replay(self, eventos_recibidos, eventos_procesados, agentes_activos):
@@ -839,7 +839,7 @@ class SimuladorAlmacen:
         font = pygame.font.Font(None, 24)
         textos = [
             f"MOTOR DE REPLAY (PRODUCTOR-CONSUMIDOR)",
-            f"Tiempo de reproducción: {self.playback_time:.1f}s",
+            f"Tiempo de reproduccion: {self.playback_time:.1f}s",
             f"Velocidad: {self.factor_aceleracion:.1f}x",
             f"Buffer: {len(self.event_buffer)} eventos",
             f"Recibidos: {eventos_recibidos} | Procesados: {eventos_procesados}",
@@ -879,14 +879,14 @@ class SimuladorAlmacen:
         font = pygame.font.Font(None, 18)
         y_offset = self.window_size[1] - 140  # Esquina inferior izquierda
         
-        # Calcular ratio de sincronización
+        # Calcular ratio de sincronizacion
         sync_ratio = eventos_procesados / max(1, eventos_recibidos) if eventos_recibidos > 0 else 1.0
         
         textos = [
             f"MOTOR PLAYBACK v1.0 - CONTROL DE VELOCIDAD",
             f"Playback Time: {self.playback_time:.2f}s | Factor: {self.factor_aceleracion:.1f}x",
             f"Eventos: Recibidos:{eventos_recibidos} Procesados:{eventos_procesados} Buffer:{buffer_size}",
-            f"Sincronización: {sync_ratio:.2f} | Agentes: {len(estado_visual.get('operarios', {}))}",
+            f"Sincronizacion: {sync_ratio:.2f} | Agentes: {len(estado_visual.get('operarios', {}))}",
             f"WorkOrders: {len(estado_visual.get('work_orders', {}))}",
             f"TECLAS: +/- para cambiar velocidad | ESC salir",
             f"ESTADO: {'REPRODUCIENDO' if buffer_size > 0 or eventos_recibidos > 0 else 'EN ESPERA'}"
@@ -904,10 +904,10 @@ class SimuladorAlmacen:
         
         # Cleanup del proceso SimPy
         if self.simulation_process and self.simulation_process.is_alive():
-            print("[REPLAY-ENGINE] Esperando finalización del proceso SimPy...")
+            print("[REPLAY-ENGINE] Esperando finalizacion del proceso SimPy...")
             self.simulation_process.join(timeout=10)
             if self.simulation_process.is_alive():
-                print("[REPLAY-ENGINE] Forzando terminación del proceso SimPy...")
+                print("[REPLAY-ENGINE] Forzando terminacion del proceso SimPy...")
                 self.simulation_process.terminate()
         
         print("[REPLAY-ENGINE] Motor de replay terminado.")
@@ -949,7 +949,7 @@ class SimuladorAlmacen:
                     self.factor_aceleracion = factores[factores.index(self.factor_aceleracion) + 1]
                 else:
                     self.factor_aceleracion = factores[-1]
-                print(f"[REPLAY] Velocidad de reproducción: {self.factor_aceleracion:.1f}x")
+                print(f"[REPLAY] Velocidad de reproduccion: {self.factor_aceleracion:.1f}x")
             elif evento.key == pygame.K_MINUS or evento.key == pygame.K_KP_MINUS:  # Tecla - o -
                 # REFACTOR FINAL: Control de velocidad local del motor de replay
                 factores = [0.5, 1.0, 2.0, 5.0, 10.0, 20.0]
@@ -957,17 +957,17 @@ class SimuladorAlmacen:
                     self.factor_aceleracion = factores[factores.index(self.factor_aceleracion) - 1]
                 else:
                     self.factor_aceleracion = factores[0]
-                print(f"[REPLAY] Velocidad de reproducción: {self.factor_aceleracion:.1f}x")
-            elif evento.key == pygame.K_o:  # Tecla O para Dashboard de Órdenes
+                print(f"[REPLAY] Velocidad de reproduccion: {self.factor_aceleracion:.1f}x")
+            elif evento.key == pygame.K_o:  # Tecla O para Dashboard de Ordenes
                 print("[DIAGNOSTICO-TECLA] Tecla 'O' detectada.")
-                # ESCRIBIR TAMBIÉN A ARCHIVO PARA GARANTIZAR CAPTURA
+                # ESCRIBIR TAMBIEN A ARCHIVO PARA GARANTIZAR CAPTURA
                 with open('diagnostico_tecla_o.txt', 'a', encoding='utf-8') as f:
                     import time
                     f.write(f"[{time.strftime('%H:%M:%S')}] DIAGNOSTICO-TECLA: Tecla 'O' detectada.\n")
                     f.write(f"[{time.strftime('%H:%M:%S')}] Estado almacen: {'Existe' if self.almacen else 'No Existe'}\n")
                 print(f"[DEBUG-DASHBOARD] Intento de abrir dashboard. Estado de self.almacen: {'Existe' if self.almacen else 'No Existe'}")
                 self.toggle_order_dashboard()
-            # Funciones de diagnóstico desactivadas en limpieza
+            # Funciones de diagnostico desactivadas en limpieza
         
         return True
     
@@ -982,7 +982,7 @@ class SimuladorAlmacen:
             self.layout_manager.render(self.pantalla)
             
             # 2. Renderizar operarios directamente (sin escalado - correspondencia 1:1)
-            # Las coordenadas en estado_visual ya están en píxeles TMX centrados
+            # Las coordenadas en estado_visual ya estan en pixeles TMX centrados
             self.renderer.renderizar_operarios_solamente(self.layout_manager)
         else:
             # Sistema legacy
@@ -998,24 +998,24 @@ class SimuladorAlmacen:
     # Unused debug method removed in final cleanup
     
     def _simulacion_activa(self):
-        """Verifica si la simulación está activa usando nueva lógica robusta"""
+        """Verifica si la simulacion esta activa usando nueva logica robusta"""
         if self.almacen is None or self.env is None:
             return False
         
-        # Usar la nueva lógica centralizada de finalización
+        # Usar la nueva logica centralizada de finalizacion
         return not self.almacen.simulacion_ha_terminado()
     
     def _simulacion_completada(self):
-        """Maneja la finalización de la simulación con pipeline automatizado"""
+        """Maneja la finalizacion de la simulacion con pipeline automatizado"""
         print("\n" + "="*70)
         print("SIMULACION COMPLETADA - INICIANDO PIPELINE DE ANALITICAS")
         print("="*70)
         
         if not self.almacen:
-            print("Error: No hay datos del almacén para procesar")
+            print("Error: No hay datos del almacen para procesar")
             return
         
-        # Mostrar métricas básicas
+        # Mostrar metricas basicas
         mostrar_metricas_consola(self.almacen)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1034,13 +1034,13 @@ class SimuladorAlmacen:
         
         archivos_generados = []
         
-        # 1. Exportar métricas JSON básicas
+        # 1. Exportar metricas JSON basicas
         archivo_json = os.path.join(output_dir, f"simulacion_completada_{timestamp}.json")
         exportar_metricas(self.almacen, archivo_json)
         archivos_generados.append(archivo_json)
-        print(f"[1/4] Métricas JSON guardadas: {archivo_json}")
+        print(f"[1/4] Metricas JSON guardadas: {archivo_json}")
         
-        # 2. Exportar eventos crudos (modificar almacén para usar output_dir)
+        # 2. Exportar eventos crudos (modificar almacen para usar output_dir)
         archivo_eventos = self._exportar_eventos_crudos_organizado(output_dir, timestamp)
         if archivo_eventos:
             archivos_generados.append(archivo_eventos)
@@ -1061,13 +1061,13 @@ class SimuladorAlmacen:
                 archivos_generados.append(archivo_replay)
                 print(f"[2.5/4] Eventos de replay guardados: {archivo_replay}")
             except Exception as e:
-                print(f"[ERROR] Fallo crítico al volcar el replay: {e}")
+                print(f"[ERROR] Fallo critico al volcar el replay: {e}")
         else:
             print(f"[DEBUG] No se volca replay porque headless_mode es False")
-        # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine → Excel
-        print("[3/4] Simulación completada. Generando reporte de Excel...")
+        # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine -> Excel
+        print("[3/4] Simulacion completada. Generando reporte de Excel...")
         try:
-            # Usar el método __init__ original con eventos y configuración en memoria
+            # Usar el metodo __init__ original con eventos y configuracion en memoria
             analytics_engine = AnalyticsEngine(self.almacen.event_log, self.configuracion)
             analytics_engine.process_events()
             
@@ -1079,7 +1079,7 @@ class SimuladorAlmacen:
                 archivos_generados.append(archivo_excel)
                 print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
                 
-                # 4. PIPELINE AUTOMATIZADO: Visualizer → PNG
+                # 4. PIPELINE AUTOMATIZADO: Visualizer -> PNG
                 print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
                 self._ejecutar_visualizador(archivo_excel, timestamp, output_dir)
                 
@@ -1087,7 +1087,7 @@ class SimuladorAlmacen:
                 print("[ERROR] No se pudo generar el reporte de Excel")
                 
         except Exception as e:
-            print(f"[ERROR] Error en pipeline de analíticas: {e}")
+            print(f"[ERROR] Error en pipeline de analiticas: {e}")
             import traceback
             traceback.print_exc()
         
@@ -1102,16 +1102,16 @@ class SimuladorAlmacen:
         print("\nPresiona R para reiniciar o ESC para salir")
     
     def _simulacion_completada_con_buffer(self, buffer_eventos):
-        """Maneja la finalización de la simulación con buffer de eventos específico"""
+        """Maneja la finalizacion de la simulacion con buffer de eventos especifico"""
         print("\n" + "="*70)
         print("SIMULACION COMPLETADA - INICIANDO PIPELINE DE ANALITICAS")
         print("="*70)
         
         if not self.almacen:
-            print("Error: No hay datos del almacén para procesar")
+            print("Error: No hay datos del almacen para procesar")
             return
         
-        # Mostrar métricas básicas
+        # Mostrar metricas basicas
         mostrar_metricas_consola(self.almacen)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1130,13 +1130,13 @@ class SimuladorAlmacen:
         
         archivos_generados = []
         
-        # 1. Exportar métricas JSON básicas
+        # 1. Exportar metricas JSON basicas
         archivo_json = os.path.join(output_dir, f"simulacion_completada_{timestamp}.json")
         exportar_metricas(self.almacen, archivo_json)
         archivos_generados.append(archivo_json)
-        print(f"[1/4] Métricas JSON guardadas: {archivo_json}")
+        print(f"[1/4] Metricas JSON guardadas: {archivo_json}")
         
-        # 2. Exportar eventos crudos (modificar almacén para usar output_dir)
+        # 2. Exportar eventos crudos (modificar almacen para usar output_dir)
         archivo_eventos = self._exportar_eventos_crudos_organizado(output_dir, timestamp)
         if archivo_eventos:
             archivos_generados.append(archivo_eventos)
@@ -1147,13 +1147,13 @@ class SimuladorAlmacen:
         if self.headless_mode:
             archivo_replay = os.path.join(output_dir, f"replay_events_{timestamp}.jsonl")
             try:
-                # AUDIT: Estado crítico del buffer antes de volcado
+                # AUDIT: Estado critico del buffer antes de volcado
                 eventos = self.replay_buffer.get_events()
                 buffer_size = len(eventos)
                 print(f"[AUDIT-ID] Volcando buffer con id: {id(self.replay_buffer)}")
                 print(f"[AUDIT-CRITICAL] JUSTO ANTES DE VOLCADO: Buffer contiene {buffer_size} eventos")
                 
-                # Mostrar tipos de eventos en buffer para diagnóstico
+                # Mostrar tipos de eventos en buffer para diagnostico
                 event_types = {}
                 for event in eventos:
                     event_type = event.get('type', 'unknown')
@@ -1166,14 +1166,14 @@ class SimuladorAlmacen:
                 archivos_generados.append(archivo_replay)
                 print(f"[2.5/4] Eventos de replay guardados: {archivo_replay}")
             except Exception as e:
-                print(f"[ERROR] Fallo crítico al volcar el replay: {e}")
+                print(f"[ERROR] Fallo critico al volcar el replay: {e}")
         else:
             print(f"[DEBUG] No se volca replay porque headless_mode es False")
         
-        # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine → Excel
-        print("[3/4] Simulación completada. Generando reporte de Excel...")
+        # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine -> Excel
+        print("[3/4] Simulacion completada. Generando reporte de Excel...")
         try:
-            # Usar el método __init__ original con eventos y configuración en memoria
+            # Usar el metodo __init__ original con eventos y configuracion en memoria
             analytics_engine = AnalyticsEngine(self.almacen.event_log, self.configuracion)
             analytics_engine.process_events()
             
@@ -1185,7 +1185,7 @@ class SimuladorAlmacen:
                 archivos_generados.append(archivo_excel)
                 print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
                 
-                # 4. PIPELINE AUTOMATIZADO: Visualizer → PNG
+                # 4. PIPELINE AUTOMATIZADO: Visualizer -> PNG
                 print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
                 self._ejecutar_visualizador(archivo_excel, timestamp, output_dir)
                 
@@ -1193,7 +1193,7 @@ class SimuladorAlmacen:
                 print("[ERROR] No se pudo generar el reporte de Excel")
                 
         except Exception as e:
-            print(f"[ERROR] Error en pipeline de analíticas: {e}")
+            print(f"[ERROR] Error en pipeline de analiticas: {e}")
             import traceback
             traceback.print_exc()
         
@@ -1223,9 +1223,9 @@ class SimuladorAlmacen:
             return None
     
     def _ejecutar_visualizador(self, excel_path: str, timestamp: str, output_dir: str):
-        """Ejecuta visualizer.py automáticamente usando subprocess"""
+        """Ejecuta visualizer.py automaticamente usando subprocess"""
         try:
-            # Construir rutas dinámicamente
+            # Construir rutas dinamicamente
             script_dir = os.path.dirname(os.path.abspath(__file__))
             visualizer_path = os.path.join(script_dir, "visualizer.py")
             tmx_path = os.path.join(script_dir, self.configuracion.get('layout_file', 'layouts/WH1.tmx'))
@@ -1268,29 +1268,29 @@ class SimuladorAlmacen:
             
             if result.returncode == 0:
                 print(f"[4/4] Imagen de heatmap generada exitosamente: {output_filename}")
-                # Mostrar output del visualizer si es útil
+                # Mostrar output del visualizer si es util
                 if result.stdout:
-                    # Filtrar solo las líneas importantes del output
+                    # Filtrar solo las lineas importantes del output
                     lines = result.stdout.split('\n')
                     for line in lines:
                         if '[VISUALIZER]' in line or 'PROCESAMIENTO COMPLETADO' in line:
                             print(f"  {line}")
             else:
-                print(f"[ERROR] visualizer.py falló con código: {result.returncode}")
+                print(f"[ERROR] visualizer.py fallo con codigo: {result.returncode}")
                 if result.stderr:
                     print(f"[ERROR] Error del visualizer: {result.stderr}")
                 if result.stdout:
                     print(f"[ERROR] Output del visualizer: {result.stdout}")
                     
         except subprocess.TimeoutExpired:
-            print("[ERROR] visualizer.py tomó demasiado tiempo (>5 min) - proceso terminado")
+            print("[ERROR] visualizer.py tomo demasiado tiempo (>5 min) - proceso terminado")
         except Exception as e:
             print(f"[ERROR] Error ejecutando visualizer.py: {e}")
             import traceback
             traceback.print_exc()
     
     def _reiniciar_simulacion(self):
-        """Reinicia la simulación"""
+        """Reinicia la simulacion"""
         print("Reiniciando simulacion...")
         
         limpiar_estado()
@@ -1306,18 +1306,18 @@ class SimuladorAlmacen:
             print("Reinicio cancelado")
     
     def toggle_order_dashboard(self):
-        """Alternar visibilidad del dashboard de órdenes (multiproceso)"""
+        """Alternar visibilidad del dashboard de ordenes (multiproceso)"""
         if self.order_dashboard_process is None or not self.order_dashboard_process.is_alive():
             # Crear proceso del dashboard si no existe
             if self.almacen:
                 try:
                     from git.visualization.order_dashboard import launch_dashboard_process
                     
-                    # Crear cola para comunicación
+                    # Crear cola para comunicacion
                     self.dashboard_data_queue = Queue()
                     
-                    # AUDIT: Instrumentar creación de proceso Dashboard
-                    print("[DASHBOARD] Creando proceso Dashboard de Órdenes...")
+                    # AUDIT: Instrumentar creacion de proceso Dashboard
+                    print("[DASHBOARD] Creando proceso Dashboard de Ordenes...")
                     
                     # Crear proceso separado para el dashboard
                     self.order_dashboard_process = multiprocessing.Process(
@@ -1329,30 +1329,30 @@ class SimuladorAlmacen:
                     print("[DASHBOARD] Iniciando proceso Dashboard...")
                     self.order_dashboard_process.start()
                     print(f"[DASHBOARD] Proceso Dashboard iniciado (PID: {self.order_dashboard_process.pid})")
-                    print("Dashboard de Órdenes abierto en proceso separado - Presiona 'O' nuevamente para cerrar")
+                    print("Dashboard de Ordenes abierto en proceso separado - Presiona 'O' nuevamente para cerrar")
                     
-                    # NUEVO: Enviar estado completo inicial inmediatamente después del arranque
+                    # NUEVO: Enviar estado completo inicial inmediatamente despues del arranque
                     if self.almacen and self.almacen.dispatcher:
-                        # Modo simulación activa
+                        # Modo simulacion activa
                         self._enviar_estado_completo_inicial()
                     else:
                         # Modo replay
                         self._enviar_estado_completo_inicial_replay()
                     
-                    # SYNC FIX: Verificar si simulación ya terminó y enviar comando de hibernación
+                    # SYNC FIX: Verificar si simulacion ya termino y enviar comando de hibernacion
                     if self.simulacion_finalizada_reportada:
                         try:
                             self.dashboard_data_queue.put('__SIMULATION_ENDED__')
-                            print("[DASHBOARD-SYNC] Comando __SIMULATION_ENDED__ enviado a dashboard post-simulación")
+                            print("[DASHBOARD-SYNC] Comando __SIMULATION_ENDED__ enviado a dashboard post-simulacion")
                         except Exception as e:
-                            print(f"[DASHBOARD-SYNC] Error enviando comando de hibernación: {e}")
+                            print(f"[DASHBOARD-SYNC] Error enviando comando de hibernacion: {e}")
                     
                 except ImportError as e:
                     print(f"Error importando launch_dashboard_process: {e}")
                 except Exception as e:
                     print(f"Error creando dashboard: {e}")
             else:
-                print("No hay simulación activa para mostrar órdenes")
+                print("No hay simulacion activa para mostrar ordenes")
         else:
             # NUEVO: Cierre graceful del proceso dashboard
             try:
@@ -1363,14 +1363,14 @@ class SimuladorAlmacen:
                             self.dashboard_data_queue.put_nowait('__EXIT_COMMAND__')
                             print("[DASHBOARD] Comando de cierre enviado")
                         except:
-                            pass  # Cola llena, proceder con terminación
+                            pass  # Cola llena, proceder con terminacion
                     
                     # Esperar cierre graceful
                     self.order_dashboard_process.join(timeout=3)
                     
-                    # Si no responde, terminación forzada
+                    # Si no responde, terminacion forzada
                     if self.order_dashboard_process.is_alive():
-                        print("[DASHBOARD] Timeout - forzando terminación")
+                        print("[DASHBOARD] Timeout - forzando terminacion")
                         self.order_dashboard_process.terminate()
                         self.order_dashboard_process.join(timeout=1)
                         print("[PROCESS-LIFECYCLE] Join post-terminate Dashboard completado")
@@ -1379,7 +1379,7 @@ class SimuladorAlmacen:
                         
                 self.order_dashboard_process = None
                 self.dashboard_data_queue = None
-                print("Dashboard de Órdenes cerrado correctamente")
+                print("Dashboard de Ordenes cerrado correctamente")
             except Exception as e:
                 print(f"Error cerrando dashboard: {e}")
                 self.order_dashboard_process = None
@@ -1387,15 +1387,15 @@ class SimuladorAlmacen:
     
     def _enviar_estado_completo_inicial(self):
         """
-        NUEVO: Envía el estado completo de todas las WorkOrders al dashboard recién iniciado
-        Protocolo anti-condición de carrera: full_state antes que deltas
+        NUEVO: Envia el estado completo de todas las WorkOrders al dashboard recien iniciado
+        Protocolo anti-condicion de carrera: full_state antes que deltas
         """
         if (self.dashboard_data_queue and 
             self.almacen and 
             self.almacen.dispatcher):
             
             try:
-                # Obtener estado completo actual (activas + históricas)
+                # Obtener estado completo actual (activas + historicas)
                 lista_viva = self.almacen.dispatcher.lista_maestra_work_orders
                 lista_historica = self.almacen.dispatcher.work_orders_completadas_historicas
                 lista_completa = lista_viva + lista_historica
@@ -1429,7 +1429,7 @@ class SimuladorAlmacen:
                 print(f"[DEBUG-SENDER] Enviando datos de WO (full_state): {len(full_state_data)} WorkOrders, primeras 2: {full_state_data[:2] if full_state_data else 'VACIO'}")
                 print(f"[DEBUG-SENDER] Enviando datos de WO: {full_state_message}")
                 self.dashboard_data_queue.put_nowait(full_state_message)
-                print(f"[COMMS-PROTOCOL] ✅ Estado completo inicial enviado: {len(full_state_data)} WorkOrders")
+                print(f"[COMMS-PROTOCOL] ? Estado completo inicial enviado: {len(full_state_data)} WorkOrders")
                 
                 # Inicializar cache de estado para deltas futuros
                 self.dashboard_last_state = {}
@@ -1437,11 +1437,11 @@ class SimuladorAlmacen:
                     self.dashboard_last_state[work_order_data['id']] = work_order_data
                 
             except Exception as e:
-                print(f"[COMMS-PROTOCOL] ❌ Error enviando estado completo inicial: {e}")
+                print(f"[COMMS-PROTOCOL] ? Error enviando estado completo inicial: {e}")
     
     def _actualizar_dashboard_ordenes(self):
-        """Enviar datos actualizados al dashboard de órdenes si está activo"""
-        # INSTRUMENTACIÓN: Verificar enlace de comunicación
+        """Enviar datos actualizados al dashboard de ordenes si esta activo"""
+        # INSTRUMENTACION: Verificar enlace de comunicacion
         print(f"[COMMS-LINK] Verificando enlace... Proceso dashboard existe: {self.order_dashboard_process is not None}")
         
         if (self.order_dashboard_process and 
@@ -1450,19 +1450,19 @@ class SimuladorAlmacen:
             self.almacen and 
             self.almacen.dispatcher):
             
-            # INSTRUMENTACIÓN: Estado del proceso y cola
+            # INSTRUMENTACION: Estado del proceso y cola
             is_alive_status = self.order_dashboard_process.is_alive()
             queue_size = self.dashboard_data_queue.qsize() if hasattr(self.dashboard_data_queue, 'qsize') else "unknown"
             print(f"[COMMS-LINK] |-- Proceso dashboard vivo: {is_alive_status}. Cola size: {queue_size}. Intentando enviar datos...")
             
             if not is_alive_status:
-                print("[COMMS-LINK] |-- ¡ERROR! El proceso se reporta como no vivo. No se enviarán datos.")
+                print("[COMMS-LINK] |-- !ERROR! El proceso se reporta como no vivo. No se enviaran datos.")
                 return
             
             try:
                 # OPTIMIZADO: Sistema de delta updates para reducir latencia
                 
-                # PASO 1: Obtener ambas listas (activas + históricas)
+                # PASO 1: Obtener ambas listas (activas + historicas)
                 lista_viva = self.almacen.dispatcher.lista_maestra_work_orders
                 lista_historica = self.almacen.dispatcher.work_orders_completadas_historicas
                 lista_completa = lista_viva + lista_historica
@@ -1491,7 +1491,7 @@ class SimuladorAlmacen:
                     # Comparar con estado anterior
                     estado_anterior = self.dashboard_last_state.get(work_order.id)
                     
-                    # Si es nueva o cambió algún campo relevante, añadir al delta
+                    # Si es nueva o cambio algun campo relevante, anadir al delta
                     if (estado_anterior is None or
                         estado_anterior["status"] != wo_state["status"] or
                         estado_anterior["cantidad_restante"] != wo_state["cantidad_restante"] or
@@ -1500,7 +1500,7 @@ class SimuladorAlmacen:
                         
                         delta_updates.append(wo_state)
                 
-                print(f"[COMMS-LINK] 🔄 Delta calculado: {len(delta_updates)} cambios de {len(lista_completa)} total ({len(lista_viva)} activas + {len(lista_historica)} históricas)")
+                print(f"[COMMS-LINK] ? Delta calculado: {len(delta_updates)} cambios de {len(lista_completa)} total ({len(lista_viva)} activas + {len(lista_historica)} historicas)")
                 
                 # PASO 3: Enviar deltas con formato estructurado (si hay cambios)
                 if delta_updates:
@@ -1516,38 +1516,38 @@ class SimuladorAlmacen:
                         print(f"[DEBUG-SENDER] Enviando datos de WO (delta): {len(delta_updates)} WorkOrders, primeras 2: {delta_updates[:2] if delta_updates else 'VACIO'}")
                         print(f"[DEBUG-SENDER] Enviando datos de WO: {delta_message}")
                         self.dashboard_data_queue.put_nowait(delta_message)
-                        print(f"[COMMS-PROTOCOL] ✅ Delta enviado exitosamente ({len(delta_updates)} WorkOrders cambiadas)")
+                        print(f"[COMMS-PROTOCOL] ? Delta enviado exitosamente ({len(delta_updates)} WorkOrders cambiadas)")
                     except Exception as e:
-                        print(f"[COMMS-PROTOCOL] ⚠️  Error enviando delta: {e} (Cola posiblemente llena)")
+                        print(f"[COMMS-PROTOCOL] ??  Error enviando delta: {e} (Cola posiblemente llena)")
                         pass
                 else:
                     # No hay cambios, no enviar nada
-                    print("[COMMS-PROTOCOL] 📍 Sin cambios - no se envían datos")
+                    print("[COMMS-PROTOCOL] ? Sin cambios - no se envian datos")
                 
-                # PASO 4: Actualizar estado anterior para próxima comparación
+                # PASO 4: Actualizar estado anterior para proxima comparacion
                 self.dashboard_last_state = estado_actual
                     
             except Exception as e:
-                # Error en serialización - no crítico
-                print(f"[COMMS-LINK] ❌ Error crítico en serialización: {e}")
+                # Error en serializacion - no critico
+                print(f"[COMMS-LINK] ? Error critico en serializacion: {e}")
                 pass
         else:
-            # INSTRUMENTACIÓN: Diagnóstico cuando no se envían datos
+            # INSTRUMENTACION: Diagnostico cuando no se envian datos
             if not self.order_dashboard_process:
                 print("[COMMS-LINK] |-- No hay proceso dashboard creado")
             elif not self.order_dashboard_process.is_alive():
-                print("[COMMS-LINK] |-- Proceso dashboard no está vivo")
+                print("[COMMS-LINK] |-- Proceso dashboard no esta vivo")
             elif not self.dashboard_data_queue:
                 print("[COMMS-LINK] |-- No hay cola de datos")
             elif not self.almacen:
-                print("[COMMS-LINK] |-- No hay almacén inicializado")
+                print("[COMMS-LINK] |-- No hay almacen inicializado")
             elif not self.almacen.dispatcher:
                 print("[COMMS-LINK] |-- No hay dispatcher inicializado")
     
     def _enviar_estado_completo_inicial_replay(self):
         """
-        REPLAY: Envía el estado completo de WorkOrders desde estado_visual al dashboard recién iniciado
-        Adaptado específicamente para modo replay
+        REPLAY: Envia el estado completo de WorkOrders desde estado_visual al dashboard recien iniciado
+        Adaptado especificamente para modo replay
         """
         if self.dashboard_data_queue:
             try:
@@ -1584,7 +1584,7 @@ class SimuladorAlmacen:
     def _actualizar_dashboard_ordenes_replay(self):
         """
         REPLAY: Enviar datos actualizados al dashboard usando estado_visual
-        Adaptado específicamente para modo replay
+        Adaptado especificamente para modo replay
         """
         if (self.order_dashboard_process and 
             self.order_dashboard_process.is_alive() and 
@@ -1627,7 +1627,7 @@ class SimuladorAlmacen:
                 print(f"[REPLAY-DASHBOARD] Error actualizando dashboard: {e}")
     
     def _inicializar_operarios_en_estado_visual(self, agentes):
-        """Inicializa estado visual basándose en agentes reales creados"""
+        """Inicializa estado visual basandose en agentes reales creados"""
         from visualization.state import estado_visual
         
         if not agentes:
@@ -1648,20 +1648,20 @@ class SimuladorAlmacen:
         
         # Crear entradas de estado visual para cada agente real
         for i, agente in enumerate(agentes):
-            # Calcular posición en grilla para distribución visual
+            # Calcular posicion en grilla para distribucion visual
             grid_x = depot_point[0] + (i % 3)  # Distribuir en una grilla 3x3
             grid_y = depot_point[1] + (i // 3)
             
-            # Validar que la posición sea caminable
+            # Validar que la posicion sea caminable
             if not self.layout_manager.is_walkable(grid_x, grid_y):
-                # Buscar posición caminable cercana
+                # Buscar posicion caminable cercana
                 fallback_pos = self.layout_manager.get_random_walkable_point()
                 if fallback_pos:
                     grid_x, grid_y = fallback_pos
                 else:
-                    grid_x, grid_y = depot_point  # Último recurso: depot original
+                    grid_x, grid_y = depot_point  # Ultimo recurso: depot original
             
-            # Convertir a píxeles
+            # Convertir a pixeles
             pixel_x, pixel_y = self.layout_manager.grid_to_pixel(grid_x, grid_y)
             
             # Offset para Forklifts
@@ -1682,22 +1682,22 @@ class SimuladorAlmacen:
                 'tipo': tipo_visual
             }
             
-            print(f"  [VISUAL-STATE] {agente.id} ({agente.type}) -> posición ({pixel_x}, {pixel_y})")
+            print(f"  [VISUAL-STATE] {agente.id} ({agente.type}) -> posicion ({pixel_x}, {pixel_y})")
         
         print(f"[VISUAL-STATE] Estado visual inicializado para {len(estado_visual['operarios'])} agentes reales")
     
     def _diagnosticar_route_calculator(self):
-        """Método de diagnóstico para el RouteCalculator V2.6"""
-        print("\n--- DIAGNÓSTICO DEL CALCULADOR DE RUTAS V2.6 ---")
+        """Metodo de diagnostico para el RouteCalculator V2.6"""
+        print("\n--- DIAGNOSTICO DEL CALCULADOR DE RUTAS V2.6 ---")
         if not self.almacen or not self.almacen.dispatcher:
-            print("El almacén o el dispatcher no están listos.")
+            print("El almacen o el dispatcher no estan listos.")
             return
 
-        # Tomar la posición inicial del primer depot como punto de partida
+        # Tomar la posicion inicial del primer depot como punto de partida
         start_pos = self.almacen.data_manager.outbound_staging_locations[1]
-        print(f"Punto de partida para el diagnóstico: Depot en {start_pos}")
+        print(f"Punto de partida para el diagnostico: Depot en {start_pos}")
 
-        # V2.6: Analizar tareas de la lista maestra en lugar de líneas pendientes
+        # V2.6: Analizar tareas de la lista maestra en lugar de lineas pendientes
         if hasattr(self.almacen.dispatcher, 'lista_maestra_work_orders') and self.almacen.dispatcher.lista_maestra_work_orders:
             total_work_orders = len(self.almacen.dispatcher.lista_maestra_work_orders)
             sample_size = min(10, total_work_orders)
@@ -1713,10 +1713,10 @@ class SimuladorAlmacen:
         print("-------------------------------------------\n")
     
     def ejecutar(self):
-        """Método principal de ejecución - Modo automatizado sin UI"""
+        """Metodo principal de ejecucion - Modo automatizado sin UI"""
         try:
-            # NUEVO ORDEN: Configuración JSON → TMX → Pygame → Simulación
-            print("[SIMULATOR] Iniciando en modo automatizado (sin UI de configuración)")
+            # NUEVO ORDEN: Configuracion JSON -> TMX -> Pygame -> Simulacion
+            print("[SIMULATOR] Iniciando en modo automatizado (sin UI de configuracion)")
             
             if not self.cargar_configuracion():
                 print("Error al cargar configuracion. Saliendo...")
@@ -1726,19 +1726,19 @@ class SimuladorAlmacen:
                 print("Error al crear la simulacion. Saliendo...")
                 return
             
-            # BIFURCACIÓN PRINCIPAL: Headless vs Visual vs Multiproceso
+            # BIFURCACION PRINCIPAL: Headless vs Visual vs Multiproceso
             if self.headless_mode:
-                # Modo headless: máxima velocidad sin interfaz gráfica
+                # Modo headless: maxima velocidad sin interfaz grafica
                 self._ejecutar_bucle_headless()
             else:
                 # REFACTOR: Modo visual con arquitectura Productor-Consumidor
                 print("[SIMULATOR] Iniciando modo visual con multiproceso...")
                 
-                # 1. Crear cola de comunicación
+                # 1. Crear cola de comunicacion
                 self.visual_event_queue = multiprocessing.Queue()
                 
-                # 2. Lanzar proceso de simulación SimPy
-                print("[SIMULATOR] Lanzando proceso de simulación SimPy...")
+                # 2. Lanzar proceso de simulacion SimPy
+                print("[SIMULATOR] Lanzando proceso de simulacion SimPy...")
                 self.simulation_process = multiprocessing.Process(
                     target=_run_simulation_process_static,
                     args=(self.visual_event_queue, self.configuracion)
@@ -1751,13 +1751,13 @@ class SimuladorAlmacen:
                 time.sleep(0.5)
                 print("[SIMULATOR] Inicializando interfaz pygame en proceso principal...")
                 
-                # 4. Inicializar interfaz Pygame DESPUÉS del proceso hijo
+                # 4. Inicializar interfaz Pygame DESPUES del proceso hijo
                 self.inicializar_pygame()
                 
-                print("[SIMULATOR] Iniciando bucle principal de visualización...")
+                print("[SIMULATOR] Iniciando bucle principal de visualizacion...")
                 print("[SIMULATOR] Presiona ESC para salir, SPACE para pausar")
                 
-                # 5. Ejecutar bucle de visualización como Consumidor
+                # 5. Ejecutar bucle de visualizacion como Consumidor
                 self._ejecutar_bucle_consumidor()
             
         except KeyboardInterrupt:
@@ -1772,7 +1772,7 @@ class SimuladorAlmacen:
     def limpiar_recursos(self):
         """Limpia todos los recursos incluyendo procesos"""
         if self.simulation_process and self.simulation_process.is_alive():
-            print("[CLEANUP] Terminando proceso de simulación...")
+            print("[CLEANUP] Terminando proceso de simulacion...")
             self.simulation_process.terminate()
             self.simulation_process.join(timeout=5)
         
@@ -1782,13 +1782,13 @@ class SimuladorAlmacen:
 
 def _run_simulation_process_static(visual_event_queue, configuracion):
     """
-    REFACTOR: Función estática para proceso separado de simulación SimPy
+    REFACTOR: Funcion estatica para proceso separado de simulacion SimPy
     
-    Esta función ejecuta en un proceso hijo y contiene toda la lógica
-    de inicialización y ejecución de SimPy, enviando eventos de estado
-    a través de la cola de multiproceso.
+    Esta funcion ejecuta en un proceso hijo y contiene toda la logica
+    de inicializacion y ejecucion de SimPy, enviando eventos de estado
+    a traves de la cola de multiproceso.
     
-    NOTA: Debe ser función estática para evitar problemas de pickle
+    NOTA: Debe ser funcion estatica para evitar problemas de pickle
     """
     # AUDIT: Configurar logging al inicio del proceso simulation_producer
     import logging
@@ -1799,8 +1799,8 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
     )
     logger = logging.getLogger(__name__)
     
-    # AUDIT: Log de inicio del proceso productor de simulación
-    logger.info("Iniciando proceso productor de simulación...")
+    # AUDIT: Log de inicio del proceso productor de simulacion
+    logger.info("Iniciando proceso productor de simulacion...")
     
     import sys
     import os
@@ -1817,19 +1817,19 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
     from simulation.route_calculator import RouteCalculator
     
     try:
-        print("[PROCESO-SIMPY] Iniciando proceso de simulación separado...")
+        print("[PROCESO-SIMPY] Iniciando proceso de simulacion separado...")
         
-        # ARQUITECTURA TMX OBLIGATORIA - Inicialización en proceso hijo
+        # ARQUITECTURA TMX OBLIGATORIA - Inicializacion en proceso hijo
         print("[PROCESO-SIMPY] Inicializando arquitectura TMX...")
         
         # REFACTOR: PyTMX requiere pygame display inicializado - usar driver dummy para proceso multiproceso
         import os
         # Configurar SDL para evitar conflictos con proceso padre
         os.environ['SDL_VIDEODRIVER'] = 'dummy'  # Usar driver dummy para evitar ventanas en proceso hijo
-        os.environ['SDL_AUDIODRIVER'] = 'dummy'  # También desactivar audio para evitar conflictos
+        os.environ['SDL_AUDIODRIVER'] = 'dummy'  # Tambien desactivar audio para evitar conflictos
         pygame.init()
-        # Usar flags específicos para proceso hijo
-        pygame.display.set_mode((1, 1), pygame.NOFRAME | pygame.HIDDEN)  # Superficie dummy mínima
+        # Usar flags especificos para proceso hijo
+        pygame.display.set_mode((1, 1), pygame.NOFRAME | pygame.HIDDEN)  # Superficie dummy minima
         
         # 1. Inicializar LayoutManager
         tmx_file = os.path.join(os.path.dirname(__file__), "layouts", "WH1.tmx")
@@ -1878,24 +1878,24 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
             pathfinder=pathfinder, layout_manager=layout_manager
         )
         
-        # 9. Proceso de actualización de métricas simple
+        # 9. Proceso de actualizacion de metricas simple
         def proceso_actualizacion_metricas():
             while True:
                 yield almacen.adelantar_tiempo(5.0)
-                # Las métricas ahora se envían vía cola
+                # Las metricas ahora se envian via cola
                 pass
         
         env.process(proceso_actualizacion_metricas())
         
-        # 10. Inicializar almacén y crear órdenes
+        # 10. Inicializar almacen y crear ordenes
         almacen._crear_catalogo_y_stock()
         almacen._generar_flujo_ordenes()
         
-        # 11. Proceso de envío de estado del almacén para el dashboard
+        # 11. Proceso de envio de estado del almacen para el dashboard
         def enviar_estado_almacen():
             while True:
                 try:
-                    # Crear estado del almacén para el dashboard
+                    # Crear estado del almacen para el dashboard
                     estado_almacen = {
                         'tareas_completadas_count': almacen.tareas_completadas_count,
                         'total_tareas': getattr(almacen, 'total_tareas', len(almacen.dispatcher.lista_maestra_work_orders) if hasattr(almacen, 'dispatcher') else 0),
@@ -1911,26 +1911,26 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
                         'timestamp': env.now
                     })
                 except Exception as e:
-                    print(f"[ERROR-ESTADO] Error enviando estado del almacén: {e}")
+                    print(f"[ERROR-ESTADO] Error enviando estado del almacen: {e}")
                 
                 yield env.timeout(5.0)  # Enviar cada 5 segundos simulados
         
         env.process(enviar_estado_almacen())
 
-        # 12. NUEVO: Proceso de métricas del dashboard
+        # 12. NUEVO: Proceso de metricas del dashboard
         def proceso_metricas_dashboard(env, almacen, event_queue):
             """
-            Proceso SimPy que calcula y emite métricas para el dashboard periódicamente
+            Proceso SimPy que calcula y emite metricas para el dashboard periodicamente
             """
-            # AUDIT: Log de inicio del proceso de métricas
-            logger.info("Iniciando proceso de métricas de dashboard...")
+            # AUDIT: Log de inicio del proceso de metricas
+            logger.info("Iniciando proceso de metricas de dashboard...")
             
             while True:
-                # AUDIT: Log DEBUG en cada iteración del bucle
-                logger.debug("Proceso de métricas de dashboard: Tick de ejecución.")
+                # AUDIT: Log DEBUG en cada iteracion del bucle
+                logger.debug("Proceso de metricas de dashboard: Tick de ejecucion.")
                 
                 try:
-                    # a. Calcular Métricas del almacén - DUAL COUNTERS
+                    # a. Calcular Metricas del almacen - DUAL COUNTERS
                     tiempo = env.now
                     
                     # Contadores duales: WorkOrders y Tareas (PickingTasks)
@@ -1946,7 +1946,7 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
                         'data': {
                             'tiempo': tiempo,
                             'workorders_completadas': workorders_completadas,  # KPI principal
-                            'tareas_completadas': tareas_completadas,  # Métrica granular
+                            'tareas_completadas': tareas_completadas,  # Metrica granular
                             'wos_pendientes': wos_pendientes,
                             'wos_totales': wos_totales,
                             'progreso': progreso,
@@ -1959,12 +1959,12 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
                     event_queue.put(mensaje)
                     
                 except Exception as e:
-                    print(f"[ERROR-METRICAS] Error calculando métricas del dashboard: {e}")
+                    print(f"[ERROR-METRICAS] Error calculando metricas del dashboard: {e}")
                 
-                # d. Esperar intervalo antes de próxima actualización
+                # d. Esperar intervalo antes de proxima actualizacion
                 yield env.timeout(1.0)  # Actualizar cada 1 segundo simulado
         
-        # Lanzar el proceso de métricas junto con otros procesos
+        # Lanzar el proceso de metricas junto con otros procesos
         print("[PROCESO-SIMPY] LANZANDO PROCESO DE METRICAS DEL DASHBOARD")
         env.process(proceso_metricas_dashboard(env, almacen, visual_event_queue))
         print("[PROCESO-SIMPY] Proceso de metricas registrado en SimPy")
@@ -1974,31 +1974,31 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
             print("[PROCESO-SIMPY] Iniciando dispatcher V2.6...")
             env.process(almacen.dispatcher.dispatcher_process(operarios))
         
-        print(f"[PROCESO-SIMPY] Simulación creada: {len(procesos_operarios)} agentes")
-        print("[PROCESO-SIMPY] EJECUTANDO SIMULACIÓN CON env.run()...")
+        print(f"[PROCESO-SIMPY] Simulacion creada: {len(procesos_operarios)} agentes")
+        print("[PROCESO-SIMPY] EJECUTANDO SIMULACION CON env.run()...")
         
         # AUDIT: Log antes de la llamada a env.run()
         logger.info("Iniciando bucle de eventos principal de SimPy...")
         
-        # 12. EJECUTAR SIMULACIÓN COMPLETA
+        # 12. EJECUTAR SIMULACION COMPLETA
         env.run()
         
-        # AUDIT: Log inmediatamente después de la llamada a env.run()
+        # AUDIT: Log inmediatamente despues de la llamada a env.run()
         logger.info("Bucle de eventos principal de SimPy ha finalizado. Procediendo a la limpieza...")
         
-        print("[PROCESO-SIMPY] Simulación completada.")
+        print("[PROCESO-SIMPY] Simulacion completada.")
         
-        # 13. Procesar analíticas en el proceso productor y enviar resultados
-        print("[PROCESO-SIMPY] Procesando analíticas en proceso productor...")
+        # 13. Procesar analiticas en el proceso productor y enviar resultados
+        print("[PROCESO-SIMPY] Procesando analiticas en proceso productor...")
         try:
-            # Importar el pipeline de analíticas
+            # Importar el pipeline de analiticas
             from analytics_engine import AnalyticsEngine
             from datetime import datetime
             import os
             
             def mostrar_metricas_consola_productor(almacen):
                 print(f"Tareas completadas: {almacen.tareas_completadas_count}")
-                print(f"Tiempo total de simulación: {env.now:.2f}")
+                print(f"Tiempo total de simulacion: {env.now:.2f}")
                 
             mostrar_metricas_consola_productor(almacen)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -2008,7 +2008,7 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
             output_dir = os.path.join(output_base_dir, f"simulation_{timestamp}")
             os.makedirs(output_dir, exist_ok=True)
             
-            # Pipeline automatizado: AnalyticsEngine → Excel
+            # Pipeline automatizado: AnalyticsEngine -> Excel
             excel_filename = f"analytics_warehouse_{timestamp}.xlsx"
             excel_path = os.path.join(output_dir, excel_filename)
             
@@ -2019,17 +2019,17 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
             archivo_excel = analytics_engine.export_to_excel(excel_filename)
             print(f"[PROCESO-SIMPY] Excel generado: {archivo_excel}")
             
-            # [AUDIT-BACKPRESSURE] Instrumentación del Productor (simulation_completed)
+            # [AUDIT-BACKPRESSURE] Instrumentacion del Productor (simulation_completed)
             import time
             queue_size_before = visual_event_queue.qsize()
             put_start_time = time.time()
-            print(f"[PRODUCTOR-AUDIT] SIMULATION_COMPLETED: Intentando poner evento. Tamaño actual de la cola: {queue_size_before}")
+            print(f"[PRODUCTOR-AUDIT] SIMULATION_COMPLETED: Intentando poner evento. Tamano actual de la cola: {queue_size_before}")
             
-            # Enviar evento de finalización con información de archivos generados
+            # Enviar evento de finalizacion con informacion de archivos generados
             visual_event_queue.put({
                 'type': 'simulation_completed',
                 'timestamp': env.now,
-                'message': 'Simulación SimPy completada exitosamente',
+                'message': 'Simulacion SimPy completada exitosamente',
                 'analytics_completed': True,
                 'excel_file': archivo_excel,
                 'output_dir': output_dir
@@ -2038,52 +2038,52 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
             put_end_time = time.time()
             put_duration_ms = (put_end_time - put_start_time) * 1000
             queue_size_after = visual_event_queue.qsize()
-            print(f"[PRODUCTOR-AUDIT] SIMULATION_COMPLETED: Evento puesto con éxito. Duración: {put_duration_ms:.2f}ms. Tamaño nueva cola: {queue_size_after}")
+            print(f"[PRODUCTOR-AUDIT] SIMULATION_COMPLETED: Evento puesto con exito. Duracion: {put_duration_ms:.2f}ms. Tamano nueva cola: {queue_size_after}")
             
         except Exception as e:
-            print(f"[ERROR-PROCESO-SIMPY] Error en pipeline de analíticas: {e}")
+            print(f"[ERROR-PROCESO-SIMPY] Error en pipeline de analiticas: {e}")
             import traceback
             traceback.print_exc()
             
-            # Enviar evento de finalización aunque fallen las analíticas
+            # Enviar evento de finalizacion aunque fallen las analiticas
             visual_event_queue.put({
                 'type': 'simulation_completed',
                 'timestamp': env.now,
-                'message': 'Simulación completada con errores en analíticas',
+                'message': 'Simulacion completada con errores en analiticas',
                 'analytics_completed': False,
                 'error': str(e)
             })
         
     except Exception as e:
-        print(f"[ERROR-PROCESO-SIMPY] Error en proceso de simulación: {e}")
+        print(f"[ERROR-PROCESO-SIMPY] Error en proceso de simulacion: {e}")
         import traceback
         traceback.print_exc()
         # Enviar evento de error
         visual_event_queue.put({
             'type': 'simulation_error',
             'error': str(e),
-            'message': 'Error en proceso de simulación SimPy'
+            'message': 'Error en proceso de simulacion SimPy'
         })
     finally:
-        # AUDIT: Log final del proceso productor de simulación
-        logger.info("Proceso productor de simulación finalizado limpiamente.")
-        print("[PROCESO-SIMPY] Proceso de simulación terminado.")
+        # AUDIT: Log final del proceso productor de simulacion
+        logger.info("Proceso productor de simulacion finalizado limpiamente.")
+        print("[PROCESO-SIMPY] Proceso de simulacion terminado.")
 
-# Retornar a la clase SimuladorAlmacen (continuación)
+# Retornar a la clase SimuladorAlmacen (continuacion)
 
     def _run_simulation_process(self, visual_event_queue, configuracion):
-        """Wrapper para llamar a la función estática"""
+        """Wrapper para llamar a la funcion estatica"""
         _run_simulation_process_static(visual_event_queue, configuracion)
     
     def _proceso_actualizacion_metricas_subprocess(self):
-        """Versión del proceso de métricas para el subprocess"""
-        # Esta función no es usada en la versión static, pero se deja por compatibilidad
+        """Version del proceso de metricas para el subprocess"""
+        # Esta funcion no es usada en la version static, pero se deja por compatibilidad
         pass
     
     def limpiar_recursos(self):
         """Limpia todos los recursos incluyendo procesos"""
         if self.simulation_process and self.simulation_process.is_alive():
-            print("[CLEANUP] Terminando proceso de simulación...")
+            print("[CLEANUP] Terminando proceso de simulacion...")
             self.simulation_process.terminate()
             self.simulation_process.join(timeout=5)
         
@@ -2092,16 +2092,16 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
         print("Recursos liberados. Hasta luego!")
     
     def _diagnosticar_data_manager(self):
-        print("\n--- DIAGNÓSTICO DEL DATA MANAGER ---")
+        print("\n--- DIAGNOSTICO DEL DATA MANAGER ---")
         config = self.configuracion
         if config.get('layout_file') and config.get('sequence_file'):
             data_manager = DataManager(config['layout_file'], config['sequence_file'])
             if not data_manager.puntos_de_picking_ordenados:
                 print("  [FALLO] El DataManager no pudo cargar o procesar los puntos de picking.")
             else:
-                print("  [ÉXITO] El DataManager se ha cargado correctamente.")
+                print("  [EXITO] El DataManager se ha cargado correctamente.")
         else:
-            print("  [ERROR] Faltan las rutas a los archivos tmx o sequence_csv en la configuración.")
+            print("  [ERROR] Faltan las rutas a los archivos tmx o sequence_csv en la configuracion.")
         print("------------------------------------\n")
 
     # All unused debug methods removed in final cleanup
@@ -2127,7 +2127,13 @@ def ejecutar_modo_replay(jsonl_file_path):
                 if line:
                     try:
                         event = json.loads(line)
-                        
+
+                        # AUDIT SONDA: Estado ANTES del procesamiento del evento
+                        print(f"[AUDIT-PRE] Procesando evento: {event.get('event_type', 'UNKNOWN')}")
+                        print(f"[AUDIT-PRE] Total eventos cargados hasta ahora: {len(eventos)}")
+                        print(f"[AUDIT-PRE] simulation_start_event: {'SET' if simulation_start_event else 'NULL'}")
+                        print(f"[AUDIT-PRE] initial_work_orders count: {len(initial_work_orders)}")
+
                         if event.get('event_type') == 'SIMULATION_START':
                             simulation_start_event = event
                             initial_work_orders = event.get('initial_work_orders', [])
@@ -2138,11 +2144,22 @@ def ejecutar_modo_replay(jsonl_file_path):
                             else:
                                 print(f"[REPLAY] WARNING: total_work_orders no encontrado en SIMULATION_START (replay antiguo)")
                             print(f"[REPLAY] Encontrado SIMULATION_START con {len(initial_work_orders)} WorkOrders iniciales")
-                        elif event.get('event_type') != 'SIMULATION_END':
+
+                            # AUDIT SONDA: Estado DESPUES de procesar SIMULATION_START
+                            print(f"[AUDIT-POST-START] simulation_start_event keys: {list(simulation_start_event.keys())}")
+                            print(f"[AUDIT-POST-START] initial_work_orders count: {len(initial_work_orders)}")
+                            print(f"[AUDIT-POST-START] total_work_orders_fijo: {total_work_orders_fijo}")
+
+                        else:
+                            # BUGFIX: Incluir TODOS los eventos incluyendo SIMULATION_END
                             eventos.append(event)
-                            
+                            if event.get('event_type') == 'SIMULATION_END':
+                                print(f"[BUGFIX] SIMULATION_END incluido en eventos: {event}")
+                            else:
+                                print(f"[AUDIT-APPEND] Evento agregado: {event.get('event_type', 'UNKNOWN')} | Total eventos: {len(eventos)}")
+
                     except json.JSONDecodeError as e:
-                        print(f"[REPLAY] Error parseando línea: {e}")
+                        print(f"[REPLAY] Error parseando linea: {e}")
                         continue
         
         print(f"[REPLAY] {len(eventos)} eventos cargados exitosamente")
@@ -2161,13 +2178,13 @@ def ejecutar_modo_replay(jsonl_file_path):
     window_height = 1000
     window_size = (window_width, window_height)
     pantalla = pygame.display.set_mode(window_size)
-    pygame.display.set_caption("Simulador de Almacén - Modo Replay")
+    pygame.display.set_caption("Simulador de Almacen - Modo Replay")
     reloj = pygame.time.Clock()
     
-    # Cargar configuración desde el evento SIMULATION_START
+    # Cargar configuracion desde el evento SIMULATION_START
     configuracion = simulation_start_event.get('config', {}) if simulation_start_event else {}
     
-    # Inicializar arquitectura TMX básica (necesaria para renderizado)
+    # Inicializar arquitectura TMX basica (necesaria para renderizado)
     from simulation.layout_manager import LayoutManager
     from visualization.original_renderer import RendererOriginal
     from visualization.state import inicializar_estado, estado_visual
@@ -2180,17 +2197,24 @@ def ejecutar_modo_replay(jsonl_file_path):
     virtual_surface = pygame.Surface((warehouse_width, warehouse_width))  # Superficie virtual para el mapa
     renderer = RendererOriginal(virtual_surface)
     
-    # Inicializar estado visual básico
+    # Inicializar estado visual basico
     inicializar_estado(None, None, configuracion, layout_manager)
-    
-    # Configurar estado inicial con WorkOrders si están disponibles
+
+    # FEATURE: Motor de Estado Continuo del Dashboard de Replay
+    dashboard_wos_state = {}  # Estado persistente de WorkOrders para el dashboard
+    print("[DASHBOARD-STATE] Motor de estado continuo inicializado")
+
+    # Configurar estado inicial con WorkOrders si estan disponibles
     if initial_work_orders:
         for wo in initial_work_orders:
             estado_visual["work_orders"][wo['id']] = wo.copy()
+            # FEATURE: Poblar el estado continuo del dashboard
+            dashboard_wos_state[wo['id']] = wo.copy()
         print(f"[REPLAY] {len(initial_work_orders)} WorkOrders cargadas en estado inicial")
-        
-        # SONDA 1: Estado después de procesar initial_work_orders del SIMULATION_START
-        print(f"\n=== SONDA 1: DESPUÉS DE PROCESAR INITIAL_WORK_ORDERS ===")
+        print(f"[DASHBOARD-STATE] {len(dashboard_wos_state)} WorkOrders pobladas en estado continuo")
+
+        # SONDA 1: Estado despues de procesar initial_work_orders del SIMULATION_START
+        print(f"\n=== SONDA 1: DESPUES DE PROCESAR INITIAL_WORK_ORDERS ===")
         print(f"Work Orders cargadas: {len(estado_visual['work_orders'])}")
         for wo_id, wo_data in estado_visual["work_orders"].items():
             print(f"  WO {wo_id}: status={wo_data.get('status', 'unknown')}")
@@ -2210,30 +2234,27 @@ def ejecutar_modo_replay(jsonl_file_path):
         estado_visual["operarios"][agent_id] = data.copy()
     
     print(f"[REPLAY] {len(agentes_iniciales)} agentes encontrados en estado inicial")
-    print("[REPLAY] Iniciando bucle de visualización...")
+    print("[REPLAY] Iniciando bucle de visualizacion...")
     
     # Inicializar motor de playback
     playback_time = 0.0
     replay_speed = 1.0
     velocidades_permitidas = [0.25, 0.5, 1.0, 2.0, 4.0, 8.0]
     processed_event_indices = set()  # Trackear eventos ya procesados
-    
+    replay_finalizado = False  # BUGFIX: Control de finalizacion del replay
+
     print(f"[REPLAY] Motor de playback inicializado - {len(eventos)} eventos total")
-    
-    # Variables para gestión del Dashboard de Órdenes en modo replay
-    order_dashboard_process = None
-    dashboard_data_queue = None
-    dashboard_last_state = {}  # Cache para detección de cambios
-    dashboard_initialized = False  # REFACTOR: Flag para evitar re-inicialización
-    last_processed_wo_events = set()  # REFACTOR: Track eventos WO ya procesados para deltas
-    
-    # AUDIT: Auto-trigger para capturar estado del dashboard después de 3 segundos
-    import time
-    auto_trigger_time = time.time() + 3.0
-    auto_triggered = False
-    
+    print(f"[REPLAY] Estado inicial: replay_finalizado = {replay_finalizado}")
+
+    # FEATURE: Control de visibilidad del dashboard nativo Pygame
+    dashboard_visible = False
+    dashboard_scroll_offset = 0  # FEATURE: Offset de scroll para navegacion por WorkOrders
+    print(f"[DASHBOARD-PYGAME] Dashboard nativo inicializado: visible = {dashboard_visible}")
+    print(f"[DASHBOARD-SCROLL] Scroll offset inicializado: {dashboard_scroll_offset}")
+
     # Bucle principal de replay con motor temporal
     corriendo = True
+    frame_counter = 0  # SONDA: Contador de frames para diagnostico
     while corriendo:
         # Manejar eventos de pygame
         for event in pygame.event.get():
@@ -2255,245 +2276,41 @@ def ejecutar_modo_replay(jsonl_file_path):
                         replay_speed = velocidades_permitidas[current_index - 1]
                         print(f"[REPLAY] Velocidad disminuida a {replay_speed:.2f}x")
                 elif event.key == pygame.K_o:
-                    # Tecla 'O' para toggle Dashboard de Órdenes
-                    print("[REPLAY-DASHBOARD] Tecla 'O' detectada - Toggle dashboard")
-                    if order_dashboard_process is None or not order_dashboard_process.is_alive():
-                        # Abrir dashboard
-                        try:
-                            from git.visualization.order_dashboard import launch_dashboard_process
-                            from multiprocessing import Queue
-                            
-                            # Crear cola para comunicación
-                            dashboard_data_queue = Queue()
-                            
-                            # Crear proceso separado para el dashboard
-                            order_dashboard_process = multiprocessing.Process(
-                                target=launch_dashboard_process,
-                                args=(dashboard_data_queue,)
-                            )
-                            
-                            order_dashboard_process.start()
-                            print(f"[REPLAY-DASHBOARD] Dashboard abierto (PID: {order_dashboard_process.pid})")
-                            
-                            # REFACTOR: Marcar dashboard como inicializado y enviar estado inicial UNA VEZ
-                            dashboard_initialized = True
-                            
-                            # BUGFIX: Reconstruir estado inicial filtrado por playback_time
-                            estado_reconstruido = {}
-                            
-                            # Procesar TODOS los eventos desde el principio, filtrando por playback_time
-                            for evento in eventos:
-                                event_timestamp = evento.get('timestamp', 0.0)
-                                if event_timestamp is None:
-                                    event_timestamp = 0.0
-                                
-                                # CRITICAL: Solo procesar eventos cuyo timestamp <= playback_time actual
-                                if event_timestamp <= playback_time:
-                                    # Procesar evento SIMULATION_START (WorkOrders iniciales)
-                                    if evento.get('event_type') == 'SIMULATION_START':
-                                        # Inicializar con WorkOrders del metadata
-                                        if initial_work_orders:
-                                            for wo in initial_work_orders:
-                                                estado_reconstruido[wo['id']] = wo.copy()
-                                    
-                                    # Procesar eventos work_order_update
-                                    elif evento.get('type') == 'work_order_update':
-                                        work_order_data = evento.get('data', {})
-                                        work_order_id = work_order_data.get('id')
-                                        
-                                        if work_order_id:
-                                            if work_order_id in estado_reconstruido:
-                                                estado_reconstruido[work_order_id].update(work_order_data)
-                                            else:
-                                                estado_reconstruido[work_order_id] = work_order_data.copy()
-                            
-                            if estado_reconstruido:
-                                full_state_data = list(estado_reconstruido.values())
-                                
-                                # SONDA 2: Estado después de procesar eventos work_order_update en timestamp=0
-                                if playback_time == 0.0:
-                                    print(f"\n=== SONDA 2: DESPUÉS DE PROCESAR EVENTOS TIMESTAMP=0 ===")
-                                    print(f"Work Orders reconstruidas: {len(estado_reconstruido)}")
-                                    for wo_id, wo_data in estado_reconstruido.items():
-                                        print(f"  WO {wo_id}: status={wo_data.get('status', 'unknown')}")
-                                    print("=========================================\n")
-                                
-                                # AUDIT: Sonda DEBUG-EMISOR - Instrumentar estado antes del envio
-                                status_summary = {}
-                                for wo_data in full_state_data:
-                                    status = wo_data.get('status', 'unknown')
-                                    status_summary[status] = status_summary.get(status, 0) + 1
-                                
-                                # AUDIT: Sonda de comparación temporal - detectar desacoplamiento
-                                import time
-                                real_time = time.time()
-                                print(f"[DEBUG-EMISOR] REPLAY enviando {len(full_state_data)} WorkOrders. Estados: {status_summary}. Playback_time: {playback_time}")
-                                print(f"[TEMPORAL-AUDIT] WorkOrder_States_Time: {playback_time:.3f} | RealTime: {real_time:.3f}")
-                                
-                                full_state_message = {
-                                    'type': 'full_state',
-                                    'timestamp': playback_time,
-                                    'data': full_state_data
-                                }
-                                # AUDIT: Verificar estados en el momento de activacion del dashboard
-                                status_count = {}
-                                for wo_data in full_state_data:
-                                    status = wo_data.get('status', 'unknown')
-                                    status_count[status] = status_count.get(status, 0) + 1
-                                print(f"\n=== AUDIT: ESTADO AL PRESIONAR 'O' ===")
-                                print(f"Total WorkOrders: {len(full_state_data)}")
-                                print(f"Estados encontrados: {status_count}")
-                                print(f"Playback time actual: {playback_time}")
-                                if full_state_data:
-                                    print(f"Primera WO: {full_state_data[0]['id']} = {full_state_data[0].get('status', 'unknown')}")
-                                    print(f"Ultima WO: {full_state_data[-1]['id']} = {full_state_data[-1].get('status', 'unknown')}")
-                                print("===================================\n")
-                                
-                                dashboard_data_queue.put_nowait(full_state_message)
-                                print(f"[REPLAY-DASHBOARD] Estado inicial enviado: {len(full_state_data)} WorkOrders")
-                                
-                                # Actualizar cache
-                                dashboard_last_state = {wo['id']: wo.copy() for wo in full_state_data}
-                            
-                        except ImportError as e:
-                            print(f"[REPLAY-DASHBOARD] Error importando dashboard: {e}")
-                        except Exception as e:
-                            print(f"[REPLAY-DASHBOARD] Error abriendo dashboard: {e}")
-                    else:
-                        # Cerrar dashboard
-                        try:
-                            if dashboard_data_queue:
-                                try:
-                                    dashboard_data_queue.put_nowait('__EXIT_COMMAND__')
-                                except:
-                                    pass
-                            
-                            order_dashboard_process.join(timeout=3)
-                            
-                            if order_dashboard_process.is_alive():
-                                order_dashboard_process.terminate()
-                                order_dashboard_process.join(timeout=1)
-                            
-                            order_dashboard_process = None
-                            dashboard_data_queue = None
-                            dashboard_last_state = {}
-                            dashboard_initialized = False  # REFACTOR: Reset flag
-                            last_processed_wo_events = set()  # REFACTOR: Reset tracking
-                            print("[REPLAY-DASHBOARD] Dashboard cerrado")
-                            
-                        except Exception as e:
-                            print(f"[REPLAY-DASHBOARD] Error cerrando dashboard: {e}")
+                    # FEATURE: Toggle dashboard nativo Pygame
+                    dashboard_visible = not dashboard_visible
+                    print(f"[DASHBOARD-PYGAME] Dashboard toggled: visible = {dashboard_visible}")
+                    if dashboard_visible:
+                        dashboard_scroll_offset = 0  # Reset scroll al abrir dashboard
+                        print(f"[DASHBOARD-SCROLL] Scroll reset al abrir dashboard")
+
+            # FEATURE: Captura de eventos scroll cuando dashboard visible
+            elif event.type == pygame.MOUSEWHEEL and dashboard_visible:
+                scroll_speed = 40  # Pixels por tick de rueda del raton
+                old_offset = dashboard_scroll_offset
+                dashboard_scroll_offset -= event.y * scroll_speed
+
+                # Calcular limites dinamicos basados en contenido actual
+                work_orders_count = len(dashboard_wos_state)
+                max_visible_rows = 18  # Filas que caben en el panel del dashboard
+                row_height = 20  # Altura de cada fila en pixels
+
+                # Limite superior: 0 (no scroll negativo hacia arriba)
+                min_scroll = 0
+
+                # Limite inferior: scroll maximo necesario para ver todas las ordenes
+                if work_orders_count > max_visible_rows:
+                    max_scroll = (work_orders_count - max_visible_rows) * row_height
+                else:
+                    max_scroll = 0  # No hay necesidad de scroll si caben todas
+
+                # SEGURIDAD: Aplicar limites para evitar scroll fuera de rango
+                dashboard_scroll_offset = max(min_scroll, min(dashboard_scroll_offset, max_scroll))
+
+                # LOGGING DIAGNOSTICO para depuracion
+                print(f"[DASHBOARD-SCROLL] event.y={event.y}, offset: {old_offset} -> {dashboard_scroll_offset} (max: {max_scroll})")
         
-        # AUDIT: Auto-trigger para capturar estado del dashboard
-        if not auto_triggered and time.time() >= auto_trigger_time:
-            print("[AUDIT-AUTO] Auto-triggering dashboard apertura para capturar estado...")
-            auto_triggered = True
-            # Simular tecla 'O' presionada
-            if order_dashboard_process is None or not order_dashboard_process.is_alive():
-                # Abrir dashboard
-                try:
-                    from git.visualization.order_dashboard import launch_dashboard_process
-                    from multiprocessing import Queue
-                    
-                    # Crear cola para comunicación
-                    dashboard_data_queue = Queue()
-                    
-                    # Crear proceso separado para el dashboard
-                    order_dashboard_process = multiprocessing.Process(
-                        target=launch_dashboard_process,
-                        args=(dashboard_data_queue,)
-                    )
-                    
-                    order_dashboard_process.start()
-                    print(f"[AUDIT-AUTO] Dashboard abierto automáticamente (PID: {order_dashboard_process.pid})")
-                    
-                    # REFACTOR: Marcar dashboard como inicializado y enviar estado inicial UNA VEZ
-                    dashboard_initialized = True
-                    
-                    # BUGFIX: Reconstruir estado inicial filtrado por playback_time
-                    estado_reconstruido = {}
-                    
-                    # Procesar TODOS los eventos desde el principio, filtrando por playback_time
-                    for evento in eventos:
-                        event_timestamp = evento.get('timestamp', 0.0)
-                        if event_timestamp is None:
-                            event_timestamp = 0.0
-                        
-                        # CRITICAL: Solo procesar eventos cuyo timestamp <= playback_time actual
-                        if event_timestamp <= playback_time:
-                            # Procesar evento SIMULATION_START (WorkOrders iniciales)
-                            if evento.get('event_type') == 'SIMULATION_START':
-                                # Inicializar con WorkOrders del metadata
-                                if initial_work_orders:
-                                    for wo in initial_work_orders:
-                                        estado_reconstruido[wo['id']] = wo.copy()
-                            
-                            # Procesar eventos work_order_update
-                            elif evento.get('type') == 'work_order_update':
-                                work_order_data = evento.get('data', {})
-                                work_order_id = work_order_data.get('id')
-                                
-                                if work_order_id:
-                                    if work_order_id in estado_reconstruido:
-                                        estado_reconstruido[work_order_id].update(work_order_data)
-                                    else:
-                                        estado_reconstruido[work_order_id] = work_order_data.copy()
-                    
-                    if estado_reconstruido:
-                        full_state_data = list(estado_reconstruido.values())
-                        
-                        # SONDA 2: Estado después de procesar eventos work_order_update en timestamp=0
-                        if playback_time == 0.0:
-                            print(f"\n=== SONDA 2: DESPUÉS DE PROCESAR EVENTOS TIMESTAMP=0 ===")
-                            print(f"Work Orders reconstruidas: {len(estado_reconstruido)}")
-                            for wo_id, wo_data in estado_reconstruido.items():
-                                print(f"  WO {wo_id}: status={wo_data.get('status', 'unknown')}")
-                            print("=========================================\n")
-                        
-                        # AUDIT: Sonda DEBUG-EMISOR - Instrumentar estado antes del envio
-                        status_summary = {}
-                        for wo_data in full_state_data:
-                            status = wo_data.get('status', 'unknown')
-                            status_summary[status] = status_summary.get(status, 0) + 1
-                        
-                        # AUDIT: Sonda de comparación temporal - detectar desacoplamiento
-                        real_time = time.time()
-                        print(f"[DEBUG-EMISOR] REPLAY enviando {len(full_state_data)} WorkOrders. Estados: {status_summary}. Playback_time: {playback_time}")
-                        print(f"[TEMPORAL-AUDIT] WorkOrder_States_Time: {playback_time:.3f} | RealTime: {real_time:.3f}")
-                        
-                        full_state_message = {
-                            'type': 'full_state',
-                            'timestamp': playback_time,
-                            'data': full_state_data
-                        }
-                        # AUDIT: Verificar estados en el momento de activacion del dashboard
-                        status_count = {}
-                        for wo_data in full_state_data:
-                            status = wo_data.get('status', 'unknown')
-                            status_count[status] = status_count.get(status, 0) + 1
-                        print(f"\n=== AUDIT: ESTADO AL PRESIONAR 'O' (AUTO) ===")
-                        print(f"Total WorkOrders: {len(full_state_data)}")
-                        print(f"Estados encontrados: {status_count}")
-                        print(f"Playback time actual: {playback_time}")
-                        if full_state_data:
-                            print(f"Primera WO: {full_state_data[0]['id']} = {full_state_data[0].get('status', 'unknown')}")
-                            print(f"Ultima WO: {full_state_data[-1]['id']} = {full_state_data[-1].get('status', 'unknown')}")
-                        print("===================================\n")
-                        
-                        dashboard_data_queue.put_nowait(full_state_message)
-                        print(f"[AUDIT-AUTO] Estado inicial enviado: {len(full_state_data)} WorkOrders")
-                        
-                        # Terminar replay después de capturar audit
-                        print("[AUDIT-AUTO] Terminando replay después de capturar datos de auditoría")
-                        corriendo = False
-                        
-                except Exception as e:
-                    print(f"[AUDIT-AUTO] Error abriendo dashboard automáticamente: {e}")
         
-        # Avanzar tiempo de playback usando delta time
-        delta_time = reloj.get_time() / 1000.0  # Convertir ms a segundos
-        playback_time += delta_time * replay_speed
-        
+        # REFACTOR ARQUITECTONICO: Procesar eventos ANTES de avanzar el tiempo
         # Obtener lote de eventos para el tiempo actual
         eventos_a_procesar = []
         for i, evento in enumerate(eventos):
@@ -2504,50 +2321,62 @@ def ejecutar_modo_replay(jsonl_file_path):
                     event_timestamp = 0.0
                 if event_timestamp <= playback_time:
                     eventos_a_procesar.append((i, evento))
-        
+
         # Actualizar estado de agentes con eventos procesados
         for event_index, evento in eventos_a_procesar:
             processed_event_indices.add(event_index)
-            
+
+            # BUGFIX: Detectar evento SIMULATION_END y pausar replay
+            if evento.get('event_type') == 'SIMULATION_END':
+                replay_finalizado = True
+                print(f"[BUGFIX] SIMULATION_END detectado en playback_time={playback_time:.3f}s")
+                print(f"[BUGFIX] Replay pausado - replay_finalizado = {replay_finalizado}")
+
             if evento.get('type') == 'estado_agente':
                 agent_id = evento.get('agent_id')
                 event_data = evento.get('data', {})
                 event_timestamp = evento.get('timestamp', 0.0)
-                
-                # AUDIT: Sonda de comparación temporal - eventos visuales
+
+                # AUDIT: Sonda de comparacion temporal - eventos visuales
                 import time
                 real_time = time.time()
                 if agent_id and 'position' in event_data:  # Solo loggear eventos de movimiento
                     print(f"[TEMPORAL-AUDIT] Visual_Agent_Movement: {event_timestamp:.3f} | Playback_time: {playback_time:.3f} | Agent: {agent_id}")
-                
+
                 if agent_id and event_data:
                     # Inicializar agente si no existe
                     if agent_id not in estado_visual["operarios"]:
                         estado_visual["operarios"][agent_id] = {}
-                    
-                    # CRÍTICO: Usar .update() para fusionar datos sin perder claves existentes
+
+                    # CRITICO: Usar .update() para fusionar datos sin perder claves existentes
                     estado_visual["operarios"][agent_id].update(event_data)
-                    
+
+                    # SONDA 2: Diagnostico de posicion de agentes
+                    if 'position' in event_data:
+                        position = event_data['position']
+                        status = event_data.get('status', 'unknown')
+                        print(f"[SONDA-AGENTE] Agent {agent_id}: position={position}, status={status}, timestamp={event_timestamp:.3f}")
+
                     # BUGFIX: Extraer WorkOrders anidadas en tour_details
                     tour_details = event_data.get('tour_details', [])
                     if tour_details:
                         # Inicializar diccionario work_orders si no existe
                         if 'work_orders' not in estado_visual:
                             estado_visual['work_orders'] = {}
-                        
+
                         # Extraer cada WorkOrder de la lista tour_details
                         for work_order in tour_details:
                             wo_id = work_order.get('id')
                             if wo_id:
                                 estado_visual['work_orders'][wo_id] = work_order.copy()
-            
+
             elif evento.get('type') == 'work_order_update':
-                # Procesar actualización de Work Order
+                # Procesar actualizacion de Work Order
                 work_order_data = evento.get('data', {})
                 work_order_id = work_order_data.get('id')
                 event_timestamp = evento.get('timestamp', 0.0)
-                
-                # AUDIT: Sonda de comparación temporal - eventos WorkOrder
+
+                # AUDIT: Sonda de comparacion temporal - eventos WorkOrder
                 import time
                 real_time = time.time()
                 status = work_order_data.get('status', 'unknown')
@@ -2555,42 +2384,31 @@ def ejecutar_modo_replay(jsonl_file_path):
                 if event_timestamp is None:
                     event_timestamp = 0.0
                 print(f"[TEMPORAL-AUDIT] WorkOrder_Update: {event_timestamp:.3f} | Playback_time: {playback_time:.3f} | WO: {work_order_id} | Status: {status}")
-                
+
                 if work_order_id:
                     # Actualizar Work Order en estado visual
                     if 'work_orders' not in estado_visual:
                         estado_visual['work_orders'] = {}
                     estado_visual['work_orders'][work_order_id] = work_order_data.copy()
-        
-        # REFACTOR: Sistema de delta updates optimizado para Dashboard de Órdenes
-        if order_dashboard_process and order_dashboard_process.is_alive() and dashboard_data_queue and dashboard_initialized:
-            try:
-                # Detectar nuevos eventos work_order_update desde el último frame
-                new_wo_events = []
-                for event_index, evento in eventos_a_procesar:
-                    if evento.get('type') == 'work_order_update' and event_index not in last_processed_wo_events:
-                        new_wo_events.append(evento)
-                        last_processed_wo_events.add(event_index)
-                
-                # Enviar deltas solo si hay nuevos eventos WorkOrder
-                if new_wo_events:
-                    delta_data = []
-                    for evento in new_wo_events:
-                        work_order_data = evento.get('data', {})
-                        if work_order_data and work_order_data.get('id'):
-                            delta_data.append(work_order_data.copy())
-                    
-                    if delta_data:
-                        delta_message = {
-                            'type': 'delta_update',
-                            'timestamp': playback_time,
-                            'data': delta_data
-                        }
-                        dashboard_data_queue.put_nowait(delta_message)
-                        print(f"[DELTA-UPDATE] Enviado {len(delta_data)} WorkOrder updates al dashboard")
-                        
-            except Exception as e:
-                print(f"[REPLAY-DASHBOARD] Error enviando deltas: {e}")
+
+                    # FEATURE: Actualizar estado continuo del dashboard
+                    dashboard_wos_state[work_order_id] = work_order_data.copy()
+                    print(f"[DASHBOARD-STATE] WO {work_order_id} actualizada: status={status}")
+
+        # CODIGO ELIMINADO: Sistema de dashboard extirpado por contaminacion Tkinter
+
+        # REFACTOR ARQUITECTONICO: Avanzar tiempo DESPUES de procesar eventos
+        # BUGFIX: Solo avanzar tiempo si el replay NO ha finalizado
+        if not replay_finalizado:
+            delta_time = reloj.get_time() / 1000.0  # Convertir ms a segundos
+            playback_time += delta_time * replay_speed
+        else:
+            print(f"[REPLAY-END] Tiempo pausado en playback_time={playback_time:.3f}s - SIMULATION_END detectado")
+
+        # SONDA 1: Diagnostico de playback_time cada 100 frames
+        frame_counter += 1
+        if frame_counter % 100 == 0:
+            print(f"[SONDA-TIEMPO] Frame {frame_counter}: playback_time={playback_time:.3f}s, speed={replay_speed:.2f}x, eventos_procesados={len(processed_event_indices)}")
         
         # Limpiar pantalla
         pantalla.fill((240, 240, 240))
@@ -2603,31 +2421,31 @@ def ejecutar_modo_replay(jsonl_file_path):
         # Renderizar agentes con posiciones actualizadas
         from visualization.original_renderer import renderizar_agentes
         if estado_visual.get("operarios"):
-            # CRÍTICO: Convertir diccionario a lista para renderizar_agentes
+            # CRITICO: Convertir diccionario a lista para renderizar_agentes
             operarios_a_renderizar = []
             for agent_id, agent_data in estado_visual["operarios"].items():
                 agente = agent_data.copy()
-                agente['id'] = agent_id  # Asegurar que el ID esté presente
+                agente['id'] = agent_id  # Asegurar que el ID este presente
                 operarios_a_renderizar.append(agente)
             
             renderizar_agentes(virtual_surface, operarios_a_renderizar, layout_manager)
         
-        # Escalar y mostrar superficie virtual del almacén
+        # Escalar y mostrar superficie virtual del almacen
         scaled_warehouse = pygame.transform.smoothscale(virtual_surface, (warehouse_width, window_height))
         pantalla.blit(scaled_warehouse, (0, 0))
         
         # Renderizar Dashboard de Agentes
         from visualization.original_renderer import renderizar_dashboard
         
-        # Preparar métricas para el dashboard - DUAL COUNTERS
-        # Contar WorkOrders completadas según contrato de renderizar_dashboard
+        # Preparar metricas para el dashboard - DUAL COUNTERS
+        # Contar WorkOrders completadas segun contrato de renderizar_dashboard
         work_orders = estado_visual.get('work_orders', {})
         workorders_completadas = sum(1 for wo in work_orders.values() if wo.get('status') == 'completed')
         
         # Contar tareas completadas procesando los eventos acumulados hasta playback_time
         tareas_completadas = 0
         for evento in eventos:
-            # BUGFIX: Validación defensiva contra timestamp None que causaba TypeError
+            # BUGFIX: Validacion defensiva contra timestamp None que causaba TypeError
             timestamp = evento.get('timestamp', 0)
             if timestamp is None:
                 timestamp = 0  # Fallback seguro
@@ -2636,13 +2454,13 @@ def ejecutar_modo_replay(jsonl_file_path):
                 if evento.get('type') == 'task_completed' or evento.get('type') == 'operation_completed':
                     tareas_completadas += 1
         
-        # BUGFIX: Usar total fijo de WorkOrders si está disponible
+        # BUGFIX: Usar total fijo de WorkOrders si esta disponible
         total_wos_a_usar = total_work_orders_fijo if total_work_orders_fijo is not None else len(work_orders)
         
         metricas = {
             'tiempo': playback_time,
             'workorders_completadas': workorders_completadas,  # KPI principal
-            'tareas_completadas': tareas_completadas,  # Métrica granular
+            'tareas_completadas': tareas_completadas,  # Metrica granular
             'total_wos': total_wos_a_usar
         }
         
@@ -2656,41 +2474,35 @@ def ejecutar_modo_replay(jsonl_file_path):
         # Renderizar dashboard en el lado derecho
         renderizar_dashboard(pantalla, warehouse_width, metricas, operarios_dashboard)
         
-        # Mostrar información de replay en la parte superior del almacén
+        # Mostrar informacion de replay en la parte superior del almacen
         font = pygame.font.Font(None, 20)
         info_text = font.render(f"REPLAY: Tiempo {playback_time:.2f}s | Velocidad: {replay_speed:.2f}x | Eventos {len(processed_event_indices)}/{len(eventos)}", True, (255, 255, 255))
         pantalla.blit(info_text, (10, 10))
         
-        # Mostrar información de controles y dashboard
-        controls_text = font.render("CONTROLES: +/- velocidad | ESC salir | O dashboard", True, (255, 255, 255))
+        # Mostrar informacion de controles y dashboard
+        controls_text = font.render("CONTROLES: +/- velocidad | O dashboard | ESC salir", True, (255, 255, 255))
         pantalla.blit(controls_text, (10, 35))
-        
-        dashboard_status = "Dashboard: ACTIVO" if (order_dashboard_process and order_dashboard_process.is_alive()) else "Dashboard: INACTIVO"
-        dashboard_text = font.render(dashboard_status, True, (0, 255, 0) if (order_dashboard_process and order_dashboard_process.is_alive()) else (128, 128, 128))
-        pantalla.blit(dashboard_text, (10, 60))
-        
+
+        # FEATURE: Dashboard nativo Pygame con adaptador de datos
+        if dashboard_visible:
+            # Convertir diccionario dashboard_wos_state a lista para renderizado
+            work_orders_list = list(dashboard_wos_state.values())
+
+            # Crear estructura de datos temporal compatible con renderizar_dashboard_ordenes_pygame
+            estado_visual_adaptado = {
+                'master_work_orders': work_orders_list
+            }
+
+            # Importar y llamar funcion de renderizado con scroll
+            from git.visualization.original_renderer import renderizar_dashboard_ordenes_pygame
+            renderizar_dashboard_ordenes_pygame(pantalla, estado_visual_adaptado, dashboard_scroll_offset)
+
+            print(f"[DASHBOARD-PYGAME] Renderizando {len(work_orders_list)} WorkOrders")
+
         pygame.display.flip()
         reloj.tick(30)  # 30 FPS
     
-    # Limpieza del Dashboard de Órdenes antes de salir
-    if order_dashboard_process and order_dashboard_process.is_alive():
-        try:
-            print("[REPLAY-DASHBOARD] Cerrando dashboard antes de salir...")
-            if dashboard_data_queue:
-                try:
-                    dashboard_data_queue.put_nowait('__EXIT_COMMAND__')
-                except:
-                    pass  # Cola llena, proceder con terminación
-            
-            order_dashboard_process.join(timeout=3)
-            
-            if order_dashboard_process.is_alive():
-                order_dashboard_process.terminate()
-                order_dashboard_process.join(timeout=1)
-            
-            print("[REPLAY-DASHBOARD] Dashboard cerrado correctamente")
-        except Exception as e:
-            print(f"[REPLAY-DASHBOARD] Error cerrando dashboard: {e}")
+    # CODIGO ELIMINADO: Limpieza de dashboard extirpada por contaminacion Tkinter
     
     pygame.quit()
     print("[REPLAY] Modo replay terminado")
@@ -2698,26 +2510,26 @@ def ejecutar_modo_replay(jsonl_file_path):
 
 
 def main():
-    """Función principal - Modo automatizado con soporte headless"""
+    """Funcion principal - Modo automatizado con soporte headless"""
     # Configurar argparse
     parser = argparse.ArgumentParser(description='Digital Twin Warehouse Simulator')
     parser.add_argument('--headless', action='store_true', 
-                       help='Ejecuta la simulación en modo headless (sin UI)')
+                       help='Ejecuta la simulacion en modo headless (sin UI)')
     parser.add_argument('--replay', type=str, metavar='FILE.jsonl',
                        help='Ejecuta en modo Replay Viewer consumiendo un archivo .jsonl')
     args = parser.parse_args()
     
     print("="*60)
     print("SIMULADOR DE ALMACEN - GEMELO DIGITAL")
-    print("Sistema de Navegación Inteligente v2.6")
+    print("Sistema de Navegacion Inteligente v2.6")
     
     if args.replay:
-        print("Modo REPLAY VIEWER - Visualización de Archivo .jsonl")
+        print("Modo REPLAY VIEWER - Visualizacion de Archivo .jsonl")
         print(f"Archivo: {args.replay}")
     elif args.headless:
-        print("Modo HEADLESS - Máxima Velocidad")
+        print("Modo HEADLESS - Maxima Velocidad")
     else:
-        print("Modo Visual - Con Interfaz Gráfica")
+        print("Modo Visual - Con Interfaz Grafica")
     print("="*60)
     print()
     
@@ -2739,11 +2551,11 @@ def main():
         print("INSTRUCCIONES:")
         print("1. Use 'python configurator.py' para crear/modificar configuraciones")
         print("2. Use 'python run_simulator.py' para modo visual")
-        print("3. Use 'python run_simulator.py --headless' para modo de máxima velocidad")
+        print("3. Use 'python run_simulator.py --headless' para modo de maxima velocidad")
         print("4. Use 'python run_simulator.py --replay archivo.jsonl' para modo replay viewer")
         print()
-        print("El simulador buscará 'config.json' en el directorio actual.")
-        print("Si no existe, usará configuración por defecto.")
+        print("El simulador buscara 'config.json' en el directorio actual.")
+        print("Si no existe, usara configuracion por defecto.")
         print()
         
         simulador = SimuladorAlmacen(headless_mode=False)

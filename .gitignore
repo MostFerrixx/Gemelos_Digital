@@ -351,3 +351,15 @@ test_replay_*.jsonl
 assets/temp/
 assets/screenshots/
 assets/debug/
+
+# Archivos temporales de auditoría de scroll (V7.0.0)
+scroll_audit_example.py
+*_scroll_*.py
+scroll_test_*.py
+dashboard_scroll_debug_*.log
+
+# Archivos temporales de análisis de eventos y flow control
+*_audit_*.py
+*_example_*.py
+pattern_test_*.py
+flow_analysis_*.txt
