@@ -363,3 +363,29 @@ dashboard_scroll_debug_*.log
 *_example_*.py
 pattern_test_*.py
 flow_analysis_*.txt
+
+# Archivos temporales de testing de pygame_gui y theming (V7.1.0)
+test_window_*.py
+debug_selection_*.py
+*_lifecycle.py
+draggable_window_*.py
+window_test_*.py
+theme_test_*.py
+ui_debug_*.py
+
+# Archivos temporales de auditoría de API y reconocimiento técnico
+*_audit_api.py
+*_patterns.py
+*_lifecycle_*.py
+*_attributes*.py
+
+# Archivos de testing temporal de botones y ordenamiento
+button_test_*.py
+sort_test_*.py
+*_sort_debug.py
+dashboard_interaction_*.py
+
+# Logs específicos de pygame_gui debugging
+pygame_gui_*.log
+ui_manager_*.log
+theme_loading_*.log

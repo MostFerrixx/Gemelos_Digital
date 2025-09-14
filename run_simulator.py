@@ -8,6 +8,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'git'))
 
 import pygame
+import pygame_gui  # REFACTOR: Libreria para ventanas manipulables
 import simpy
 import json
 import time
@@ -2107,6 +2108,28 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
     # All unused debug methods removed in final cleanup
     
 
+class DashboardWindow(pygame_gui.elements.UIWindow):
+    """
+    Clase personalizada de UIWindow que maneja correctamente el cierre del dashboard
+    """
+    def __init__(self, *args, **kwargs):
+        # Extraer referencia al estado de dashboard_visible
+        self.dashboard_visible_ref = kwargs.pop('dashboard_visible_ref', None)
+        super().__init__(*args, **kwargs)
+
+    def on_close_window_button_pressed(self):
+        """
+        Sobreescribir metodo de cierre para solo ocultar ventana (igual que tecla 'O')
+        """
+        # PASO 1: Actualizar estado de la aplicacion
+        if self.dashboard_visible_ref is not None:
+            self.dashboard_visible_ref[0] = False
+            print("[PYGAME_GUI] Dashboard ocultado por usuario con boton [X]")
+
+        # PASO 2: Solo ocultar ventana, no destruirla (comportamiento identico a tecla 'O')
+        self.hide()
+
+
 def ejecutar_modo_replay(jsonl_file_path):
     """
     Ejecuta el modo replay cargando y visualizando eventos desde un archivo .jsonl
@@ -2180,6 +2203,10 @@ def ejecutar_modo_replay(jsonl_file_path):
     pantalla = pygame.display.set_mode(window_size)
     pygame.display.set_caption("Simulador de Almacen - Modo Replay")
     reloj = pygame.time.Clock()
+
+    # REFACTOR: Inicializar pygame_gui UIManager con tema "Modo Industrial"
+    ui_manager = pygame_gui.UIManager(window_size, theme_path='dashboard_theme.json')
+    print("[PYGAME_GUI] UIManager inicializado para ventana {0}x{1} con tema Modo Industrial".format(window_width, window_height))
     
     # Cargar configuracion desde el evento SIMULATION_START
     configuracion = simulation_start_event.get('config', {}) if simulation_start_event else {}
@@ -2246,18 +2273,85 @@ def ejecutar_modo_replay(jsonl_file_path):
     print(f"[REPLAY] Motor de playback inicializado - {len(eventos)} eventos total")
     print(f"[REPLAY] Estado inicial: replay_finalizado = {replay_finalizado}")
 
-    # FEATURE: Control de visibilidad del dashboard nativo Pygame
+    # REFACTOR: Control de dashboard con pygame_gui
     dashboard_visible = False
-    dashboard_scroll_offset = 0  # FEATURE: Offset de scroll para navegacion por WorkOrders
-    print(f"[DASHBOARD-PYGAME] Dashboard nativo inicializado: visible = {dashboard_visible}")
-    print(f"[DASHBOARD-SCROLL] Scroll offset inicializado: {dashboard_scroll_offset}")
+    # Crear referencia mutable para pasar a la ventana personalizada
+    dashboard_visible_ref = [dashboard_visible]
+
+    # REFACTOR: Crear UIWindow del dashboard (inicialmente invisible)
+    dashboard_window = None
+    dashboard_selection_list = None
+
+    # FEATURE: Variables de estado para ordenamiento persistente
+    sort_column = None  # 'status', 'order', 'agent', None
+    sort_direction = 'asc'  # 'asc', 'desc'
+
+    # FEATURE: Referencias a botones de ordenamiento
+    sort_button_status = None
+    sort_button_order = None
+    sort_button_agent = None
+
+    def create_dashboard_window():
+        """Crear ventana del dashboard con pygame_gui usando clase personalizada"""
+        nonlocal dashboard_window, dashboard_selection_list, sort_button_status, sort_button_order, sort_button_agent
+
+        dashboard_window = DashboardWindow(
+            rect=pygame.Rect(100, 100, 700, 600),
+            manager=ui_manager,
+            window_display_title='Dashboard de Ordenes de Trabajo - Replay Viewer',
+            object_id='#dashboard_window',
+            dashboard_visible_ref=dashboard_visible_ref
+        )
+
+        # Lista de seleccion para WorkOrders
+        dashboard_selection_list = pygame_gui.elements.UISelectionList(
+            relative_rect=pygame.Rect(10, 10, 680, 520),  # Reducida para hacer espacio a botones
+            item_list=[],  # Inicialmente vacia
+            manager=ui_manager,
+            container=dashboard_window
+        )
+
+        # FEATURE: Botones de ordenamiento
+        sort_button_status = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect(10, 540, 100, 30),
+            text='Sort Status',
+            manager=ui_manager,
+            container=dashboard_window
+        )
+
+        sort_button_order = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect(120, 540, 100, 30),
+            text='Sort Order',
+            manager=ui_manager,
+            container=dashboard_window
+        )
+
+        sort_button_agent = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect(230, 540, 100, 30),
+            text='Sort Agent',
+            manager=ui_manager,
+            container=dashboard_window
+        )
+
+        # Ocultar ventana inicialmente
+        dashboard_window.hide()
+        print("[PYGAME_GUI] Dashboard window creada y ocultada inicialmente")
+
+    # Crear la ventana del dashboard
+    create_dashboard_window()
+
+    print("[PYGAME_GUI] Dashboard con UIWindow inicializado: visible = {0}".format(dashboard_visible))
 
     # Bucle principal de replay con motor temporal
     corriendo = True
     frame_counter = 0  # SONDA: Contador de frames para diagnostico
     while corriendo:
+        time_delta = reloj.tick(30) / 1000.0
+
         # Manejar eventos de pygame
         for event in pygame.event.get():
+            # REFACTOR: Pasar eventos a pygame_gui primero
+            ui_manager.process_events(event)
             if event.type == pygame.QUIT:
                 corriendo = False
             elif event.type == pygame.KEYDOWN:
@@ -2276,38 +2370,41 @@ def ejecutar_modo_replay(jsonl_file_path):
                         replay_speed = velocidades_permitidas[current_index - 1]
                         print(f"[REPLAY] Velocidad disminuida a {replay_speed:.2f}x")
                 elif event.key == pygame.K_o:
-                    # FEATURE: Toggle dashboard nativo Pygame
+                    # REFACTOR: Toggle dashboard pygame_gui UIWindow
                     dashboard_visible = not dashboard_visible
-                    print(f"[DASHBOARD-PYGAME] Dashboard toggled: visible = {dashboard_visible}")
+                    dashboard_visible_ref[0] = dashboard_visible  # Sincronizar referencia
+                    print("[PYGAME_GUI] Dashboard toggled: visible = {0}".format(dashboard_visible))
+
                     if dashboard_visible:
-                        dashboard_scroll_offset = 0  # Reset scroll al abrir dashboard
-                        print(f"[DASHBOARD-SCROLL] Scroll reset al abrir dashboard")
-
-            # FEATURE: Captura de eventos scroll cuando dashboard visible
-            elif event.type == pygame.MOUSEWHEEL and dashboard_visible:
-                scroll_speed = 40  # Pixels por tick de rueda del raton
-                old_offset = dashboard_scroll_offset
-                dashboard_scroll_offset -= event.y * scroll_speed
-
-                # Calcular limites dinamicos basados en contenido actual
-                work_orders_count = len(dashboard_wos_state)
-                max_visible_rows = 18  # Filas que caben en el panel del dashboard
-                row_height = 20  # Altura de cada fila en pixels
-
-                # Limite superior: 0 (no scroll negativo hacia arriba)
-                min_scroll = 0
-
-                # Limite inferior: scroll maximo necesario para ver todas las ordenes
-                if work_orders_count > max_visible_rows:
-                    max_scroll = (work_orders_count - max_visible_rows) * row_height
-                else:
-                    max_scroll = 0  # No hay necesidad de scroll si caben todas
-
-                # SEGURIDAD: Aplicar limites para evitar scroll fuera de rango
-                dashboard_scroll_offset = max(min_scroll, min(dashboard_scroll_offset, max_scroll))
-
-                # LOGGING DIAGNOSTICO para depuracion
-                print(f"[DASHBOARD-SCROLL] event.y={event.y}, offset: {old_offset} -> {dashboard_scroll_offset} (max: {max_scroll})")
+                        # Mostrar ventana
+                        dashboard_window.show()
+                    else:
+                        # Ocultar ventana
+                        dashboard_window.hide()
+                        print("[PYGAME_GUI] Dashboard ocultado")
+            elif event.type == pygame_gui.UI_BUTTON_PRESSED:
+                # FEATURE: Manejador de eventos para botones de ordenamiento
+                if event.ui_element == sort_button_status:
+                    if sort_column == 'status':
+                        sort_direction = 'desc' if sort_direction == 'asc' else 'asc'
+                    else:
+                        sort_column = 'status'
+                        sort_direction = 'asc'
+                    print(f"[DASHBOARD] Ordenamiento por Status ({sort_direction})")
+                elif event.ui_element == sort_button_order:
+                    if sort_column == 'order':
+                        sort_direction = 'desc' if sort_direction == 'asc' else 'asc'
+                    else:
+                        sort_column = 'order'
+                        sort_direction = 'asc'
+                    print(f"[DASHBOARD] Ordenamiento por Order ({sort_direction})")
+                elif event.ui_element == sort_button_agent:
+                    if sort_column == 'agent':
+                        sort_direction = 'desc' if sort_direction == 'asc' else 'asc'
+                    else:
+                        sort_column = 'agent'
+                        sort_direction = 'asc'
+                    print(f"[DASHBOARD] Ordenamiento por Agent ({sort_direction})")
         
         
         # REFACTOR ARQUITECTONICO: Procesar eventos ANTES de avanzar el tiempo
@@ -2483,24 +2580,58 @@ def ejecutar_modo_replay(jsonl_file_path):
         controls_text = font.render("CONTROLES: +/- velocidad | O dashboard | ESC salir", True, (255, 255, 255))
         pantalla.blit(controls_text, (10, 35))
 
-        # FEATURE: Dashboard nativo Pygame con adaptador de datos
+        # REFACTOR: Actualizar datos del dashboard si esta visible PRESERVANDO scroll
+        # Sincronizar estado local con referencia de la ventana
+        dashboard_visible = dashboard_visible_ref[0]
         if dashboard_visible:
-            # Convertir diccionario dashboard_wos_state a lista para renderizado
-            work_orders_list = list(dashboard_wos_state.values())
+            # PASO 1: Guardar posicion actual del scroll usando API correcta
+            current_scroll_percentage = 0.0
+            if dashboard_selection_list.scroll_bar:
+                current_scroll_percentage = dashboard_selection_list.scroll_bar.start_percentage
 
-            # Crear estructura de datos temporal compatible con renderizar_dashboard_ordenes_pygame
-            estado_visual_adaptado = {
-                'master_work_orders': work_orders_list
-            }
+            # PASO 2: Convertir dashboard_wos_state a lista de datos para ordenamiento
+            work_orders_data = []
+            for wo_id, wo_data in dashboard_wos_state.items():
+                wo_item = {
+                    'wo_id': wo_id,
+                    'status': wo_data.get('status', 'N/A'),
+                    'order_id': wo_data.get('order_id', 'N/A'),
+                    'sku_id': wo_data.get('sku_id', 'N/A'),
+                    'cantidad_restante': wo_data.get('cantidad_restante', 'N/A'),
+                    'assigned_agent_id': wo_data.get('assigned_agent_id', '-')
+                }
+                work_orders_data.append(wo_item)
 
-            # Importar y llamar funcion de renderizado con scroll
-            from git.visualization.original_renderer import renderizar_dashboard_ordenes_pygame
-            renderizar_dashboard_ordenes_pygame(pantalla, estado_visual_adaptado, dashboard_scroll_offset)
+            # PASO 3: Aplicar ordenamiento persistente basado en variables de estado
+            if sort_column == 'status':
+                work_orders_data.sort(key=lambda x: x['status'], reverse=(sort_direction == 'desc'))
+            elif sort_column == 'order':
+                work_orders_data.sort(key=lambda x: str(x['order_id']), reverse=(sort_direction == 'desc'))
+            elif sort_column == 'agent':
+                work_orders_data.sort(key=lambda x: x['assigned_agent_id'], reverse=(sort_direction == 'desc'))
+            # Si sort_column es None, mantener orden original
 
-            print(f"[DASHBOARD-PYGAME] Renderizando {len(work_orders_list)} WorkOrders")
+            # PASO 4: Convertir datos ordenados a lista de strings para UISelectionList
+            work_orders_text = []
+            for wo_item in work_orders_data:
+                wo_text = "{0} | Order: {1} | SKU: {2} | Status: {3} | Qty: {4} | Agent: {5}".format(
+                    wo_item['wo_id'][:8], str(wo_item['order_id'])[:10], str(wo_item['sku_id'])[:12],
+                    wo_item['status'][:10], str(wo_item['cantidad_restante']), str(wo_item['assigned_agent_id'])[:10]
+                )
+                work_orders_text.append(wo_text)
+
+            # PASO 5: Actualizar lista en UISelectionList
+            dashboard_selection_list.set_item_list(work_orders_text)
+
+            # PASO 6: Restaurar posicion del scroll usando API correcta
+            if dashboard_selection_list.scroll_bar:
+                dashboard_selection_list.scroll_bar.set_scroll_from_start_percentage(current_scroll_percentage)
+
+        # REFACTOR: Actualizar y renderizar pygame_gui
+        ui_manager.update(time_delta)
+        ui_manager.draw_ui(pantalla)
 
         pygame.display.flip()
-        reloj.tick(30)  # 30 FPS
     
     # CODIGO ELIMINADO: Limpieza de dashboard extirpada por contaminacion Tkinter
     
