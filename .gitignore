@@ -415,3 +415,22 @@ dashboard_native_*.log
 .qt/
 *.qmlc
 *.jsc
+
+# Archivos temporales de auditoría IPC y debugging de mapeo (V8.1.0)
+*_ipc_audit.log
+*_mapping_debug.log
+[IPC-*]*.log
+work_order_audit_*.txt
+delta_comparison_*.log
+field_mapping_*.debug
+
+# Archivos temporales de testing PyQt6 dashboard
+dashboard_test_*.py
+*_dashboard_test.py
+pyqt6_debug_*.log
+ui_testing_*.py
+
+# Archivos de configuración temporal de QSS y theming
+theme_debug_*.qss
+qss_test_*.py
+*_theme_backup.qss
