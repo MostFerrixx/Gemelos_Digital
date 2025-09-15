@@ -464,3 +464,23 @@ replay_control_test_*.py
 *_certification_v8.3.0.txt
 *_quality_assurance_*.log
 production_ready_*.log
+
+# Archivos temporales de refactoring V9.0.0 "Dominio y Control"
+*_staging_refactor*.log
+*_domain_refactor*.log
+*_staged_migration*.txt
+workorder_completed_to_staged_*.log
+ui_polish_*.log
+*_dominio_y_control*.log
+
+# Archivos de auditoría de estado WorkOrder temporal
+workorder_status_audit_*.txt
+estado_migration_*.log
+*_estado_debug.py
+status_transition_*.log
+
+# Archivos temporales de limpieza UI y eliminación redundancias
+ui_cleanup_tareas_completadas_*.log
+dashboard_polish_*.txt
+redundancy_removal_*.log
+*_ui_limpieza.log

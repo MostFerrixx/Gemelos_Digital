@@ -548,19 +548,14 @@ class SimuladorAlmacen:
         simulacion_activa = True
         self.metricas_actuales = {}  # Estado de metricas del dashboard
         
-        # [AUDIT-BACKPRESSURE] Instrumentacion del Consumidor
         eventos_procesados_total = 0
         ultimo_reporte_tiempo = time.time()
         
-        # AUDIT: Variable de control para verificacion de datos unica
         datos_verificados = False
         
         # Resetear el reloj de reproduccion
         self.playback_time = 0.0
         
-        # SONDA 3: Estado antes de iniciar el bucle principal de renderizado
-        print(f"\n=== SONDA 3: ANTES DEL BUCLE PRINCIPAL DE RENDERIZADO ===")
-        print(f"Work Orders en estado_visual: {len(estado_visual.get('work_orders', {}))}")
         for wo_id, wo_data in estado_visual.get('work_orders', {}).items():
             print(f"  WO {wo_id}: status={wo_data.get('status', 'unknown')}")
         print(f"Operarios en estado_visual: {len(estado_visual.get('operarios', {}))}")
@@ -588,10 +583,6 @@ class SimuladorAlmacen:
             # 3. LLENAR BUFFER: Recibir todos los eventos disponibles del productor
             eventos_recibidos = 0
             
-            # [AUDIT-BACKPRESSURE] Monitorear cola antes del drenado
-            queue_size_before_drain = self.visual_event_queue.qsize()
-            if queue_size_before_drain > 0:
-                print(f"[CONSUMIDOR-AUDIT] Iniciando drenado de cola. Tamano: {queue_size_before_drain}")
             
             try:
                 while True:  # Drenar la cola completamente
@@ -610,10 +601,6 @@ class SimuladorAlmacen:
                     except queue.Empty:
                         break
                 
-                # [AUDIT-BACKPRESSURE] Reportar drenado completado
-                if eventos_recibidos > 0:
-                    queue_size_after_drain = self.visual_event_queue.qsize()
-                    print(f"[CONSUMIDOR-AUDIT] Drenado completado. Eventos recibidos: {eventos_recibidos}, Cola restante: {queue_size_after_drain}")
                     
             except Exception as e:
                 print(f"[ERROR-CONSUMIDOR] Error llenando buffer: {e}")
@@ -625,13 +612,6 @@ class SimuladorAlmacen:
             eventos_procesados = 0
             eventos_procesados_este_frame = 0
             
-            # [AUDIT-BACKPRESSURE] Reportar estado periodicamente
-            tiempo_actual = time.time()
-            if tiempo_actual - ultimo_reporte_tiempo >= 2.0:  # Cada 2 segundos
-                buffer_size = len(self.event_buffer)
-                queue_size = self.visual_event_queue.qsize()
-                print(f"[CONSUMIDOR-AUDIT] Reporte periodico: Buffer: {buffer_size} eventos, Cola: {queue_size}, Procesados totales: {eventos_procesados_total}")
-                ultimo_reporte_tiempo = tiempo_actual
             while self.event_buffer and self.event_buffer[0]['timestamp'] <= self.playback_time:
                 # Sacar el primer evento del buffer
                 mensaje = self.event_buffer.pop(0)
@@ -1997,11 +1977,9 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
             archivo_excel = analytics_engine.export_to_excel(excel_filename)
             print(f"[PROCESO-SIMPY] Excel generado: {archivo_excel}")
             
-            # [AUDIT-BACKPRESSURE] Instrumentacion del Productor (simulation_completed)
             import time
             queue_size_before = visual_event_queue.qsize()
             put_start_time = time.time()
-            print(f"[PRODUCTOR-AUDIT] SIMULATION_COMPLETED: Intentando poner evento. Tamano actual de la cola: {queue_size_before}")
             
             # Enviar evento de finalizacion con informacion de archivos generados
             visual_event_queue.put({
@@ -2016,7 +1994,6 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
             put_end_time = time.time()
             put_duration_ms = (put_end_time - put_start_time) * 1000
             queue_size_after = visual_event_queue.qsize()
-            print(f"[PRODUCTOR-AUDIT] SIMULATION_COMPLETED: Evento puesto con exito. Duracion: {put_duration_ms:.2f}ms. Tamano nueva cola: {queue_size_after}")
             
         except Exception as e:
             print(f"[ERROR-PROCESO-SIMPY] Error en pipeline de analiticas: {e}")
@@ -2127,8 +2104,6 @@ def ejecutar_modo_replay(jsonl_file_path):
                             eventos.append(event)
                             if event.get('event_type') == 'SIMULATION_END':
                                 print(f"[BUGFIX] SIMULATION_END incluido en eventos: {event}")
-                            else:
-                                print(f"[AUDIT-APPEND] Evento agregado: {event.get('event_type', 'UNKNOWN')} | Total eventos: {len(eventos)}")
 
                     except json.JSONDecodeError as e:
                         print(f"[REPLAY] Error parseando linea: {e}")
@@ -2191,11 +2166,6 @@ def ejecutar_modo_replay(jsonl_file_path):
         print(f"[REPLAY] {len(initial_work_orders)} WorkOrders cargadas en estado inicial")
         print(f"[DASHBOARD-STATE] {len(dashboard_wos_state)} WorkOrders pobladas en estado continuo")
 
-        # SONDA 1: Estado despues de procesar initial_work_orders del SIMULATION_START
-        print(f"\n=== SONDA 1: DESPUES DE PROCESAR INITIAL_WORK_ORDERS ===")
-        print(f"Work Orders cargadas: {len(estado_visual['work_orders'])}")
-        for wo_id, wo_data in estado_visual["work_orders"].items():
-            print(f"  WO {wo_id}: status={wo_data.get('status', 'unknown')}")
         print("=========================================\n")
     
     # Procesar primer evento para obtener posiciones iniciales de agentes
@@ -2345,11 +2315,8 @@ def ejecutar_modo_replay(jsonl_file_path):
                 event_data = evento.get('data', {})
                 event_timestamp = evento.get('timestamp', 0.0)
 
-                # AUDIT: Sonda de comparacion temporal - eventos visuales
                 import time
                 real_time = time.time()
-                if agent_id and 'position' in event_data:  # Solo loggear eventos de movimiento
-                    print(f"[TEMPORAL-AUDIT] Visual_Agent_Movement: {event_timestamp:.3f} | Playback_time: {playback_time:.3f} | Agent: {agent_id}")
 
                 if agent_id and event_data:
                     # Inicializar agente si no existe
@@ -2359,11 +2326,9 @@ def ejecutar_modo_replay(jsonl_file_path):
                     # CRITICO: Usar .update() para fusionar datos sin perder claves existentes
                     estado_visual["operarios"][agent_id].update(event_data)
 
-                    # SONDA 2: Diagnostico de posicion de agentes
+                    # Extraer position si existe
                     if 'position' in event_data:
                         position = event_data['position']
-                        status = event_data.get('status', 'unknown')
-                        print(f"[SONDA-AGENTE] Agent {agent_id}: position={position}, status={status}, timestamp={event_timestamp:.3f}")
 
                     # BUGFIX: Extraer WorkOrders anidadas en tour_details
                     tour_details = event_data.get('tour_details', [])
@@ -2384,14 +2349,12 @@ def ejecutar_modo_replay(jsonl_file_path):
                 work_order_id = work_order_data.get('id')
                 event_timestamp = evento.get('timestamp', 0.0)
 
-                # AUDIT: Sonda de comparacion temporal - eventos WorkOrder
                 import time
                 real_time = time.time()
                 status = work_order_data.get('status', 'unknown')
                 # BUGFIX: Manejar timestamp None
                 if event_timestamp is None:
                     event_timestamp = 0.0
-                print(f"[TEMPORAL-AUDIT] WorkOrder_Update: {event_timestamp:.3f} | Playback_time: {playback_time:.3f} | WO: {work_order_id} | Status: {status}")
 
                 if work_order_id:
                     # Actualizar Work Order en estado visual
@@ -2442,7 +2405,7 @@ def ejecutar_modo_replay(jsonl_file_path):
         # Preparar metricas para el dashboard - DUAL COUNTERS
         # Contar WorkOrders completadas segun contrato de renderizar_dashboard
         work_orders = estado_visual.get('work_orders', {})
-        workorders_completadas = sum(1 for wo in work_orders.values() if wo.get('status') == 'completed')
+        workorders_completadas = sum(1 for wo in work_orders.values() if wo.get('status') == 'staged')
         
         # Contar tareas completadas procesando los eventos acumulados hasta playback_time
         tareas_completadas = 0
