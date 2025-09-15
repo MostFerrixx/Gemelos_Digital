@@ -389,3 +389,29 @@ dashboard_interaction_*.py
 pygame_gui_*.log
 ui_manager_*.log
 theme_loading_*.log
+
+# Archivos temporales de refactor PyQt6 (V8.0.0)
+pyqt6_test_*.py
+*_pyqt6_*.py
+dashboard_pyqt6_*.log
+ipc_test_*.py
+*_ipc_*.log
+qt_debug_*.log
+multiprocess_debug_*.log
+
+# Archivos de instalación y dependencias PyQt6
+PyQt6-*.whl
+*_requirements_*.txt
+venv_pyqt6/
+qt_env/
+
+# Archivos temporales de testing UI nativa
+native_ui_test_*.py
+qtableview_test_*.py
+*_ui_test.py
+dashboard_native_*.log
+
+# Cache y archivos temporales de Qt
+.qt/
+*.qmlc
+*.jsc

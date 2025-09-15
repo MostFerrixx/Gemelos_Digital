@@ -8,7 +8,6 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'git'))
 
 import pygame
-import pygame_gui  # REFACTOR: Libreria para ventanas manipulables
 import simpy
 import json
 import time
@@ -2108,26 +2107,7 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
     # All unused debug methods removed in final cleanup
     
 
-class DashboardWindow(pygame_gui.elements.UIWindow):
-    """
-    Clase personalizada de UIWindow que maneja correctamente el cierre del dashboard
-    """
-    def __init__(self, *args, **kwargs):
-        # Extraer referencia al estado de dashboard_visible
-        self.dashboard_visible_ref = kwargs.pop('dashboard_visible_ref', None)
-        super().__init__(*args, **kwargs)
-
-    def on_close_window_button_pressed(self):
-        """
-        Sobreescribir metodo de cierre para solo ocultar ventana (igual que tecla 'O')
-        """
-        # PASO 1: Actualizar estado de la aplicacion
-        if self.dashboard_visible_ref is not None:
-            self.dashboard_visible_ref[0] = False
-            print("[PYGAME_GUI] Dashboard ocultado por usuario con boton [X]")
-
-        # PASO 2: Solo ocultar ventana, no destruirla (comportamiento identico a tecla 'O')
-        self.hide()
+# REMOVIDO: DashboardWindow pygame_gui - Reemplazado por PyQt6 Dashboard
 
 
 def ejecutar_modo_replay(jsonl_file_path):
@@ -2204,9 +2184,11 @@ def ejecutar_modo_replay(jsonl_file_path):
     pygame.display.set_caption("Simulador de Almacen - Modo Replay")
     reloj = pygame.time.Clock()
 
-    # REFACTOR: Inicializar pygame_gui UIManager con tema "Modo Industrial"
-    ui_manager = pygame_gui.UIManager(window_size, theme_path='dashboard_theme.json')
-    print("[PYGAME_GUI] UIManager inicializado para ventana {0}x{1} con tema Modo Industrial".format(window_width, window_height))
+    # REFACTOR V8.0: Inicializar IPC Manager para PyQt6 Dashboard
+    from git.visualization.ipc_manager import create_ipc_manager
+    ipc_manager = create_ipc_manager()
+    dashboard_process_started = False
+    print("[IPC-MANAGER] Inicializado para comunicacion con PyQt6 Dashboard")
     
     # Cargar configuracion desde el evento SIMULATION_START
     configuracion = simulation_start_event.get('config', {}) if simulation_start_event else {}
@@ -2273,74 +2255,35 @@ def ejecutar_modo_replay(jsonl_file_path):
     print(f"[REPLAY] Motor de playback inicializado - {len(eventos)} eventos total")
     print(f"[REPLAY] Estado inicial: replay_finalizado = {replay_finalizado}")
 
-    # REFACTOR: Control de dashboard con pygame_gui
+    # REFACTOR V8.0: Control de dashboard PyQt6
     dashboard_visible = False
-    # Crear referencia mutable para pasar a la ventana personalizada
-    dashboard_visible_ref = [dashboard_visible]
 
-    # REFACTOR: Crear UIWindow del dashboard (inicialmente invisible)
-    dashboard_window = None
-    dashboard_selection_list = None
+    def start_pyqt_dashboard():
+        """Iniciar dashboard PyQt6 en proceso separado"""
+        nonlocal dashboard_process_started
+        if not dashboard_process_started:
+            success = ipc_manager.start_ui_process()
+            if success:
+                dashboard_process_started = True
+                print("[PYQT6-DASHBOARD] Proceso iniciado exitosamente")
 
-    # FEATURE: Variables de estado para ordenamiento persistente
-    sort_column = None  # 'status', 'order', 'agent', None
-    sort_direction = 'asc'  # 'asc', 'desc'
+                # Enviar metadata inicial
+                metadata = {
+                    'type': 'simulation_start',
+                    'config': configuracion,
+                    'total_work_orders': len(initial_work_orders) if initial_work_orders else 0
+                }
+                ipc_manager.send_simulation_metadata(metadata)
 
-    # FEATURE: Referencias a botones de ordenamiento
-    sort_button_status = None
-    sort_button_order = None
-    sort_button_agent = None
+                # Enviar WorkOrders iniciales
+                if initial_work_orders:
+                    ipc_manager.send_batch_work_orders(initial_work_orders)
+                    print(f"[PYQT6-DASHBOARD] {len(initial_work_orders)} WorkOrders iniciales enviadas")
+            else:
+                print("[PYQT6-DASHBOARD] Error iniciando proceso")
 
-    def create_dashboard_window():
-        """Crear ventana del dashboard con pygame_gui usando clase personalizada"""
-        nonlocal dashboard_window, dashboard_selection_list, sort_button_status, sort_button_order, sort_button_agent
-
-        dashboard_window = DashboardWindow(
-            rect=pygame.Rect(100, 100, 700, 600),
-            manager=ui_manager,
-            window_display_title='Dashboard de Ordenes de Trabajo - Replay Viewer',
-            object_id='#dashboard_window',
-            dashboard_visible_ref=dashboard_visible_ref
-        )
-
-        # Lista de seleccion para WorkOrders
-        dashboard_selection_list = pygame_gui.elements.UISelectionList(
-            relative_rect=pygame.Rect(10, 10, 680, 520),  # Reducida para hacer espacio a botones
-            item_list=[],  # Inicialmente vacia
-            manager=ui_manager,
-            container=dashboard_window
-        )
-
-        # FEATURE: Botones de ordenamiento
-        sort_button_status = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect(10, 540, 100, 30),
-            text='Sort Status',
-            manager=ui_manager,
-            container=dashboard_window
-        )
-
-        sort_button_order = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect(120, 540, 100, 30),
-            text='Sort Order',
-            manager=ui_manager,
-            container=dashboard_window
-        )
-
-        sort_button_agent = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect(230, 540, 100, 30),
-            text='Sort Agent',
-            manager=ui_manager,
-            container=dashboard_window
-        )
-
-        # Ocultar ventana inicialmente
-        dashboard_window.hide()
-        print("[PYGAME_GUI] Dashboard window creada y ocultada inicialmente")
-
-    # Crear la ventana del dashboard
-    create_dashboard_window()
-
-    print("[PYGAME_GUI] Dashboard con UIWindow inicializado: visible = {0}".format(dashboard_visible))
+    # Placeholder para inicio del dashboard PyQt6 (se inicia al presionar 'O')
+    print("[PYQT6-DASHBOARD] Dashboard listo para iniciarse (presiona 'O')")
 
     # Bucle principal de replay con motor temporal
     corriendo = True
@@ -2350,8 +2293,7 @@ def ejecutar_modo_replay(jsonl_file_path):
 
         # Manejar eventos de pygame
         for event in pygame.event.get():
-            # REFACTOR: Pasar eventos a pygame_gui primero
-            ui_manager.process_events(event)
+            # REFACTOR V8.0: Eventos para proceso principal (sin pygame_gui)
             if event.type == pygame.QUIT:
                 corriendo = False
             elif event.type == pygame.KEYDOWN:
@@ -2370,41 +2312,36 @@ def ejecutar_modo_replay(jsonl_file_path):
                         replay_speed = velocidades_permitidas[current_index - 1]
                         print(f"[REPLAY] Velocidad disminuida a {replay_speed:.2f}x")
                 elif event.key == pygame.K_o:
-                    # REFACTOR: Toggle dashboard pygame_gui UIWindow
-                    dashboard_visible = not dashboard_visible
-                    dashboard_visible_ref[0] = dashboard_visible  # Sincronizar referencia
-                    print("[PYGAME_GUI] Dashboard toggled: visible = {0}".format(dashboard_visible))
+                    # BUGFIX V8.0: Manejador PyQt6 Dashboard con gestion de procesos
+                    if ipc_manager.is_ui_process_alive():
+                        # Proceso activo - terminarlo
+                        print("[PYQT6-DASHBOARD] Cerrando dashboard...")
+                        ipc_manager.stop_ui_process()
+                        dashboard_process_started = False
+                        print("[PYQT6-DASHBOARD] Dashboard cerrado")
+                    else:
+                        # Proceso inactivo - iniciarlo
+                        print("[PYQT6-DASHBOARD] Iniciando dashboard...")
+                        success = ipc_manager.start_ui_process()
+                        if success:
+                            dashboard_process_started = True
+                            print("[PYQT6-DASHBOARD] Dashboard iniciado exitosamente")
 
-                    if dashboard_visible:
-                        # Mostrar ventana
-                        dashboard_window.show()
-                    else:
-                        # Ocultar ventana
-                        dashboard_window.hide()
-                        print("[PYGAME_GUI] Dashboard ocultado")
-            elif event.type == pygame_gui.UI_BUTTON_PRESSED:
-                # FEATURE: Manejador de eventos para botones de ordenamiento
-                if event.ui_element == sort_button_status:
-                    if sort_column == 'status':
-                        sort_direction = 'desc' if sort_direction == 'asc' else 'asc'
-                    else:
-                        sort_column = 'status'
-                        sort_direction = 'asc'
-                    print(f"[DASHBOARD] Ordenamiento por Status ({sort_direction})")
-                elif event.ui_element == sort_button_order:
-                    if sort_column == 'order':
-                        sort_direction = 'desc' if sort_direction == 'asc' else 'asc'
-                    else:
-                        sort_column = 'order'
-                        sort_direction = 'asc'
-                    print(f"[DASHBOARD] Ordenamiento por Order ({sort_direction})")
-                elif event.ui_element == sort_button_agent:
-                    if sort_column == 'agent':
-                        sort_direction = 'desc' if sort_direction == 'asc' else 'asc'
-                    else:
-                        sort_column = 'agent'
-                        sort_direction = 'asc'
-                    print(f"[DASHBOARD] Ordenamiento por Agent ({sort_direction})")
+                            # Enviar metadata inicial de simulacion
+                            metadata = {
+                                'type': 'simulation_start',
+                                'config': configuracion,
+                                'total_work_orders': len(initial_work_orders) if initial_work_orders else 0
+                            }
+                            ipc_manager.send_simulation_metadata(metadata)
+
+                            # Enviar WorkOrders iniciales si existen
+                            if initial_work_orders:
+                                sent_count = ipc_manager.send_batch_work_orders(initial_work_orders)
+                                print(f"[PYQT6-DASHBOARD] {sent_count} WorkOrders iniciales enviadas")
+                        else:
+                            print("[PYQT6-DASHBOARD] Error iniciando dashboard")
+            # REMOVIDO: pygame_gui.UI_BUTTON_PRESSED - No necesario en PyQt6
         
         
         # REFACTOR ARQUITECTONICO: Procesar eventos ANTES de avanzar el tiempo
@@ -2580,61 +2517,26 @@ def ejecutar_modo_replay(jsonl_file_path):
         controls_text = font.render("CONTROLES: +/- velocidad | O dashboard | ESC salir", True, (255, 255, 255))
         pantalla.blit(controls_text, (10, 35))
 
-        # REFACTOR: Actualizar datos del dashboard si esta visible PRESERVANDO scroll
-        # Sincronizar estado local con referencia de la ventana
-        dashboard_visible = dashboard_visible_ref[0]
-        if dashboard_visible:
-            # PASO 1: Guardar posicion actual del scroll usando API correcta
-            current_scroll_percentage = 0.0
-            if dashboard_selection_list.scroll_bar:
-                current_scroll_percentage = dashboard_selection_list.scroll_bar.start_percentage
-
-            # PASO 2: Convertir dashboard_wos_state a lista de datos para ordenamiento
-            work_orders_data = []
+        # REFACTOR V8.0: IPC communication con PyQt6 Dashboard
+        if dashboard_process_started and ipc_manager:
+            # Enviar actualizaciones de WorkOrders al dashboard PyQt6
             for wo_id, wo_data in dashboard_wos_state.items():
-                wo_item = {
-                    'wo_id': wo_id,
-                    'status': wo_data.get('status', 'N/A'),
-                    'order_id': wo_data.get('order_id', 'N/A'),
-                    'sku_id': wo_data.get('sku_id', 'N/A'),
-                    'cantidad_restante': wo_data.get('cantidad_restante', 'N/A'),
-                    'assigned_agent_id': wo_data.get('assigned_agent_id', '-')
-                }
-                work_orders_data.append(wo_item)
+                ipc_manager.send_work_order_delta(wo_data)
 
-            # PASO 3: Aplicar ordenamiento persistente basado en variables de estado
-            if sort_column == 'status':
-                work_orders_data.sort(key=lambda x: x['status'], reverse=(sort_direction == 'desc'))
-            elif sort_column == 'order':
-                work_orders_data.sort(key=lambda x: str(x['order_id']), reverse=(sort_direction == 'desc'))
-            elif sort_column == 'agent':
-                work_orders_data.sort(key=lambda x: x['assigned_agent_id'], reverse=(sort_direction == 'desc'))
-            # Si sort_column es None, mantener orden original
-
-            # PASO 4: Convertir datos ordenados a lista de strings para UISelectionList
-            work_orders_text = []
-            for wo_item in work_orders_data:
-                wo_text = "{0} | Order: {1} | SKU: {2} | Status: {3} | Qty: {4} | Agent: {5}".format(
-                    wo_item['wo_id'][:8], str(wo_item['order_id'])[:10], str(wo_item['sku_id'])[:12],
-                    wo_item['status'][:10], str(wo_item['cantidad_restante']), str(wo_item['assigned_agent_id'])[:10]
-                )
-                work_orders_text.append(wo_text)
-
-            # PASO 5: Actualizar lista en UISelectionList
-            dashboard_selection_list.set_item_list(work_orders_text)
-
-            # PASO 6: Restaurar posicion del scroll usando API correcta
-            if dashboard_selection_list.scroll_bar:
-                dashboard_selection_list.scroll_bar.set_scroll_from_start_percentage(current_scroll_percentage)
-
-        # REFACTOR: Actualizar y renderizar pygame_gui
-        ui_manager.update(time_delta)
-        ui_manager.draw_ui(pantalla)
+            # Verificar estado del proceso UI
+            if not ipc_manager.is_ui_process_alive():
+                dashboard_process_started = False
+                print("[PYQT6-DASHBOARD] Proceso terminado inesperadamente")
+        # REFACTOR V8.0: REMOVIDO - Logica de rendering pygame_gui dashboard
+        # PyQt6 dashboard maneja su propia UI independientemente
 
         pygame.display.flip()
     
-    # CODIGO ELIMINADO: Limpieza de dashboard extirpada por contaminacion Tkinter
-    
+    # REFACTOR V8.0: Cleanup PyQt6 Dashboard
+    if ipc_manager:
+        print("[CLEANUP] Deteniendo dashboard PyQt6...")
+        ipc_manager.cleanup()
+
     pygame.quit()
     print("[REPLAY] Modo replay terminado")
     return 0
