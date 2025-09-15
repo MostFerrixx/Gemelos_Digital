@@ -434,3 +434,14 @@ ui_testing_*.py
 theme_debug_*.qss
 qss_test_*.py
 *_theme_backup.qss
+
+# Archivos temporales de auditoría de progreso y datos V8.2.0
+[AUDIT-PROGRESS-*]*.log
+[AUDIT-PROGRESS]*.txt
+*_progress_audit.log
+*_data_audit.log
+
+# Logs de debugging detallados que se limpiarán en próximo ciclo
+*_debugging_*.log
+[DEBUG-*]_progress.log
+audit_progress_*.txt
