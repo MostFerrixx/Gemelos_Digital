@@ -502,11 +502,7 @@ class SimuladorAlmacen:
                     # Usar un timeout pequeno para permitir verificar la condicion de terminacion
                     self.env.run(until=self.env.now + 1.0)
                     
-                    # AUDIT: Diagnostico periodico del buffer cada 10 pasos
                     step_counter += 1
-                    if step_counter % 10 == 0:
-                        buffer_size = len(self.replay_buffer.get_events())
-                        print(f"[AUDIT-BUFFER] Paso {step_counter}: Buffer tiene {buffer_size} eventos")
                         
                 except simpy.core.EmptySchedule:
                     # No hay mas eventos programados, pero verificar si la simulacion realmente termino
@@ -1147,18 +1143,7 @@ class SimuladorAlmacen:
         if self.headless_mode:
             archivo_replay = os.path.join(output_dir, f"replay_events_{timestamp}.jsonl")
             try:
-                # AUDIT: Estado critico del buffer antes de volcado
                 eventos = self.replay_buffer.get_events()
-                buffer_size = len(eventos)
-                print(f"[AUDIT-ID] Volcando buffer con id: {id(self.replay_buffer)}")
-                print(f"[AUDIT-CRITICAL] JUSTO ANTES DE VOLCADO: Buffer contiene {buffer_size} eventos")
-                
-                # Mostrar tipos de eventos en buffer para diagnostico
-                event_types = {}
-                for event in eventos:
-                    event_type = event.get('type', 'unknown')
-                    event_types[event_type] = event_types.get(event_type, 0) + 1
-                print(f"[AUDIT-CRITICAL] Tipos de eventos: {event_types}")
                 
                 # REFACTOR: Pasar instantanea inicial capturada en t=0
                 initial_snapshot = getattr(self.almacen, 'initial_work_orders_snapshot', None)
@@ -1426,18 +1411,15 @@ class SimuladorAlmacen:
                 }
                 
                 # Enviar estado completo inicial
-                print(f"[DEBUG-SENDER] Enviando datos de WO (full_state): {len(full_state_data)} WorkOrders, primeras 2: {full_state_data[:2] if full_state_data else 'VACIO'}")
-                print(f"[DEBUG-SENDER] Enviando datos de WO: {full_state_message}")
                 self.dashboard_data_queue.put_nowait(full_state_message)
-                print(f"[COMMS-PROTOCOL] ? Estado completo inicial enviado: {len(full_state_data)} WorkOrders")
                 
                 # Inicializar cache de estado para deltas futuros
                 self.dashboard_last_state = {}
                 for work_order_data in full_state_data:
                     self.dashboard_last_state[work_order_data['id']] = work_order_data
-                
+
             except Exception as e:
-                print(f"[COMMS-PROTOCOL] ? Error enviando estado completo inicial: {e}")
+                pass
     
     def _actualizar_dashboard_ordenes(self):
         """Enviar datos actualizados al dashboard de ordenes si esta activo"""
@@ -1513,16 +1495,12 @@ class SimuladorAlmacen:
                             'data': delta_updates
                         }
                         
-                        print(f"[DEBUG-SENDER] Enviando datos de WO (delta): {len(delta_updates)} WorkOrders, primeras 2: {delta_updates[:2] if delta_updates else 'VACIO'}")
-                        print(f"[DEBUG-SENDER] Enviando datos de WO: {delta_message}")
                         self.dashboard_data_queue.put_nowait(delta_message)
-                        print(f"[COMMS-PROTOCOL] ? Delta enviado exitosamente ({len(delta_updates)} WorkOrders cambiadas)")
                     except Exception as e:
-                        print(f"[COMMS-PROTOCOL] ??  Error enviando delta: {e} (Cola posiblemente llena)")
                         pass
                 else:
                     # No hay cambios, no enviar nada
-                    print("[COMMS-PROTOCOL] ? Sin cambios - no se envian datos")
+                    pass
                 
                 # PASO 4: Actualizar estado anterior para proxima comparacion
                 self.dashboard_last_state = estado_actual
@@ -2131,11 +2109,6 @@ def ejecutar_modo_replay(jsonl_file_path):
                     try:
                         event = json.loads(line)
 
-                        # AUDIT SONDA: Estado ANTES del procesamiento del evento
-                        print(f"[AUDIT-PRE] Procesando evento: {event.get('event_type', 'UNKNOWN')}")
-                        print(f"[AUDIT-PRE] Total eventos cargados hasta ahora: {len(eventos)}")
-                        print(f"[AUDIT-PRE] simulation_start_event: {'SET' if simulation_start_event else 'NULL'}")
-                        print(f"[AUDIT-PRE] initial_work_orders count: {len(initial_work_orders)}")
 
                         if event.get('event_type') == 'SIMULATION_START':
                             simulation_start_event = event
@@ -2148,10 +2121,6 @@ def ejecutar_modo_replay(jsonl_file_path):
                                 print(f"[REPLAY] WARNING: total_work_orders no encontrado en SIMULATION_START (replay antiguo)")
                             print(f"[REPLAY] Encontrado SIMULATION_START con {len(initial_work_orders)} WorkOrders iniciales")
 
-                            # AUDIT SONDA: Estado DESPUES de procesar SIMULATION_START
-                            print(f"[AUDIT-POST-START] simulation_start_event keys: {list(simulation_start_event.keys())}")
-                            print(f"[AUDIT-POST-START] initial_work_orders count: {len(initial_work_orders)}")
-                            print(f"[AUDIT-POST-START] total_work_orders_fijo: {total_work_orders_fijo}")
 
                         else:
                             # BUGFIX: Incluir TODOS los eventos incluyendo SIMULATION_END
@@ -2248,7 +2217,7 @@ def ejecutar_modo_replay(jsonl_file_path):
     # Inicializar motor de playback
     playback_time = 0.0
     replay_speed = 1.0
-    velocidades_permitidas = [0.25, 0.5, 1.0, 2.0, 4.0, 8.0]
+    velocidades_permitidas = [0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0]
     processed_event_indices = set()  # Trackear eventos ya procesados
     replay_finalizado = False  # BUGFIX: Control de finalizacion del replay
 
@@ -2287,7 +2256,7 @@ def ejecutar_modo_replay(jsonl_file_path):
 
     # Bucle principal de replay con motor temporal
     corriendo = True
-    frame_counter = 0  # SONDA: Contador de frames para diagnostico
+    replay_pausado = False  # Control de pausa sincronizada del replay
     while corriendo:
         time_delta = reloj.tick(30) / 1000.0
 
@@ -2311,6 +2280,10 @@ def ejecutar_modo_replay(jsonl_file_path):
                     if current_index > 0:
                         replay_speed = velocidades_permitidas[current_index - 1]
                         print(f"[REPLAY] Velocidad disminuida a {replay_speed:.2f}x")
+                elif event.key == pygame.K_SPACE:
+                    # Toggle pausa sincronizada del replay
+                    replay_pausado = not replay_pausado
+                    print(f"[REPLAY] {'Pausado' if replay_pausado else 'Reanudado'}")
                 elif event.key == pygame.K_o:
                     # BUGFIX V8.0: Manejador PyQt6 Dashboard con gestion de procesos
                     if ipc_manager.is_ui_process_alive():
@@ -2345,16 +2318,17 @@ def ejecutar_modo_replay(jsonl_file_path):
         
         
         # REFACTOR ARQUITECTONICO: Procesar eventos ANTES de avanzar el tiempo
-        # Obtener lote de eventos para el tiempo actual
+        # Obtener lote de eventos para el tiempo actual (solo si no está pausado)
         eventos_a_procesar = []
-        for i, evento in enumerate(eventos):
-            if i not in processed_event_indices:
-                event_timestamp = evento.get('timestamp', 0.0)
-                # BUGFIX: Manejar timestamps None
-                if event_timestamp is None:
-                    event_timestamp = 0.0
-                if event_timestamp <= playback_time:
-                    eventos_a_procesar.append((i, evento))
+        if not replay_pausado:
+            for i, evento in enumerate(eventos):
+                if i not in processed_event_indices:
+                    event_timestamp = evento.get('timestamp', 0.0)
+                    # BUGFIX: Manejar timestamps None
+                    if event_timestamp is None:
+                        event_timestamp = 0.0
+                    if event_timestamp <= playback_time:
+                        eventos_a_procesar.append((i, evento))
 
         # Actualizar estado de agentes con eventos procesados
         for event_index, evento in eventos_a_procesar:
@@ -2432,17 +2406,11 @@ def ejecutar_modo_replay(jsonl_file_path):
         # CODIGO ELIMINADO: Sistema de dashboard extirpado por contaminacion Tkinter
 
         # REFACTOR ARQUITECTONICO: Avanzar tiempo DESPUES de procesar eventos
-        # BUGFIX: Solo avanzar tiempo si el replay NO ha finalizado
-        if not replay_finalizado:
+        # BUGFIX: Solo avanzar tiempo si el replay NO ha finalizado y NO está pausado
+        if not replay_finalizado and not replay_pausado:
             delta_time = reloj.get_time() / 1000.0  # Convertir ms a segundos
             playback_time += delta_time * replay_speed
-        else:
-            print(f"[REPLAY-END] Tiempo pausado en playback_time={playback_time:.3f}s - SIMULATION_END detectado")
 
-        # SONDA 1: Diagnostico de playback_time cada 100 frames
-        frame_counter += 1
-        if frame_counter % 100 == 0:
-            print(f"[SONDA-TIEMPO] Frame {frame_counter}: playback_time={playback_time:.3f}s, speed={replay_speed:.2f}x, eventos_procesados={len(processed_event_indices)}")
         
         # Limpiar pantalla
         pantalla.fill((240, 240, 240))
@@ -2514,11 +2482,11 @@ def ejecutar_modo_replay(jsonl_file_path):
         pantalla.blit(info_text, (10, 10))
         
         # Mostrar informacion de controles y dashboard
-        controls_text = font.render("CONTROLES: +/- velocidad | O dashboard | ESC salir", True, (255, 255, 255))
+        controls_text = font.render("CONTROLES: +/- velocidad | SPACE pausa | O dashboard | ESC salir", True, (255, 255, 255))
         pantalla.blit(controls_text, (10, 35))
 
         # REFACTOR V8.0: IPC communication con PyQt6 Dashboard
-        if dashboard_process_started and ipc_manager:
+        if dashboard_process_started and ipc_manager and not replay_pausado:
             # Enviar actualizaciones de WorkOrders al dashboard PyQt6
             for wo_id, wo_data in dashboard_wos_state.items():
                 ipc_manager.send_work_order_delta(wo_data)
