@@ -514,3 +514,20 @@ visual_mode_debug_*.txt
 *_background_*.log
 execution_*.log
 crash_debug_*.txt
+
+# Archivos temporales de limpieza de código (V9.2.2)
+*_cleanup_*.log
+*_dead_code_*.log
+*_refactor_cleanup*.txt
+*_code_removal*.log
+*_audit_cleanup*.txt
+*_tprf_cleanup*.log
+debt_cleanup_*.txt
+*_obsolete_*.py
+*_deprecated_functions*.log
+
+# Archivos de backup temporal durante limpieza de refactor
+*_pre_cleanup_backup.*
+*_refactor_backup_*.py
+*_before_cleanup.*
+cleanup_backup_*/
