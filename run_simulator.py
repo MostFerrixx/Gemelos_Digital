@@ -24,69 +24,71 @@ import logging
 
 
 
-def agregar_evento_replay(buffer, evento):
-    """Agrega un evento al bufer de replay"""
-    buffer.add_event(evento)
+# REFACTOR: Movido a core/replay_utils.py
+# def agregar_evento_replay(buffer, evento):
+#     """Agrega un evento al bufer de replay"""
+#     buffer.add_event(evento)
 
-def volcar_replay_a_archivo(buffer, archivo_salida, configuracion, almacen=None, initial_work_orders_snapshot=None):
-    """Vuelca el bufer completo a un archivo .jsonl"""
-    
-    # REFACTOR: Usar la instancia de ReplayBuffer recibida como parametro
-    eventos_a_volcar = buffer.get_events()
-    print(f"[VOLCADO-REFACTOR] Usando ReplayBuffer con {len(eventos_a_volcar)} eventos")
-    
-    # Contar eventos para volcado (logging minimo)
-    wo_events = [e for e in eventos_a_volcar if e.get('type') == 'work_order_update']
-    estado_events = [e for e in eventos_a_volcar if e.get('type') == 'estado_agente']
-    print(f"[REPLAY-EXPORT] Volcando {len(wo_events)} work_order_update + {len(estado_events)} estado_agente de {len(eventos_a_volcar)} total")
-    
-    # ELIMINADO: Sistema de respaldo artificial que causaba replay erratico
-    # Los eventos reales del headless son de alta fidelidad y ya no necesitan respaldo sintetico
-    
-    try:
-        with open(archivo_salida, 'w', encoding='utf-8') as f:
-            # Escribir metadata de la simulacion primero
-            metadata = {
-                'event_type': 'SIMULATION_START',
-                'timestamp': 0,
-                'config': configuracion,
-                'total_events_captured': len(eventos_a_volcar)
-            }
-            
-            # BUGFIX: Anadir total de WorkOrders al evento SIMULATION_START
-            if almacen and hasattr(almacen, 'dispatcher') and hasattr(almacen.dispatcher, 'work_orders_total_inicial'):
-                total_work_orders = almacen.dispatcher.work_orders_total_inicial
-                metadata['total_work_orders'] = total_work_orders
-                print(f"[REPLAY-METADATA] Anadido total_work_orders: {total_work_orders} al evento SIMULATION_START")
-            else:
-                print(f"[REPLAY-METADATA] WARNING: No se pudo obtener total de WorkOrders del almacen")
-            
-            # REFACTOR: Usar instantanea capturada en t=0 en lugar de estado al final
-            if initial_work_orders_snapshot and len(initial_work_orders_snapshot) > 0:
-                metadata['initial_work_orders'] = initial_work_orders_snapshot
-                print(f"[REPLAY-METADATA] Anadidas {len(initial_work_orders_snapshot)} initial_work_orders desde instantanea t=0")
-            else:
-                print(f"[REPLAY-METADATA] WARNING: No se recibio instantanea inicial de WorkOrders")
-            
-            f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
-            
-            # Escribir todos los eventos
-            for evento in eventos_a_volcar:
-                f.write(json.dumps(evento, ensure_ascii=False) + '\n')
-            
-            # Escribir evento final
-            final_event = {
-                'event_type': 'SIMULATION_END',
-                'timestamp': eventos_a_volcar[-1]['timestamp'] if eventos_a_volcar else 0
-            }
-            f.write(json.dumps(final_event, ensure_ascii=False) + '\n')
-            
-        print(f"[REPLAY-BUFFER] {len(eventos_a_volcar)} eventos guardados en {archivo_salida}")
-        return True
-        
-    except Exception as e:
-        print(f"[REPLAY-BUFFER] ERROR al escribir archivo: {e}")
-        return False
+# REFACTOR: Movido a core/replay_utils.py como volcar_replay_a_archivo
+# def volcar_replay_a_archivo(buffer, archivo_salida, configuracion, almacen=None, initial_work_orders_snapshot=None):
+#     """Vuelca el bufer completo a un archivo .jsonl"""
+#
+#     # REFACTOR: Usar la instancia de ReplayBuffer recibida como parametro
+#     eventos_a_volcar = buffer.get_events()
+#     print(f"[VOLCADO-REFACTOR] Usando ReplayBuffer con {len(eventos_a_volcar)} eventos")
+#
+#     # Contar eventos para volcado (logging minimo)
+#     wo_events = [e for e in eventos_a_volcar if e.get('type') == 'work_order_update']
+#     estado_events = [e for e in eventos_a_volcar if e.get('type') == 'estado_agente']
+#     print(f"[REPLAY-EXPORT] Volcando {len(wo_events)} work_order_update + {len(estado_events)} estado_agente de {len(eventos_a_volcar)} total")
+#
+#     # ELIMINADO: Sistema de respaldo artificial que causaba replay erratico
+#     # Los eventos reales del headless son de alta fidelidad y ya no necesitan respaldo sintetico
+#
+#     try:
+#         with open(archivo_salida, 'w', encoding='utf-8') as f:
+#             # Escribir metadata de la simulacion primero
+#             metadata = {
+#                 'event_type': 'SIMULATION_START',
+#                 'timestamp': 0,
+#                 'config': configuracion,
+#                 'total_events_captured': len(eventos_a_volcar)
+#             }
+#
+#             # BUGFIX: Anadir total de WorkOrders al evento SIMULATION_START
+#             if almacen and hasattr(almacen, 'dispatcher') and hasattr(almacen.dispatcher, 'work_orders_total_inicial'):
+#                 total_work_orders = almacen.dispatcher.work_orders_total_inicial
+#                 metadata['total_work_orders'] = total_work_orders
+#                 print(f"[REPLAY-METADATA] Anadido total_work_orders: {total_work_orders} al evento SIMULATION_START")
+#             else:
+#                 print(f"[REPLAY-METADATA] WARNING: No se pudo obtener total de WorkOrders del almacen")
+#
+#             # REFACTOR: Usar instantanea capturada en t=0 en lugar de estado al final
+#             if initial_work_orders_snapshot and len(initial_work_orders_snapshot) > 0:
+#                 metadata['initial_work_orders'] = initial_work_orders_snapshot
+#                 print(f"[REPLAY-METADATA] Anadidas {len(initial_work_orders_snapshot)} initial_work_orders desde instantanea t=0")
+#             else:
+#                 print(f"[REPLAY-METADATA] WARNING: No se recibio instantanea inicial de WorkOrders")
+#
+#             f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
+#
+#             # Escribir todos los eventos
+#             for evento in eventos_a_volcar:
+#                 f.write(json.dumps(evento, ensure_ascii=False) + '\n')
+#
+#             # Escribir evento final
+#             final_event = {
+#                 'event_type': 'SIMULATION_END',
+#                 'timestamp': eventos_a_volcar[-1]['timestamp'] if eventos_a_volcar else 0
+#             }
+#             f.write(json.dumps(final_event, ensure_ascii=False) + '\n')
+#
+#         print(f"[REPLAY-BUFFER] {len(eventos_a_volcar)} eventos guardados en {archivo_salida}")
+#         return True
+#
+#     except Exception as e:
+#         print(f"[REPLAY-BUFFER] ERROR al escribir archivo: {e}")
+#         return False
 
 # Importaciones de modulos propios
 from config.settings import *
@@ -107,6 +109,8 @@ from utils.helpers import exportar_metricas, mostrar_metricas_consola
 from config.settings import SUPPORTED_RESOLUTIONS, LOGICAL_WIDTH, LOGICAL_HEIGHT
 # from dynamic_pathfinding_integration import get_dynamic_pathfinding_wrapper  # Eliminado en limpieza
 from simulation_buffer import ReplayBuffer
+from core.replay_utils import agregar_evento_replay, volcar_replay_a_archivo
+from core.config_utils import get_default_config, mostrar_resumen_config
 
 class SimuladorAlmacen:
     """Clase principal que coordina toda la simulacion"""
@@ -196,82 +200,84 @@ class SimuladorAlmacen:
                 print("[CONFIG] Configuracion cargada exitosamente desde archivo JSON")
             else:
                 print("[CONFIG] config.json no encontrado, usando configuracion por defecto")
-                self.configuracion = self._get_default_config()
+                self.configuracion = get_default_config()
                 print("[CONFIG] Configuracion por defecto cargada")
             
             # Nota: cost_calculator se creara despues de inicializar data_manager
             
             # Mostrar resumen de configuracion cargada
-            self._mostrar_resumen_config()
+            mostrar_resumen_config(self.configuracion)
             
             return True
             
         except json.JSONDecodeError as e:
             print(f"[CONFIG ERROR] Error al parsear config.json: {e}")
             print("[CONFIG] Usando configuracion por defecto como fallback")
-            self.configuracion = self._get_default_config()
+            self.configuracion = get_default_config()
             return True
             
         except Exception as e:
             print(f"[CONFIG ERROR] Error inesperado cargando configuracion: {e}")
             print("[CONFIG] Usando configuracion por defecto como fallback")
-            self.configuracion = self._get_default_config()
+            self.configuracion = get_default_config()
             return True
     
-    def _get_default_config(self) -> dict:
-        """Retorna la configuracion por defecto hardcodeada"""
-        return {
-            # Configuracion de tareas de picking
-            'total_ordenes': 300,
-            'distribucion_tipos': {
-                'pequeno': {'porcentaje': 60, 'volumen': 5},
-                'mediano': {'porcentaje': 30, 'volumen': 25},
-                'grande': {'porcentaje': 10, 'volumen': 80}
-            },
-            'capacidad_carro': 150,
-            
-            # Configuracion de estrategias
-            'strategy': 'Zoning and Snake',
-            'dispatch_strategy': 'Ejecucion de Plan (Filtro por Prioridad)',
-            
-            # Configuracion de layout
-            'layout_file': 'layouts/WH1.tmx',
-            'sequence_file': 'layouts/Warehouse_Logic.xlsx',
-            
-            # Configuracion de ventana
-            'selected_resolution_key': 'Pequena (800x800)',
-            
-            # Configuracion de operarios
-            'num_operarios_terrestres': 1,
-            'num_montacargas': 1,
-            'num_operarios_total': 2,
-            'capacidad_montacargas': 1000,
-            
-            # Configuracion de asignacion de recursos
-            'assignment_rules': {
-                "GroundOperator": {1: 1},
-                "Forklift": {1: 2, 2: 1, 3: 1, 4: 1, 5: 1}
-            },
-            
-            # Compatibilidad con codigo existente
-            'tareas_zona_a': 0,
-            'tareas_zona_b': 0,
-            'num_operarios': 2
-        }
+    # REFACTOR: Movido a core/config_utils.py como get_default_config
+    # def _get_default_config(self) -> dict:
+    #     """Retorna la configuracion por defecto hardcodeada"""
+    #     return {
+    #         # Configuracion de tareas de picking
+    #         'total_ordenes': 300,
+    #         'distribucion_tipos': {
+    #             'pequeno': {'porcentaje': 60, 'volumen': 5},
+    #             'mediano': {'porcentaje': 30, 'volumen': 25},
+    #             'grande': {'porcentaje': 10, 'volumen': 80}
+    #         },
+    #         'capacidad_carro': 150,
+    #
+    #         # Configuracion de estrategias
+    #         'strategy': 'Zoning and Snake',
+    #         'dispatch_strategy': 'Ejecucion de Plan (Filtro por Prioridad)',
+    #
+    #         # Configuracion de layout
+    #         'layout_file': 'layouts/WH1.tmx',
+    #         'sequence_file': 'layouts/Warehouse_Logic.xlsx',
+    #
+    #         # Configuracion de ventana
+    #         'selected_resolution_key': 'Pequena (800x800)',
+    #
+    #         # Configuracion de operarios
+    #         'num_operarios_terrestres': 1,
+    #         'num_montacargas': 1,
+    #         'num_operarios_total': 2,
+    #         'capacidad_montacargas': 1000,
+    #
+    #         # Configuracion de asignacion de recursos
+    #         'assignment_rules': {
+    #             "GroundOperator": {1: 1},
+    #             "Forklift": {1: 2, 2: 1, 3: 1, 4: 1, 5: 1}
+    #         },
+    #
+    #         # Compatibilidad con codigo existente
+    #         'tareas_zona_a': 0,
+    #         'tareas_zona_b': 0,
+    #         'num_operarios': 2
+    #     }
     
-    def _mostrar_resumen_config(self):
-        """Muestra un resumen de la configuracion cargada"""
-        config = self.configuracion
-        print("\n" + "="*50)
-        print("CONFIGURACION DE SIMULACION CARGADA")
-        print("="*50)
-        print(f"Total de ordenes: {config.get('total_ordenes', 'N/A')}")
-        print(f"Operarios terrestres: {config.get('num_operarios_terrestres', 'N/A')}")
-        print(f"Montacargas: {config.get('num_montacargas', 'N/A')}")
-        print(f"Estrategia de despacho: {config.get('dispatch_strategy', 'N/A')}")
-        print(f"Layout: {config.get('layout_file', 'N/A')}")
-        print(f"Secuencia: {config.get('sequence_file', 'N/A')}")
-        print("="*50 + "\n")
+    # REFACTOR: Movido a core/config_utils.py como mostrar_resumen_config
+    # def _mostrar_resumen_config(self):
+    #     """Muestra un resumen de la configuracion cargada"""
+    #     config = self.configuracion
+    #     print("\n" + "="*50)
+    #     print("CONFIGURACION DE SIMULACION CARGADA")
+    #     print("="*50)
+    #     print(f"Total de ordenes: {config.get('total_ordenes', 'N/A')}")
+    #     print(f"Operarios terrestres: {config.get('num_operarios_terrestres', 'N/A')}")
+    #     print(f"Montacargas: {config.get('num_montacargas', 'N/A')}")
+    #     print(f"Estrategia de despacho: {config.get('dispatch_strategy', 'N/A')}")
+    #     print(f"Layout: {config.get('layout_file', 'N/A')}")
+    #     print(f"Secuencia: {config.get('sequence_file', 'N/A')}")
+    #     print("="*50 + "\n")
     
     def crear_simulacion(self):
         """Crea una nueva simulacion"""
