@@ -484,3 +484,11 @@ ui_cleanup_tareas_completadas_*.log
 dashboard_polish_*.txt
 redundancy_removal_*.log
 *_ui_limpieza.log
+
+# Archivos temporales de refactoring modular (V9.2.0)
+*_refactor_temp.py
+*_entry_point_*.log
+main_test_*.py
+*_modular_*.log
+entry_point_audit_*.txt
+*_architectural_*.log
