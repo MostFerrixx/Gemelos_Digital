@@ -492,3 +492,25 @@ main_test_*.py
 *_modular_*.log
 entry_point_audit_*.txt
 *_architectural_*.log
+
+# Archivos temporales de debugging renderer (V9.2.1)
+*_render_debug*.log
+*_renderer_audit*.txt
+*_visual_debug*.py
+*_tprf_*.log
+renderer_test_*.py
+*_renderizar_*.debug
+*_missing_args_*.log
+*_parameter_fix*.txt
+
+# Archivos temporales de debugging pygame y rendering
+pygame_debug_*.log
+surface_debug_*.log
+rendering_test_*.py
+*_pygame_crash*.log
+visual_mode_debug_*.txt
+
+# Archivos adicionales de logs de ejecucion en background
+*_background_*.log
+execution_*.log
+crash_debug_*.txt

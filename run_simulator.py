@@ -473,8 +473,13 @@ class SimuladorAlmacen:
             if hasattr(self, 'layout_manager') and self.layout_manager:
                 self.renderer.renderizar_mapa_tmx(self.virtual_surface, self.layout_manager.tmx_data)
                 from visualization.original_renderer import renderizar_tareas_pendientes
-                renderizar_tareas_pendientes(self.virtual_surface, self.layout_manager)
-            renderizar_agentes(self.virtual_surface)
+                # Obtener lista de tareas pendientes del dispatcher
+                tareas_pendientes = self.almacen.dispatcher.lista_maestra_work_orders if (self.almacen and self.almacen.dispatcher) else []
+                renderizar_tareas_pendientes(self.virtual_surface, tareas_pendientes, self.layout_manager)
+            # Obtener lista de agentes para renderizar desde estado visual
+            from visualization.state import estado_visual
+            agentes_para_renderizar = list(estado_visual.get('operarios', {}).values())
+            renderizar_agentes(self.virtual_surface, agentes_para_renderizar, self.layout_manager)
 
             # 5. Escalar la superficie virtual al area de simulacion en la pantalla
             scaled_surface = pygame.transform.smoothscale(self.virtual_surface, self.window_size)
@@ -683,8 +688,13 @@ class SimuladorAlmacen:
                 self.virtual_surface.fill((25, 25, 25))
                 if hasattr(self, 'layout_manager') and self.layout_manager:
                     self.renderer.renderizar_mapa_tmx(self.virtual_surface, self.layout_manager.tmx_data)
-                    renderizar_tareas_pendientes(self.virtual_surface, self.layout_manager)
-                renderizar_agentes(self.virtual_surface)
+                    # Obtener lista de tareas pendientes del dispatcher
+                    tareas_pendientes = self.almacen.dispatcher.lista_maestra_work_orders if (self.almacen and self.almacen.dispatcher) else []
+                    renderizar_tareas_pendientes(self.virtual_surface, tareas_pendientes, self.layout_manager)
+                # Obtener lista de agentes para renderizar desde estado visual
+                from visualization.state import estado_visual
+                agentes_para_renderizar = list(estado_visual.get('operarios', {}).values())
+                renderizar_agentes(self.virtual_surface, agentes_para_renderizar, self.layout_manager)
 
                 # Escalar la superficie virtual al area de simulacion en la pantalla
                 scaled_surface = pygame.transform.smoothscale(self.virtual_surface, self.window_size)

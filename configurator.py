@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Configurador del Simulador de Almacén - Separación de configuración y ejecución.
-Interfaz gráfica independiente para configurar parámetros de simulación.
+Configurador del Simulador de Almacen - Separacion de configuracion y ejecucion.
+Interfaz grafica independiente para configurar parametros de simulacion.
 """
 
 import sys
@@ -10,7 +10,7 @@ import json
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
-# Añadir path al git submodule
+# Anadir path al git submodule
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'git'))
 
 from config.window_config import VentanaConfiguracion
@@ -20,7 +20,7 @@ class ConfiguradorSimulador:
     
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("Configurador de Simulación - Gemelo Digital")
+        self.root.title("Configurador de Simulacion - Gemelo Digital")
         self.root.geometry("650x550")
         self.root.resizable(True, True)
         
@@ -29,11 +29,12 @@ class ConfiguradorSimulador:
         
         # Crear el configurador principal pasando la ventana raíz
         self.ventana_config = VentanaConfiguracion(self.root)
-        
+
         # Los botones ahora se manejan directamente en window_config.py
-        
-        # Intentar cargar configuración existente al inicio
-        self._cargar_configuracion_existente()
+
+        # CORRECCION: Diferir carga hasta que UI este completamente lista
+        # Usar after() para evitar dependencias circulares durante inicializacion
+        self.root.after(100, self._cargar_configuracion_existente)
         
         print("[CONFIGURATOR] Configurador independiente inicializado")
     
