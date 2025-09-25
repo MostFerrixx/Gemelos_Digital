@@ -45,15 +45,29 @@ from visualization.original_dashboard import DashboardOriginal
 from utils.helpers import exportar_metricas, mostrar_metricas_consola
 from config.settings import SUPPORTED_RESOLUTIONS, LOGICAL_WIDTH, LOGICAL_HEIGHT
 # from dynamic_pathfinding_integration import get_dynamic_pathfinding_wrapper  # Eliminado en limpieza
-# ELIMINATED: from simulation_buffer import ReplayBuffer - No replay buffer needed for live simulation
-# ELIMINATED: from core.replay_utils import agregar_evento_replay, volcar_replay_a_archivo - No replay utilities needed
+# RESTORED: Replay system components for .jsonl generation
+from simulation_buffer import ReplayBuffer
+from core.replay_utils import agregar_evento_replay, volcar_replay_a_archivo
+# REFACTOR: ConfigurationManager replaces cargar_configuracion logic
+from core.config_manager import ConfigurationManager, ConfigurationError
 from core.config_utils import get_default_config, mostrar_resumen_config
 
 class SimulationEngine:
     """Motor puro de simulacion - Solo capacidades live (visual y headless)"""
     
     def __init__(self, headless_mode=False):
-        self.configuracion = None
+        # REFACTOR: ConfigurationManager integration
+        try:
+            self.config_manager = ConfigurationManager()
+            self.config_manager.validate_configuration()  # Validar configuracion cargada
+            self.configuracion = self.config_manager.configuration
+            print("[SIMULATION-ENGINE] ConfigurationManager integrado exitosamente")
+        except ConfigurationError as e:
+            print(f"[SIMULATION-ENGINE ERROR] Error en configuracion: {e}")
+            # Fallback: usar configuracion por defecto
+            self.config_manager = None
+            self.configuracion = get_default_config()
+            print("[SIMULATION-ENGINE] Fallback: Usando configuracion por defecto")
         self.almacen = None
         self.env = None
         self.pantalla = None
@@ -63,8 +77,8 @@ class SimulationEngine:
         self.corriendo = True
         self.headless_mode = headless_mode  # Nuevo: modo headless
 
-        # ELIMINATED: ReplayBuffer instance - No replay capabilities needed for live simulation
-        # ELIMINATED: self.replay_buffer = ReplayBuffer() - Pure simulation doesn't need replay buffer
+        # RESTORED: ReplayBuffer instance for .jsonl generation
+        self.replay_buffer = ReplayBuffer()
         self.order_dashboard_process = None  # Proceso del dashboard de ordenes
         # REFACTOR: Infraestructura de multiproceso para SimPy Productor
         self.visual_event_queue = None       # Cola de eventos visuales
@@ -114,48 +128,66 @@ class SimulationEngine:
         self.renderer = RendererOriginal(self.virtual_surface)
         self.dashboard = DashboardOriginal()
     
+    # REFACTOR: Method replaced by ConfigurationManager integration in __init__
+    # Original method preserved below (commented out) for reference
     def cargar_configuracion(self):
-        """Carga la configuracion desde config.json o usa defaults hardcodeados"""
-        config_path = os.path.join(os.path.dirname(__file__), "config.json")
-        
-        try:
-            # Intentar cargar config.json
-            if os.path.exists(config_path):
-                print(f"[CONFIG] Cargando configuracion desde: {config_path}")
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    self.configuracion = json.load(f)
-                
-                # Sanitizar assignment_rules: convertir claves str a int
-                if 'assignment_rules' in self.configuracion and self.configuracion['assignment_rules']:
-                    sanitized_rules = {}
-                    for agent_type, rules in self.configuracion['assignment_rules'].items():
-                        sanitized_rules[agent_type] = {int(k): v for k, v in rules.items()}
-                    self.configuracion['assignment_rules'] = sanitized_rules
-                
-                print("[CONFIG] Configuracion cargada exitosamente desde archivo JSON")
-            else:
-                print("[CONFIG] config.json no encontrado, usando configuracion por defecto")
-                self.configuracion = get_default_config()
-                print("[CONFIG] Configuracion por defecto cargada")
-            
-            # Nota: cost_calculator se creara despues de inicializar data_manager
-            
-            # Mostrar resumen de configuracion cargada
-            mostrar_resumen_config(self.configuracion)
-            
-            return True
-            
-        except json.JSONDecodeError as e:
-            print(f"[CONFIG ERROR] Error al parsear config.json: {e}")
-            print("[CONFIG] Usando configuracion por defecto como fallback")
-            self.configuracion = get_default_config()
-            return True
-            
-        except Exception as e:
-            print(f"[CONFIG ERROR] Error inesperado cargando configuracion: {e}")
-            print("[CONFIG] Usando configuracion por defecto como fallback")
-            self.configuracion = get_default_config()
-            return True
+        """
+        ORIGINAL METHOD - Now handled by ConfigurationManager in __init__
+
+        Carga la configuracion desde config.json o usa defaults hardcodeados
+
+        MIGRATION NOTE: This method has been replaced by ConfigurationManager
+        integration in __init__(). Configuration is now loaded automatically
+        during SimulationEngine instantiation with robust error handling.
+
+        Original functionality moved to:
+        - core.config_manager.ConfigurationManager._load_configuration()
+        - core.config_manager.ConfigurationManager._sanitize_assignment_rules()
+        """
+        # COMMENTED OUT - Original implementation preserved for reference
+        # config_path = os.path.join(os.path.dirname(__file__), "config.json")
+        #
+        # try:
+        #     # Intentar cargar config.json
+        #     if os.path.exists(config_path):
+        #         print(f"[CONFIG] Cargando configuracion desde: {config_path}")
+        #         with open(config_path, 'r', encoding='utf-8') as f:
+        #             self.configuracion = json.load(f)
+        #
+        #         # Sanitizar assignment_rules: convertir claves str a int
+        #         if 'assignment_rules' in self.configuracion and self.configuracion['assignment_rules']:
+        #             sanitized_rules = {}
+        #             for agent_type, rules in self.configuracion['assignment_rules'].items():
+        #                 sanitized_rules[agent_type] = {int(k): v for k, v in rules.items()}
+        #             self.configuracion['assignment_rules'] = sanitized_rules
+        #
+        #         print("[CONFIG] Configuracion cargada exitosamente desde archivo JSON")
+        #     else:
+        #         print("[CONFIG] config.json no encontrado, usando configuracion por defecto")
+        #         self.configuracion = get_default_config()
+        #         print("[CONFIG] Configuracion por defecto cargada")
+        #
+        #     # Nota: cost_calculator se creara despues de inicializar data_manager
+        #
+        #     # Mostrar resumen de configuracion cargada
+        #     mostrar_resumen_config(self.configuracion)
+        #
+        #     return True
+        #
+        # except json.JSONDecodeError as e:
+        #     print(f"[CONFIG ERROR] Error al parsear config.json: {e}")
+        #     print("[CONFIG] Usando configuracion por defecto como fallback")
+        #     self.configuracion = get_default_config()
+        #     return True
+        #
+        # except Exception as e:
+        #     print(f"[CONFIG ERROR] Error inesperado cargando configuracion: {e}")
+        #     print("[CONFIG] Usando configuracion por defecto como fallback")
+        #     self.configuracion = get_default_config()
+        #     return True
+
+        # NEW IMPLEMENTATION: Return success since config is loaded in __init__
+        return True
     
     
     
@@ -256,7 +288,13 @@ class SimulationEngine:
         # Inicializar el almacen y crear ordenes
         self.almacen._crear_catalogo_y_stock()
         self.almacen._generar_flujo_ordenes()
-        
+
+        # RESTORED: Capture initial WorkOrders snapshot for replay
+        if hasattr(self.almacen, 'dispatcher') and hasattr(self.almacen.dispatcher, 'lista_maestra_work_orders'):
+            initial_snapshot = [wo.to_dict() for wo in self.almacen.dispatcher.lista_maestra_work_orders]
+            self.almacen.dispatcher.initial_work_orders_snapshot = initial_snapshot
+            print(f"[REPLAY] Initial WorkOrders snapshot captured: {len(initial_snapshot)} items")
+
         # Iniciar proceso del dispatcher V2.6 (CORREGIDO)
         if hasattr(self.almacen, 'dispatcher') and hasattr(self.almacen.dispatcher, 'dispatcher_process'):
             print("[SIMULADOR] Iniciando el proceso del Dispatcher V2.6...")
@@ -963,19 +1001,17 @@ class SimulationEngine:
         print("\n" + "="*70)
         print("SIMULACION COMPLETADA - INICIANDO PIPELINE DE ANALITICAS")
         print("="*70)
-        
+
         if not self.almacen:
             print("Error: No hay datos del almacen para procesar")
             return
-        
+
         # Mostrar metricas basicas
         mostrar_metricas_consola(self.almacen)
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Crear estructura de directorios organizados
-        output_base_dir = "output"
-        output_dir = os.path.join(output_base_dir, f"simulation_{timestamp}")
+
+        # UNIFIED: Use session timestamp instead of generating new one
+        timestamp = getattr(self, 'session_timestamp', datetime.now().strftime("%Y%m%d_%H%M%S"))
+        output_dir = getattr(self, 'session_output_dir', os.path.join("output", f"simulation_{timestamp}"))
         
         try:
             os.makedirs(output_dir, exist_ok=True)
@@ -1542,11 +1578,17 @@ class SimulationEngine:
     def ejecutar(self):
         """Metodo principal de ejecucion - Modo automatizado sin UI"""
         try:
+            # UNIFIED: Generate single timestamp for entire simulation session
+            self.session_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            self.session_output_dir = os.path.join("output", f"simulation_{self.session_timestamp}")
+            print(f"[SIMULATOR] Session timestamp: {self.session_timestamp}")
+
             # NUEVO ORDEN: Configuracion JSON -> TMX -> Pygame -> Simulacion
             print("[SIMULATOR] Iniciando en modo automatizado (sin UI de configuracion)")
             
-            if not self.cargar_configuracion():
-                print("Error al cargar configuracion. Saliendo...")
+            # REFACTOR: Configuration now loaded in __init__ via ConfigurationManager
+            if not self.configuracion:
+                print("Error: Configuracion no disponible. Saliendo...")
                 return
             
             if not self.crear_simulacion():
@@ -1586,7 +1628,16 @@ class SimulationEngine:
                 
                 # 5. Ejecutar bucle de visualizacion principal
                 self.ejecutar_bucle_principal()
-            
+
+            # UNIFIED: Use session timestamp and directory for replay file
+            # RESTORED: Generate replay file after simulation completion
+            if self.replay_buffer and len(self.replay_buffer) > 0:
+                os.makedirs(self.session_output_dir, exist_ok=True)
+                output_file = os.path.join(self.session_output_dir, f"replay_{self.session_timestamp}.jsonl")
+                print(f"[REPLAY] Generating replay file: {output_file}")
+                initial_snapshot = getattr(self.almacen.dispatcher, 'initial_work_orders_snapshot', []) if hasattr(self, 'almacen') and self.almacen else []
+                volcar_replay_a_archivo(self.replay_buffer, output_file, self.configuracion, self.almacen, initial_snapshot)
+
         except KeyboardInterrupt:
             print("\nInterrupcion del usuario. Saliendo...")
         except Exception as e:

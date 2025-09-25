@@ -531,3 +531,13 @@ debt_cleanup_*.txt
 *_refactor_backup_*.py
 *_before_cleanup.*
 cleanup_backup_*/
+
+# Archivos temporales de testing y desarrollo V10.0.1 - Replay restoration
+*_replay_restoration_*.log
+*_pipeline_test_*.jsonl
+*_bifurcation_*.log
+*_timestamp_debug_*.log
+*_unified_directory_*.log
+test_replay_pipeline_*.py
+replay_bugfix_*.log
+*_v10_testing_*.py
