@@ -51,6 +51,42 @@ from core.replay_utils import agregar_evento_replay, volcar_replay_a_archivo
 # REFACTOR: ConfigurationManager replaces cargar_configuracion logic
 from core.config_manager import ConfigurationManager, ConfigurationError
 from core.config_utils import get_default_config, mostrar_resumen_config
+# REFACTOR: DiagnosticTools extraction - Import diagnostics function
+def _import_diagnostic_tools():
+    """Import diagnostic tools with fallback mechanism"""
+    try:
+        import sys
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        if current_dir not in sys.path:
+            sys.path.insert(0, current_dir)
+        from utils.diagnostic_tools import diagnosticar_route_calculator as diag_func
+        return diag_func
+    except ImportError:
+        # Fallback: define inline diagnostic function
+        def diagnosticar_route_calculator_inline(almacen):
+            """Metodo de diagnostico para el RouteCalculator V2.6 (fallback)"""
+            print("\n--- DIAGNOSTICO DEL CALCULADOR DE RUTAS V2.6 ---")
+            if not almacen or not almacen.dispatcher:
+                print("El almacen o el dispatcher no estan listos.")
+                return
+            start_pos = almacen.data_manager.outbound_staging_locations[1]
+            print(f"Punto de partida para el diagnostico: Depot en {start_pos}")
+            if hasattr(almacen.dispatcher, 'lista_maestra_work_orders') and almacen.dispatcher.lista_maestra_work_orders:
+                total_work_orders = len(almacen.dispatcher.lista_maestra_work_orders)
+                sample_size = min(10, total_work_orders)
+                print(f"Analizando {sample_size} WorkOrders de {total_work_orders} en la lista maestra...")
+                for i in range(sample_size):
+                    work_order = almacen.dispatcher.lista_maestra_work_orders[i]
+                    print(f"  WorkOrder {i+1}: Seq {work_order.pick_sequence}, SKU {work_order.sku.id}, Pos {work_order.ubicacion}")
+            else:
+                print("No hay tareas en la lista maestra para diagnosticar")
+            print("V2.6: RouteCalculator integrado con DataManager y AssignmentCostCalculator")
+            print("-------------------------------------------\n")
+        return diagnosticar_route_calculator_inline
+
+# Initialize diagnostic function
+diagnosticar_route_calculator = _import_diagnostic_tools()
 
 class SimulationEngine:
     """Motor puro de simulacion - Solo capacidades live (visual y headless)"""
@@ -268,8 +304,8 @@ class SimulationEngine:
         
         inicializar_estado(self.almacen, self.env, self.configuracion, layout_manager=self.layout_manager)
         
-        # Diagnostico del RouteCalculator
-        self._diagnosticar_route_calculator()
+        # REFACTOR: Diagnostico del RouteCalculator usando herramienta extraida
+        diagnosticar_route_calculator(self.almacen)
         
         self.procesos_operarios, self.operarios = crear_operarios(
             self.env,
@@ -1549,31 +1585,32 @@ class SimulationEngine:
         
         print(f"[VISUAL-STATE] Estado visual inicializado para {len(estado_visual['operarios'])} agentes reales")
     
-    def _diagnosticar_route_calculator(self):
-        """Metodo de diagnostico para el RouteCalculator V2.6"""
-        print("\n--- DIAGNOSTICO DEL CALCULADOR DE RUTAS V2.6 ---")
-        if not self.almacen or not self.almacen.dispatcher:
-            print("El almacen o el dispatcher no estan listos.")
-            return
-
-        # Tomar la posicion inicial del primer depot como punto de partida
-        start_pos = self.almacen.data_manager.outbound_staging_locations[1]
-        print(f"Punto de partida para el diagnostico: Depot en {start_pos}")
-
-        # V2.6: Analizar tareas de la lista maestra en lugar de lineas pendientes
-        if hasattr(self.almacen.dispatcher, 'lista_maestra_work_orders') and self.almacen.dispatcher.lista_maestra_work_orders:
-            total_work_orders = len(self.almacen.dispatcher.lista_maestra_work_orders)
-            sample_size = min(10, total_work_orders)
-            print(f"Analizando {sample_size} WorkOrders de {total_work_orders} en la lista maestra...")
-            
-            for i in range(sample_size):
-                work_order = self.almacen.dispatcher.lista_maestra_work_orders[i]
-                print(f"  WorkOrder {i+1}: Seq {work_order.pick_sequence}, SKU {work_order.sku.id}, Pos {work_order.ubicacion}")
-        else:
-            print("No hay tareas en la lista maestra para diagnosticar")
-        
-        print("V2.6: RouteCalculator integrado con DataManager y AssignmentCostCalculator")
-        print("-------------------------------------------\n")
+    # REFACTOR: Method extracted to utils/diagnostic_tools.py
+    # def _diagnosticar_route_calculator(self):
+    #     """Metodo de diagnostico para el RouteCalculator V2.6"""
+    #     print("\n--- DIAGNOSTICO DEL CALCULADOR DE RUTAS V2.6 ---")
+    #     if not self.almacen or not self.almacen.dispatcher:
+    #         print("El almacen o el dispatcher no estan listos.")
+    #         return
+    #
+    #     # Tomar la posicion inicial del primer depot como punto de partida
+    #     start_pos = self.almacen.data_manager.outbound_staging_locations[1]
+    #     print(f"Punto de partida para el diagnostico: Depot en {start_pos}")
+    #
+    #     # V2.6: Analizar tareas de la lista maestra en lugar de lineas pendientes
+    #     if hasattr(self.almacen.dispatcher, 'lista_maestra_work_orders') and self.almacen.dispatcher.lista_maestra_work_orders:
+    #         total_work_orders = len(self.almacen.dispatcher.lista_maestra_work_orders)
+    #         sample_size = min(10, total_work_orders)
+    #         print(f"Analizando {sample_size} WorkOrders de {total_work_orders} en la lista maestra...")
+    #
+    #         for i in range(sample_size):
+    #             work_order = self.almacen.dispatcher.lista_maestra_work_orders[i]
+    #             print(f"  WorkOrder {i+1}: Seq {work_order.pick_sequence}, SKU {work_order.sku.id}, Pos {work_order.ubicacion}")
+    #     else:
+    #         print("No hay tareas en la lista maestra para diagnosticar")
+    #
+    #     print("V2.6: RouteCalculator integrado con DataManager y AssignmentCostCalculator")
+    #     print("-------------------------------------------\n")
     
     def ejecutar(self):
         """Metodo principal de ejecucion - Modo automatizado sin UI"""
@@ -1966,18 +2003,19 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
         pygame.quit()
         print("Recursos liberados. Hasta luego!")
     
-    def _diagnosticar_data_manager(self):
-        print("\n--- DIAGNOSTICO DEL DATA MANAGER ---")
-        config = self.configuracion
-        if config.get('layout_file') and config.get('sequence_file'):
-            data_manager = DataManager(config['layout_file'], config['sequence_file'])
-            if not data_manager.puntos_de_picking_ordenados:
-                print("  [FALLO] El DataManager no pudo cargar o procesar los puntos de picking.")
-            else:
-                print("  [EXITO] El DataManager se ha cargado correctamente.")
-        else:
-            print("  [ERROR] Faltan las rutas a los archivos tmx o sequence_csv en la configuracion.")
-        print("------------------------------------\n")
+    # LEGACY: Method unused and commented during DiagnosticTools extraction
+    # def _diagnosticar_data_manager(self):
+    #     print("\n--- DIAGNOSTICO DEL DATA MANAGER ---")
+    #     config = self.configuracion
+    #     if config.get('layout_file') and config.get('sequence_file'):
+    #         data_manager = DataManager(config['layout_file'], config['sequence_file'])
+    #         if not data_manager.puntos_de_picking_ordenados:
+    #             print("  [FALLO] El DataManager no pudo cargar o procesar los puntos de picking.")
+    #         else:
+    #             print("  [EXITO] El DataManager se ha cargado correctamente.")
+    #     else:
+    #         print("  [ERROR] Faltan las rutas a los archivos tmx o sequence_csv en la configuracion.")
+    #     print("------------------------------------\n")
 
     # All unused debug methods removed in final cleanup
     

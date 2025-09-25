@@ -541,3 +541,11 @@ cleanup_backup_*/
 test_replay_pipeline_*.py
 replay_bugfix_*.log
 *_v10_testing_*.py
+
+# Archivos temporales de refactoring V10.0.2 - DiagnosticTools extraction
+*_diagnostic_*.py
+*_utils_test_*.py
+diagnostic_extraction_*.log
+*_modular_diagnostic*.log
+*_diagnostic_tools_test.py
+test_diagnostic_*.py

@@ -56,14 +56,26 @@ from config.settings import SUPPORTED_RESOLUTIONS, LOGICAL_WIDTH, LOGICAL_HEIGHT
 # ELIMINATED: from core.replay_utils import agregar_evento_replay, volcar_replay_a_archivo
 
 # KEEP: Config utilities - Necesarios para cargar configuración
+# REFACTOR: ConfigurationManager replaces cargar_configuracion logic
+from core.config_manager import ConfigurationManager, ConfigurationError
 from core.config_utils import get_default_config, mostrar_resumen_config
 
 class ReplayViewerEngine:
     """Motor puro para visualización de archivos .jsonl de replay existentes"""
 
     def __init__(self):
-        # KEEP: Configuración - Necesaria para cargar config.json
-        self.configuracion = None
+        # REFACTOR: ConfigurationManager integration
+        try:
+            self.config_manager = ConfigurationManager()
+            self.config_manager.validate_configuration()  # Validar configuración cargada
+            self.configuracion = self.config_manager.configuration
+            print("[REPLAY-ENGINE] ConfigurationManager integrado exitosamente")
+        except ConfigurationError as e:
+            print(f"[REPLAY-ENGINE ERROR] Error en configuracion: {e}")
+            # Fallback: usar configuración por defecto
+            self.config_manager = None
+            self.configuracion = get_default_config()
+            print("[REPLAY-ENGINE] Fallback: Usando configuracion por defecto")
 
         # ELIMINATED: Simulación attributes - No simulation creation needed
         # ELIMINATED: self.almacen = None - No simulation warehouse needed
@@ -137,52 +149,70 @@ class ReplayViewerEngine:
         self.renderer = RendererOriginal(self.virtual_surface)
         self.dashboard = DashboardOriginal()
 
+    # REFACTOR: Method replaced by ConfigurationManager integration in __init__
+    # Original method preserved below (commented out) for reference
     def cargar_configuracion(self):
-        """Carga la configuración desde config.json o usa defaults hardcodeados"""
+        """
+        ORIGINAL METHOD - Now handled by ConfigurationManager in __init__
+
+        Carga la configuración desde config.json o usa defaults hardcodeados
+
+        MIGRATION NOTE: This method has been replaced by ConfigurationManager
+        integration in __init__(). Configuration is now loaded automatically
+        during ReplayViewerEngine instantiation with robust error handling.
+
+        Original functionality moved to:
+        - core.config_manager.ConfigurationManager._load_configuration()
+        - core.config_manager.ConfigurationManager._sanitize_assignment_rules()
+        """
+        # COMMENTED OUT - Original implementation preserved for reference
         # KEEP: Todo el método - Necesario para configurar el replay viewer
+        #
+        # config_path = os.path.join(os.path.dirname(__file__), "config.json")
+        #
+        # try:
+        #     # Intentar cargar config.json
+        #     if os.path.exists(config_path):
+        #         print(f"[CONFIG] Cargando configuración desde: {config_path}")
+        #         with open(config_path, 'r', encoding='utf-8') as f:
+        #             self.configuracion = json.load(f)
+        #
+        #         # KEEP: Sanitización - Necesaria para compatibilidad
+        #         # Sanitizar assignment_rules: convertir claves str a int
+        #         if 'assignment_rules' in self.configuracion and self.configuracion['assignment_rules']:
+        #             sanitized_rules = {}
+        #             for agent_type, rules in self.configuracion['assignment_rules'].items():
+        #                 sanitized_rules[agent_type] = {int(k): v for k, v in rules.items()}
+        #             self.configuracion['assignment_rules'] = sanitized_rules
+        #
+        #         print("[CONFIG] Configuración cargada exitosamente desde archivo JSON")
+        #     else:
+        #         print("[CONFIG] config.json no encontrado, usando configuración por defecto")
+        #         self.configuracion = get_default_config()
+        #         print("[CONFIG] Configuración por defecto cargada")
+        #
+        #     # ELIMINATED: cost_calculator - No needed for replay visualization
+        #     # ELIMINATED: # Nota: cost_calculator se creará después de inicializar data_manager
+        #
+        #     # Mostrar resumen de configuración cargada
+        #     mostrar_resumen_config(self.configuracion)
+        #
+        #     return True
+        #
+        # except json.JSONDecodeError as e:
+        #     print(f"[CONFIG ERROR] Error al parsear config.json: {e}")
+        #     print("[CONFIG] Usando configuración por defecto como fallback")
+        #     self.configuracion = get_default_config()
+        #     return True
+        #
+        # except Exception as e:
+        #     print(f"[CONFIG ERROR] Error inesperado cargando configuración: {e}")
+        #     print("[CONFIG] Usando configuración por defecto como fallback")
+        #     self.configuracion = get_default_config()
+        #     return True
 
-        config_path = os.path.join(os.path.dirname(__file__), "config.json")
-
-        try:
-            # Intentar cargar config.json
-            if os.path.exists(config_path):
-                print(f"[CONFIG] Cargando configuración desde: {config_path}")
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    self.configuracion = json.load(f)
-
-                # KEEP: Sanitización - Necesaria para compatibilidad
-                # Sanitizar assignment_rules: convertir claves str a int
-                if 'assignment_rules' in self.configuracion and self.configuracion['assignment_rules']:
-                    sanitized_rules = {}
-                    for agent_type, rules in self.configuracion['assignment_rules'].items():
-                        sanitized_rules[agent_type] = {int(k): v for k, v in rules.items()}
-                    self.configuracion['assignment_rules'] = sanitized_rules
-
-                print("[CONFIG] Configuración cargada exitosamente desde archivo JSON")
-            else:
-                print("[CONFIG] config.json no encontrado, usando configuración por defecto")
-                self.configuracion = get_default_config()
-                print("[CONFIG] Configuración por defecto cargada")
-
-            # ELIMINATED: cost_calculator - No needed for replay visualization
-            # ELIMINATED: # Nota: cost_calculator se creará después de inicializar data_manager
-
-            # Mostrar resumen de configuración cargada
-            mostrar_resumen_config(self.configuracion)
-
-            return True
-
-        except json.JSONDecodeError as e:
-            print(f"[CONFIG ERROR] Error al parsear config.json: {e}")
-            print("[CONFIG] Usando configuración por defecto como fallback")
-            self.configuracion = get_default_config()
-            return True
-
-        except Exception as e:
-            print(f"[CONFIG ERROR] Error inesperado cargando configuración: {e}")
-            print("[CONFIG] Usando configuración por defecto como fallback")
-            self.configuracion = get_default_config()
-            return True
+        # NEW IMPLEMENTATION: Return success since config is loaded in __init__
+        return True
 
     # ELIMINATED: def crear_simulacion(self) - No simulation creation needed for replay viewer
     # Todo el método eliminado ya que el replay viewer no crea simulaciones
@@ -565,9 +595,11 @@ class ReplayViewerEngine:
 
         # Override internal config with replay config
         if configuracion:
+            print("[REPLAY] Usando configuracion desde archivo de replay")
             self.configuracion = configuracion
-        elif not self.cargar_configuracion():
-            print("Error: No se pudo cargar la configuracion")
+        # REFACTOR: Configuration now loaded in __init__ via ConfigurationManager
+        elif not self.configuracion:
+            print("Error: Configuracion no disponible")
             return 1
 
         # Inicializar arquitectura TMX basica (necesaria para renderizado)
