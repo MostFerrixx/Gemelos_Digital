@@ -1026,205 +1026,29 @@ class SimulationEngine:
         # Usar la nueva logica centralizada de finalizacion
         return not self.almacen.simulacion_ha_terminado()
     
-    # REFACTOR PHASE 1: Metodo extraido a analytics/exporter.py - AnalyticsExporter.export_complete_analytics()
-    # ORIGINAL METHOD PRESERVED FOR REFERENCE - DO NOT DELETE
     def _simulacion_completada(self):
         """
-        REFACTOR NOTICE: Este metodo ha sido extraido a analytics/exporter.py
-
-        MIGRATED TO: AnalyticsExporter.export_complete_analytics()
-
-        Este codigo se mantiene comentado para referencia durante la fase de testing.
-        Una vez validada la funcionalidad, puede ser eliminado.
+        Simulation completion handler - functionality migrated to AnalyticsExporter
         """
-        # REFACTOR PHASE 1: Todo el codigo extraido a analytics.exporter.AnalyticsExporter.export_complete_analytics()
-        # El siguiente codigo esta comentado ya que ahora se maneja via AnalyticsExporter
-
-        # print("\n" + "="*70)
-        # print("SIMULACION COMPLETADA - INICIANDO PIPELINE DE ANALITICAS")
-        # print("="*70)
-        #
-        # if not self.almacen:
-        #     print("Error: No hay datos del almacen para procesar")
-        #     return
-        #
-        # # Mostrar metricas basicas
-        # mostrar_metricas_consola(self.almacen)
-        #
-        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        #
-        # # Crear estructura de directorios organizados
-        # output_base_dir = "output"
-        # output_dir = os.path.join(output_base_dir, f"simulation_{timestamp}")
-        #
-        # try:
-        #     os.makedirs(output_dir, exist_ok=True)
-        #     print(f"[SETUP] Directorio de salida creado: {output_dir}")
-        # except Exception as e:
-        #     print(f"[ERROR] No se pudo crear directorio de salida: {e}")
-        #     # Fallback: usar directorio actual
-        #     output_dir = "."
-        #
-        # archivos_generados = []
-        #
-        # # 1. Exportar metricas JSON basicas
-        # archivo_json = os.path.join(output_dir, f"simulacion_completada_{timestamp}.json")
-        # exportar_metricas(self.almacen, archivo_json)
-        # archivos_generados.append(archivo_json)
-        # print(f"[1/4] Metricas JSON guardadas: {archivo_json}")
-        #
-        # # 2. Exportar eventos crudos (modificar almacen para usar output_dir)
-        # archivo_eventos = self._exportar_eventos_crudos_organizado(output_dir, timestamp)
-        # if archivo_eventos:
-        #     archivos_generados.append(archivo_eventos)
-        #     print(f"[2/4] Eventos detallados guardados: {archivo_eventos}")
-        #
-        # # ELIMINATED: 2.5. VOLCADO DE REPLAY BUFFER - No replay capabilities in pure simulation
-        # # ELIMINATED: Replay buffer dumping logic removed - live simulation doesn't generate replay files
-        # # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine -> Excel
-        # print("[3/4] Simulacion completada. Generando reporte de Excel...")
-        # try:
-        #     # Usar el metodo __init__ original con eventos y configuracion en memoria
-        #     analytics_engine = AnalyticsEngine(self.almacen.event_log, self.configuracion)
-        #     analytics_engine.process_events()
-        #
-        #     # Generar archivo Excel con ruta organizada
-        #     excel_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.xlsx")
-        #     archivo_excel = analytics_engine.export_to_excel(excel_filename)
-        #
-        #     if archivo_excel:
-        #         archivos_generados.append(archivo_excel)
-        #         print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
-        #
-        #         # 4. PIPELINE AUTOMATIZADO: Visualizer -> PNG
-        #         print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
-        #         self._ejecutar_visualizador(archivo_excel, timestamp, output_dir)
-        #
-        #     else:
-        #         print("[ERROR] No se pudo generar el reporte de Excel")
-        #
-        # except Exception as e:
-        #     print(f"[ERROR] Error en pipeline de analiticas: {e}")
-        #     import traceback
-        #     traceback.print_exc()
-        #
-        # # Resumen final
-        # print("\n" + "="*70)
-        # print("PROCESO COMPLETADO")
-        # print("="*70)
-        # print("Archivos generados:")
-        # for i, archivo in enumerate(archivos_generados, 1):
-        #     print(f"  {i}. {archivo}")
-        # print("="*70)
-        # print("\nPresiona R para reiniciar o ESC para salir")
-
-        pass  # Placeholder - funcionalidad ahora en AnalyticsExporter
-    
-    # REFACTOR PHASE 1: Metodo extraido a analytics/exporter.py - AnalyticsExporter.export_complete_analytics_with_buffer()
-    # ORIGINAL METHOD PRESERVED FOR REFERENCE - DO NOT DELETE
-    def _simulacion_completada_con_buffer(self, buffer_eventos):
-        """
-        REFACTOR NOTICE: Este metodo ha sido extraido a analytics/exporter.py
-
-        MIGRATED TO: AnalyticsExporter.export_complete_analytics_with_buffer()
-
-        Este codigo se mantiene comentado para referencia durante la fase de testing.
-        Una vez validada la funcionalidad, puede ser eliminado.
-        """
-        # REFACTOR PHASE 1: Todo el codigo extraido a analytics.exporter.AnalyticsExporter.export_complete_analytics_with_buffer()
-        # El siguiente codigo esta comentado ya que ahora se maneja via AnalyticsExporter
-
-        pass  # Placeholder - funcionalidad ahora en AnalyticsExporter
-    
-    # REFACTOR PHASE 1: Metodo extraido a analytics/exporter.py - AnalyticsExporter._exportar_eventos_crudos_organizado()
-    # ORIGINAL METHOD PRESERVED FOR REFERENCE - DO NOT DELETE
-    def _exportar_eventos_crudos_organizado(self, output_dir: str, timestamp: str):
-        """
-        REFACTOR NOTICE: Este metodo ha sido extraido a analytics/exporter.py
-
-        MIGRATED TO: AnalyticsExporter._exportar_eventos_crudos_organizado()
-
-        Este codigo se mantiene comentado para referencia durante la fase de testing.
-        Una vez validada la funcionalidad, puede ser eliminado.
-        """
-        # Funcionalidad ahora en AnalyticsExporter
         pass
     
-    # REFACTOR PHASE 1: Metodo extraido a analytics/exporter.py - AnalyticsExporter._ejecutar_visualizador()
-    # ORIGINAL METHOD PRESERVED FOR REFERENCE - DO NOT DELETE
+    def _simulacion_completada_con_buffer(self, buffer_eventos):
+        """
+        Simulation completion with buffer - functionality migrated to AnalyticsExporter
+        """
+        pass
+    
+    def _exportar_eventos_crudos_organizado(self, output_dir: str, timestamp: str):
+        """
+        Export raw events - functionality migrated to AnalyticsExporter
+        """
+        pass
+    
     def _ejecutar_visualizador(self, excel_path: str, timestamp: str, output_dir: str):
         """
-        REFACTOR NOTICE: Este metodo ha sido extraido a analytics/exporter.py
-
-        MIGRATED TO: AnalyticsExporter._ejecutar_visualizador()
-
-        Este codigo se mantiene comentado para referencia durante la fase de testing.
-        Una vez validada la funcionalidad, puede ser eliminado.
+        Execute visualizer - functionality migrated to AnalyticsExporter
         """
-        try:
-            # Construir rutas dinamicamente
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            visualizer_path = os.path.join(script_dir, "visualizer.py")
-            tmx_path = os.path.join(script_dir, self.configuracion.get('layout_file', 'layouts/WH1.tmx'))
-            output_filename = os.path.join(output_dir, f"warehouse_heatmap_{timestamp}.png")
-            
-            # Verificar que los archivos existen
-            if not os.path.exists(visualizer_path):
-                print(f"[ERROR] visualizer.py no encontrado en: {visualizer_path}")
-                return
-            
-            if not os.path.exists(tmx_path):
-                print(f"[ERROR] Archivo TMX no encontrado: {tmx_path}")
-                return
-            
-            if not os.path.exists(excel_path):
-                print(f"[ERROR] Archivo Excel no encontrado: {excel_path}")
-                return
-            
-            # Construir comando para visualizer.py
-            cmd = [
-                sys.executable,  # Python ejecutable actual
-                visualizer_path,
-                "--excel_path", excel_path,
-                "--tmx_path", tmx_path,
-                "--output_path", output_filename,
-                "--layer_name", "Capa de patrones 1",  # Nombre de capa TMX conocido
-                "--pixel_scale", "16"  # Escala por defecto
-            ]
-            
-            print(f"[VISUALIZER] Ejecutando comando: {' '.join(cmd)}")
-            
-            # Ejecutar visualizer.py de forma robusta
-            result = subprocess.run(
-                cmd,
-                cwd=script_dir,  # Ejecutar en el directorio del script
-                capture_output=True,
-                text=True,
-                timeout=300  # Timeout de 5 minutos
-            )
-            
-            if result.returncode == 0:
-                print(f"[4/4] Imagen de heatmap generada exitosamente: {output_filename}")
-                # Mostrar output del visualizer si es util
-                if result.stdout:
-                    # Filtrar solo las lineas importantes del output
-                    lines = result.stdout.split('\n')
-                    for line in lines:
-                        if '[VISUALIZER]' in line or 'PROCESAMIENTO COMPLETADO' in line:
-                            print(f"  {line}")
-            else:
-                print(f"[ERROR] visualizer.py fallo con codigo: {result.returncode}")
-                if result.stderr:
-                    print(f"[ERROR] Error del visualizer: {result.stderr}")
-                if result.stdout:
-                    print(f"[ERROR] Output del visualizer: {result.stdout}")
-                    
-        except subprocess.TimeoutExpired:
-            print("[ERROR] visualizer.py tomo demasiado tiempo (>5 min) - proceso terminado")
-        except Exception as e:
-            print(f"[ERROR] Error ejecutando visualizer.py: {e}")
-            import traceback
-            traceback.print_exc()
+        pass
     
     def _reiniciar_simulacion(self):
         """Reinicia la simulacion"""
@@ -1244,98 +1068,8 @@ class SimulationEngine:
     
     def toggle_order_dashboard(self):
         """
-        REFACTOR PHASE 2: Este metodo ha sido extraido a communication/dashboard_communicator.py
-
-        MIGRATED TO: DashboardCommunicator.toggle_dashboard()
-
-        Este codigo se mantiene comentado para referencia durante la fase de testing.
-        Una vez validada la funcionalidad en Fase 3, puede ser eliminado.
-
-        Alternar visibilidad del dashboard de ordenes (multiproceso)
+        Toggle dashboard using DashboardCommunicator (migrated functionality)
         """
-        # REFACTOR PHASE 2: Original logic commented out - replaced by DashboardCommunicator
-        #
-        # Original implementation follows (preserved for reference):
-        #
-        # if self.order_dashboard_process is None or not self.order_dashboard_process.is_alive():
-        #     # Crear proceso del dashboard si no existe
-        #     if self.almacen:
-        #         try:
-        #             from git.visualization.order_dashboard import launch_dashboard_process
-        #
-        #             # Crear cola para comunicacion
-        #             self.dashboard_data_queue = Queue()
-        #
-        #             # AUDIT: Instrumentar creacion de proceso Dashboard
-        #             print("[DASHBOARD] Creando proceso Dashboard de Ordenes...")
-        #
-        #             # Crear proceso separado para el dashboard
-        #             self.order_dashboard_process = multiprocessing.Process(
-        #                 target=launch_dashboard_process,
-        #                 args=(self.dashboard_data_queue,)
-        #             )
-        #
-        #             # AUDIT: Log antes de iniciar proceso Dashboard
-        #             print("[DASHBOARD] Iniciando proceso Dashboard...")
-        #             self.order_dashboard_process.start()
-        #             print(f"[DASHBOARD] Proceso Dashboard iniciado (PID: {self.order_dashboard_process.pid})")
-        #             print("Dashboard de Ordenes abierto en proceso separado - Presiona 'O' nuevamente para cerrar")
-                    
-        #             # NUEVO: Enviar estado completo inicial inmediatamente despues del arranque
-        #             if self.almacen and self.almacen.dispatcher:
-        #                 # Modo simulacion activa
-        #                 self._enviar_estado_completo_inicial()
-        #             else:
-        #                 # Modo replay
-        #                 self._enviar_estado_completo_inicial_replay()
-        #
-        #             # SYNC FIX: Verificar si simulacion ya termino y enviar comando de hibernacion
-        #             if self.simulacion_finalizada_reportada:
-        #                 try:
-        #                     self.dashboard_data_queue.put('__SIMULATION_ENDED__')
-        #                     print("[DASHBOARD-SYNC] Comando __SIMULATION_ENDED__ enviado a dashboard post-simulacion")
-        #                 except Exception as e:
-        #                     print(f"[DASHBOARD-SYNC] Error enviando comando de hibernacion: {e}")
-        #
-        #         except ImportError as e:
-        #             print(f"Error importando launch_dashboard_process: {e}")
-        #         except Exception as e:
-        #             print(f"Error creando dashboard: {e}")
-        #     else:
-        #         print("No hay simulacion activa para mostrar ordenes")
-        # else:
-        #     # NUEVO: Cierre graceful del proceso dashboard
-        #     try:
-        #         if self.order_dashboard_process.is_alive():
-        #             # Enviar mensaje de cierre por la cola
-        #             if self.dashboard_data_queue:
-        #                 try:
-        #                     self.dashboard_data_queue.put_nowait('__EXIT_COMMAND__')
-        #                     print("[DASHBOARD] Comando de cierre enviado")
-        #                 except:
-        #                     pass  # Cola llena, proceder con terminacion
-        #
-        #             # Esperar cierre graceful
-        #             self.order_dashboard_process.join(timeout=3)
-        #
-        #             # Si no responde, terminacion forzada
-        #             if self.order_dashboard_process.is_alive():
-        #                 print("[DASHBOARD] Timeout - forzando terminacion")
-        #                 self.order_dashboard_process.terminate()
-        #                 self.order_dashboard_process.join(timeout=1)
-        #                 print("[PROCESS-LIFECYCLE] Join post-terminate Dashboard completado")
-        #             else:
-        #                 print("[PROCESS-LIFECYCLE] Dashboard terminado exitosamente via join()")
-        #
-        #         self.order_dashboard_process = None
-        #         self.dashboard_data_queue = None
-        #         print("Dashboard de Ordenes cerrado correctamente")
-        #     except Exception as e:
-        #         print(f"Error cerrando dashboard: {e}")
-        #         self.order_dashboard_process = None
-        #         self.dashboard_data_queue = None
-
-        # REFACTOR PHASE 2: Temporary stub - will be replaced with DashboardCommunicator integration in Phase 3
         print("[REFACTOR] toggle_order_dashboard() - Functionality moved to communication/dashboard_communicator.py")
         print("[REFACTOR] Phase 3 will integrate DashboardCommunicator here")
     
@@ -1392,26 +1126,8 @@ class SimulationEngine:
     
     def _actualizar_dashboard_ordenes(self):
         """
-        REFACTOR PHASE 2: Este metodo ha sido extraido a communication/dashboard_communicator.py
-
-        MIGRATED TO: DashboardCommunicator.update_dashboard_state()
-
-        Este codigo se mantiene comentado para referencia durante la fase de testing.
-        Una vez validada la funcionalidad en Fase 3, puede ser eliminado.
-
-        Enviar datos actualizados al dashboard de ordenes si esta activo
+        Update dashboard using DashboardCommunicator (migrated functionality)
         """
-        # REFACTOR PHASE 2: Original logic commented out - replaced by DashboardCommunicator.update_dashboard_state()
-        #
-        # Original implementation follows (preserved for reference):
-        #
-        # # INSTRUMENTACION: Verificar enlace de comunicacion
-        # print(f"[COMMS-LINK] Verificando enlace... Proceso dashboard existe: {self.order_dashboard_process is not None}")
-        #
-        # All original dashboard update logic commented out - functionality moved to DashboardCommunicator
-        # (Original implementation preserved for reference - will be removed in Phase 3)
-
-        # REFACTOR PHASE 2: Temporary stub - will be replaced with DashboardCommunicator integration in Phase 3
         print("[REFACTOR] _actualizar_dashboard_ordenes() - Functionality moved to communication/dashboard_communicator.py")
         print("[REFACTOR] Phase 3 will integrate DashboardCommunicator.update_dashboard_state() here")
     

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-ReplayViewerEngine - Motor puro para visualización de archivos .jsonl de replay.
-Refactorizado desde run_simulator.py V9.2.2 - Solo capacidades de visualización.
+ReplayViewerEngine - Motor puro para visualizacion de archivos .jsonl de replay.
+Refactorizado desde run_simulator.py V9.2.2 - Solo capacidades de visualizacion.
 """
 
 import sys
@@ -9,59 +9,28 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'git'))
 
 import pygame
-# ELIMINATED: import simpy - No needed for replay visualization only
 import json
 import time
-# ELIMINATED: import subprocess - No needed for replay visualization
 from datetime import datetime
-# ELIMINATED: import multiprocessing - No needed for pure replay viewer
-# ELIMINATED: from multiprocessing import Queue - No needed for pure replay viewer
 import logging
-
-# MOVED: Additional imports needed for the run() method
 import argparse
 
-# ELIMINATED: Buffer de eventos para generar replay - Solo necesario para simulación
-# ELIMINATED: from simulation_buffer import ReplayBuffer - Solo para generar replay, no para consumir
-
-# Importaciones de módulos propios - SOLO los necesarios para visualización
 from config.settings import *
 from config.colors import *
 
-# ELIMINATED: Simulación imports - No needed for replay viewer
-# ELIMINATED: from simulation.warehouse import AlmacenMejorado - No simulation creation
-# ELIMINATED: from simulation.operators_workorder import crear_operarios - No simulation creation
-# ELIMINATED: from analytics_engine import AnalyticsEngine - No analytics needed for replay viewer
-
-# KEEP: Layout y rendering - Necesarios para mostrar el mapa y agentes
 from simulation.layout_manager import LayoutManager
-# ELIMINATED: from simulation.assignment_calculator import AssignmentCostCalculator - No needed for visualization
-# ELIMINATED: from simulation.data_manager import DataManager - No needed for visualization
-
-# ELIMINATED: Pathfinding imports - No needed for visualization only
-# ELIMINATED: from simulation.pathfinder import Pathfinder
-# ELIMINATED: from simulation.route_calculator import RouteCalculator
-
-# KEEP: Visualization imports - Core para el replay viewer
 from visualization.state import inicializar_estado, actualizar_metricas_tiempo, toggle_pausa, toggle_dashboard, estado_visual, limpiar_estado, aumentar_velocidad, disminuir_velocidad, obtener_velocidad_simulacion
 from visualization.original_renderer import RendererOriginal, renderizar_diagnostico_layout
 from visualization.original_dashboard import DashboardOriginal
-
-# ELIMINATED: Utils para métricas y analytics - No needed for replay viewer
-# ELIMINATED: from utils.helpers import exportar_metricas, mostrar_metricas_consola
-
 from config.settings import SUPPORTED_RESOLUTIONS, LOGICAL_WIDTH, LOGICAL_HEIGHT
 
-# ELIMINATED: Replay generation utilities - Solo para generar replay, no consumir
-# ELIMINATED: from core.replay_utils import agregar_evento_replay, volcar_replay_a_archivo
-
-# KEEP: Config utilities - Necesarios para cargar configuración
+# KEEP: Config utilities - Necesarios para cargar configuracion
 # REFACTOR: ConfigurationManager replaces cargar_configuracion logic
 from core.config_manager import ConfigurationManager, ConfigurationError
 from core.config_utils import get_default_config, mostrar_resumen_config
 
 class ReplayViewerEngine:
-    """Motor puro para visualización de archivos .jsonl de replay existentes"""
+    """Motor puro para visualizacion de archivos .jsonl de replay existentes"""
 
     def __init__(self):
         # REFACTOR: ConfigurationManager integration
@@ -77,63 +46,33 @@ class ReplayViewerEngine:
             self.configuracion = get_default_config()
             print("[REPLAY-ENGINE] Fallback: Usando configuracion por defecto")
 
-        # ELIMINATED: Simulación attributes - No simulation creation needed
-        # ELIMINATED: self.almacen = None - No simulation warehouse needed
-        # ELIMINATED: self.env = None - No SimPy environment needed
-
-        # KEEP: Pygame y rendering - Core para visualización
         self.pantalla = None
         self.renderer = None
         self.dashboard = None
         self.reloj = None
         self.corriendo = True
-
-        # ELIMINATED: Modo headless - Replay viewer siempre es visual
-        # ELIMINATED: self.headless_mode = headless_mode
-
-        # ELIMINATED: ReplayBuffer - Solo para generar replay, no para consumir
-        # ELIMINATED: self.replay_buffer = ReplayBuffer()
-
-        # KEEP: Dashboard process - Necesario para PyQt6 dashboard
-        self.order_dashboard_process = None  # Proceso del dashboard de ordenes
-
-        # ELIMINATED: Multiprocessing infrastructure - No simulation processes needed
-        # ELIMINATED: self.visual_event_queue = None - No producer-consumer needed
-        # ELIMINATED: self.simulation_process = None - No simulation process needed
-        # ELIMINATED: self.dashboard_data_queue = None - No simulation communication needed
-
-        # KEEP: Layout manager - Necesario para mostrar TMX maps
+        self.order_dashboard_process = None
         self.layout_manager = None
-
-        # ELIMINATED: Pathfinding - No route calculation needed for replay
-        # ELIMINATED: self.pathfinder = None
-
-        # KEEP: Display attributes - Necesarios para ventana Pygame
         self.window_size = (0, 0)
         self.virtual_surface = None
 
-        # ELIMINATED: Simulation process management - No simulation processes
-        # ELIMINATED: self.procesos_operarios = []
-        # ELIMINATED: self.simulacion_finalizada_reportada = False
-        # ELIMINATED: self.dashboard_last_state = {} - No delta updates needed for replay
-
         # KEEP: Replay visualization motor - Core para mostrar replay
         self.event_buffer = []           # Buffer de eventos para replay
-        self.playback_time = 0.0         # Reloj de reproducción interno
-        self.factor_aceleracion = 1.0    # Factor de velocidad de reproducción
+        self.playback_time = 0.0         # Reloj de reproduccion interno
+        self.factor_aceleracion = 1.0    # Factor de velocidad de reproduccion
 
     def inicializar_pygame(self):
-        """Inicializa ventana de Pygame para visualización de replay"""
-        # KEEP: Todo el método - Necesario para crear ventana
+        """Inicializa ventana de Pygame para visualizacion de replay"""
+        # KEEP: Todo el metodo - Necesario para crear ventana
 
         PANEL_WIDTH = 400
-        # 1. Obtener la clave de resolución seleccionada por el usuario
+        # 1. Obtener la clave de resolucion seleccionada por el usuario
         resolution_key = self.configuracion.get('selected_resolution_key', "Pequena (800x800)")
 
         # 2. Buscar el tamaño (ancho, alto) en nuestro diccionario
         self.window_size = SUPPORTED_RESOLUTIONS.get(resolution_key, (800, 800))
 
-        print(f"[DISPLAY] Resolución seleccionada por el usuario: '{resolution_key}' -> {self.window_size[0]}x{self.window_size[1]}")
+        print(f"[DISPLAY] Resolucion seleccionada por el usuario: '{resolution_key}' -> {self.window_size[0]}x{self.window_size[1]}")
 
         # 3. Hacemos la ventana principal más ancha para acomodar el panel
         main_window_width = self.window_size[0] + PANEL_WIDTH
@@ -242,20 +181,6 @@ class ReplayViewerEngine:
             print("[FATAL ERROR] El replay viewer requiere un archivo TMX válido para mostrar el mapa.")
             raise SystemExit(f"Error cargando TMX: {e}")
 
-        # ELIMINATED: Pathfinding initialization - No needed for replay visualization
-        # ELIMINATED: print("[TMX] Inicializando sistema de pathfinding...")
-        # ELIMINATED: self.pathfinder = Pathfinder(self.layout_manager.collision_matrix)
-        # ELIMINATED: self.route_calculator = RouteCalculator(self.pathfinder)
-
-        # ELIMINATED: SimPy environment - No simulation needed
-        # ELIMINATED: self.env = simpy.Environment()
-
-        # ELIMINATED: Simulation components - No simulation needed for replay
-        # ELIMINATED: self.data_manager = DataManager(layout_file, sequence_file)
-        # ELIMINATED: self.cost_calculator = AssignmentCostCalculator(self.data_manager)
-        # ELIMINATED: self.almacen = AlmacenMejorado(...)
-        # ELIMINATED: inicializar_estado(self.almacen, self.env, self.configuracion, layout_manager=self.layout_manager)
-        # ELIMINATED: self.procesos_operarios, self.operarios = crear_operarios(...)
 
         print(f"[TMX] Layout inicializado para replay viewer:")
         print(f"  - Dimensiones: {self.layout_manager.grid_width}x{self.layout_manager.grid_height}")
@@ -279,22 +204,13 @@ class ReplayViewerEngine:
                 if not self._manejar_evento(event):
                     self.corriendo = False
 
-            # 2. ELIMINATED: Lógica de Simulación - No simulation needed for replay viewer
-            # Todo el bloque de simulación eliminado ya que solo mostramos replay
-
-            # 3. KEEP: Renderizado - Core para mostrar replay
-            # Limpiar la pantalla principal
+            # 3. Renderizado - Core para mostrar replay
             self.pantalla.fill((240, 240, 240))  # Fondo gris claro
 
-            # 4. KEEP: Dibujar el mundo de replay en la superficie virtual
+            # 4. Dibujar el mundo de replay en la superficie virtual
             self.virtual_surface.fill((25, 25, 25))
             if hasattr(self, 'layout_manager') and self.layout_manager:
                 self.renderer.renderizar_mapa_tmx(self.virtual_surface, self.layout_manager.tmx_data)
-
-                # ELIMINATED: Renderizar tareas pendientes - No simulation tasks in replay
-                # ELIMINATED: from visualization.original_renderer import renderizar_tareas_pendientes
-                # ELIMINATED: tareas_pendientes = self.almacen.dispatcher.lista_maestra_work_orders
-                # ELIMINATED: renderizar_tareas_pendientes(self.virtual_surface, tareas_pendientes, self.layout_manager)
 
             # Obtener lista de agentes para renderizar desde estado visual
             from visualization.state import estado_visual
@@ -350,11 +266,6 @@ class ReplayViewerEngine:
             superficie_texto = font.render(texto, True, color)
             self.pantalla.blit(superficie_texto, (panel_x + 10, 20 + i * 30))
 
-    # ELIMINATED: def _ejecutar_bucle_headless(self) - No headless mode for replay viewer
-
-    # ELIMINATED: def _ejecutar_bucle_consumidor(self) - No producer-consumer needed for replay viewer
-
-    # ELIMINATED: def _crear_almacen_mock(self) - No simulation mock needed
 
     def _renderizar_replay_frame(self, operarios_visual, eventos_recibidos, eventos_procesados):
         """Renderiza un frame del motor de replay"""
@@ -425,11 +336,6 @@ class ReplayViewerEngine:
             superficie_texto = font.render(texto, True, (50, 50, 50))
             self.pantalla.blit(superficie_texto, (10, 10 + i * 25))
 
-    # ELIMINATED: def _renderizar_hud_replay_mejorado - Duplicate functionality
-
-    # ELIMINATED: def _renderizar_hud_playback_motor - Complex producer-consumer not needed
-
-    # ELIMINATED: def _finalizar_replay_engine - No simulation processes to cleanup
 
     def _manejar_evento(self, evento):
         """Maneja los eventos de pygame"""
@@ -449,10 +355,6 @@ class ReplayViewerEngine:
                 pausado = toggle_pausa()
                 print(f"Replay {'pausado' if pausado else 'reanudado'}")
 
-            # ELIMINATED: elif evento.key == pygame.K_r: - No simulation restart needed
-            # ELIMINATED: elif evento.key == pygame.K_m: - No simulation metrics needed
-            # ELIMINATED: elif evento.key == pygame.K_x: - No metrics export needed
-            # ELIMINATED: elif evento.key == pygame.K_d: - Dashboard toggle simplified
 
             elif evento.key == pygame.K_EQUALS or evento.key == pygame.K_KP_PLUS:  # Tecla + o +
                 # KEEP: Velocidad control - Core for replay playback speed
@@ -481,17 +383,6 @@ class ReplayViewerEngine:
 
         return True
 
-    # ELIMINATED: def _renderizar_frame(self) - Complex rendering logic not needed for replay
-
-    # ELIMINATED: def _simulacion_activa(self) - No simulation to check
-
-    # ELIMINATED: def _simulacion_completada(self) - No simulation to complete
-
-    # ELIMINATED: def _simulacion_completada_con_buffer(self) - No simulation analytics needed
-
-    # ELIMINATED: def _exportar_eventos_crudos_organizado(self) - No event export needed for replay viewer
-
-    # ELIMINATED: def _ejecutar_visualizador(self) - No analytics needed for replay viewer
 
     def toggle_order_dashboard(self):
         """Toggle del dashboard de órdenes (PyQt6)"""
@@ -942,18 +833,3 @@ class ReplayViewerEngine:
         pygame.quit()
         print("[CLEANUP] Recursos limpiados exitosamente")
 
-    # ELIMINATED: All remaining simulation-specific methods
-
-    # ELIMINATED: def _actualizar_dashboard_ordenes(self) - Complex simulation dashboard updates
-
-    # ELIMINATED: def _actualizar_dashboard_ordenes_replay(self) - Complex replay dashboard logic
-
-    # ELIMINATED: def _reiniciar_simulacion(self) - No simulation restart needed
-
-    # ELIMINATED: All multiprocessing related methods - No producer-consumer needed
-
-    # FINAL AUDIT NOTES:
-    # - Eliminado: ~70% del código original relacionado con simulación
-    # - Conservado: Configuración, Pygame, rendering básico, layout TMX, dashboard PyQt6
-    # - Refactorizado: Bucles principales simplificados solo para replay
-    # - Comentado: Cada eliminación explicada con razones técnicas
