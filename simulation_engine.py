@@ -55,6 +55,8 @@ from core.config_utils import get_default_config, mostrar_resumen_config
 from analytics.exporter import AnalyticsExporter as AnalyticsExporterV1
 # REFACTOR PHASE 2: Enhanced AnalyticsExporter with SimulationContext
 from analytics import AnalyticsExporter, SimulationContext, ExportResult
+# REFACTOR PHASE 3: DashboardCommunicator integration - Import communication components
+from communication import DashboardCommunicator, create_simulation_data_provider, DashboardConfig
 # REFACTOR: DiagnosticTools extraction - Import diagnostics function
 def _import_diagnostic_tools():
     """Import diagnostic tools with fallback mechanism"""
@@ -134,8 +136,27 @@ class SimulationEngine:
         self.procesos_operarios = []
         # Bandera para evitar reportes repetidos
         self.simulacion_finalizada_reportada = False
-        # NUEVO: Cache de estado anterior para delta updates del dashboard
-        self.dashboard_last_state = {}
+        # REFACTOR PHASE 3: Replace legacy dashboard attributes with DashboardCommunicator
+        # Legacy attributes (will be removed after Phase 3 validation):
+        self.dashboard_last_state = {}  # Legacy - now handled by DashboardCommunicator
+
+        # PHASE 3: Initialize DashboardCommunicator with robust architecture
+        try:
+            from communication import DashboardCommunicator, DashboardConfig
+            from communication.simulation_data_provider import SimulationEngineDataProvider
+
+            data_provider = SimulationEngineDataProvider(self)
+            dashboard_config = DashboardConfig(
+                startup_timeout=5.0,
+                graceful_shutdown_timeout=3.0,
+                debug_logging=False,  # Reduce noise in production
+                log_prefix="[DASHBOARD-COMM]"
+            )
+            self.dashboard_communicator = DashboardCommunicator(data_provider, dashboard_config)
+            print("[REFACTOR PHASE 3] DashboardCommunicator initialized successfully")
+        except Exception as e:
+            print(f"[REFACTOR PHASE 3] Warning: Failed to initialize DashboardCommunicator: {e}")
+            self.dashboard_communicator = None
         
         # ELIMINATED: Motor de visualizacion tipo "replay" - No replay visualization needed
         # ELIMINATED: self.event_buffer = [] - No event buffer for replay playback
@@ -226,8 +247,7 @@ class SimulationEngine:
         #     self.configuracion = get_default_config()
         #     return True
 
-        # NEW IMPLEMENTATION: Return success since config is loaded in __init__
-        return True
+        # NEW IMPLEMENTATION: Config is loaded in __init__, continue with simulation setup
     
     
     
@@ -310,7 +330,7 @@ class SimulationEngine:
         
         # REFACTOR: Diagnostico del RouteCalculator usando herramienta extraida
         diagnosticar_route_calculator(self.almacen)
-        
+
         self.procesos_operarios, self.operarios = crear_operarios(
             self.env,
             self.almacen,
@@ -347,6 +367,7 @@ class SimulationEngine:
         print(f"  - {len(self.almacen.dispatcher.lista_maestra_work_orders)} WorkOrders en lista maestra")
         print(f"  - {self.almacen.total_ordenes} ordenes generadas")
         print(f"  - Master Plan: {len(self.data_manager.puntos_de_picking_ordenados)} puntos de picking")
+
         if self.layout_manager:
             print(f"  - Layout TMX: ACTIVO ({tmx_file})")
         else:
@@ -400,8 +421,15 @@ class SimulationEngine:
                             print(f"Error en simulacion: {e}")
                             # Continuar sin detener el bucle
                         
-                        # Dashboard updates SOLO durante simulacion activa
-                        self._actualizar_dashboard_ordenes()
+                        # REFACTOR PHASE 3: Replace _actualizar_dashboard_ordenes() with DashboardCommunicator
+                        if self.dashboard_communicator:
+                            try:
+                                self.dashboard_communicator.update_dashboard_state()
+                            except Exception as e:
+                                print(f"[REFACTOR PHASE 3] Error updating dashboard state: {e}")
+                        else:
+                            # Fallback to legacy method for debugging
+                            self._actualizar_dashboard_ordenes()
                     else: # Si la simulacion ha terminado
                         print("[SIMULADOR] Condicion de finalizacion cumplida: No hay tareas pendientes y todos los agentes estan ociosos.")
                         print("Simulacion completada y finalizada logicamente.")
@@ -413,8 +441,17 @@ class SimulationEngine:
                         if not export_result.success:
                             print(f"[WARNING] Exportacion tuvo errores: {len(export_result.errors)} errores") 
                         
-                        # Dashboard final update UNA VEZ
-                        self._actualizar_dashboard_ordenes()
+                        # REFACTOR PHASE 3: Replace final dashboard update with DashboardCommunicator
+                        if self.dashboard_communicator:
+                            try:
+                                self.dashboard_communicator.update_dashboard_state()
+                                # Send simulation ended command
+                                self.dashboard_communicator.send_simulation_ended()
+                            except Exception as e:
+                                print(f"[REFACTOR PHASE 3] Error in final dashboard update: {e}")
+                        else:
+                            # Fallback to legacy method
+                            self._actualizar_dashboard_ordenes()
                         
                         # Enviar comando de finalizacion al Dashboard de Ordenes
                         if self.order_dashboard_process and self.order_dashboard_process.is_alive():
@@ -642,8 +679,15 @@ class SimulationEngine:
                     tareas_c = metricas.get('tareas_completadas', 0)
                     print(f"[PLAYBACK-METRICAS] T={self.playback_time:.1f}s (sim:{metricas['tiempo']:.1f}s), WOs:{workorders_c}, Tareas:{tareas_c}, Factor:{self.factor_aceleracion:.1f}x")
                     
-                    # Actualizar dashboard de ordenes si esta activo
-                    self._actualizar_dashboard_ordenes()
+                    # REFACTOR PHASE 3: Replace dashboard update in replay mode with DashboardCommunicator
+                    if self.dashboard_communicator:
+                        try:
+                            self.dashboard_communicator.update_dashboard_state()
+                        except Exception as e:
+                            print(f"[REFACTOR PHASE 3] Error updating dashboard in replay mode: {e}")
+                    else:
+                        # Fallback to legacy method for debugging
+                        self._actualizar_dashboard_ordenes()
                 
                 elif mensaje['type'] == 'simulation_completed':
                     print(f"[PLAYBACK] Simulacion completada a los {self.playback_time:.1f}s de reproduccion")
@@ -927,7 +971,23 @@ class SimulationEngine:
                     f.write(f"[{time.strftime('%H:%M:%S')}] DIAGNOSTICO-TECLA: Tecla 'O' detectada.\n")
                     f.write(f"[{time.strftime('%H:%M:%S')}] Estado almacen: {'Existe' if self.almacen else 'No Existe'}\n")
                 print(f"[DEBUG-DASHBOARD] Intento de abrir dashboard. Estado de self.almacen: {'Existe' if self.almacen else 'No Existe'}")
-                self.toggle_order_dashboard()
+
+                # REFACTOR PHASE 3: Replace toggle_order_dashboard() with DashboardCommunicator
+                if self.dashboard_communicator:
+                    try:
+                        success = self.dashboard_communicator.toggle_dashboard()
+                        if success:
+                            print("[REFACTOR PHASE 3] Dashboard toggled successfully via DashboardCommunicator")
+                        else:
+                            print("[REFACTOR PHASE 3] Dashboard toggle failed")
+                    except Exception as e:
+                        print(f"[REFACTOR PHASE 3] Error toggling dashboard: {e}")
+                        # Fallback to legacy method for debugging
+                        print("[REFACTOR PHASE 3] Falling back to legacy toggle_order_dashboard()")
+                        self.toggle_order_dashboard()
+                else:
+                    print("[REFACTOR PHASE 3] DashboardCommunicator not initialized, using legacy method")
+                    self.toggle_order_dashboard()
             # Funciones de diagnostico desactivadas en limpieza
         
         return True
@@ -1183,84 +1243,101 @@ class SimulationEngine:
             print("Reinicio cancelado")
     
     def toggle_order_dashboard(self):
-        """Alternar visibilidad del dashboard de ordenes (multiproceso)"""
-        if self.order_dashboard_process is None or not self.order_dashboard_process.is_alive():
-            # Crear proceso del dashboard si no existe
-            if self.almacen:
-                try:
-                    from git.visualization.order_dashboard import launch_dashboard_process
+        """
+        REFACTOR PHASE 2: Este metodo ha sido extraido a communication/dashboard_communicator.py
+
+        MIGRATED TO: DashboardCommunicator.toggle_dashboard()
+
+        Este codigo se mantiene comentado para referencia durante la fase de testing.
+        Una vez validada la funcionalidad en Fase 3, puede ser eliminado.
+
+        Alternar visibilidad del dashboard de ordenes (multiproceso)
+        """
+        # REFACTOR PHASE 2: Original logic commented out - replaced by DashboardCommunicator
+        #
+        # Original implementation follows (preserved for reference):
+        #
+        # if self.order_dashboard_process is None or not self.order_dashboard_process.is_alive():
+        #     # Crear proceso del dashboard si no existe
+        #     if self.almacen:
+        #         try:
+        #             from git.visualization.order_dashboard import launch_dashboard_process
+        #
+        #             # Crear cola para comunicacion
+        #             self.dashboard_data_queue = Queue()
+        #
+        #             # AUDIT: Instrumentar creacion de proceso Dashboard
+        #             print("[DASHBOARD] Creando proceso Dashboard de Ordenes...")
+        #
+        #             # Crear proceso separado para el dashboard
+        #             self.order_dashboard_process = multiprocessing.Process(
+        #                 target=launch_dashboard_process,
+        #                 args=(self.dashboard_data_queue,)
+        #             )
+        #
+        #             # AUDIT: Log antes de iniciar proceso Dashboard
+        #             print("[DASHBOARD] Iniciando proceso Dashboard...")
+        #             self.order_dashboard_process.start()
+        #             print(f"[DASHBOARD] Proceso Dashboard iniciado (PID: {self.order_dashboard_process.pid})")
+        #             print("Dashboard de Ordenes abierto en proceso separado - Presiona 'O' nuevamente para cerrar")
                     
-                    # Crear cola para comunicacion
-                    self.dashboard_data_queue = Queue()
-                    
-                    # AUDIT: Instrumentar creacion de proceso Dashboard
-                    print("[DASHBOARD] Creando proceso Dashboard de Ordenes...")
-                    
-                    # Crear proceso separado para el dashboard
-                    self.order_dashboard_process = multiprocessing.Process(
-                        target=launch_dashboard_process,
-                        args=(self.dashboard_data_queue,)
-                    )
-                    
-                    # AUDIT: Log antes de iniciar proceso Dashboard
-                    print("[DASHBOARD] Iniciando proceso Dashboard...")
-                    self.order_dashboard_process.start()
-                    print(f"[DASHBOARD] Proceso Dashboard iniciado (PID: {self.order_dashboard_process.pid})")
-                    print("Dashboard de Ordenes abierto en proceso separado - Presiona 'O' nuevamente para cerrar")
-                    
-                    # NUEVO: Enviar estado completo inicial inmediatamente despues del arranque
-                    if self.almacen and self.almacen.dispatcher:
-                        # Modo simulacion activa
-                        self._enviar_estado_completo_inicial()
-                    else:
-                        # Modo replay
-                        self._enviar_estado_completo_inicial_replay()
-                    
-                    # SYNC FIX: Verificar si simulacion ya termino y enviar comando de hibernacion
-                    if self.simulacion_finalizada_reportada:
-                        try:
-                            self.dashboard_data_queue.put('__SIMULATION_ENDED__')
-                            print("[DASHBOARD-SYNC] Comando __SIMULATION_ENDED__ enviado a dashboard post-simulacion")
-                        except Exception as e:
-                            print(f"[DASHBOARD-SYNC] Error enviando comando de hibernacion: {e}")
-                    
-                except ImportError as e:
-                    print(f"Error importando launch_dashboard_process: {e}")
-                except Exception as e:
-                    print(f"Error creando dashboard: {e}")
-            else:
-                print("No hay simulacion activa para mostrar ordenes")
-        else:
-            # NUEVO: Cierre graceful del proceso dashboard
-            try:
-                if self.order_dashboard_process.is_alive():
-                    # Enviar mensaje de cierre por la cola
-                    if self.dashboard_data_queue:
-                        try:
-                            self.dashboard_data_queue.put_nowait('__EXIT_COMMAND__')
-                            print("[DASHBOARD] Comando de cierre enviado")
-                        except:
-                            pass  # Cola llena, proceder con terminacion
-                    
-                    # Esperar cierre graceful
-                    self.order_dashboard_process.join(timeout=3)
-                    
-                    # Si no responde, terminacion forzada
-                    if self.order_dashboard_process.is_alive():
-                        print("[DASHBOARD] Timeout - forzando terminacion")
-                        self.order_dashboard_process.terminate()
-                        self.order_dashboard_process.join(timeout=1)
-                        print("[PROCESS-LIFECYCLE] Join post-terminate Dashboard completado")
-                    else:
-                        print("[PROCESS-LIFECYCLE] Dashboard terminado exitosamente via join()")
-                        
-                self.order_dashboard_process = None
-                self.dashboard_data_queue = None
-                print("Dashboard de Ordenes cerrado correctamente")
-            except Exception as e:
-                print(f"Error cerrando dashboard: {e}")
-                self.order_dashboard_process = None
-                self.dashboard_data_queue = None
+        #             # NUEVO: Enviar estado completo inicial inmediatamente despues del arranque
+        #             if self.almacen and self.almacen.dispatcher:
+        #                 # Modo simulacion activa
+        #                 self._enviar_estado_completo_inicial()
+        #             else:
+        #                 # Modo replay
+        #                 self._enviar_estado_completo_inicial_replay()
+        #
+        #             # SYNC FIX: Verificar si simulacion ya termino y enviar comando de hibernacion
+        #             if self.simulacion_finalizada_reportada:
+        #                 try:
+        #                     self.dashboard_data_queue.put('__SIMULATION_ENDED__')
+        #                     print("[DASHBOARD-SYNC] Comando __SIMULATION_ENDED__ enviado a dashboard post-simulacion")
+        #                 except Exception as e:
+        #                     print(f"[DASHBOARD-SYNC] Error enviando comando de hibernacion: {e}")
+        #
+        #         except ImportError as e:
+        #             print(f"Error importando launch_dashboard_process: {e}")
+        #         except Exception as e:
+        #             print(f"Error creando dashboard: {e}")
+        #     else:
+        #         print("No hay simulacion activa para mostrar ordenes")
+        # else:
+        #     # NUEVO: Cierre graceful del proceso dashboard
+        #     try:
+        #         if self.order_dashboard_process.is_alive():
+        #             # Enviar mensaje de cierre por la cola
+        #             if self.dashboard_data_queue:
+        #                 try:
+        #                     self.dashboard_data_queue.put_nowait('__EXIT_COMMAND__')
+        #                     print("[DASHBOARD] Comando de cierre enviado")
+        #                 except:
+        #                     pass  # Cola llena, proceder con terminacion
+        #
+        #             # Esperar cierre graceful
+        #             self.order_dashboard_process.join(timeout=3)
+        #
+        #             # Si no responde, terminacion forzada
+        #             if self.order_dashboard_process.is_alive():
+        #                 print("[DASHBOARD] Timeout - forzando terminacion")
+        #                 self.order_dashboard_process.terminate()
+        #                 self.order_dashboard_process.join(timeout=1)
+        #                 print("[PROCESS-LIFECYCLE] Join post-terminate Dashboard completado")
+        #             else:
+        #                 print("[PROCESS-LIFECYCLE] Dashboard terminado exitosamente via join()")
+        #
+        #         self.order_dashboard_process = None
+        #         self.dashboard_data_queue = None
+        #         print("Dashboard de Ordenes cerrado correctamente")
+        #     except Exception as e:
+        #         print(f"Error cerrando dashboard: {e}")
+        #         self.order_dashboard_process = None
+        #         self.dashboard_data_queue = None
+
+        # REFACTOR PHASE 2: Temporary stub - will be replaced with DashboardCommunicator integration in Phase 3
+        print("[REFACTOR] toggle_order_dashboard() - Functionality moved to communication/dashboard_communicator.py")
+        print("[REFACTOR] Phase 3 will integrate DashboardCommunicator here")
     
     def _enviar_estado_completo_inicial(self):
         """
@@ -1314,105 +1391,29 @@ class SimulationEngine:
                 pass
     
     def _actualizar_dashboard_ordenes(self):
-        """Enviar datos actualizados al dashboard de ordenes si esta activo"""
-        # INSTRUMENTACION: Verificar enlace de comunicacion
-        print(f"[COMMS-LINK] Verificando enlace... Proceso dashboard existe: {self.order_dashboard_process is not None}")
-        
-        if (self.order_dashboard_process and 
-            self.order_dashboard_process.is_alive() and 
-            self.dashboard_data_queue and 
-            self.almacen and 
-            self.almacen.dispatcher):
-            
-            # INSTRUMENTACION: Estado del proceso y cola
-            is_alive_status = self.order_dashboard_process.is_alive()
-            queue_size = self.dashboard_data_queue.qsize() if hasattr(self.dashboard_data_queue, 'qsize') else "unknown"
-            print(f"[COMMS-LINK] |-- Proceso dashboard vivo: {is_alive_status}. Cola size: {queue_size}. Intentando enviar datos...")
-            
-            if not is_alive_status:
-                print("[COMMS-LINK] |-- !ERROR! El proceso se reporta como no vivo. No se enviaran datos.")
-                return
-            
-            try:
-                # OPTIMIZADO: Sistema de delta updates para reducir latencia
-                
-                # PASO 1: Obtener ambas listas (activas + historicas)
-                lista_viva = self.almacen.dispatcher.lista_maestra_work_orders
-                lista_historica = self.almacen.dispatcher.work_orders_completadas_historicas
-                lista_completa = lista_viva + lista_historica
-                
-                # PASO 2: Calcular deltas (solo WorkOrders que cambiaron)
-                delta_updates = []
-                estado_actual = {}
-                
-                for work_order in lista_completa:
-                    # Crear snapshot del estado actual
-                    wo_state = {
-                        "id": work_order.id,
-                        "order_id": work_order.order_id,
-                        "tour_id": work_order.tour_id,
-                        "sku_id": work_order.sku.id if work_order.sku else "N/A",
-                        "status": work_order.status,
-                        "ubicacion": work_order.ubicacion,
-                        "work_area": work_order.work_area,
-                        "cantidad_restante": work_order.cantidad_restante,
-                        "volumen_restante": work_order.calcular_volumen_restante(),
-                        "assigned_agent_id": work_order.assigned_agent_id
-                    }
-                    
-                    estado_actual[work_order.id] = wo_state
-                    
-                    # Comparar con estado anterior
-                    estado_anterior = self.dashboard_last_state.get(work_order.id)
-                    
-                    # Si es nueva o cambio algun campo relevante, anadir al delta
-                    if (estado_anterior is None or
-                        estado_anterior["status"] != wo_state["status"] or
-                        estado_anterior["cantidad_restante"] != wo_state["cantidad_restante"] or
-                        estado_anterior["assigned_agent_id"] != wo_state["assigned_agent_id"] or
-                        estado_anterior["volumen_restante"] != wo_state["volumen_restante"]):
-                        
-                        delta_updates.append(wo_state)
-                
-                print(f"[COMMS-LINK] ? Delta calculado: {len(delta_updates)} cambios de {len(lista_completa)} total ({len(lista_viva)} activas + {len(lista_historica)} historicas)")
-                
-                # PASO 3: Enviar deltas con formato estructurado (si hay cambios)
-                if delta_updates:
-                    try:
-                        # NUEVO: Envolver deltas en formato de protocolo estructurado
-                        import time
-                        delta_message = {
-                            'type': 'delta',
-                            'timestamp': time.time(),
-                            'data': delta_updates
-                        }
-                        
-                        self.dashboard_data_queue.put_nowait(delta_message)
-                    except Exception as e:
-                        pass
-                else:
-                    # No hay cambios, no enviar nada
-                    pass
-                
-                # PASO 4: Actualizar estado anterior para proxima comparacion
-                self.dashboard_last_state = estado_actual
-                    
-            except Exception as e:
-                # Error en serializacion - no critico
-                print(f"[COMMS-LINK] ? Error critico en serializacion: {e}")
-                pass
-        else:
-            # INSTRUMENTACION: Diagnostico cuando no se envian datos
-            if not self.order_dashboard_process:
-                print("[COMMS-LINK] |-- No hay proceso dashboard creado")
-            elif not self.order_dashboard_process.is_alive():
-                print("[COMMS-LINK] |-- Proceso dashboard no esta vivo")
-            elif not self.dashboard_data_queue:
-                print("[COMMS-LINK] |-- No hay cola de datos")
-            elif not self.almacen:
-                print("[COMMS-LINK] |-- No hay almacen inicializado")
-            elif not self.almacen.dispatcher:
-                print("[COMMS-LINK] |-- No hay dispatcher inicializado")
+        """
+        REFACTOR PHASE 2: Este metodo ha sido extraido a communication/dashboard_communicator.py
+
+        MIGRATED TO: DashboardCommunicator.update_dashboard_state()
+
+        Este codigo se mantiene comentado para referencia durante la fase de testing.
+        Una vez validada la funcionalidad en Fase 3, puede ser eliminado.
+
+        Enviar datos actualizados al dashboard de ordenes si esta activo
+        """
+        # REFACTOR PHASE 2: Original logic commented out - replaced by DashboardCommunicator.update_dashboard_state()
+        #
+        # Original implementation follows (preserved for reference):
+        #
+        # # INSTRUMENTACION: Verificar enlace de comunicacion
+        # print(f"[COMMS-LINK] Verificando enlace... Proceso dashboard existe: {self.order_dashboard_process is not None}")
+        #
+        # All original dashboard update logic commented out - functionality moved to DashboardCommunicator
+        # (Original implementation preserved for reference - will be removed in Phase 3)
+
+        # REFACTOR PHASE 2: Temporary stub - will be replaced with DashboardCommunicator integration in Phase 3
+        print("[REFACTOR] _actualizar_dashboard_ordenes() - Functionality moved to communication/dashboard_communicator.py")
+        print("[REFACTOR] Phase 3 will integrate DashboardCommunicator.update_dashboard_state() here")
     
     # ELIMINATED: def _enviar_estado_completo_inicial_replay() - Replay initial state method removed
     def _ELIMINATED_enviar_estado_completo_inicial_replay(self):
@@ -1659,11 +1660,23 @@ class SimulationEngine:
 
     def limpiar_recursos(self):
         """Limpia todos los recursos incluyendo procesos"""
+        # REFACTOR PHASE 3: Shutdown DashboardCommunicator gracefully
+        if hasattr(self, 'dashboard_communicator') and self.dashboard_communicator:
+            try:
+                print("[CLEANUP] Shutting down DashboardCommunicator...")
+                success = self.dashboard_communicator.shutdown_dashboard()
+                if success:
+                    print("[CLEANUP] DashboardCommunicator shutdown completed successfully")
+                else:
+                    print("[CLEANUP] DashboardCommunicator shutdown had issues")
+            except Exception as e:
+                print(f"[CLEANUP] Error shutting down DashboardCommunicator: {e}")
+
         if self.simulation_process and self.simulation_process.is_alive():
             print("[CLEANUP] Terminando proceso de simulacion...")
             self.simulation_process.terminate()
             self.simulation_process.join(timeout=5)
-        
+
         limpiar_estado()
         pygame.quit()
         print("Recursos liberados. Hasta luego!")

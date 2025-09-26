@@ -565,3 +565,15 @@ export_result_test_*.py
 test_config*.jsonl
 *_test_*.jsonl
 config_analytics_*.json
+
+# Archivos temporales de testing V10.0.4 - DashboardCommunicator TPRF
+test_dashboard_*.py
+debug_dashboard_*.py
+*_dashboard_test*.py
+*_dashboard_integration*.py
+*_dashboard_realtime*.py
+*_dashboard_cleanup*.py
+dashboard_tprf_*.log
+*_tprf_validation*.log
+*_communication_test*.py
+phase3_integration_*.log
