@@ -549,3 +549,19 @@ diagnostic_extraction_*.log
 *_modular_diagnostic*.log
 *_diagnostic_tools_test.py
 test_diagnostic_*.py
+
+# Archivos temporales de refactoring V10.0.3 - AnalyticsExporter enhancement
+*_analytics_test_*.py
+*_exporter_test_*.py
+*_context_test_*.py
+analytics_refactor_*.log
+*_analytics_migration*.log
+*_exporter_v2_test.py
+test_simulation_context_*.py
+export_result_test_*.py
+*_analytics_audit*.log
+
+# Archivos de configuración temporal para testing
+test_config*.jsonl
+*_test_*.jsonl
+config_analytics_*.json

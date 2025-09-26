@@ -51,6 +51,10 @@ from core.replay_utils import agregar_evento_replay, volcar_replay_a_archivo
 # REFACTOR: ConfigurationManager replaces cargar_configuracion logic
 from core.config_manager import ConfigurationManager, ConfigurationError
 from core.config_utils import get_default_config, mostrar_resumen_config
+# REFACTOR: AnalyticsExporter extraction - Import analytics exporter
+from analytics.exporter import AnalyticsExporter as AnalyticsExporterV1
+# REFACTOR PHASE 2: Enhanced AnalyticsExporter with SimulationContext
+from analytics import AnalyticsExporter, SimulationContext, ExportResult
 # REFACTOR: DiagnosticTools extraction - Import diagnostics function
 def _import_diagnostic_tools():
     """Import diagnostic tools with fallback mechanism"""
@@ -401,8 +405,13 @@ class SimulationEngine:
                     else: # Si la simulacion ha terminado
                         print("[SIMULADOR] Condicion de finalizacion cumplida: No hay tareas pendientes y todos los agentes estan ociosos.")
                         print("Simulacion completada y finalizada logicamente.")
-                        # La funcion de reporte ahora solo se llama UNA VEZ
-                        self._simulacion_completada() 
+                        # REFACTOR PHASE 2: Usar AnalyticsExporter V2 con SimulationContext
+                        context = SimulationContext.from_simulation_engine(self)
+                        analytics_exporter = AnalyticsExporter(context)
+                        export_result = analytics_exporter.export_complete_analytics()
+
+                        if not export_result.success:
+                            print(f"[WARNING] Exportacion tuvo errores: {len(export_result.errors)} errores") 
                         
                         # Dashboard final update UNA VEZ
                         self._actualizar_dashboard_ordenes()
@@ -487,9 +496,14 @@ class SimulationEngine:
             print("Simulacion Headless completada.")
             
             # REFACTOR: Buffer ahora manejado por self.replay_buffer
-            
-            # Llamar a analiticas al finalizar, SIN pasar buffer especifico
-            self._simulacion_completada_con_buffer(None)
+
+            # REFACTOR PHASE 2: Usar AnalyticsExporter V2 con SimulationContext
+            context = SimulationContext.from_simulation_engine(self)
+            analytics_exporter = AnalyticsExporter(context)
+            export_result = analytics_exporter.export_complete_analytics_with_buffer(None)
+
+            if not export_result.success:
+                print(f"[WARNING] Exportacion headless tuvo errores: {len(export_result.errors)} errores")
             
         except KeyboardInterrupt:
             print("\nInterrupcion del usuario en modo headless. Saliendo...")
@@ -952,182 +966,141 @@ class SimulationEngine:
         # Usar la nueva logica centralizada de finalizacion
         return not self.almacen.simulacion_ha_terminado()
     
+    # REFACTOR PHASE 1: Metodo extraido a analytics/exporter.py - AnalyticsExporter.export_complete_analytics()
+    # ORIGINAL METHOD PRESERVED FOR REFERENCE - DO NOT DELETE
     def _simulacion_completada(self):
-        """Maneja la finalizacion de la simulacion con pipeline automatizado"""
-        print("\n" + "="*70)
-        print("SIMULACION COMPLETADA - INICIANDO PIPELINE DE ANALITICAS")
-        print("="*70)
-        
-        if not self.almacen:
-            print("Error: No hay datos del almacen para procesar")
-            return
-        
-        # Mostrar metricas basicas
-        mostrar_metricas_consola(self.almacen)
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Crear estructura de directorios organizados
-        output_base_dir = "output"
-        output_dir = os.path.join(output_base_dir, f"simulation_{timestamp}")
-        
-        try:
-            os.makedirs(output_dir, exist_ok=True)
-            print(f"[SETUP] Directorio de salida creado: {output_dir}")
-        except Exception as e:
-            print(f"[ERROR] No se pudo crear directorio de salida: {e}")
-            # Fallback: usar directorio actual
-            output_dir = "."
-        
-        archivos_generados = []
-        
-        # 1. Exportar metricas JSON basicas
-        archivo_json = os.path.join(output_dir, f"simulacion_completada_{timestamp}.json")
-        exportar_metricas(self.almacen, archivo_json)
-        archivos_generados.append(archivo_json)
-        print(f"[1/4] Metricas JSON guardadas: {archivo_json}")
-        
-        # 2. Exportar eventos crudos (modificar almacen para usar output_dir)
-        archivo_eventos = self._exportar_eventos_crudos_organizado(output_dir, timestamp)
-        if archivo_eventos:
-            archivos_generados.append(archivo_eventos)
-            print(f"[2/4] Eventos detallados guardados: {archivo_eventos}")
-        
-        # ELIMINATED: 2.5. VOLCADO DE REPLAY BUFFER - No replay capabilities in pure simulation
-        # ELIMINATED: Replay buffer dumping logic removed - live simulation doesn't generate replay files
-        # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine -> Excel
-        print("[3/4] Simulacion completada. Generando reporte de Excel...")
-        try:
-            # Usar el metodo __init__ original con eventos y configuracion en memoria
-            analytics_engine = AnalyticsEngine(self.almacen.event_log, self.configuracion)
-            analytics_engine.process_events()
-            
-            # Generar archivo Excel con ruta organizada
-            excel_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.xlsx")
-            archivo_excel = analytics_engine.export_to_excel(excel_filename)
-            
-            if archivo_excel:
-                archivos_generados.append(archivo_excel)
-                print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
-                
-                # 4. PIPELINE AUTOMATIZADO: Visualizer -> PNG
-                print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
-                self._ejecutar_visualizador(archivo_excel, timestamp, output_dir)
-                
-            else:
-                print("[ERROR] No se pudo generar el reporte de Excel")
-                
-        except Exception as e:
-            print(f"[ERROR] Error en pipeline de analiticas: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        # Resumen final
-        print("\n" + "="*70)
-        print("PROCESO COMPLETADO")
-        print("="*70)
-        print("Archivos generados:")
-        for i, archivo in enumerate(archivos_generados, 1):
-            print(f"  {i}. {archivo}")
-        print("="*70)
-        print("\nPresiona R para reiniciar o ESC para salir")
+        """
+        REFACTOR NOTICE: Este metodo ha sido extraido a analytics/exporter.py
+
+        MIGRATED TO: AnalyticsExporter.export_complete_analytics()
+
+        Este codigo se mantiene comentado para referencia durante la fase de testing.
+        Una vez validada la funcionalidad, puede ser eliminado.
+        """
+        # REFACTOR PHASE 1: Todo el codigo extraido a analytics.exporter.AnalyticsExporter.export_complete_analytics()
+        # El siguiente codigo esta comentado ya que ahora se maneja via AnalyticsExporter
+
+        # print("\n" + "="*70)
+        # print("SIMULACION COMPLETADA - INICIANDO PIPELINE DE ANALITICAS")
+        # print("="*70)
+        #
+        # if not self.almacen:
+        #     print("Error: No hay datos del almacen para procesar")
+        #     return
+        #
+        # # Mostrar metricas basicas
+        # mostrar_metricas_consola(self.almacen)
+        #
+        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        #
+        # # Crear estructura de directorios organizados
+        # output_base_dir = "output"
+        # output_dir = os.path.join(output_base_dir, f"simulation_{timestamp}")
+        #
+        # try:
+        #     os.makedirs(output_dir, exist_ok=True)
+        #     print(f"[SETUP] Directorio de salida creado: {output_dir}")
+        # except Exception as e:
+        #     print(f"[ERROR] No se pudo crear directorio de salida: {e}")
+        #     # Fallback: usar directorio actual
+        #     output_dir = "."
+        #
+        # archivos_generados = []
+        #
+        # # 1. Exportar metricas JSON basicas
+        # archivo_json = os.path.join(output_dir, f"simulacion_completada_{timestamp}.json")
+        # exportar_metricas(self.almacen, archivo_json)
+        # archivos_generados.append(archivo_json)
+        # print(f"[1/4] Metricas JSON guardadas: {archivo_json}")
+        #
+        # # 2. Exportar eventos crudos (modificar almacen para usar output_dir)
+        # archivo_eventos = self._exportar_eventos_crudos_organizado(output_dir, timestamp)
+        # if archivo_eventos:
+        #     archivos_generados.append(archivo_eventos)
+        #     print(f"[2/4] Eventos detallados guardados: {archivo_eventos}")
+        #
+        # # ELIMINATED: 2.5. VOLCADO DE REPLAY BUFFER - No replay capabilities in pure simulation
+        # # ELIMINATED: Replay buffer dumping logic removed - live simulation doesn't generate replay files
+        # # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine -> Excel
+        # print("[3/4] Simulacion completada. Generando reporte de Excel...")
+        # try:
+        #     # Usar el metodo __init__ original con eventos y configuracion en memoria
+        #     analytics_engine = AnalyticsEngine(self.almacen.event_log, self.configuracion)
+        #     analytics_engine.process_events()
+        #
+        #     # Generar archivo Excel con ruta organizada
+        #     excel_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.xlsx")
+        #     archivo_excel = analytics_engine.export_to_excel(excel_filename)
+        #
+        #     if archivo_excel:
+        #         archivos_generados.append(archivo_excel)
+        #         print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
+        #
+        #         # 4. PIPELINE AUTOMATIZADO: Visualizer -> PNG
+        #         print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
+        #         self._ejecutar_visualizador(archivo_excel, timestamp, output_dir)
+        #
+        #     else:
+        #         print("[ERROR] No se pudo generar el reporte de Excel")
+        #
+        # except Exception as e:
+        #     print(f"[ERROR] Error en pipeline de analiticas: {e}")
+        #     import traceback
+        #     traceback.print_exc()
+        #
+        # # Resumen final
+        # print("\n" + "="*70)
+        # print("PROCESO COMPLETADO")
+        # print("="*70)
+        # print("Archivos generados:")
+        # for i, archivo in enumerate(archivos_generados, 1):
+        #     print(f"  {i}. {archivo}")
+        # print("="*70)
+        # print("\nPresiona R para reiniciar o ESC para salir")
+
+        pass  # Placeholder - funcionalidad ahora en AnalyticsExporter
     
+    # REFACTOR PHASE 1: Metodo extraido a analytics/exporter.py - AnalyticsExporter.export_complete_analytics_with_buffer()
+    # ORIGINAL METHOD PRESERVED FOR REFERENCE - DO NOT DELETE
     def _simulacion_completada_con_buffer(self, buffer_eventos):
-        """Maneja la finalizacion de la simulacion con buffer de eventos especifico"""
-        print("\n" + "="*70)
-        print("SIMULACION COMPLETADA - INICIANDO PIPELINE DE ANALITICAS")
-        print("="*70)
+        """
+        REFACTOR NOTICE: Este metodo ha sido extraido a analytics/exporter.py
 
-        if not self.almacen:
-            print("Error: No hay datos del almacen para procesar")
-            return
+        MIGRATED TO: AnalyticsExporter.export_complete_analytics_with_buffer()
 
-        # Mostrar metricas basicas
-        mostrar_metricas_consola(self.almacen)
+        Este codigo se mantiene comentado para referencia durante la fase de testing.
+        Una vez validada la funcionalidad, puede ser eliminado.
+        """
+        # REFACTOR PHASE 1: Todo el codigo extraido a analytics.exporter.AnalyticsExporter.export_complete_analytics_with_buffer()
+        # El siguiente codigo esta comentado ya que ahora se maneja via AnalyticsExporter
 
-        # UNIFIED: Use session timestamp instead of generating new one
-        timestamp = getattr(self, 'session_timestamp', datetime.now().strftime("%Y%m%d_%H%M%S"))
-        output_dir = getattr(self, 'session_output_dir', os.path.join("output", f"simulation_{timestamp}"))
-        
-        try:
-            os.makedirs(output_dir, exist_ok=True)
-            print(f"[SETUP] Directorio de salida creado: {output_dir}")
-        except Exception as e:
-            print(f"[ERROR] No se pudo crear directorio de salida: {e}")
-            # Fallback: usar directorio actual
-            output_dir = "."
-        
-        archivos_generados = []
-        
-        # 1. Exportar metricas JSON basicas
-        archivo_json = os.path.join(output_dir, f"simulacion_completada_{timestamp}.json")
-        exportar_metricas(self.almacen, archivo_json)
-        archivos_generados.append(archivo_json)
-        print(f"[1/4] Metricas JSON guardadas: {archivo_json}")
-        
-        # 2. Exportar eventos crudos (modificar almacen para usar output_dir)
-        archivo_eventos = self._exportar_eventos_crudos_organizado(output_dir, timestamp)
-        if archivo_eventos:
-            archivos_generados.append(archivo_eventos)
-            print(f"[2/4] Eventos detallados guardados: {archivo_eventos}")
-
-        # ELIMINATED: 2.5. VOLCADO DE REPLAY BUFFER - No replay capabilities in pure simulation
-        # ELIMINATED: Replay buffer dumping logic removed - live simulation doesn't generate replay files
-
-        # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine -> Excel
-        print("[3/4] Simulacion completada. Generando reporte de Excel...")
-        try:
-            # Usar el metodo __init__ original con eventos y configuracion en memoria
-            analytics_engine = AnalyticsEngine(self.almacen.event_log, self.configuracion)
-            analytics_engine.process_events()
-            
-            # Generar archivo Excel con ruta organizada
-            excel_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.xlsx")
-            archivo_excel = analytics_engine.export_to_excel(excel_filename)
-            
-            if archivo_excel:
-                archivos_generados.append(archivo_excel)
-                print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
-                
-                # 4. PIPELINE AUTOMATIZADO: Visualizer -> PNG
-                print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
-                self._ejecutar_visualizador(archivo_excel, timestamp, output_dir)
-                
-            else:
-                print("[ERROR] No se pudo generar el reporte de Excel")
-                
-        except Exception as e:
-            print(f"[ERROR] Error en pipeline de analiticas: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        # Resumen final
-        print("\n" + "="*70)
-        print("PROCESO COMPLETADO")
-        print("="*70)
-        print("Archivos generados:")
-        for i, archivo in enumerate(archivos_generados, 1):
-            print(f"  {i}. {archivo}")
-        print("="*70)
-        print("\nPresiona R para reiniciar o ESC para salir")
+        pass  # Placeholder - funcionalidad ahora en AnalyticsExporter
     
+    # REFACTOR PHASE 1: Metodo extraido a analytics/exporter.py - AnalyticsExporter._exportar_eventos_crudos_organizado()
+    # ORIGINAL METHOD PRESERVED FOR REFERENCE - DO NOT DELETE
     def _exportar_eventos_crudos_organizado(self, output_dir: str, timestamp: str):
-        """Exporta eventos crudos a directorio organizado"""
-        import json
-        
-        filename = os.path.join(output_dir, f"raw_events_{timestamp}.json")
-        
-        try:
-            with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(self.almacen.event_log, f, indent=2, ensure_ascii=False)
-            print(f"[ANALYTICS] Eventos exportados a: {filename} ({len(self.almacen.event_log)} eventos)")
-            return filename
-        except Exception as e:
-            print(f"[ANALYTICS] Error exportando eventos: {e}")
-            return None
+        """
+        REFACTOR NOTICE: Este metodo ha sido extraido a analytics/exporter.py
+
+        MIGRATED TO: AnalyticsExporter._exportar_eventos_crudos_organizado()
+
+        Este codigo se mantiene comentado para referencia durante la fase de testing.
+        Una vez validada la funcionalidad, puede ser eliminado.
+        """
+        # Funcionalidad ahora en AnalyticsExporter
+        pass
     
+    # REFACTOR PHASE 1: Metodo extraido a analytics/exporter.py - AnalyticsExporter._ejecutar_visualizador()
+    # ORIGINAL METHOD PRESERVED FOR REFERENCE - DO NOT DELETE
     def _ejecutar_visualizador(self, excel_path: str, timestamp: str, output_dir: str):
-        """Ejecuta visualizer.py automaticamente usando subprocess"""
+        """
+        REFACTOR NOTICE: Este metodo ha sido extraido a analytics/exporter.py
+
+        MIGRATED TO: AnalyticsExporter._ejecutar_visualizador()
+
+        Este codigo se mantiene comentado para referencia durante la fase de testing.
+        Una vez validada la funcionalidad, puede ser eliminado.
+        """
         try:
             # Construir rutas dinamicamente
             script_dir = os.path.dirname(os.path.abspath(__file__))
