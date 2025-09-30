@@ -19,11 +19,52 @@ class VentanaConfiguracion:
     """
 
     def __init__(self, parent):
+        """Inicializa la ventana de configuracion"""
         self.parent = parent
-        self.notebook = ttk.Notebook(parent)
-        self.notebook.pack(fill='both', expand=True, padx=10, pady=10)
+        self.available_work_areas = []
+        self.assignment_rules = {"GroundOperator": {}, "Forklift": {}}
+        self.assignment_widgets = {"GroundOperator": [], "Forklift": []}
+        self.fleet_groups = []  # Lista de grupos de flota creados
 
-        # Variables de configuracion
+        # Crear notebook con pestanas
+        self.notebook = ttk.Notebook(parent)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Crear pestanas
+        self.tab_carga = ttk.Frame(self.notebook)
+        self.tab_recursos = ttk.Frame(self.notebook)
+        self.tab_estrategias = ttk.Frame(self.notebook)
+        self.tab_asignacion = ttk.Frame(self.notebook)
+        self.tab_layout = ttk.Frame(self.notebook)
+        self.tab_flota = ttk.Frame(self.notebook)
+        self.tab_staging = ttk.Frame(self.notebook)
+
+        self.notebook.add(self.tab_carga, text="Carga de Trabajo")
+        self.notebook.add(self.tab_recursos, text="Recursos")
+        self.notebook.add(self.tab_estrategias, text="Estrategias")
+        self.notebook.add(self.tab_asignacion, text="Asignacion Recursos")
+        self.notebook.add(self.tab_layout, text="Layout")
+        self.notebook.add(self.tab_flota, text="Flota de Agentes")
+        self.notebook.add(self.tab_staging, text="Outbound Staging")
+
+        # Inicializar variables
+        self._inicializar_variables()
+
+        # Crear widgets en cada pestana
+        self._crear_widgets_carga()
+        self._crear_widgets_recursos()
+        self._crear_widgets_estrategias()
+        self._crear_widgets_asignacion()
+        self._crear_widgets_layout()
+        self._crear_widgets_flota()
+        self._crear_widgets_staging()
+
+        # Crear frame de botones en la parte inferior
+        self._crear_botones_accion()
+
+    def _inicializar_variables(self):
+        """Inicializa todas las variables de tkinter"""
+        # Carga de trabajo
         self.total_ordenes_var = tk.IntVar(value=300)
         self.pct_pequeno = tk.IntVar(value=60)
         self.pct_mediano = tk.IntVar(value=30)
@@ -39,394 +80,463 @@ class VentanaConfiguracion:
         self.capacidad_montacargas = tk.IntVar(value=1000)
         self.tiempo_descarga_por_tarea = tk.IntVar(value=5)
 
-        # Estrategias
-        self.dispatch_strategy_var = tk.StringVar(value='Ejecucion de Plan (Filtro por Prioridad)')
+        # Estrategias (3 tipos)
+        self.strategy_var = tk.StringVar(value="Zoning and Snake")
+        self.batching_strategy_var = tk.StringVar(value="Orden por Orden (Linea Base)")
+        self.dispatch_strategy_var = tk.StringVar(value="Ejecucion de Plan (Filtro por Prioridad)")
 
         # Layout
-        self.layout_path_var = tk.StringVar(value='layouts/WH1.tmx')
-        self.sequence_path_var = tk.StringVar(value='layouts/Warehouse_Logic.xlsx')
+        self.layout_path_var = tk.StringVar(value="layouts/WH1.tmx")
+        self.sequence_path_var = tk.StringVar(value="layouts/Warehouse_Logic.xlsx")
         self.map_scale_var = tk.DoubleVar(value=1.3)
 
         # Resolucion
-        self.resolution_var = tk.StringVar(value='Pequena (800x800)')
+        self.resolution_var = tk.StringVar(value="Pequena (800x800)")
 
-        # Asignacion de recursos
-        self.assignment_rules = {
-            "GroundOperator": {1: 1},
-            "Forklift": {1: 2, 2: 1, 3: 1, 4: 1, 5: 1}
+        # Outbound Staging Distribution
+        self.outbound_staging_vars = {
+            str(i): tk.IntVar(value=100 if i == 1 else 0)
+            for i in range(1, 8)
         }
-        self.assignment_widgets = {"GroundOperator": [], "Forklift": []}
 
-        # Outbound Staging
-        self.outbound_staging_vars = {str(i): tk.IntVar(value=100 if i == 1 else 0) for i in range(1, 8)}
-
-        # Flota de agentes
-        self.available_work_areas = []
-        self.fleet_groups = []
-
-        # Crear tabs
-        self._crear_tab_carga_trabajo()
-        self._crear_tab_recursos()
-        self._crear_tab_estrategias()
-        self._crear_tab_layout()
-        self._crear_tab_flota()
-        self._crear_tab_outbound_staging()
-
-        # Frame de botones inferior
-        self._crear_frame_botones()
-
-    def _crear_tab_carga_trabajo(self):
-        """Tab 1: Configuracion de carga de trabajo"""
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text='Carga de Trabajo')
-
-        # Frame principal con scroll
-        canvas = tk.Canvas(tab)
-        scrollbar = ttk.Scrollbar(tab, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
+    def _crear_widgets_carga(self):
+        """Crea widgets de la pestana Carga de Trabajo"""
+        frame = ttk.LabelFrame(self.tab_carga, text="Configuracion de Ordenes", padding=10)
+        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Total de ordenes
-        frame_total = ttk.LabelFrame(scrollable_frame, text="Total de Ordenes", padding=10)
-        frame_total.pack(fill='x', padx=10, pady=5)
-
-        ttk.Label(frame_total, text="Total de ordenes:").grid(row=0, column=0, sticky='w', padx=5)
-        ttk.Entry(frame_total, textvariable=self.total_ordenes_var, width=10).grid(row=0, column=1, padx=5)
+        row = 0
+        ttk.Label(frame, text="Total de Ordenes:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame, textvariable=self.total_ordenes_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
 
         # Distribucion de tipos
-        frame_dist = ttk.LabelFrame(scrollable_frame, text="Distribucion de Tipos de Ordenes", padding=10)
-        frame_dist.pack(fill='x', padx=10, pady=5)
+        row += 1
+        ttk.Label(frame, text="DISTRIBUCION DE TIPOS", font=("Arial", 10, "bold")).grid(row=row, column=0, columnspan=4, pady=10)
 
         # Pequeno
-        ttk.Label(frame_dist, text="Pequeno:", font=('Arial', 10, 'bold')).grid(row=0, column=0, sticky='w', pady=5)
-        ttk.Label(frame_dist, text="Porcentaje (%):").grid(row=1, column=0, sticky='w', padx=20)
-        ttk.Entry(frame_dist, textvariable=self.pct_pequeno, width=10).grid(row=1, column=1, padx=5)
-        ttk.Label(frame_dist, text="Volumen (unidades):").grid(row=1, column=2, sticky='w', padx=20)
-        ttk.Entry(frame_dist, textvariable=self.vol_pequeno, width=10).grid(row=1, column=3, padx=5)
+        row += 1
+        ttk.Label(frame, text="Ordenes Pequenas (%):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame, textvariable=self.pct_pequeno, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(frame, text="Volumen:").grid(row=row, column=2, sticky=tk.W, pady=5, padx=(10, 0))
+        ttk.Entry(frame, textvariable=self.vol_pequeno, width=15).grid(row=row, column=3, sticky=tk.W, pady=5)
 
         # Mediano
-        ttk.Label(frame_dist, text="Mediano:", font=('Arial', 10, 'bold')).grid(row=2, column=0, sticky='w', pady=5)
-        ttk.Label(frame_dist, text="Porcentaje (%):").grid(row=3, column=0, sticky='w', padx=20)
-        ttk.Entry(frame_dist, textvariable=self.pct_mediano, width=10).grid(row=3, column=1, padx=5)
-        ttk.Label(frame_dist, text="Volumen (unidades):").grid(row=3, column=2, sticky='w', padx=20)
-        ttk.Entry(frame_dist, textvariable=self.vol_mediano, width=10).grid(row=3, column=3, padx=5)
+        row += 1
+        ttk.Label(frame, text="Ordenes Medianas (%):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame, textvariable=self.pct_mediano, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(frame, text="Volumen:").grid(row=row, column=2, sticky=tk.W, pady=5, padx=(10, 0))
+        ttk.Entry(frame, textvariable=self.vol_mediano, width=15).grid(row=row, column=3, sticky=tk.W, pady=5)
 
         # Grande
-        ttk.Label(frame_dist, text="Grande:", font=('Arial', 10, 'bold')).grid(row=4, column=0, sticky='w', pady=5)
-        ttk.Label(frame_dist, text="Porcentaje (%):").grid(row=5, column=0, sticky='w', padx=20)
-        ttk.Entry(frame_dist, textvariable=self.pct_grande, width=10).grid(row=5, column=1, padx=5)
-        ttk.Label(frame_dist, text="Volumen (unidades):").grid(row=5, column=2, sticky='w', padx=20)
-        ttk.Entry(frame_dist, textvariable=self.vol_grande, width=10).grid(row=5, column=3, padx=5)
+        row += 1
+        ttk.Label(frame, text="Ordenes Grandes (%):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame, textvariable=self.pct_grande, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(frame, text="Volumen:").grid(row=row, column=2, sticky=tk.W, pady=5, padx=(10, 0))
+        ttk.Entry(frame, textvariable=self.vol_grande, width=15).grid(row=row, column=3, sticky=tk.W, pady=5)
 
-        # Validacion
-        self.label_total_pct = ttk.Label(frame_dist, text="Total: 100%", foreground='green')
-        self.label_total_pct.grid(row=6, column=0, columnspan=4, pady=10)
+        # Capacidad carro
+        row += 1
+        ttk.Separator(frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=4, sticky=tk.EW, pady=10)
+        row += 1
+        ttk.Label(frame, text="Capacidad del Carro:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame, textvariable=self.capacidad_carro, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
 
-        # Capacidad de carro
-        frame_capacidad = ttk.LabelFrame(scrollable_frame, text="Capacidad de Carro", padding=10)
-        frame_capacidad.pack(fill='x', padx=10, pady=5)
+        # Label de validacion
+        row += 1
+        self.label_validacion = ttk.Label(frame, text="", foreground="green")
+        self.label_validacion.grid(row=row, column=0, columnspan=4, pady=10)
 
-        ttk.Label(frame_capacidad, text="Capacidad del carro (unidades):").grid(row=0, column=0, sticky='w', padx=5)
-        ttk.Entry(frame_capacidad, textvariable=self.capacidad_carro, width=10).grid(row=0, column=1, padx=5)
+        # Validar porcentajes en tiempo real
+        self.pct_pequeno.trace_add("write", lambda *args: self.validar_porcentajes())
+        self.pct_mediano.trace_add("write", lambda *args: self.validar_porcentajes())
+        self.pct_grande.trace_add("write", lambda *args: self.validar_porcentajes())
 
-        # Bind para validacion en tiempo real
-        self.pct_pequeno.trace_add('write', lambda *args: self.validar_porcentajes())
-        self.pct_mediano.trace_add('write', lambda *args: self.validar_porcentajes())
-        self.pct_grande.trace_add('write', lambda *args: self.validar_porcentajes())
+    def _crear_widgets_recursos(self):
+        """Crea widgets de la pestana Recursos"""
+        frame = ttk.LabelFrame(self.tab_recursos, text="Configuracion de Recursos", padding=10)
+        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        row = 0
+        ttk.Label(frame, text="Operarios Terrestres:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame, textvariable=self.num_operarios_terrestres, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
 
-    def _crear_tab_recursos(self):
-        """Tab 2: Configuracion de recursos"""
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text='Recursos')
+        row += 1
+        ttk.Label(frame, text="Montacargas:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame, textvariable=self.num_montacargas, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
 
-        frame_recursos = ttk.LabelFrame(tab, text="Configuracion de Recursos", padding=20)
-        frame_recursos.pack(fill='both', expand=True, padx=10, pady=10)
+        row += 1
+        ttk.Label(frame, text="Capacidad Montacargas:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame, textvariable=self.capacidad_montacargas, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
 
-        # Operarios terrestres
-        ttk.Label(frame_recursos, text="Operarios Terrestres:").grid(row=0, column=0, sticky='w', pady=5, padx=5)
-        ttk.Entry(frame_recursos, textvariable=self.num_operarios_terrestres, width=10).grid(row=0, column=1, pady=5, padx=5)
+        row += 1
+        ttk.Label(frame, text="Tiempo Descarga por Tarea (s):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame, textvariable=self.tiempo_descarga_por_tarea, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
 
-        # Montacargas
-        ttk.Label(frame_recursos, text="Montacargas:").grid(row=1, column=0, sticky='w', pady=5, padx=5)
-        ttk.Entry(frame_recursos, textvariable=self.num_montacargas, width=10).grid(row=1, column=1, pady=5, padx=5)
+        row += 1
+        self.label_total_recursos = ttk.Label(frame, text="Total de Recursos: 2", font=("Arial", 10, "bold"))
+        self.label_total_recursos.grid(row=row, column=0, columnspan=2, pady=10)
 
-        # Capacidad montacargas
-        ttk.Label(frame_recursos, text="Capacidad Montacargas (unidades):").grid(row=2, column=0, sticky='w', pady=5, padx=5)
-        ttk.Entry(frame_recursos, textvariable=self.capacidad_montacargas, width=10).grid(row=2, column=1, pady=5, padx=5)
+        self.num_operarios_terrestres.trace_add("write", lambda *args: self.actualizar_total())
+        self.num_montacargas.trace_add("write", lambda *args: self.actualizar_total())
 
-        # Tiempo de descarga
-        ttk.Label(frame_recursos, text="Tiempo Descarga por Tarea (s):").grid(row=3, column=0, sticky='w', pady=5, padx=5)
-        ttk.Entry(frame_recursos, textvariable=self.tiempo_descarga_por_tarea, width=10).grid(row=3, column=1, pady=5, padx=5)
+    def _crear_widgets_estrategias(self):
+        """Crea widgets de la pestana Estrategias"""
+        frame = ttk.LabelFrame(self.tab_estrategias, text="Estrategias de Operacion", padding=10)
+        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Total de operarios
-        ttk.Label(frame_recursos, text="Total de Operarios:", font=('Arial', 10, 'bold')).grid(row=4, column=0, sticky='w', pady=10, padx=5)
-        self.label_total_operarios = ttk.Label(frame_recursos, text="2", font=('Arial', 10, 'bold'))
-        self.label_total_operarios.grid(row=4, column=1, pady=10, padx=5)
+        row = 0
 
-        # Bind para actualizar total
-        self.num_operarios_terrestres.trace_add('write', lambda *args: self.actualizar_total())
-        self.num_montacargas.trace_add('write', lambda *args: self.actualizar_total())
-
-    def _crear_tab_estrategias(self):
-        """Tab 3: Estrategias de dispatch"""
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text='Estrategias')
-
-        frame_estrategias = ttk.LabelFrame(tab, text="Estrategia de Dispatch", padding=20)
-        frame_estrategias.pack(fill='both', expand=True, padx=10, pady=10)
-
-        ttk.Label(frame_estrategias, text="Selecciona la estrategia de dispatch:").pack(anchor='w', pady=5)
-
-        estrategias = [
-            'Ejecucion de Plan (Filtro por Prioridad)',
-            'FIFO Simple',
-            'Prioridad por Volumen'
+        # Estrategia de Ruteo
+        ttk.Label(frame, text="Estrategia de Ruteo:", font=("Arial", 10, "bold")).grid(row=row, column=0, sticky=tk.W, pady=(5, 2))
+        row += 1
+        estrategias_ruteo = [
+            "Zoning and Snake",
+            "S-Shape",
+            "Largest Gap",
+            "Return"
         ]
+        combo_ruteo = ttk.Combobox(frame, textvariable=self.strategy_var, values=estrategias_ruteo, width=40, state='readonly')
+        combo_ruteo.grid(row=row, column=0, sticky=tk.W, pady=(0, 15), padx=(20, 0))
 
-        for estrategia in estrategias:
-            ttk.Radiobutton(
-                frame_estrategias,
-                text=estrategia,
-                variable=self.dispatch_strategy_var,
-                value=estrategia
-            ).pack(anchor='w', pady=2, padx=20)
+        # Estrategia de Batching
+        row += 1
+        ttk.Label(frame, text="Estrategia de Batching:", font=("Arial", 10, "bold")).grid(row=row, column=0, sticky=tk.W, pady=(5, 2))
+        row += 1
+        estrategias_batching = [
+            "Orden por Orden (Linea Base)",
+            "Time Window Batching",
+            "Priority Batching",
+            "Seed-Based Batching"
+        ]
+        combo_batching = ttk.Combobox(frame, textvariable=self.batching_strategy_var, values=estrategias_batching, width=40, state='readonly')
+        combo_batching.grid(row=row, column=0, sticky=tk.W, pady=(0, 15), padx=(20, 0))
 
-    def _crear_tab_layout(self):
-        """Tab 4: Configuracion de layout y archivos"""
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text='Layout')
+        # Estrategia de Dispatch
+        row += 1
+        ttk.Label(frame, text="Estrategia de Dispatch:", font=("Arial", 10, "bold")).grid(row=row, column=0, sticky=tk.W, pady=(5, 2))
+        row += 1
+        estrategias_dispatch = [
+            "Ejecucion de Plan (Filtro por Prioridad)",
+            "Dispatch Dinamico",
+            "Prioridad FIFO",
+            "Global Cost Strategy"
+        ]
+        combo_dispatch = ttk.Combobox(frame, textvariable=self.dispatch_strategy_var, values=estrategias_dispatch, width=40, state='readonly')
+        combo_dispatch.grid(row=row, column=0, sticky=tk.W, pady=(0, 5), padx=(20, 0))
 
-        frame_layout = ttk.LabelFrame(tab, text="Archivos de Layout", padding=20)
-        frame_layout.pack(fill='both', expand=True, padx=10, pady=10)
+    def _crear_widgets_asignacion(self):
+        """Crea widgets de la pestana Asignacion de Recursos"""
+        main_frame = ttk.Frame(self.tab_asignacion)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Layout file
-        ttk.Label(frame_layout, text="Archivo de Layout (.tmx):").grid(row=0, column=0, sticky='w', pady=5)
-        ttk.Entry(frame_layout, textvariable=self.layout_path_var, width=40).grid(row=0, column=1, pady=5, padx=5)
-        ttk.Button(frame_layout, text="Buscar...", command=self._seleccionar_layout).grid(row=0, column=2, pady=5)
+        # Titulo
+        ttk.Label(main_frame, text="Asignacion de Prioridades por Nivel de WorkArea",
+                 font=("Arial", 11, "bold")).pack(pady=10)
 
-        # Sequence file
-        ttk.Label(frame_layout, text="Archivo de Secuencia (.xlsx):").grid(row=1, column=0, sticky='w', pady=5)
-        ttk.Entry(frame_layout, textvariable=self.sequence_path_var, width=40).grid(row=1, column=1, pady=5, padx=5)
-        ttk.Button(frame_layout, text="Buscar...", command=self._seleccionar_secuencia).grid(row=1, column=2, pady=5)
+        # Descripcion
+        desc = ttk.Label(main_frame, text="Configura la prioridad de cada tipo de agente para cada nivel.\nPrioridad 1 = Mayor prioridad, numeros mayores = menor prioridad.",
+                        justify=tk.CENTER)
+        desc.pack(pady=5)
 
-        # Map scale
-        ttk.Label(frame_layout, text="Escala del Mapa:").grid(row=2, column=0, sticky='w', pady=5)
-        ttk.Entry(frame_layout, textvariable=self.map_scale_var, width=10).grid(row=2, column=1, pady=5, padx=5, sticky='w')
+        # Frame con scroll para las asignaciones
+        canvas = tk.Canvas(main_frame, height=300)
+        scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=canvas.yview)
+        self.assignment_frame = ttk.Frame(canvas)
 
-        # Resolucion
-        ttk.Label(frame_layout, text="Resolucion de Ventana:").grid(row=3, column=0, sticky='w', pady=5)
-        resoluciones = ['Pequena (800x800)', 'Mediana (1024x768)', 'Grande (1280x1024)', 'Extra Grande (1920x1080)']
-        ttk.Combobox(frame_layout, textvariable=self.resolution_var, values=resoluciones, width=30, state='readonly').grid(row=3, column=1, pady=5, padx=5, sticky='w')
-
-    def _crear_tab_flota(self):
-        """Tab 5: Flota de agentes"""
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text='Flota de Agentes')
-
-        # Canvas con scrollbar
-        canvas = tk.Canvas(tab)
-        scrollbar = ttk.Scrollbar(tab, orient="vertical", command=canvas.yview)
-        self.fleet_frame = ttk.Frame(canvas)
-
-        self.fleet_frame.bind(
+        self.assignment_frame.bind(
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
 
-        canvas.create_window((0, 0), window=self.fleet_frame, anchor="nw")
+        canvas.create_window((0, 0), window=self.assignment_frame, anchor=tk.NW)
         canvas.configure(yscrollcommand=scrollbar.set)
 
-        # Botones de control
-        frame_controles = ttk.Frame(tab)
-        frame_controles.pack(side='top', fill='x', padx=10, pady=5)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        ttk.Button(frame_controles, text="Generar Flota por Defecto", command=self._generar_flota_defecto_ui).pack(side='left', padx=5)
-        ttk.Button(frame_controles, text="Agregar Grupo", command=self._agregar_grupo_manual).pack(side='left', padx=5)
-        ttk.Button(frame_controles, text="Limpiar Todo", command=self._limpiar_todos_los_grupos).pack(side='left', padx=5)
+        # Botones
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=10)
 
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        ttk.Button(button_frame, text="Generar Asignacion por Defecto",
+                  command=self._generar_asignacion_defecto).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Limpiar Asignaciones",
+                  command=self._limpiar_asignaciones).pack(side=tk.LEFT, padx=5)
 
-        # Mensaje inicial
-        ttk.Label(self.fleet_frame, text="No hay grupos de flota configurados.\nUsa 'Generar Flota por Defecto' o 'Agregar Grupo' para comenzar.",
-                 justify='center').pack(pady=50)
+        # Inicializar con asignacion por defecto
+        self._generar_asignacion_defecto()
 
-    def _crear_tab_outbound_staging(self):
-        """Tab 6: Distribucion de Outbound Staging"""
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text='Outbound Staging')
+    def _crear_widgets_layout(self):
+        """Crea widgets de la pestana Layout"""
+        frame = ttk.LabelFrame(self.tab_layout, text="Archivos de Layout", padding=10)
+        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        frame_staging = ttk.LabelFrame(tab, text="Distribucion de Staging Areas (%)", padding=20)
-        frame_staging.pack(fill='both', expand=True, padx=10, pady=10)
+        row = 0
+        ttk.Label(frame, text="Archivo TMX:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame, textvariable=self.layout_path_var, width=40).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Button(frame, text="Examinar...", command=self._examinar_tmx).grid(row=row, column=2, padx=5)
 
-        ttk.Label(frame_staging, text="Configura el porcentaje de ordenes asignadas a cada area de staging:").pack(anchor='w', pady=10)
+        row += 1
+        ttk.Label(frame, text="Archivo Secuencia (XLSX):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame, textvariable=self.sequence_path_var, width=40).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Button(frame, text="Examinar...", command=self._examinar_sequence).grid(row=row, column=2, padx=5)
+
+        row += 1
+        ttk.Label(frame, text="Escala del Mapa:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame, textvariable=self.map_scale_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+
+        row += 1
+        ttk.Label(frame, text="Resolucion:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        resoluciones = ["Pequena (800x800)", "Mediana (1024x768)", "Grande (1280x1024)", "Extra Grande (1920x1080)"]
+        combo = ttk.Combobox(frame, textvariable=self.resolution_var, values=resoluciones, width=30, state='readonly')
+        combo.grid(row=row, column=1, sticky=tk.W, pady=5)
+
+    def _crear_widgets_flota(self):
+        """Crea widgets de la pestana Flota de Agentes"""
+        # Frame principal con scroll
+        main_frame = ttk.Frame(self.tab_flota)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Canvas y scrollbar
+        canvas = tk.Canvas(main_frame, height=400)
+        scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=canvas.yview)
+        self.fleet_scrollable_frame = ttk.Frame(canvas)
+
+        self.fleet_scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=self.fleet_scrollable_frame, anchor=tk.NW)
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Botones de gestion
+        button_frame = ttk.Frame(self.tab_flota)
+        button_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Button(button_frame, text="Generar Flota por Defecto",
+                  command=self._generar_flota_defecto).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Limpiar Todo",
+                  command=self._limpiar_todos_los_grupos).pack(side=tk.LEFT, padx=5)
+
+    def _crear_widgets_staging(self):
+        """Crea widgets de la pestana Outbound Staging"""
+        frame = ttk.LabelFrame(self.tab_staging, text="Distribucion de Staging", padding=10)
+        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        ttk.Label(frame, text="Distribucion porcentual de ordenes por zona de staging:",
+                 font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=3, pady=10)
 
         for i in range(1, 8):
-            frame_row = ttk.Frame(frame_staging)
-            frame_row.pack(fill='x', pady=5)
+            row = i
+            ttk.Label(frame, text=f"Staging {i}:").grid(row=row, column=0, sticky=tk.W, pady=5)
+            ttk.Entry(frame, textvariable=self.outbound_staging_vars[str(i)], width=15).grid(
+                row=row, column=1, sticky=tk.W, pady=5)
+            ttk.Label(frame, text="%").grid(row=row, column=2, sticky=tk.W, pady=5)
 
-            ttk.Label(frame_row, text=f"Staging Area {i}:", width=20).pack(side='left', padx=5)
-            ttk.Entry(frame_row, textvariable=self.outbound_staging_vars[str(i)], width=10).pack(side='left', padx=5)
-            ttk.Label(frame_row, text="%").pack(side='left')
+            # Trace para validacion
+            self.outbound_staging_vars[str(i)].trace_add("write",
+                lambda *args: self._validar_staging_distribution())
 
-            # Bind para validacion
-            self.outbound_staging_vars[str(i)].trace_add('write', lambda *args: self._validar_staging_distribution())
+        self.staging_validation_label = ttk.Label(frame, text="", foreground="green")
+        self.staging_validation_label.grid(row=8, column=0, columnspan=3, pady=10)
 
-        # Label de validacion
-        self.label_staging_total = ttk.Label(frame_staging, text="Total: 100%", foreground='green', font=('Arial', 10, 'bold'))
-        self.label_staging_total.pack(pady=10)
+    def _crear_botones_accion(self):
+        """Crea botones de accion en la parte inferior"""
+        button_frame = ttk.Frame(self.parent)
+        button_frame.pack(fill=tk.X, padx=10, pady=10)
 
-    def _crear_frame_botones(self):
-        """Frame de botones inferior"""
-        frame_botones = ttk.Frame(self.parent)
-        frame_botones.pack(side='bottom', fill='x', padx=10, pady=10)
+        ttk.Button(button_frame, text="Guardar Configuracion",
+                  command=self._guardar_callback).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cargar Valores por Defecto",
+                  command=self.valores_por_defecto_new).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Salir",
+                  command=self._salir_callback).pack(side=tk.RIGHT, padx=5)
 
-        ttk.Button(frame_botones, text="Guardar Configuracion", command=self.guardar_config).pack(side='left', padx=5)
-        ttk.Button(frame_botones, text="Cargar Defaults", command=self.valores_por_defecto_new).pack(side='left', padx=5)
-        ttk.Button(frame_botones, text="Salir", command=self.parent.quit).pack(side='right', padx=5)
-
-    # ========== METODOS DE VALIDACION ==========
+    # ========================================================================
+    # METODOS DE VALIDACION
+    # ========================================================================
 
     def validar_porcentajes(self):
         """Valida que los porcentajes sumen 100%"""
         try:
             total = self.pct_pequeno.get() + self.pct_mediano.get() + self.pct_grande.get()
-
             if total == 100:
-                self.label_total_pct.config(text=f"Total: {total}%", foreground='green')
+                self.label_validacion.config(text="OK: Suma 100%", foreground="green")
                 return True
             else:
-                self.label_total_pct.config(text=f"Total: {total}% (debe ser 100%)", foreground='red')
+                self.label_validacion.config(text=f"ERROR: Suma {total}% (debe ser 100%)", foreground="red")
                 return False
         except:
-            self.label_total_pct.config(text="Total: Error", foreground='red')
+            self.label_validacion.config(text="ERROR: Valores invalidos", foreground="red")
             return False
 
     def actualizar_total(self):
-        """Actualiza el total de operarios"""
+        """Actualiza el total de recursos"""
         try:
             total = self.num_operarios_terrestres.get() + self.num_montacargas.get()
-            self.label_total_operarios.config(text=str(total))
+            self.label_total_recursos.config(text=f"Total de Recursos: {total}")
         except:
-            self.label_total_operarios.config(text="Error")
+            self.label_total_recursos.config(text="Total de Recursos: ERROR")
 
     def _validar_staging_distribution(self):
         """Valida que la distribucion de staging sume 100%"""
         try:
             total = sum(var.get() for var in self.outbound_staging_vars.values())
-
             if total == 100:
-                self.label_staging_total.config(text=f"Total: {total}%", foreground='green')
+                self.staging_validation_label.config(text="OK: Suma 100%", foreground="green")
                 return True
             else:
-                self.label_staging_total.config(text=f"Total: {total}% (debe ser 100%)", foreground='red')
+                self.staging_validation_label.config(
+                    text=f"ERROR: Suma {total}% (debe ser 100%)", foreground="red")
                 return False
         except:
-            self.label_staging_total.config(text="Total: Error", foreground='red')
+            self.staging_validation_label.config(text="ERROR: Valores invalidos", foreground="red")
             return False
 
     def _validar_configuracion_picking(self, total_ordenes, pct_pequeno, pct_mediano, pct_grande,
                                       vol_pequeno, vol_mediano, vol_grande, capacidad_carro,
-                                      op_terrestres, montacargas, total_operarios):
+                                      op_terrestres, montacargas, total_recursos):
         """Valida la configuracion de picking"""
-        # Validar que los porcentajes sumen 100
-        if pct_pequeno + pct_mediano + pct_grande != 100:
-            messagebox.showerror("Error de Validacion", "Los porcentajes deben sumar exactamente 100%")
+        # Validacion basica
+        if total_ordenes <= 0:
+            messagebox.showerror("Error", "El total de ordenes debe ser mayor a 0")
             return False
 
-        # Validar valores positivos
-        if any(x <= 0 for x in [total_ordenes, vol_pequeno, vol_mediano, vol_grande, capacidad_carro, total_operarios]):
-            messagebox.showerror("Error de Validacion", "Todos los valores deben ser mayores que 0")
+        if pct_pequeno + pct_mediano + pct_grande != 100:
+            messagebox.showerror("Error", "Los porcentajes deben sumar 100%")
+            return False
+
+        if capacidad_carro <= 0:
+            messagebox.showerror("Error", "La capacidad del carro debe ser mayor a 0")
+            return False
+
+        if total_recursos <= 0:
+            messagebox.showerror("Error", "Debe haber al menos un recurso")
             return False
 
         return True
 
-    # ========== METODOS DE UI - LAYOUT ==========
+    # ========================================================================
+    # METODOS DE ARCHIVOS
+    # ========================================================================
 
-    def _seleccionar_layout(self):
-        """Abre dialogo para seleccionar archivo de layout"""
+    def _examinar_tmx(self):
+        """Abre dialogo para seleccionar archivo TMX"""
         filename = filedialog.askopenfilename(
-            title="Seleccionar archivo de layout",
-            filetypes=[("TMX files", "*.tmx"), ("All files", "*.*")]
+            title="Seleccionar archivo TMX",
+            filetypes=[("TMX Files", "*.tmx"), ("All Files", "*.*")]
         )
         if filename:
             self.layout_path_var.set(filename)
 
-    def _seleccionar_secuencia(self):
+    def _examinar_sequence(self):
         """Abre dialogo para seleccionar archivo de secuencia"""
         filename = filedialog.askopenfilename(
             title="Seleccionar archivo de secuencia",
-            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+            filetypes=[("Excel Files", "*.xlsx *.xls"), ("CSV Files", "*.csv"), ("All Files", "*.*")]
         )
         if filename:
             self.sequence_path_var.set(filename)
 
-    # ========== METODOS DE FLOTA ==========
+    # ========================================================================
+    # METODOS DE ASIGNACION DE RECURSOS
+    # ========================================================================
+
+    def _generar_asignacion_defecto(self):
+        """Genera asignacion de recursos por defecto"""
+        # Limpiar asignaciones existentes
+        self._limpiar_asignaciones()
+
+        # Asignaciones por defecto
+        default_assignments = {
+            "GroundOperator": {1: 1},
+            "Forklift": {1: 2, 2: 1, 3: 1, 4: 1, 5: 1}
+        }
+
+        self.assignment_rules = default_assignments
+        self._update_assignment_display()
+
+    def _limpiar_asignaciones(self):
+        """Limpia todas las asignaciones"""
+        for widget in self.assignment_frame.winfo_children():
+            widget.destroy()
+        self.assignment_widgets = {"GroundOperator": [], "Forklift": []}
+        self.assignment_rules = {"GroundOperator": {}, "Forklift": {}}
+
+    def _update_assignment_display(self):
+        """Actualiza la visualizacion de asignaciones"""
+        self._limpiar_asignaciones()
+
+        row = 0
+        for agent_type in ["GroundOperator", "Forklift"]:
+            # Titulo del tipo de agente
+            label_frame = ttk.LabelFrame(self.assignment_frame, text=agent_type, padding=10)
+            label_frame.grid(row=row, column=0, sticky=tk.EW, padx=5, pady=5)
+            row += 1
+
+            # Encabezados
+            ttk.Label(label_frame, text="Nivel", font=("Arial", 9, "bold")).grid(row=0, column=0, padx=5)
+            ttk.Label(label_frame, text="Prioridad", font=("Arial", 9, "bold")).grid(row=0, column=1, padx=5)
+
+            # Crear fila para cada nivel asignado
+            agent_row = 1
+            if agent_type in self.assignment_rules:
+                for level, priority in sorted(self.assignment_rules[agent_type].items()):
+                    level_var = tk.IntVar(value=level)
+                    priority_var = tk.IntVar(value=priority)
+
+                    ttk.Label(label_frame, text=f"Nivel {level}:").grid(row=agent_row, column=0, sticky=tk.W, padx=5, pady=2)
+                    ttk.Entry(label_frame, textvariable=priority_var, width=10).grid(row=agent_row, column=1, padx=5, pady=2)
+
+                    self.assignment_widgets[agent_type].append({
+                        'level_var': level_var,
+                        'priority_var': priority_var
+                    })
+                    agent_row += 1
+
+    # ========================================================================
+    # METODOS DE FLOTA
+    # ========================================================================
 
     def _cargar_work_areas_automatico(self, sequence_file):
-        """Carga WorkAreas automaticamente desde el archivo de secuencia"""
+        """Carga WorkAreas desde el archivo de secuencia"""
         try:
-            import openpyxl
-
             if not os.path.exists(sequence_file):
                 raise FileNotFoundError(f"Archivo no encontrado: {sequence_file}")
 
+            # Leer WorkAreas del archivo Excel
+            import openpyxl
             wb = openpyxl.load_workbook(sequence_file, read_only=True, data_only=True)
 
             # Buscar hoja Warehouse_Logic
             if 'Warehouse_Logic' in wb.sheetnames:
                 ws = wb['Warehouse_Logic']
-
-                # Leer WorkAreas desde la columna 'WorkArea' (asumiendo que esta en columna C o similar)
                 work_areas = set()
+
+                # Leer WorkAreas desde la columna WorkArea
                 for row in ws.iter_rows(min_row=2, values_only=True):
                     if row and len(row) > 2:
-                        work_area = row[2]  # Columna C (index 2)
+                        work_area = row[2]  # Columna C
                         if work_area:
                             work_areas.add(str(work_area))
 
                 self.available_work_areas = sorted(list(work_areas))
-                print(f"[FLOTA] WorkAreas cargadas: {self.available_work_areas}")
+                print(f"[VENTANA_CONFIG] WorkAreas cargadas: {self.available_work_areas}")
+            else:
+                # Si no hay hoja, usar valores por defecto
+                self.available_work_areas = ["Area_1", "Area_2", "Area_3"]
+                print("[VENTANA_CONFIG] WorkAreas por defecto cargadas")
 
             wb.close()
 
-        except ImportError:
-            print("[FLOTA] ERROR: openpyxl no esta instalado. No se pueden cargar WorkAreas automaticamente.")
         except Exception as e:
-            print(f"[FLOTA] ERROR cargando WorkAreas: {e}")
-            raise
-
-    def _generar_flota_defecto_ui(self):
-        """Genera flota por defecto con confirmacion de usuario"""
-        if not self.available_work_areas:
-            # Intentar cargar WorkAreas primero
-            sequence_file = self.sequence_path_var.get()
-            if sequence_file:
-                try:
-                    self._cargar_work_areas_automatico(sequence_file)
-                except Exception as e:
-                    messagebox.showerror("Error", f"No se pudieron cargar WorkAreas:\n{e}")
-                    return
-            else:
-                messagebox.showwarning("Advertencia", "Primero debes configurar el archivo de secuencia en la tab 'Layout'")
-                return
-
-        if messagebox.askyesno("Confirmar", "Esto generara una flota por defecto y eliminara cualquier configuracion existente. Continuar?"):
-            self._limpiar_todos_los_grupos()
-            config_defecto = self._generar_config_defecto()
-            for group_config in config_defecto:
-                self._crear_grupo_desde_config(group_config)
-            messagebox.showinfo("Exito", f"Flota por defecto generada con {len(config_defecto)} grupos")
+            print(f"[VENTANA_CONFIG ERROR] Error cargando WorkAreas: {e}")
+            # Usar valores por defecto en caso de error
+            self.available_work_areas = ["Area_1", "Area_2", "Area_3"]
 
     def _generar_config_defecto(self):
         """Genera configuracion de flota por defecto"""
@@ -434,11 +544,11 @@ class VentanaConfiguracion:
             return []
 
         # Configuracion por defecto: 1 GroundOperator y 5 Forklifts
-        config = []
+        config_defecto = []
 
-        # 1 GroundOperator con prioridades iguales
+        # 1 GroundOperator
         ground_priorities = {wa: 1 for wa in self.available_work_areas}
-        config.append({
+        config_defecto.append({
             'agent_type': 'GroundOperator',
             'cantidad': 1,
             'capacidad': 150,
@@ -446,10 +556,10 @@ class VentanaConfiguracion:
             'work_area_priorities': ground_priorities
         })
 
-        # 5 Forklifts con diferentes prioridades
+        # 5 Forklifts
         for i in range(5):
             forklift_priorities = {wa: (i % len(self.available_work_areas)) + 1 for wa in self.available_work_areas}
-            config.append({
+            config_defecto.append({
                 'agent_type': 'Forklift',
                 'cantidad': 1,
                 'capacidad': 1000,
@@ -457,87 +567,75 @@ class VentanaConfiguracion:
                 'work_area_priorities': forklift_priorities
             })
 
-        return config
+        return config_defecto
 
-    def _agregar_grupo_manual(self):
-        """Agrega un grupo de flota manualmente (simplificado)"""
+    def _generar_flota_defecto(self):
+        """Genera flota por defecto con confirmacion"""
         if not self.available_work_areas:
-            messagebox.showwarning("Advertencia", "Primero debes cargar WorkAreas desde el archivo de secuencia")
-            return
+            # Intentar cargar WorkAreas primero
+            sequence_file = self.sequence_path_var.get()
+            if sequence_file:
+                try:
+                    self._cargar_work_areas_automatico(sequence_file)
+                except Exception as e:
+                    messagebox.showerror("Error",
+                        f"No se pudieron cargar WorkAreas:\n{e}\n\nDefina el archivo de secuencia primero.")
+                    return
+            else:
+                messagebox.showerror("Error",
+                    "Debe definir el archivo de secuencia primero para cargar WorkAreas.")
+                return
 
-        # Crear configuracion basica
-        config = {
-            'agent_type': 'GroundOperator',
-            'cantidad': 1,
-            'capacidad': 150,
-            'tiempo_descarga': 5,
-            'work_area_priorities': {wa: 1 for wa in self.available_work_areas}
-        }
+        if messagebox.askyesno("Generar Flota",
+                              "Esto eliminara la configuracion actual de flota. Continuar?"):
+            config_defecto = self._generar_config_defecto()
+            self._limpiar_todos_los_grupos()
+            for group_config in config_defecto:
+                self._crear_grupo_desde_config(group_config)
 
-        self._crear_grupo_desde_config(config)
-
-    def _crear_grupo_desde_config(self, config):
-        """Crea un widget de grupo de flota desde configuracion"""
-        frame_grupo = ttk.LabelFrame(self.fleet_frame, text=f"Grupo {len(self.fleet_groups) + 1}", padding=10)
-        frame_grupo.pack(fill='x', padx=10, pady=5)
-
-        # Fila 1: Tipo y cantidad
-        frame_row1 = ttk.Frame(frame_grupo)
-        frame_row1.pack(fill='x', pady=2)
-
-        ttk.Label(frame_row1, text="Tipo:").pack(side='left', padx=5)
-        tipo_var = tk.StringVar(value=config['agent_type'])
-        ttk.Combobox(frame_row1, textvariable=tipo_var, values=['GroundOperator', 'Forklift'], width=15, state='readonly').pack(side='left', padx=5)
-
-        ttk.Label(frame_row1, text="Cantidad:").pack(side='left', padx=5)
-        cantidad_var = tk.IntVar(value=config['cantidad'])
-        ttk.Entry(frame_row1, textvariable=cantidad_var, width=5).pack(side='left', padx=5)
-
-        # Fila 2: Capacidad y tiempo
-        frame_row2 = ttk.Frame(frame_grupo)
-        frame_row2.pack(fill='x', pady=2)
-
-        ttk.Label(frame_row2, text="Capacidad:").pack(side='left', padx=5)
-        capacidad_var = tk.IntVar(value=config['capacidad'])
-        ttk.Entry(frame_row2, textvariable=capacidad_var, width=8).pack(side='left', padx=5)
-
-        ttk.Label(frame_row2, text="Tiempo Descarga:").pack(side='left', padx=5)
-        tiempo_var = tk.IntVar(value=config['tiempo_descarga'])
-        ttk.Entry(frame_row2, textvariable=tiempo_var, width=5).pack(side='left', padx=5)
-
-        # Guardar referencias
-        grupo_data = {
-            'frame': frame_grupo,
-            'tipo_var': tipo_var,
-            'cantidad_var': cantidad_var,
-            'capacidad_var': capacidad_var,
-            'tiempo_var': tiempo_var,
-            'priorities': config['work_area_priorities']
-        }
-
-        self.fleet_groups.append(grupo_data)
-
-        # Boton eliminar
-        ttk.Button(frame_grupo, text="Eliminar", command=lambda: self._eliminar_grupo(grupo_data)).pack(side='right', padx=5)
-
-    def _eliminar_grupo(self, grupo_data):
-        """Elimina un grupo de flota"""
-        grupo_data['frame'].destroy()
-        self.fleet_groups.remove(grupo_data)
+            messagebox.showinfo("Exito", "Flota por defecto generada correctamente")
 
     def _limpiar_todos_los_grupos(self):
-        """Elimina todos los grupos de flota"""
-        for grupo in self.fleet_groups[:]:
-            grupo['frame'].destroy()
+        """Limpia todos los grupos de flota"""
+        for widget in self.fleet_scrollable_frame.winfo_children():
+            widget.destroy()
         self.fleet_groups = []
 
-    def _poblar_ui_flota(self, grupos_config):
-        """Pobla la UI de flota con grupos desde configuracion"""
-        self._limpiar_todos_los_grupos()
-        for grupo_config in grupos_config:
-            self._crear_grupo_desde_config(grupo_config)
+    def _crear_grupo_desde_config(self, config):
+        """Crea un grupo de flota desde configuracion"""
+        group_frame = ttk.LabelFrame(self.fleet_scrollable_frame,
+                                     text=f"{config['agent_type']} x{config['cantidad']}",
+                                     padding=10)
+        group_frame.pack(fill=tk.X, padx=5, pady=5)
 
-    # ========== METODOS DE CONFIGURACION ==========
+        # Almacenar configuracion
+        group_data = {
+            'frame': group_frame,
+            'config': config.copy()
+        }
+        self.fleet_groups.append(group_data)
+
+        # Mostrar configuracion
+        ttk.Label(group_frame, text=f"Tipo: {config['agent_type']}").pack(anchor=tk.W)
+        ttk.Label(group_frame, text=f"Cantidad: {config['cantidad']}").pack(anchor=tk.W)
+        ttk.Label(group_frame, text=f"Capacidad: {config['capacidad']}").pack(anchor=tk.W)
+        ttk.Label(group_frame, text=f"Tiempo Descarga: {config['tiempo_descarga']}s").pack(anchor=tk.W)
+
+        # Mostrar prioridades de forma compacta
+        priorities_str = ", ".join([f"{wa}:{p}" for wa, p in list(config['work_area_priorities'].items())[:5]])
+        if len(config['work_area_priorities']) > 5:
+            priorities_str += "..."
+        ttk.Label(group_frame, text=f"Prioridades: {priorities_str}").pack(anchor=tk.W)
+
+    def _poblar_ui_flota(self, grupos):
+        """Pobla la UI de flota con grupos existentes"""
+        self._limpiar_todos_los_grupos()
+        for grupo in grupos:
+            self._crear_grupo_desde_config(grupo)
+
+    # ========================================================================
+    # METODOS DE VALORES POR DEFECTO
+    # ========================================================================
 
     def valores_por_defecto_new(self):
         """Carga valores por defecto en todos los campos"""
@@ -558,17 +656,22 @@ class VentanaConfiguracion:
         self.tiempo_descarga_por_tarea.set(5)
 
         # Estrategias
-        self.dispatch_strategy_var.set('Ejecucion de Plan (Filtro por Prioridad)')
+        self.strategy_var.set("Zoning and Snake")
+        self.batching_strategy_var.set("Orden por Orden (Linea Base)")
+        self.dispatch_strategy_var.set("Ejecucion de Plan (Filtro por Prioridad)")
 
         # Layout
-        self.layout_path_var.set('layouts/WH1.tmx')
-        self.sequence_path_var.set('layouts/Warehouse_Logic.xlsx')
+        self.layout_path_var.set("layouts/WH1.tmx")
+        self.sequence_path_var.set("layouts/Warehouse_Logic.xlsx")
         self.map_scale_var.set(1.3)
-        self.resolution_var.set('Pequena (800x800)')
+        self.resolution_var.set("Pequena (800x800)")
 
         # Outbound Staging
         for i in range(1, 8):
             self.outbound_staging_vars[str(i)].set(100 if i == 1 else 0)
+
+        # Asignacion de recursos
+        self._generar_asignacion_defecto()
 
         # Validaciones
         self.validar_porcentajes()
@@ -577,22 +680,27 @@ class VentanaConfiguracion:
 
         print("[CONFIGURATOR] Valores por defecto cargados")
 
-    def guardar_config(self):
-        """Metodo simplificado para guardar (sera llamado por ConfiguradorSimulador)"""
-        print("[VENTANA] Metodo guardar_config() llamado")
-
     def obtener_configuracion(self):
         """Obtiene la configuracion actual como diccionario"""
+        # Sincronizar assignment_rules desde widgets
+        for agent_type, widget_rows in self.assignment_widgets.items():
+            self.assignment_rules[agent_type] = {}
+            for row in widget_rows:
+                level = row['level_var'].get()
+                priority = row['priority_var'].get()
+                self.assignment_rules[agent_type][level] = priority
+
         # Construir agent_types desde fleet_groups
         agent_types = []
         for grupo in self.fleet_groups:
-            cantidad = grupo['cantidad_var'].get()
+            config = grupo['config']
+            cantidad = config['cantidad']
             for _ in range(cantidad):
                 agent_types.append({
-                    'type': grupo['tipo_var'].get(),
-                    'capacity': grupo['capacidad_var'].get(),
-                    'discharge_time': grupo['tiempo_var'].get(),
-                    'work_area_priorities': grupo['priorities'].copy()
+                    'type': config['agent_type'],
+                    'capacity': config['capacidad'],
+                    'discharge_time': config['tiempo_descarga'],
+                    'work_area_priorities': config['work_area_priorities'].copy()
                 })
 
         config = {
@@ -603,6 +711,8 @@ class VentanaConfiguracion:
                 'grande': {'porcentaje': self.pct_grande.get(), 'volumen': self.vol_grande.get()}
             },
             'capacidad_carro': self.capacidad_carro.get(),
+            'strategy': self.strategy_var.get(),
+            'batching_strategy': self.batching_strategy_var.get(),
             'dispatch_strategy': self.dispatch_strategy_var.get(),
             'layout_file': self.layout_path_var.get(),
             'sequence_file': self.sequence_path_var.get(),
@@ -621,6 +731,22 @@ class VentanaConfiguracion:
 
         return config
 
+    # ========================================================================
+    # CALLBACKS (stubs - seran conectados por ConfiguradorSimulador)
+    # ========================================================================
+
+    def _guardar_callback(self):
+        """Placeholder para guardar"""
+        print("[VENTANA] Guardar callback")
+
+    def _probar_callback(self):
+        """Placeholder para probar"""
+        print("[VENTANA] Probar callback")
+
+    def _salir_callback(self):
+        """Placeholder para salir"""
+        self.parent.quit()
+
 
 class ConfiguradorSimulador:
     """Configurador independiente del simulador con funcionalidad de guardado"""
@@ -628,7 +754,7 @@ class ConfiguradorSimulador:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Configurador de Simulacion - Gemelo Digital")
-        self.root.geometry("650x550")
+        self.root.geometry("700x600")
         self.root.resizable(True, True)
 
         # Centrar ventana
@@ -638,7 +764,6 @@ class ConfiguradorSimulador:
         self.ventana_config = VentanaConfiguracion(self.root)
 
         # CORRECCION: Diferir carga hasta que UI este completamente lista
-        # Usar after() para evitar dependencias circulares durante inicializacion
         self.root.after(100, self._cargar_configuracion_existente)
 
         print("[CONFIGURATOR] Configurador independiente inicializado")
@@ -646,8 +771,8 @@ class ConfiguradorSimulador:
     def _centrar_ventana(self):
         """Centra la ventana en la pantalla"""
         self.root.update_idletasks()
-        ancho_ventana = 650
-        alto_ventana = 550
+        ancho_ventana = 700
+        alto_ventana = 600
         x = (self.root.winfo_screenwidth() // 2) - (ancho_ventana // 2)
         y = (self.root.winfo_screenheight() // 2) - (alto_ventana // 2)
         self.root.geometry(f"{ancho_ventana}x{alto_ventana}+{x}+{y}")
@@ -706,17 +831,15 @@ class ConfiguradorSimulador:
             self.ventana_config.capacidad_montacargas.set(config.get('capacidad_montacargas', 1000))
             self.ventana_config.tiempo_descarga_por_tarea.set(config.get('tiempo_descarga_por_tarea', 5))
 
-            # Estrategias
+            # Estrategias (3 tipos)
+            self.ventana_config.strategy_var.set(config.get('strategy', 'Zoning and Snake'))
+            self.ventana_config.batching_strategy_var.set(config.get('batching_strategy', 'Orden por Orden (Linea Base)'))
             self.ventana_config.dispatch_strategy_var.set(config.get('dispatch_strategy', 'Ejecucion de Plan (Filtro por Prioridad)'))
 
             # Layout y archivos
             self.ventana_config.layout_path_var.set(config.get('layout_file', 'layouts/WH1.tmx'))
             self.ventana_config.sequence_path_var.set(config.get('sequence_file', 'layouts/Warehouse_Logic.xlsx'))
-
-            # NUEVO: Escala del mapa
             self.ventana_config.map_scale_var.set(config.get('map_scale', 1.3))
-
-            # Resolucion
             self.ventana_config.resolution_var.set(config.get('selected_resolution_key', 'Pequena (800x800)'))
 
             # Asignacion de recursos
@@ -725,6 +848,7 @@ class ConfiguradorSimulador:
                 "Forklift": {1: 2, 2: 1, 3: 1, 4: 1, 5: 1}
             })
             self.ventana_config.assignment_rules = assignment_rules
+            self.ventana_config._update_assignment_display()
 
             # Distribucion de OutboundStaging
             outbound_staging_distribution = config.get('outbound_staging_distribution', {
@@ -747,56 +871,47 @@ class ConfiguradorSimulador:
                 self.ventana_config._poblar_ui_flota(grupos_para_ui)
                 print(f"[CONFIGURATOR] EXITO - Flota cargada: {len(grupos_para_ui)} grupos creados")
 
-            # NUEVA FUNCIONALIDAD: Inicializacion inteligente
+            # Inicializacion inteligente
             self._inicializacion_inteligente(config)
 
         except Exception as e:
             print(f"[CONFIGURATOR ERROR] Error poblando UI desde config: {e}")
-            raise
+            import traceback
+            traceback.print_exc()
 
     def _inicializacion_inteligente(self, config):
-        """
-        Inicializacion inteligente: Carga WorkAreas automaticamente y genera flota por defecto si es necesario
-        """
+        """Inicializacion inteligente: Carga WorkAreas automaticamente"""
         try:
             print("[CONFIGURATOR] Iniciando inicializacion inteligente...")
 
             # PASO 1: Cargar WorkAreas automaticamente
             sequence_file = self.ventana_config.sequence_path_var.get()
-            if sequence_file:
+            if sequence_file and os.path.exists(sequence_file):
                 try:
-                    print(f"[CONFIGURATOR] Cargando WorkAreas automaticamente desde: {sequence_file}")
+                    print(f"[CONFIGURATOR] Cargando WorkAreas desde: {sequence_file}")
                     self.ventana_config._cargar_work_areas_automatico(sequence_file)
-                    print(f"[CONFIGURATOR] EXITO - WorkAreas cargadas: {self.ventana_config.available_work_areas}")
+                    print(f"[CONFIGURATOR] WorkAreas cargadas: {self.ventana_config.available_work_areas}")
                 except Exception as e:
                     print(f"[CONFIGURATOR] ADVERTENCIA - Error cargando WorkAreas: {e}")
-                    # Continuar sin fallar - WorkAreas se pueden cargar manualmente despues
 
-            # PASO 2: Verificar si existe configuracion de flota
+            # PASO 2: Generar flota por defecto si no existe
             agent_types = config.get('agent_types', [])
-
-            # PASO 3: Generar flota por defecto si no existe configuracion
             if not agent_types and self.ventana_config.available_work_areas:
-                print("[CONFIGURATOR] No se encontro configuracion de flota. Generando configuracion por defecto...")
+                print("[CONFIGURATOR] Generando flota por defecto silenciosa...")
                 try:
-                    # Llamar a la funcion de generacion automatica (sin dialogos)
-                    self._generar_flota_por_defecto_silencioso()
-                    print("[CONFIGURATOR] EXITO - Flota por defecto generada automaticamente")
+                    config_defecto = self.ventana_config._generar_config_defecto()
+                    self.ventana_config._limpiar_todos_los_grupos()
+                    for group_config in config_defecto:
+                        self.ventana_config._crear_grupo_desde_config(group_config)
+                    print("[CONFIGURATOR] Flota por defecto generada")
                 except Exception as e:
-                    print(f"[CONFIGURATOR] ADVERTENCIA - Error generando flota por defecto: {e}")
-                    # Continuar sin fallar
-            else:
-                print(f"[CONFIGURATOR] Configuracion de flota existente encontrada: {len(agent_types)} tipos de agentes")
+                    print(f"[CONFIGURATOR] Error generando flota: {e}")
 
         except Exception as e:
             print(f"[CONFIGURATOR ERROR] Error en inicializacion inteligente: {e}")
-            # No lanzar excepcion - la inicializacion inteligente es opcional
 
     def _agrupar_agentes_para_ui(self, agent_types_list):
-        """
-        Agrupa agent_types del JSON en formato para _poblar_ui_flota
-        Agentes con mismo type, capacity, discharge_time y work_area_priorities se agrupan
-        """
+        """Agrupa agent_types del JSON en formato para _poblar_ui_flota"""
         grupos = {}
 
         for agent in agent_types_list:
@@ -822,33 +937,6 @@ class ConfiguradorSimulador:
 
         return list(grupos.values())
 
-    def _generar_flota_por_defecto_silencioso(self):
-        """
-        Version silenciosa de generacion de flota por defecto (sin dialogos de confirmacion)
-        Se usa durante la inicializacion automatica
-        """
-        try:
-            # Verificar que hay WorkAreas disponibles
-            if not self.ventana_config.available_work_areas:
-                print("[CONFIGURATOR] No hay WorkAreas disponibles para generar flota por defecto")
-                return
-
-            print("[CONFIGURATOR] Generando flota por defecto silenciosa...")
-
-            # Usar la nueva funcion unificada sin dialogos
-            config_defecto = self.ventana_config._generar_config_defecto()
-
-            # Limpiar y poblar sin confirmaciones
-            self.ventana_config._limpiar_todos_los_grupos()
-            for group_config in config_defecto:
-                self.ventana_config._crear_grupo_desde_config(group_config)
-
-            print("[CONFIGURATOR] EXITO - Flota por defecto generada silenciosamente")
-
-        except Exception as e:
-            print(f"[CONFIGURATOR ERROR] Error en generacion silenciosa de flota: {e}")
-            raise
-
     def guardar_configuracion(self):
         """Guarda la configuracion actual en config.json"""
         try:
@@ -868,8 +956,7 @@ class ConfiguradorSimulador:
             messagebox.showinfo(
                 "Configuracion Guardada",
                 f"La configuracion se ha guardado exitosamente en:\n{config_path}\n\n"
-                f"Ahora puedes ejecutar 'python run_simulator.py' directamente "
-                f"para usar esta configuracion automaticamente."
+                f"Ahora puedes ejecutar 'python run_simulator.py' directamente."
             )
             print(f"[CONFIGURATOR] Configuracion guardada en: {config_path}")
 
@@ -897,32 +984,6 @@ class ConfiguradorSimulador:
             )
             print(f"[CONFIGURATOR ERROR] Error cargando defaults: {e}")
 
-    def probar_configuracion(self):
-        """Guarda la configuracion y lanza el simulador para probarla"""
-        try:
-            # Primero guardar la configuracion
-            self.guardar_configuracion()
-
-            # Confirmar si quiere lanzar el simulador
-            if messagebox.askyesno(
-                "Probar Configuracion",
-                "Configuracion guardada. Deseas lanzar el simulador ahora para probarla?"
-            ):
-                # Lanzar simulador con directorio de trabajo correcto
-                import subprocess
-                project_root = os.path.dirname(os.path.abspath(__file__))
-                simulator_path = os.path.join(project_root, "run_simulator.py")
-                subprocess.Popen([sys.executable, simulator_path], cwd=project_root)
-
-                print(f"[CONFIGURATOR] Simulador lanzado desde: {project_root}")
-
-        except Exception as e:
-            messagebox.showerror(
-                "Error al Probar",
-                f"No se pudo lanzar el simulador:\n{str(e)}"
-            )
-            print(f"[CONFIGURATOR ERROR] Error probando configuracion: {e}")
-
     def salir(self):
         """Cierra el configurador"""
         if messagebox.askyesno(
@@ -935,7 +996,7 @@ class ConfiguradorSimulador:
     def _validar_configuracion_actual(self) -> bool:
         """Valida la configuracion actual de la UI"""
         try:
-            # Usar el validador existente de VentanaConfiguracion
+            # Validaciones basicas
             total_ordenes = self.ventana_config.total_ordenes_var.get()
             pct_pequeno = self.ventana_config.pct_pequeno.get()
             pct_mediano = self.ventana_config.pct_mediano.get()
@@ -974,7 +1035,6 @@ class ConfiguradorSimulador:
         # Anadir campos de compatibilidad
         config['tareas_zona_a'] = 0
         config['tareas_zona_b'] = 0
-        config['num_operarios'] = config['num_operarios_total']
 
         # Convertir rutas a relativas
         config['layout_file'] = self._make_relative_path(config['layout_file'])
@@ -983,7 +1043,7 @@ class ConfiguradorSimulador:
         return config
 
     def _make_relative_path(self, file_path: str) -> str:
-        """Convierte rutas absolutas a relativas respecto al directorio del proyecto"""
+        """Convierte rutas absolutas a relativas"""
         if not file_path:
             return file_path
 
@@ -991,35 +1051,23 @@ class ConfiguradorSimulador:
             project_root = os.path.dirname(os.path.abspath(__file__))
             abs_path = os.path.abspath(file_path)
 
-            # Si el archivo esta dentro del proyecto, convertir a relativa
             if abs_path.startswith(project_root):
                 relative_path = os.path.relpath(abs_path, project_root)
-                return relative_path.replace('\\', '/')  # Normalizar separadores para config.json
+                return relative_path.replace('\\', '/')
             else:
-                # Si esta fuera del proyecto, mantener ruta absoluta
                 return abs_path.replace('\\', '/')
 
         except (ValueError, OSError):
-            # En caso de error, devolver la ruta original
             return file_path
 
     def ejecutar(self):
         """Ejecuta el configurador"""
         print("[CONFIGURATOR] Iniciando configurador independiente...")
         print("[CONFIGURATOR] Use 'Guardar Configuracion' para crear config.json")
-        print("[CONFIGURATOR] Luego ejecute 'python run_simulator.py' para usar la configuracion")
 
-        # Conectar boton de guardar
-        for widget in self.ventana_config.parent.winfo_children():
-            if isinstance(widget, ttk.Frame):
-                for btn in widget.winfo_children():
-                    if isinstance(btn, ttk.Button):
-                        if "Guardar" in btn.cget('text'):
-                            btn.config(command=self.guardar_configuracion)
-                        elif "Defaults" in btn.cget('text'):
-                            btn.config(command=self.cargar_defaults)
-                        elif "Salir" in btn.cget('text'):
-                            btn.config(command=self.salir)
+        # Conectar callbacks
+        self.ventana_config._guardar_callback = self.guardar_configuracion
+        self.ventana_config._salir_callback = self.salir
 
         self.root.mainloop()
 
