@@ -30,21 +30,17 @@ class VentanaConfiguracion:
         self.notebook = ttk.Notebook(parent)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Crear pestanas
+        # Crear pestanas (5 tabs as per user specification)
         self.tab_carga = ttk.Frame(self.notebook)
-        self.tab_recursos = ttk.Frame(self.notebook)
         self.tab_estrategias = ttk.Frame(self.notebook)
+        self.tab_layout_datos = ttk.Frame(self.notebook)
         self.tab_asignacion = ttk.Frame(self.notebook)
-        self.tab_layout = ttk.Frame(self.notebook)
-        self.tab_flota = ttk.Frame(self.notebook)
         self.tab_staging = ttk.Frame(self.notebook)
 
         self.notebook.add(self.tab_carga, text="Carga de Trabajo")
-        self.notebook.add(self.tab_recursos, text="Recursos")
         self.notebook.add(self.tab_estrategias, text="Estrategias")
-        self.notebook.add(self.tab_asignacion, text="Asignacion Recursos")
-        self.notebook.add(self.tab_layout, text="Layout")
-        self.notebook.add(self.tab_flota, text="Flota de Agentes")
+        self.notebook.add(self.tab_layout_datos, text="Layout y Datos")
+        self.notebook.add(self.tab_asignacion, text="Asignacion de Recursos")
         self.notebook.add(self.tab_staging, text="Outbound Staging")
 
         # Inicializar variables
@@ -52,11 +48,9 @@ class VentanaConfiguracion:
 
         # Crear widgets en cada pestana
         self._crear_widgets_carga()
-        self._crear_widgets_recursos()
         self._crear_widgets_estrategias()
+        self._crear_widgets_layout_datos()
         self._crear_widgets_asignacion()
-        self._crear_widgets_layout()
-        self._crear_widgets_flota()
         self._crear_widgets_staging()
 
         # Crear frame de botones en la parte inferior
@@ -72,18 +66,17 @@ class VentanaConfiguracion:
         self.vol_pequeno = tk.IntVar(value=5)
         self.vol_mediano = tk.IntVar(value=25)
         self.vol_grande = tk.IntVar(value=80)
-        self.capacidad_carro = tk.IntVar(value=150)
 
         # Recursos
         self.num_operarios_terrestres = tk.IntVar(value=1)
         self.num_montacargas = tk.IntVar(value=1)
         self.capacidad_montacargas = tk.IntVar(value=1000)
+        self.capacidad_carro = tk.IntVar(value=150)
         self.tiempo_descarga_por_tarea = tk.IntVar(value=5)
 
-        # Estrategias (3 tipos)
-        self.strategy_var = tk.StringVar(value="Zoning and Snake")
-        self.batching_strategy_var = tk.StringVar(value="Orden por Orden (Linea Base)")
-        self.dispatch_strategy_var = tk.StringVar(value="Ejecucion de Plan (Filtro por Prioridad)")
+        # Estrategias (2 tipos como especifico el usuario)
+        self.dispatch_strategy_var = tk.StringVar(value="Optimizacion Global")
+        self.tour_type_var = tk.StringVar(value="Tour Mixto (Multi-Destino)")
 
         # Layout
         self.layout_path_var = tk.StringVar(value="layouts/WH1.tmx")
@@ -134,13 +127,6 @@ class VentanaConfiguracion:
         ttk.Label(frame, text="Volumen:").grid(row=row, column=2, sticky=tk.W, pady=5, padx=(10, 0))
         ttk.Entry(frame, textvariable=self.vol_grande, width=15).grid(row=row, column=3, sticky=tk.W, pady=5)
 
-        # Capacidad carro
-        row += 1
-        ttk.Separator(frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=4, sticky=tk.EW, pady=10)
-        row += 1
-        ttk.Label(frame, text="Capacidad del Carro:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame, textvariable=self.capacidad_carro, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
-
         # Label de validacion
         row += 1
         self.label_validacion = ttk.Label(frame, text="", foreground="green")
@@ -151,78 +137,31 @@ class VentanaConfiguracion:
         self.pct_mediano.trace_add("write", lambda *args: self.validar_porcentajes())
         self.pct_grande.trace_add("write", lambda *args: self.validar_porcentajes())
 
-    def _crear_widgets_recursos(self):
-        """Crea widgets de la pestana Recursos"""
-        frame = ttk.LabelFrame(self.tab_recursos, text="Configuracion de Recursos", padding=10)
-        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        row = 0
-        ttk.Label(frame, text="Operarios Terrestres:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame, textvariable=self.num_operarios_terrestres, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
-
-        row += 1
-        ttk.Label(frame, text="Montacargas:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame, textvariable=self.num_montacargas, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
-
-        row += 1
-        ttk.Label(frame, text="Capacidad Montacargas:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame, textvariable=self.capacidad_montacargas, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
-
-        row += 1
-        ttk.Label(frame, text="Tiempo Descarga por Tarea (s):").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame, textvariable=self.tiempo_descarga_por_tarea, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
-
-        row += 1
-        self.label_total_recursos = ttk.Label(frame, text="Total de Recursos: 2", font=("Arial", 10, "bold"))
-        self.label_total_recursos.grid(row=row, column=0, columnspan=2, pady=10)
-
-        self.num_operarios_terrestres.trace_add("write", lambda *args: self.actualizar_total())
-        self.num_montacargas.trace_add("write", lambda *args: self.actualizar_total())
-
     def _crear_widgets_estrategias(self):
-        """Crea widgets de la pestana Estrategias"""
+        """Crea widgets de la pestana Estrategias - Solo 2 estrategias"""
         frame = ttk.LabelFrame(self.tab_estrategias, text="Estrategias de Operacion", padding=10)
         frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         row = 0
 
-        # Estrategia de Ruteo
-        ttk.Label(frame, text="Estrategia de Ruteo:", font=("Arial", 10, "bold")).grid(row=row, column=0, sticky=tk.W, pady=(5, 2))
-        row += 1
-        estrategias_ruteo = [
-            "Zoning and Snake",
-            "S-Shape",
-            "Largest Gap",
-            "Return"
+        # Estrategia de Despacho
+        ttk.Label(frame, text="Estrategia de Despacho:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        estrategias_despacho = [
+            "Optimizacion Global",
+            "Ejecucion de Plan (Filtro por Prioridad)"
         ]
-        combo_ruteo = ttk.Combobox(frame, textvariable=self.strategy_var, values=estrategias_ruteo, width=40, state='readonly')
-        combo_ruteo.grid(row=row, column=0, sticky=tk.W, pady=(0, 15), padx=(20, 0))
+        combo_despacho = ttk.Combobox(frame, textvariable=self.dispatch_strategy_var, values=estrategias_despacho, width=40)
+        combo_despacho.grid(row=row, column=1, sticky=tk.W, pady=5)
 
-        # Estrategia de Batching
+        # Tipo de Tour de Picking
         row += 1
-        ttk.Label(frame, text="Estrategia de Batching:", font=("Arial", 10, "bold")).grid(row=row, column=0, sticky=tk.W, pady=(5, 2))
-        row += 1
-        estrategias_batching = [
-            "Orden por Orden (Linea Base)",
-            "Time Window Batching",
-            "Priority Batching",
-            "Seed-Based Batching"
+        ttk.Label(frame, text="Tipo de Tour de Picking:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        tipos_tour = [
+            "Tour Mixto (Multi-Destino)",
+            "Tour Simple (Un Destino)"
         ]
-        combo_batching = ttk.Combobox(frame, textvariable=self.batching_strategy_var, values=estrategias_batching, width=40, state='readonly')
-        combo_batching.grid(row=row, column=0, sticky=tk.W, pady=(0, 15), padx=(20, 0))
-
-        # Estrategia de Dispatch
-        row += 1
-        ttk.Label(frame, text="Estrategia de Dispatch:", font=("Arial", 10, "bold")).grid(row=row, column=0, sticky=tk.W, pady=(5, 2))
-        row += 1
-        estrategias_dispatch = [
-            "Ejecucion de Plan (Filtro por Prioridad)",
-            "Dispatch Dinamico",
-            "Prioridad FIFO",
-            "Global Cost Strategy"
-        ]
-        combo_dispatch = ttk.Combobox(frame, textvariable=self.dispatch_strategy_var, values=estrategias_dispatch, width=40, state='readonly')
-        combo_dispatch.grid(row=row, column=0, sticky=tk.W, pady=(0, 5), padx=(20, 0))
+        combo_tour = ttk.Combobox(frame, textvariable=self.tour_type_var, values=tipos_tour, width=40)
+        combo_tour.grid(row=row, column=1, sticky=tk.W, pady=5)
 
     def _crear_widgets_asignacion(self):
         """Crea widgets de la pestana Asignacion de Recursos"""
@@ -266,61 +205,62 @@ class VentanaConfiguracion:
         # Inicializar con asignacion por defecto
         self._generar_asignacion_defecto()
 
-    def _crear_widgets_layout(self):
-        """Crea widgets de la pestana Layout"""
-        frame = ttk.LabelFrame(self.tab_layout, text="Archivos de Layout", padding=10)
-        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+    def _crear_widgets_layout_datos(self):
+        """Crea widgets de la pestana Layout y Datos combinada"""
+        # Frame para archivos de layout
+        frame_layout = ttk.LabelFrame(self.tab_layout_datos, text="Archivos de Layout", padding=10)
+        frame_layout.pack(fill=tk.X, padx=10, pady=(10, 5))
 
         row = 0
-        ttk.Label(frame, text="Archivo TMX:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame, textvariable=self.layout_path_var, width=40).grid(row=row, column=1, sticky=tk.W, pady=5)
-        ttk.Button(frame, text="Examinar...", command=self._examinar_tmx).grid(row=row, column=2, padx=5)
+        ttk.Label(frame_layout, text="Archivo TMX:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame_layout, textvariable=self.layout_path_var, width=40).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Button(frame_layout, text="Examinar...", command=self._examinar_tmx).grid(row=row, column=2, padx=5)
 
         row += 1
-        ttk.Label(frame, text="Archivo Secuencia (XLSX):").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame, textvariable=self.sequence_path_var, width=40).grid(row=row, column=1, sticky=tk.W, pady=5)
-        ttk.Button(frame, text="Examinar...", command=self._examinar_sequence).grid(row=row, column=2, padx=5)
+        ttk.Label(frame_layout, text="Archivo Secuencia (XLSX):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame_layout, textvariable=self.sequence_path_var, width=40).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Button(frame_layout, text="Examinar...", command=self._examinar_sequence).grid(row=row, column=2, padx=5)
 
         row += 1
-        ttk.Label(frame, text="Escala del Mapa:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame, textvariable=self.map_scale_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        ttk.Label(frame_layout, text="Escala del Mapa:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame_layout, textvariable=self.map_scale_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
 
         row += 1
-        ttk.Label(frame, text="Resolucion:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Label(frame_layout, text="Resolucion:").grid(row=row, column=0, sticky=tk.W, pady=5)
         resoluciones = ["Pequena (800x800)", "Mediana (1024x768)", "Grande (1280x1024)", "Extra Grande (1920x1080)"]
-        combo = ttk.Combobox(frame, textvariable=self.resolution_var, values=resoluciones, width=30, state='readonly')
+        combo = ttk.Combobox(frame_layout, textvariable=self.resolution_var, values=resoluciones, width=30, state='readonly')
         combo.grid(row=row, column=1, sticky=tk.W, pady=5)
 
-    def _crear_widgets_flota(self):
-        """Crea widgets de la pestana Flota de Agentes"""
-        # Frame principal con scroll
-        main_frame = ttk.Frame(self.tab_flota)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # Frame para datos de recursos
+        frame_recursos = ttk.LabelFrame(self.tab_layout_datos, text="Configuracion de Recursos", padding=10)
+        frame_recursos.pack(fill=tk.X, padx=10, pady=5)
 
-        # Canvas y scrollbar
-        canvas = tk.Canvas(main_frame, height=400)
-        scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=canvas.yview)
-        self.fleet_scrollable_frame = ttk.Frame(canvas)
+        row = 0
+        ttk.Label(frame_recursos, text="Operarios Terrestres:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame_recursos, textvariable=self.num_operarios_terrestres, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
 
-        self.fleet_scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
+        row += 1
+        ttk.Label(frame_recursos, text="Montacargas:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame_recursos, textvariable=self.num_montacargas, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
 
-        canvas.create_window((0, 0), window=self.fleet_scrollable_frame, anchor=tk.NW)
-        canvas.configure(yscrollcommand=scrollbar.set)
+        row += 1
+        ttk.Label(frame_recursos, text="Capacidad Montacargas:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame_recursos, textvariable=self.capacidad_montacargas, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
 
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        row += 1
+        ttk.Label(frame_recursos, text="Capacidad del Carro:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame_recursos, textvariable=self.capacidad_carro, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
 
-        # Botones de gestion
-        button_frame = ttk.Frame(self.tab_flota)
-        button_frame.pack(fill=tk.X, padx=10, pady=5)
+        row += 1
+        ttk.Label(frame_recursos, text="Tiempo Descarga por Tarea (s):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(frame_recursos, textvariable=self.tiempo_descarga_por_tarea, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
 
-        ttk.Button(button_frame, text="Generar Flota por Defecto",
-                  command=self._generar_flota_defecto).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Limpiar Todo",
-                  command=self._limpiar_todos_los_grupos).pack(side=tk.LEFT, padx=5)
+        row += 1
+        self.label_total_recursos = ttk.Label(frame_recursos, text="Total de Recursos: 2", font=("Arial", 10, "bold"))
+        self.label_total_recursos.grid(row=row, column=0, columnspan=2, pady=10)
+
+        self.num_operarios_terrestres.trace_add("write", lambda *args: self.actualizar_total())
+        self.num_montacargas.trace_add("write", lambda *args: self.actualizar_total())
 
     def _crear_widgets_staging(self):
         """Crea widgets de la pestana Outbound Staging"""
@@ -655,10 +595,9 @@ class VentanaConfiguracion:
         self.capacidad_montacargas.set(1000)
         self.tiempo_descarga_por_tarea.set(5)
 
-        # Estrategias
-        self.strategy_var.set("Zoning and Snake")
-        self.batching_strategy_var.set("Orden por Orden (Linea Base)")
-        self.dispatch_strategy_var.set("Ejecucion de Plan (Filtro por Prioridad)")
+        # Estrategias (solo 2)
+        self.dispatch_strategy_var.set("Optimizacion Global")
+        self.tour_type_var.set("Tour Mixto (Multi-Destino)")
 
         # Layout
         self.layout_path_var.set("layouts/WH1.tmx")
@@ -711,9 +650,8 @@ class VentanaConfiguracion:
                 'grande': {'porcentaje': self.pct_grande.get(), 'volumen': self.vol_grande.get()}
             },
             'capacidad_carro': self.capacidad_carro.get(),
-            'strategy': self.strategy_var.get(),
-            'batching_strategy': self.batching_strategy_var.get(),
             'dispatch_strategy': self.dispatch_strategy_var.get(),
+            'tour_type': self.tour_type_var.get(),
             'layout_file': self.layout_path_var.get(),
             'sequence_file': self.sequence_path_var.get(),
             'map_scale': self.map_scale_var.get(),
@@ -831,10 +769,9 @@ class ConfiguradorSimulador:
             self.ventana_config.capacidad_montacargas.set(config.get('capacidad_montacargas', 1000))
             self.ventana_config.tiempo_descarga_por_tarea.set(config.get('tiempo_descarga_por_tarea', 5))
 
-            # Estrategias (3 tipos)
-            self.ventana_config.strategy_var.set(config.get('strategy', 'Zoning and Snake'))
-            self.ventana_config.batching_strategy_var.set(config.get('batching_strategy', 'Orden por Orden (Linea Base)'))
-            self.ventana_config.dispatch_strategy_var.set(config.get('dispatch_strategy', 'Ejecucion de Plan (Filtro por Prioridad)'))
+            # Estrategias (2 tipos)
+            self.ventana_config.dispatch_strategy_var.set(config.get('dispatch_strategy', 'Optimizacion Global'))
+            self.ventana_config.tour_type_var.set(config.get('tour_type', 'Tour Mixto (Multi-Destino)'))
 
             # Layout y archivos
             self.ventana_config.layout_path_var.set(config.get('layout_file', 'layouts/WH1.tmx'))
