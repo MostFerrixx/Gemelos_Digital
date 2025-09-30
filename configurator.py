@@ -33,14 +33,14 @@ class VentanaConfiguracion:
         # Crear pestanas (5 tabs as per user specification)
         self.tab_carga = ttk.Frame(self.notebook)
         self.tab_estrategias = ttk.Frame(self.notebook)
+        self.tab_flota = ttk.Frame(self.notebook)
         self.tab_layout_datos = ttk.Frame(self.notebook)
-        self.tab_asignacion = ttk.Frame(self.notebook)
         self.tab_staging = ttk.Frame(self.notebook)
 
         self.notebook.add(self.tab_carga, text="Carga de Trabajo")
         self.notebook.add(self.tab_estrategias, text="Estrategias")
+        self.notebook.add(self.tab_flota, text="Flota de Agentes")
         self.notebook.add(self.tab_layout_datos, text="Layout y Datos")
-        self.notebook.add(self.tab_asignacion, text="Asignacion de Recursos")
         self.notebook.add(self.tab_staging, text="Outbound Staging")
 
         # Inicializar variables
@@ -49,8 +49,8 @@ class VentanaConfiguracion:
         # Crear widgets en cada pestana
         self._crear_widgets_carga()
         self._crear_widgets_estrategias()
+        self._crear_widgets_flota()
         self._crear_widgets_layout_datos()
-        self._crear_widgets_asignacion()
         self._crear_widgets_staging()
 
         # Crear frame de botones en la parte inferior
@@ -91,6 +91,17 @@ class VentanaConfiguracion:
             str(i): tk.IntVar(value=100 if i == 1 else 0)
             for i in range(1, 8)
         }
+
+        # Flota de Agentes - Grupos dinamicos
+        self.fleet_groups = {
+            'GroundOperator': [],  # Lista de diccionarios con info de cada grupo
+            'Forklift': []
+        }
+        self.fleet_group_widgets = {
+            'GroundOperator': [],  # Lista de widgets para cada grupo
+            'Forklift': []
+        }
+        self.available_work_areas = []  # Se cargara desde sequence file
 
     def _crear_widgets_carga(self):
         """Crea widgets de la pestana Carga de Trabajo"""
@@ -162,6 +173,189 @@ class VentanaConfiguracion:
         ]
         combo_tour = ttk.Combobox(frame, textvariable=self.tour_type_var, values=tipos_tour, width=40)
         combo_tour.grid(row=row, column=1, sticky=tk.W, pady=5)
+
+    def _crear_widgets_flota(self):
+        """Crea widgets de la pestana Flota de Agentes con grupos dinamicos"""
+        # Frame principal con scroll
+        main_canvas = tk.Canvas(self.tab_flota)
+        main_scrollbar = ttk.Scrollbar(self.tab_flota, orient=tk.VERTICAL, command=main_canvas.yview)
+        self.flota_scrollable_frame = ttk.Frame(main_canvas)
+
+        self.flota_scrollable_frame.bind(
+            "<Configure>",
+            lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all"))
+        )
+
+        main_canvas.create_window((0, 0), window=self.flota_scrollable_frame, anchor=tk.NW)
+        main_canvas.configure(yscrollcommand=main_scrollbar.set)
+
+        main_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        main_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Titulo
+        ttk.Label(self.flota_scrollable_frame, text="Configuracion de Flota de Agentes",
+                 font=("Arial", 12, "bold"), foreground="blue").pack(pady=10)
+
+        # Boton Generar Flota por Defecto
+        ttk.Button(self.flota_scrollable_frame, text="Generar Flota por Defecto",
+                  command=self._generar_flota_defecto).pack(pady=5)
+
+        # Seccion Operarios Terrestres
+        self.ground_operators_frame = ttk.LabelFrame(self.flota_scrollable_frame,
+                                                     text="Operarios Terrestres", padding=10)
+        self.ground_operators_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        ttk.Button(self.ground_operators_frame, text="+ Anadir Grupo",
+                  command=lambda: self._anadir_grupo_flota('GroundOperator')).pack(anchor=tk.W, pady=5)
+
+        self.ground_operators_container = ttk.Frame(self.ground_operators_frame)
+        self.ground_operators_container.pack(fill=tk.BOTH, expand=True)
+
+        # Seccion Montacargas
+        self.forklifts_frame = ttk.LabelFrame(self.flota_scrollable_frame,
+                                             text="Montacargas", padding=10)
+        self.forklifts_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        ttk.Button(self.forklifts_frame, text="+ Anadir Grupo",
+                  command=lambda: self._anadir_grupo_flota('Forklift')).pack(anchor=tk.W, pady=5)
+
+        self.forklifts_container = ttk.Frame(self.forklifts_frame)
+        self.forklifts_container.pack(fill=tk.BOTH, expand=True)
+
+    def _anadir_grupo_flota(self, agent_type):
+        """Anade un nuevo grupo de agentes (Operarios Terrestres o Montacargas)"""
+        # Determinar contenedor y valores por defecto
+        if agent_type == 'GroundOperator':
+            container = self.ground_operators_container
+            default_capacity = 150
+        else:  # Forklift
+            container = self.forklifts_container
+            default_capacity = 1000
+
+        group_num = len(self.fleet_groups[agent_type]) + 1
+
+        # Frame para el grupo
+        group_frame = ttk.LabelFrame(container, text=f"Grupo {group_num}", padding=10)
+        group_frame.pack(fill=tk.X, pady=5, padx=5)
+
+        # Frame superior con parametros
+        params_frame = ttk.Frame(group_frame)
+        params_frame.pack(fill=tk.X)
+
+        # Cantidad
+        ttk.Label(params_frame, text="Cantidad:").grid(row=0, column=0, sticky=tk.W, padx=5)
+        cantidad_var = tk.IntVar(value=2)
+        cantidad_spin = ttk.Spinbox(params_frame, from_=1, to=50, textvariable=cantidad_var, width=10)
+        cantidad_spin.grid(row=0, column=1, padx=5)
+
+        # Capacidad
+        ttk.Label(params_frame, text="Capacidad (L):").grid(row=0, column=2, sticky=tk.W, padx=5)
+        capacidad_var = tk.IntVar(value=default_capacity)
+        capacidad_spin = ttk.Spinbox(params_frame, from_=50, to=2000, textvariable=capacidad_var, width=10)
+        capacidad_spin.grid(row=0, column=3, padx=5)
+
+        # Tiempo Descarga
+        ttk.Label(params_frame, text="Tiempo Descarga (s):").grid(row=0, column=4, sticky=tk.W, padx=5)
+        tiempo_var = tk.IntVar(value=5)
+        tiempo_spin = ttk.Spinbox(params_frame, from_=1, to=60, textvariable=tiempo_var, width=10)
+        tiempo_spin.grid(row=0, column=5, padx=5)
+
+        # Boton eliminar grupo
+        ttk.Button(params_frame, text="x", width=3,
+                  command=lambda: self._eliminar_grupo_flota(agent_type, group_num-1, group_frame)).grid(
+                      row=0, column=6, padx=10)
+
+        # Seccion de Prioridades de Work Area
+        priorities_frame = ttk.LabelFrame(group_frame, text="Prioridades de Work Area", padding=5)
+        priorities_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+
+        # Boton para agregar prioridad
+        ttk.Button(priorities_frame, text="+", width=3,
+                  command=lambda: self._anadir_prioridad_wa(agent_type, group_num-1,
+                                                            priorities_container)).pack(anchor=tk.W, pady=2)
+
+        # Contenedor de prioridades
+        priorities_container = ttk.Frame(priorities_frame)
+        priorities_container.pack(fill=tk.BOTH, expand=True)
+
+        # Guardar informacion del grupo
+        group_data = {
+            'frame': group_frame,
+            'cantidad_var': cantidad_var,
+            'capacidad_var': capacidad_var,
+            'tiempo_var': tiempo_var,
+            'priorities_container': priorities_container,
+            'priorities': []  # Lista de {wa_var, priority_var, frame}
+        }
+
+        self.fleet_groups[agent_type].append(group_data)
+
+    def _anadir_prioridad_wa(self, agent_type, group_idx, priorities_container):
+        """Anade una fila de Work Area y Prioridad"""
+        priority_frame = ttk.Frame(priorities_container)
+        priority_frame.pack(fill=tk.X, pady=2)
+
+        # Work Area dropdown
+        ttk.Label(priority_frame, text="Work Area:").grid(row=0, column=0, sticky=tk.W, padx=5)
+        wa_var = tk.StringVar()
+        wa_combo = ttk.Combobox(priority_frame, textvariable=wa_var, width=15, state='readonly')
+        wa_combo['values'] = self.available_work_areas if self.available_work_areas else ["1", "2", "3", "4", "5"]
+        wa_combo.grid(row=0, column=1, padx=5)
+
+        # Prioridad spinner
+        ttk.Label(priority_frame, text="Prioridad:").grid(row=0, column=2, sticky=tk.W, padx=5)
+        priority_var = tk.IntVar(value=1)
+        priority_spin = ttk.Spinbox(priority_frame, from_=1, to=10, textvariable=priority_var, width=10)
+        priority_spin.grid(row=0, column=3, padx=5)
+
+        # Boton eliminar prioridad
+        ttk.Button(priority_frame, text="x", width=3,
+                  command=lambda: self._eliminar_prioridad_wa(agent_type, group_idx,
+                                                              priority_frame)).grid(row=0, column=4, padx=5)
+
+        # Guardar en el grupo
+        priority_data = {
+            'frame': priority_frame,
+            'wa_var': wa_var,
+            'priority_var': priority_var
+        }
+        self.fleet_groups[agent_type][group_idx]['priorities'].append(priority_data)
+
+    def _eliminar_prioridad_wa(self, agent_type, group_idx, priority_frame):
+        """Elimina una fila de prioridad de Work Area"""
+        priority_frame.destroy()
+        # Remover de la lista
+        group = self.fleet_groups[agent_type][group_idx]
+        group['priorities'] = [p for p in group['priorities'] if p['frame'] != priority_frame]
+
+    def _eliminar_grupo_flota(self, agent_type, group_idx, group_frame):
+        """Elimina un grupo completo de la flota"""
+        group_frame.destroy()
+        # Remover de la lista
+        del self.fleet_groups[agent_type][group_idx]
+        # Renumerar grupos restantes
+        self._renumerar_grupos_flota(agent_type)
+
+    def _renumerar_grupos_flota(self, agent_type):
+        """Renumera los grupos despues de eliminar uno"""
+        for idx, group in enumerate(self.fleet_groups[agent_type]):
+            group['frame'].config(text=f"Grupo {idx + 1}")
+
+    def _generar_flota_defecto(self):
+        """Genera configuracion de flota por defecto"""
+        # Limpiar grupos existentes
+        for agent_type in ['GroundOperator', 'Forklift']:
+            for group in list(self.fleet_groups[agent_type]):
+                group['frame'].destroy()
+            self.fleet_groups[agent_type].clear()
+
+        # Crear 1 grupo de Operarios Terrestres
+        self._anadir_grupo_flota('GroundOperator')
+
+        # Crear 1 grupo de Montacargas
+        self._anadir_grupo_flota('Forklift')
+
+        messagebox.showinfo("Flota Generada", "Configuracion de flota por defecto generada exitosamente.")
 
     def _crear_widgets_asignacion(self):
         """Crea widgets de la pestana Asignacion de Recursos"""
@@ -478,100 +672,35 @@ class VentanaConfiguracion:
             # Usar valores por defecto en caso de error
             self.available_work_areas = ["Area_1", "Area_2", "Area_3"]
 
-    def _generar_config_defecto(self):
-        """Genera configuracion de flota por defecto"""
-        if not self.available_work_areas:
-            return []
-
-        # Configuracion por defecto: 1 GroundOperator y 5 Forklifts
-        config_defecto = []
-
-        # 1 GroundOperator
-        ground_priorities = {wa: 1 for wa in self.available_work_areas}
-        config_defecto.append({
-            'agent_type': 'GroundOperator',
-            'cantidad': 1,
-            'capacidad': 150,
-            'tiempo_descarga': 5,
-            'work_area_priorities': ground_priorities
-        })
-
-        # 5 Forklifts
-        for i in range(5):
-            forklift_priorities = {wa: (i % len(self.available_work_areas)) + 1 for wa in self.available_work_areas}
-            config_defecto.append({
-                'agent_type': 'Forklift',
-                'cantidad': 1,
-                'capacidad': 1000,
-                'tiempo_descarga': 5,
-                'work_area_priorities': forklift_priorities
-            })
-
-        return config_defecto
-
-    def _generar_flota_defecto(self):
-        """Genera flota por defecto con confirmacion"""
-        if not self.available_work_areas:
-            # Intentar cargar WorkAreas primero
-            sequence_file = self.sequence_path_var.get()
-            if sequence_file:
-                try:
-                    self._cargar_work_areas_automatico(sequence_file)
-                except Exception as e:
-                    messagebox.showerror("Error",
-                        f"No se pudieron cargar WorkAreas:\n{e}\n\nDefina el archivo de secuencia primero.")
-                    return
-            else:
-                messagebox.showerror("Error",
-                    "Debe definir el archivo de secuencia primero para cargar WorkAreas.")
-                return
-
-        if messagebox.askyesno("Generar Flota",
-                              "Esto eliminara la configuracion actual de flota. Continuar?"):
-            config_defecto = self._generar_config_defecto()
-            self._limpiar_todos_los_grupos()
-            for group_config in config_defecto:
-                self._crear_grupo_desde_config(group_config)
-
-            messagebox.showinfo("Exito", "Flota por defecto generada correctamente")
-
-    def _limpiar_todos_los_grupos(self):
-        """Limpia todos los grupos de flota"""
-        for widget in self.fleet_scrollable_frame.winfo_children():
-            widget.destroy()
-        self.fleet_groups = []
-
-    def _crear_grupo_desde_config(self, config):
-        """Crea un grupo de flota desde configuracion"""
-        group_frame = ttk.LabelFrame(self.fleet_scrollable_frame,
-                                     text=f"{config['agent_type']} x{config['cantidad']}",
-                                     padding=10)
-        group_frame.pack(fill=tk.X, padx=5, pady=5)
-
-        # Almacenar configuracion
-        group_data = {
-            'frame': group_frame,
-            'config': config.copy()
-        }
-        self.fleet_groups.append(group_data)
-
-        # Mostrar configuracion
-        ttk.Label(group_frame, text=f"Tipo: {config['agent_type']}").pack(anchor=tk.W)
-        ttk.Label(group_frame, text=f"Cantidad: {config['cantidad']}").pack(anchor=tk.W)
-        ttk.Label(group_frame, text=f"Capacidad: {config['capacidad']}").pack(anchor=tk.W)
-        ttk.Label(group_frame, text=f"Tiempo Descarga: {config['tiempo_descarga']}s").pack(anchor=tk.W)
-
-        # Mostrar prioridades de forma compacta
-        priorities_str = ", ".join([f"{wa}:{p}" for wa, p in list(config['work_area_priorities'].items())[:5]])
-        if len(config['work_area_priorities']) > 5:
-            priorities_str += "..."
-        ttk.Label(group_frame, text=f"Prioridades: {priorities_str}").pack(anchor=tk.W)
-
     def _poblar_ui_flota(self, grupos):
-        """Pobla la UI de flota con grupos existentes"""
-        self._limpiar_todos_los_grupos()
+        """Pobla la UI de flota con grupos existentes desde config cargado"""
+        # Limpiar grupos actuales
+        for agent_type in ['GroundOperator', 'Forklift']:
+            for group in list(self.fleet_groups[agent_type]):
+                group['frame'].destroy()
+            self.fleet_groups[agent_type].clear()
+
+        # Recrear grupos desde config
         for grupo in grupos:
-            self._crear_grupo_desde_config(grupo)
+            agent_type = grupo['agent_type']
+            self._anadir_grupo_flota(agent_type)
+
+            # Obtener el grupo recien creado
+            group = self.fleet_groups[agent_type][-1]
+
+            # Setear valores
+            group['cantidad_var'].set(grupo['cantidad'])
+            group['capacidad_var'].set(grupo['capacidad'])
+            group['tiempo_var'].set(grupo['tiempo_descarga'])
+
+            # Agregar prioridades
+            for wa, priority in grupo['work_area_priorities'].items():
+                self._anadir_prioridad_wa(agent_type, len(self.fleet_groups[agent_type])-1,
+                                         group['priorities_container'])
+                # Setear valores de la prioridad recien creada
+                priority_data = group['priorities'][-1]
+                priority_data['wa_var'].set(str(wa))
+                priority_data['priority_var'].set(priority)
 
     # ========================================================================
     # METODOS DE VALORES POR DEFECTO
@@ -629,17 +758,53 @@ class VentanaConfiguracion:
                 priority = row['priority_var'].get()
                 self.assignment_rules[agent_type][level] = priority
 
-        # Construir agent_types desde fleet_groups
+        # Construir agent_types desde fleet_groups (nueva estructura)
         agent_types = []
-        for grupo in self.fleet_groups:
-            config = grupo['config']
-            cantidad = config['cantidad']
+
+        # Procesar Operarios Terrestres
+        for group in self.fleet_groups['GroundOperator']:
+            cantidad = group['cantidad_var'].get()
+            capacidad = group['capacidad_var'].get()
+            tiempo_descarga = group['tiempo_var'].get()
+
+            # Construir diccionario de prioridades de Work Area
+            work_area_priorities = {}
+            for priority_data in group['priorities']:
+                wa = priority_data['wa_var'].get()
+                priority = priority_data['priority_var'].get()
+                if wa:  # Solo agregar si se selecciono un WA
+                    work_area_priorities[int(wa)] = priority
+
+            # Crear agentes individuales
             for _ in range(cantidad):
                 agent_types.append({
-                    'type': config['agent_type'],
-                    'capacity': config['capacidad'],
-                    'discharge_time': config['tiempo_descarga'],
-                    'work_area_priorities': config['work_area_priorities'].copy()
+                    'type': 'GroundOperator',
+                    'capacity': capacidad,
+                    'discharge_time': tiempo_descarga,
+                    'work_area_priorities': work_area_priorities.copy()
+                })
+
+        # Procesar Montacargas
+        for group in self.fleet_groups['Forklift']:
+            cantidad = group['cantidad_var'].get()
+            capacidad = group['capacidad_var'].get()
+            tiempo_descarga = group['tiempo_var'].get()
+
+            # Construir diccionario de prioridades de Work Area
+            work_area_priorities = {}
+            for priority_data in group['priorities']:
+                wa = priority_data['wa_var'].get()
+                priority = priority_data['priority_var'].get()
+                if wa:  # Solo agregar si se selecciono un WA
+                    work_area_priorities[int(wa)] = priority
+
+            # Crear agentes individuales
+            for _ in range(cantidad):
+                agent_types.append({
+                    'type': 'Forklift',
+                    'capacity': capacidad,
+                    'discharge_time': tiempo_descarga,
+                    'work_area_priorities': work_area_priorities.copy()
                 })
 
         config = {
