@@ -400,61 +400,93 @@ class VentanaConfiguracion:
         self._generar_asignacion_defecto()
 
     def _crear_widgets_layout_datos(self):
-        """Crea widgets de la pestana Layout y Datos combinada"""
-        # Frame para archivos de layout
-        frame_layout = ttk.LabelFrame(self.tab_layout_datos, text="Archivos de Layout", padding=10)
+        """Crea widgets de la pestana Layout y Datos segun screenshot original"""
+        # SECCION 1: Seleccion de Archivo de Layout
+        frame_layout = ttk.LabelFrame(self.tab_layout_datos, text="Seleccion de Archivo de Layout", padding=10)
         frame_layout.pack(fill=tk.X, padx=10, pady=(10, 5))
 
-        row = 0
-        ttk.Label(frame_layout, text="Archivo TMX:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame_layout, textvariable=self.layout_path_var, width=40).grid(row=row, column=1, sticky=tk.W, pady=5)
-        ttk.Button(frame_layout, text="Examinar...", command=self._examinar_tmx).grid(row=row, column=2, padx=5)
+        ttk.Label(frame_layout, text="Archivo TMX:").grid(row=0, column=0, sticky=tk.W, pady=5, padx=5)
+        ttk.Entry(frame_layout, textvariable=self.layout_path_var, width=50).grid(row=0, column=1, sticky=tk.W, pady=5, padx=5)
+        ttk.Button(frame_layout, text="Seleccionar...", command=self._examinar_tmx).grid(row=0, column=2, padx=5)
 
-        row += 1
-        ttk.Label(frame_layout, text="Archivo Secuencia (XLSX):").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame_layout, textvariable=self.sequence_path_var, width=40).grid(row=row, column=1, sticky=tk.W, pady=5)
-        ttk.Button(frame_layout, text="Examinar...", command=self._examinar_sequence).grid(row=row, column=2, padx=5)
+        # SECCION 2: Gestion de Datos de Secuencia (CSV)
+        frame_secuencia = ttk.LabelFrame(self.tab_layout_datos, text="Gestion de Datos de Secuencia (CSV)", padding=10)
+        frame_secuencia.pack(fill=tk.X, padx=10, pady=5)
 
-        row += 1
-        ttk.Label(frame_layout, text="Escala del Mapa:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame_layout, textvariable=self.map_scale_var, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        # Archivo de Secuencia
+        ttk.Label(frame_secuencia, text="Archivo de Secuencia:").grid(row=0, column=0, sticky=tk.W, pady=5, padx=5)
+        ttk.Entry(frame_secuencia, textvariable=self.sequence_path_var, width=50).grid(row=0, column=1, sticky=tk.W, pady=5, padx=5)
+        ttk.Button(frame_secuencia, text="Seleccionar...", command=self._examinar_sequence).grid(row=0, column=2, padx=5)
 
-        row += 1
-        ttk.Label(frame_layout, text="Resolucion:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        # Botones de accion
+        button_frame = ttk.Frame(frame_secuencia)
+        button_frame.grid(row=1, column=0, columnspan=3, pady=10)
+
+        ttk.Button(button_frame, text="Generar Plantilla desde TMX",
+                  command=self._generar_plantilla_desde_tmx).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Poblar SKUs Aleatorios en CSV",
+                  command=self._poblar_skus_aleatorios).pack(side=tk.LEFT, padx=5)
+
+        # Texto explicativo
+        help_text = (
+            "• Generar Plantilla: Analiza el TMX y crea un CSV con ubicaciones de picking\n"
+            "• Poblar SKUs: Rellena el CSV con SKUs y cantidades aleatorias"
+        )
+        help_label = ttk.Label(frame_secuencia, text=help_text, foreground="gray", justify=tk.LEFT)
+        help_label.grid(row=2, column=0, columnspan=3, sticky=tk.W, pady=5, padx=5)
+
+        # SECCION 3: Configuracion de Ventana
+        frame_ventana = ttk.LabelFrame(self.tab_layout_datos, text="Configuracion de Ventana", padding=10)
+        frame_ventana.pack(fill=tk.X, padx=10, pady=5)
+
+        # Resolucion con label descriptivo
+        res_frame = ttk.Frame(frame_ventana)
+        res_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        ttk.Label(res_frame, text="Resolucion de Pantalla:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
         resoluciones = ["Pequena (800x800)", "Mediana (1024x768)", "Grande (1280x1024)", "Extra Grande (1920x1080)"]
-        combo = ttk.Combobox(frame_layout, textvariable=self.resolution_var, values=resoluciones, width=30, state='readonly')
-        combo.grid(row=row, column=1, sticky=tk.W, pady=5)
+        combo = ttk.Combobox(res_frame, textvariable=self.resolution_var, values=resoluciones, width=25, state='readonly')
+        combo.pack(side=tk.LEFT, padx=5)
+        ttk.Label(res_frame, text="(Tamano de ventana del simulador)", foreground="gray").pack(side=tk.LEFT, padx=5)
 
-        # Frame para datos de recursos
-        frame_recursos = ttk.LabelFrame(self.tab_layout_datos, text="Configuracion de Recursos", padding=10)
-        frame_recursos.pack(fill=tk.X, padx=10, pady=5)
+        # Texto explicativo
+        help_res = "Pequena: Rendimiento optimo | Mediana: Balance | Grande: Mejor visualizacion"
+        ttk.Label(frame_ventana, text=help_res, foreground="gray").pack(anchor=tk.W, padx=5, pady=(0, 5))
 
-        row = 0
-        ttk.Label(frame_recursos, text="Operarios Terrestres:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame_recursos, textvariable=self.num_operarios_terrestres, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+    def _generar_plantilla_desde_tmx(self):
+        """Genera Warehouse_Logic.xlsx desde el archivo TMX"""
+        tmx_file = self.layout_path_var.get()
+        if not tmx_file or not os.path.exists(tmx_file):
+            messagebox.showerror("Error", "Debe seleccionar un archivo TMX valido primero.")
+            return
 
-        row += 1
-        ttk.Label(frame_recursos, text="Montacargas:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame_recursos, textvariable=self.num_montacargas, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+        try:
+            # TODO: Implementar logica para parsear TMX y crear XLSX
+            messagebox.showinfo("Generacion de Plantilla",
+                              "Funcionalidad en desarrollo.\n\n"
+                              "Creara Warehouse_Logic.xlsx con:\n"
+                              "- Columnas de ubicaciones de picking\n"
+                              "- Datos por defecto para el simulador\n"
+                              "- Estructura lista para modificar")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error generando plantilla: {e}")
 
-        row += 1
-        ttk.Label(frame_recursos, text="Capacidad Montacargas:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame_recursos, textvariable=self.capacidad_montacargas, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
+    def _poblar_skus_aleatorios(self):
+        """Pobla el CSV con SKUs y cantidades aleatorias"""
+        csv_file = self.sequence_path_var.get()
+        if not csv_file:
+            messagebox.showerror("Error", "Debe seleccionar un archivo de secuencia primero.")
+            return
 
-        row += 1
-        ttk.Label(frame_recursos, text="Capacidad del Carro:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame_recursos, textvariable=self.capacidad_carro, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
-
-        row += 1
-        ttk.Label(frame_recursos, text="Tiempo Descarga por Tarea (s):").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(frame_recursos, textvariable=self.tiempo_descarga_por_tarea, width=15).grid(row=row, column=1, sticky=tk.W, pady=5)
-
-        row += 1
-        self.label_total_recursos = ttk.Label(frame_recursos, text="Total de Recursos: 2", font=("Arial", 10, "bold"))
-        self.label_total_recursos.grid(row=row, column=0, columnspan=2, pady=10)
-
-        self.num_operarios_terrestres.trace_add("write", lambda *args: self.actualizar_total())
-        self.num_montacargas.trace_add("write", lambda *args: self.actualizar_total())
+        try:
+            # TODO: Implementar logica para poblar CSV con datos aleatorios
+            messagebox.showinfo("Poblar SKUs",
+                              "Funcionalidad en desarrollo.\n\n"
+                              "Rellenara el CSV con:\n"
+                              "- SKUs aleatorios\n"
+                              "- Cantidades aleatorias")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error poblando SKUs: {e}")
 
     def _crear_widgets_staging(self):
         """Crea widgets de la pestana Outbound Staging"""
