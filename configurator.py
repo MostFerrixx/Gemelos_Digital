@@ -658,10 +658,15 @@ class VentanaConfiguracion:
         button_frame = ttk.Frame(self.parent)
         button_frame.pack(fill=tk.X, padx=10, pady=10)
 
+        # Botones principales a la izquierda
         ttk.Button(button_frame, text="Guardar Configuracion",
                   command=self._guardar_callback).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Cargar Valores por Defecto",
+        ttk.Button(button_frame, text="Cargar Configuracion",
+                  command=self._cargar_callback).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Valores por Defecto",
                   command=self.valores_por_defecto_new).pack(side=tk.LEFT, padx=5)
+
+        # Botón Salir a la derecha
         ttk.Button(button_frame, text="Salir",
                   command=self._salir_callback).pack(side=tk.RIGHT, padx=5)
 
@@ -983,8 +988,12 @@ class VentanaConfiguracion:
     # ========================================================================
 
     def _guardar_callback(self):
-        """Placeholder para guardar"""
+        """Placeholder para guardar - se sobreescribe en ConfiguradorSimulador"""
         print("[VENTANA] Guardar callback")
+
+    def _cargar_callback(self):
+        """Placeholder para cargar - se sobreescribe en ConfiguradorSimulador"""
+        print("[VENTANA] Cargar callback")
 
     def _probar_callback(self):
         """Placeholder para probar"""
@@ -1210,6 +1219,47 @@ class ConfiguradorSimulador:
             )
             print(f"[CONFIGURATOR ERROR] Error guardando configuracion: {e}")
 
+    def cargar_configuracion_manual(self):
+        """Carga la configuracion desde config.json manualmente (por solicitud del usuario)"""
+        config_path = os.path.join(os.path.dirname(__file__), "config.json")
+
+        if not os.path.exists(config_path):
+            messagebox.showwarning(
+                "Archivo No Encontrado",
+                f"No se encontro el archivo de configuracion:\n{config_path}\n\n"
+                "Use 'Guardar Configuracion' primero para crear el archivo."
+            )
+            return
+
+        try:
+            print(f"[CONFIGURATOR] Cargando configuracion desde: {config_path}")
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+
+            # Sanitizar assignment_rules: convertir claves str a int
+            if 'assignment_rules' in config and config['assignment_rules']:
+                sanitized_rules = {}
+                for agent_type, rules in config['assignment_rules'].items():
+                    sanitized_rules[agent_type] = {int(k): v for k, v in rules.items()}
+                config['assignment_rules'] = sanitized_rules
+
+            # Poblar UI
+            self._poblar_ui_desde_config(config)
+
+            messagebox.showinfo(
+                "Configuracion Cargada",
+                f"La configuracion se ha cargado exitosamente desde:\n{config_path}"
+            )
+            print("[CONFIGURATOR] Configuracion cargada exitosamente en UI")
+
+        except (json.JSONDecodeError, KeyError, Exception) as e:
+            messagebox.showerror(
+                "Error al Cargar",
+                f"No se pudo cargar la configuracion:\n{str(e)}\n\n"
+                "Verifique que el archivo config.json sea valido."
+            )
+            print(f"[CONFIGURATOR ERROR] Error cargando config.json: {e}")
+
     def cargar_defaults(self):
         """Carga los valores por defecto en la UI"""
         try:
@@ -1310,6 +1360,7 @@ class ConfiguradorSimulador:
 
         # Conectar callbacks
         self.ventana_config._guardar_callback = self.guardar_configuracion
+        self.ventana_config._cargar_callback = self.cargar_configuracion_manual
         self.ventana_config._salir_callback = self.salir
 
         self.root.mainloop()
