@@ -426,11 +426,14 @@ class VentanaConfiguracion:
                   command=self._generar_plantilla_desde_tmx).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Poblar SKUs Aleatorios en CSV",
                   command=self._poblar_skus_aleatorios).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cargar Work Areas",
+                  command=self._cargar_work_areas_manual).pack(side=tk.LEFT, padx=5)
 
         # Texto explicativo
         help_text = (
             "• Generar Plantilla: Analiza el TMX y crea un CSV con ubicaciones de picking\n"
-            "• Poblar SKUs: Rellena el CSV con SKUs y cantidades aleatorias"
+            "• Poblar SKUs: Rellena el CSV con SKUs y cantidades aleatorias\n"
+            "• Cargar Work Areas: Carga WA/WG desde archivo de secuencia para configurar prioridades"
         )
         help_label = ttk.Label(frame_secuencia, text=help_text, foreground="gray", justify=tk.LEFT)
         help_label.grid(row=2, column=0, columnspan=3, sticky=tk.W, pady=5, padx=5)
@@ -487,6 +490,63 @@ class VentanaConfiguracion:
                               "- Cantidades aleatorias")
         except Exception as e:
             messagebox.showerror("Error", f"Error poblando SKUs: {e}")
+
+    def _cargar_work_areas_manual(self):
+        """Carga Work Areas manualmente desde el archivo de secuencia seleccionado"""
+        sequence_file = self.sequence_path_var.get()
+
+        if not sequence_file:
+            messagebox.showerror("Error",
+                               "Debe seleccionar un archivo de secuencia primero.")
+            return
+
+        if not os.path.exists(sequence_file):
+            messagebox.showerror("Error",
+                               f"El archivo no existe:\n{sequence_file}")
+            return
+
+        try:
+            # Usar el metodo automatico existente
+            self._cargar_work_areas_automatico(sequence_file)
+
+            # Actualizar todos los dropdowns existentes en Flota de Agentes
+            self._actualizar_dropdowns_work_areas()
+
+            if self.available_work_areas:
+                messagebox.showinfo("Work Areas Cargadas",
+                                  f"Se cargaron {len(self.available_work_areas)} Work Areas:\n\n" +
+                                  ", ".join(self.available_work_areas) +
+                                  "\n\nYa estan disponibles en la pestana Flota de Agentes.")
+            else:
+                messagebox.showwarning("Advertencia",
+                                     "No se encontraron Work Areas en el archivo.\n"
+                                     "Se usaran valores por defecto.")
+
+        except Exception as e:
+            messagebox.showerror("Error",
+                               f"Error cargando Work Areas:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def _actualizar_dropdowns_work_areas(self):
+        """Actualiza los valores de todos los dropdowns de Work Areas en grupos existentes"""
+        # Actualizar dropdowns en Operarios Terrestres
+        for group in self.fleet_groups['GroundOperator']:
+            for priority_data in group['priorities']:
+                # Obtener el combobox y actualizar sus values
+                for widget in priority_data['frame'].winfo_children():
+                    if isinstance(widget, ttk.Combobox):
+                        widget['values'] = self.available_work_areas
+                        break
+
+        # Actualizar dropdowns en Montacargas
+        for group in self.fleet_groups['Forklift']:
+            for priority_data in group['priorities']:
+                # Obtener el combobox y actualizar sus values
+                for widget in priority_data['frame'].winfo_children():
+                    if isinstance(widget, ttk.Combobox):
+                        widget['values'] = self.available_work_areas
+                        break
 
     def _crear_widgets_staging(self):
         """Crea widgets de la pestana Outbound Staging"""
