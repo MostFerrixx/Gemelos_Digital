@@ -26,9 +26,12 @@ class VentanaConfiguracion:
         self.assignment_widgets = {"GroundOperator": [], "Forklift": []}
         self.fleet_groups = []  # Lista de grupos de flota creados
 
+        # Aplicar tema moderno estilo Google
+        self._aplicar_tema_moderno()
+
         # Crear notebook con pestanas
         self.notebook = ttk.Notebook(parent)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
 
         # Crear pestanas (5 tabs as per user specification)
         self.tab_carga = ttk.Frame(self.notebook)
@@ -102,6 +105,102 @@ class VentanaConfiguracion:
             'Forklift': []
         }
         self.available_work_areas = []  # Se cargara desde sequence file
+
+    def _aplicar_tema_moderno(self):
+        """Aplica un tema moderno estilo Google Material Design"""
+        style = ttk.Style()
+
+        # Configurar tema base
+        style.theme_use('clam')
+
+        # Paleta de colores Google Material Design
+        COLOR_PRIMARY = '#1a73e8'      # Azul Google
+        COLOR_PRIMARY_DARK = '#1557b0' # Azul oscuro
+        COLOR_SURFACE = '#ffffff'       # Blanco
+        COLOR_BACKGROUND = '#f8f9fa'    # Gris muy claro
+        COLOR_BORDER = '#dadce0'        # Gris borde
+        COLOR_TEXT = '#202124'          # Texto oscuro
+        COLOR_TEXT_SECONDARY = '#5f6368' # Texto secundario
+
+        # Configurar colores de fondo de la ventana principal
+        self.parent.configure(bg=COLOR_BACKGROUND)
+
+        # Estilo para TFrame
+        style.configure('TFrame', background=COLOR_BACKGROUND)
+
+        # Estilo para TLabelframe (grupos)
+        style.configure('TLabelframe',
+                       background=COLOR_SURFACE,
+                       bordercolor=COLOR_BORDER,
+                       borderwidth=1,
+                       relief='solid')
+        style.configure('TLabelframe.Label',
+                       background=COLOR_SURFACE,
+                       foreground=COLOR_TEXT,
+                       font=('Segoe UI', 10, 'bold'))
+
+        # Estilo para TLabel
+        style.configure('TLabel',
+                       background=COLOR_SURFACE,
+                       foreground=COLOR_TEXT,
+                       font=('Segoe UI', 9))
+
+        # Estilo para TEntry
+        style.configure('TEntry',
+                       fieldbackground=COLOR_SURFACE,
+                       bordercolor=COLOR_BORDER,
+                       lightcolor=COLOR_PRIMARY,
+                       darkcolor=COLOR_PRIMARY)
+
+        # Estilo para TButton - Botones modernos con bordes redondeados
+        style.configure('TButton',
+                       background=COLOR_PRIMARY,
+                       foreground='white',
+                       borderwidth=0,
+                       focuscolor='none',
+                       font=('Segoe UI', 9, 'bold'),
+                       padding=(16, 8))
+        style.map('TButton',
+                 background=[('active', COLOR_PRIMARY_DARK),
+                            ('disabled', COLOR_BORDER)],
+                 foreground=[('disabled', COLOR_TEXT_SECONDARY)])
+
+        # Estilo para botones secundarios
+        style.configure('Secondary.TButton',
+                       background=COLOR_SURFACE,
+                       foreground=COLOR_PRIMARY,
+                       borderwidth=1,
+                       bordercolor=COLOR_BORDER,
+                       font=('Segoe UI', 9),
+                       padding=(16, 8))
+        style.map('Secondary.TButton',
+                 background=[('active', COLOR_BACKGROUND)])
+
+        # Estilo para Notebook (pestañas)
+        style.configure('TNotebook',
+                       background=COLOR_BACKGROUND,
+                       borderwidth=0)
+        style.configure('TNotebook.Tab',
+                       background=COLOR_SURFACE,
+                       foreground=COLOR_TEXT_SECONDARY,
+                       padding=(20, 12),
+                       font=('Segoe UI', 10))
+        style.map('TNotebook.Tab',
+                 background=[('selected', COLOR_SURFACE)],
+                 foreground=[('selected', COLOR_PRIMARY)],
+                 expand=[('selected', (0, 0, 0, 2))])
+
+        # Estilo para Combobox
+        style.configure('TCombobox',
+                       fieldbackground=COLOR_SURFACE,
+                       background=COLOR_SURFACE,
+                       bordercolor=COLOR_BORDER,
+                       arrowcolor=COLOR_TEXT)
+
+        # Estilo para Spinbox (si se usa)
+        style.configure('TSpinbox',
+                       fieldbackground=COLOR_SURFACE,
+                       bordercolor=COLOR_BORDER)
 
     def _crear_widgets_carga(self):
         """Crea widgets de la pestana Carga de Trabajo"""
@@ -877,9 +976,12 @@ class ConfiguradorSimulador:
 
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("Configurador de Simulacion - Gemelo Digital")
-        self.root.geometry("700x600")
+        self.root.title("Warehouse Simulation Configurator")
+        self.root.geometry("900x700")
         self.root.resizable(True, True)
+
+        # Configurar tamaño mínimo
+        self.root.minsize(800, 600)
 
         # Centrar ventana
         self._centrar_ventana()
@@ -895,8 +997,8 @@ class ConfiguradorSimulador:
     def _centrar_ventana(self):
         """Centra la ventana en la pantalla"""
         self.root.update_idletasks()
-        ancho_ventana = 700
-        alto_ventana = 600
+        ancho_ventana = 900
+        alto_ventana = 700
         x = (self.root.winfo_screenwidth() // 2) - (ancho_ventana // 2)
         y = (self.root.winfo_screenheight() // 2) - (alto_ventana // 2)
         self.root.geometry(f"{ancho_ventana}x{alto_ventana}+{x}+{y}")
