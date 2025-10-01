@@ -59,6 +59,9 @@ class VentanaConfiguracion:
         # Crear frame de botones en la parte inferior
         self._crear_botones_accion()
 
+        # Cargar Work Areas automaticamente desde el archivo por defecto
+        self._cargar_work_areas_inicial()
+
     def _inicializar_variables(self):
         """Inicializa todas las variables de tkinter"""
         # Carga de trabajo
@@ -105,6 +108,20 @@ class VentanaConfiguracion:
             'Forklift': []
         }
         self.available_work_areas = []  # Se cargara desde sequence file
+
+    def _cargar_work_areas_inicial(self):
+        """Carga Work Areas automaticamente al inicio desde el archivo configurado"""
+        sequence_file = self.sequence_path_var.get()
+        if sequence_file and os.path.exists(sequence_file):
+            try:
+                self._cargar_work_areas_automatico(sequence_file)
+                # No actualizar dropdowns aqui porque aun no hay grupos creados
+                # Los dropdowns se actualizaran cuando se creen grupos o se cargue config
+                print(f"[INIT] Work Areas cargadas al inicio: {self.available_work_areas}")
+            except Exception as e:
+                print(f"[INIT] No se pudieron cargar Work Areas al inicio: {e}")
+        else:
+            print(f"[INIT] Archivo de secuencia no encontrado: {sequence_file}")
 
     def _aplicar_tema_moderno(self):
         """Aplica un tema moderno estilo Google Material Design"""
@@ -730,6 +747,13 @@ class VentanaConfiguracion:
         )
         if filename:
             self.sequence_path_var.set(filename)
+            # Cargar Work Areas automaticamente cuando se selecciona un archivo
+            try:
+                self._cargar_work_areas_automatico(filename)
+                self._actualizar_dropdowns_work_areas()
+                print(f"[AUTO-LOAD] Work Areas cargadas automaticamente: {self.available_work_areas}")
+            except Exception as e:
+                print(f"[AUTO-LOAD] Error al cargar Work Areas: {e}")
 
     # ========================================================================
     # METODOS DE FLOTA
