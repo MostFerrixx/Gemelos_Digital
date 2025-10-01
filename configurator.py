@@ -1022,6 +1022,12 @@ class ConfiguradorSimulador:
         # Crear el configurador principal pasando la ventana raiz
         self.ventana_config = VentanaConfiguracion(self.root)
 
+        # Conectar callbacks INMEDIATAMENTE después de crear la ventana
+        self.ventana_config._guardar_callback = self.guardar_configuracion
+        self.ventana_config._cargar_callback = self.cargar_configuracion_manual
+        self.ventana_config._salir_callback = self.salir
+        print("[CONFIGURATOR] Callbacks conectados")
+
         # CORRECCION: Diferir carga hasta que UI este completamente lista
         self.root.after(100, self._cargar_configuracion_existente)
 
@@ -1221,9 +1227,12 @@ class ConfiguradorSimulador:
 
     def cargar_configuracion_manual(self):
         """Carga la configuracion desde config.json manualmente (por solicitud del usuario)"""
+        print("[CONFIGURATOR] *** BOTON CARGAR PRESIONADO ***")
         config_path = os.path.join(os.path.dirname(__file__), "config.json")
+        print(f"[CONFIGURATOR] Buscando archivo en: {config_path}")
 
         if not os.path.exists(config_path):
+            print("[CONFIGURATOR] ERROR: Archivo no encontrado")
             messagebox.showwarning(
                 "Archivo No Encontrado",
                 f"No se encontro el archivo de configuracion:\n{config_path}\n\n"
@@ -1358,11 +1367,7 @@ class ConfiguradorSimulador:
         print("[CONFIGURATOR] Iniciando configurador independiente...")
         print("[CONFIGURATOR] Use 'Guardar Configuracion' para crear config.json")
 
-        # Conectar callbacks
-        self.ventana_config._guardar_callback = self.guardar_configuracion
-        self.ventana_config._cargar_callback = self.cargar_configuracion_manual
-        self.ventana_config._salir_callback = self.salir
-
+        # Callbacks ya conectados en __init__
         self.root.mainloop()
 
 
