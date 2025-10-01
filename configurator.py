@@ -313,11 +313,12 @@ class VentanaConfiguracion:
                   command=lambda: self._eliminar_prioridad_wa(agent_type, group_idx,
                                                               priority_frame)).grid(row=0, column=4, padx=5)
 
-        # Guardar en el grupo
+        # Guardar en el grupo (incluir referencia al combobox)
         priority_data = {
             'frame': priority_frame,
             'wa_var': wa_var,
-            'priority_var': priority_var
+            'priority_var': priority_var,
+            'wa_combo': wa_combo  # Guardar referencia directa al combobox
         }
         self.fleet_groups[agent_type][group_idx]['priorities'].append(priority_data)
 
@@ -356,48 +357,6 @@ class VentanaConfiguracion:
         self._anadir_grupo_flota('Forklift')
 
         messagebox.showinfo("Flota Generada", "Configuracion de flota por defecto generada exitosamente.")
-
-    def _crear_widgets_asignacion(self):
-        """Crea widgets de la pestana Asignacion de Recursos"""
-        main_frame = ttk.Frame(self.tab_asignacion)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        # Titulo
-        ttk.Label(main_frame, text="Asignacion de Prioridades por Nivel de WorkArea",
-                 font=("Arial", 11, "bold")).pack(pady=10)
-
-        # Descripcion
-        desc = ttk.Label(main_frame, text="Configura la prioridad de cada tipo de agente para cada nivel.\nPrioridad 1 = Mayor prioridad, numeros mayores = menor prioridad.",
-                        justify=tk.CENTER)
-        desc.pack(pady=5)
-
-        # Frame con scroll para las asignaciones
-        canvas = tk.Canvas(main_frame, height=300)
-        scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=canvas.yview)
-        self.assignment_frame = ttk.Frame(canvas)
-
-        self.assignment_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        canvas.create_window((0, 0), window=self.assignment_frame, anchor=tk.NW)
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        # Botones
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, pady=10)
-
-        ttk.Button(button_frame, text="Generar Asignacion por Defecto",
-                  command=self._generar_asignacion_defecto).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Limpiar Asignaciones",
-                  command=self._limpiar_asignaciones).pack(side=tk.LEFT, padx=5)
-
-        # Inicializar con asignacion por defecto
-        self._generar_asignacion_defecto()
 
     def _crear_widgets_layout_datos(self):
         """Crea widgets de la pestana Layout y Datos segun screenshot original"""
@@ -530,23 +489,31 @@ class VentanaConfiguracion:
 
     def _actualizar_dropdowns_work_areas(self):
         """Actualiza los valores de todos los dropdowns de Work Areas en grupos existentes"""
+        print(f"[DEBUG] Actualizando dropdowns con Work Areas: {self.available_work_areas}")
+
         # Actualizar dropdowns en Operarios Terrestres
-        for group in self.fleet_groups['GroundOperator']:
-            for priority_data in group['priorities']:
-                # Obtener el combobox y actualizar sus values
-                for widget in priority_data['frame'].winfo_children():
-                    if isinstance(widget, ttk.Combobox):
-                        widget['values'] = self.available_work_areas
-                        break
+        for group_idx, group in enumerate(self.fleet_groups['GroundOperator']):
+            for priority_idx, priority_data in enumerate(group['priorities']):
+                if 'wa_combo' in priority_data:
+                    combo = priority_data['wa_combo']
+                    current_value = priority_data['wa_var'].get()
+                    combo['values'] = self.available_work_areas
+                    # Preservar selección si aún es válida
+                    if current_value and current_value in self.available_work_areas:
+                        priority_data['wa_var'].set(current_value)
+                    print(f"[DEBUG] GroundOperator Grupo {group_idx+1}, Prioridad {priority_idx+1}: Actualizado")
 
         # Actualizar dropdowns en Montacargas
-        for group in self.fleet_groups['Forklift']:
-            for priority_data in group['priorities']:
-                # Obtener el combobox y actualizar sus values
-                for widget in priority_data['frame'].winfo_children():
-                    if isinstance(widget, ttk.Combobox):
-                        widget['values'] = self.available_work_areas
-                        break
+        for group_idx, group in enumerate(self.fleet_groups['Forklift']):
+            for priority_idx, priority_data in enumerate(group['priorities']):
+                if 'wa_combo' in priority_data:
+                    combo = priority_data['wa_combo']
+                    current_value = priority_data['wa_var'].get()
+                    combo['values'] = self.available_work_areas
+                    # Preservar selección si aún es válida
+                    if current_value and current_value in self.available_work_areas:
+                        priority_data['wa_var'].set(current_value)
+                    print(f"[DEBUG] Forklift Grupo {group_idx+1}, Prioridad {priority_idx+1}: Actualizado")
 
     def _crear_widgets_staging(self):
         """Crea widgets de la pestana Outbound Staging"""
@@ -601,12 +568,9 @@ class VentanaConfiguracion:
             return False
 
     def actualizar_total(self):
-        """Actualiza el total de recursos"""
-        try:
-            total = self.num_operarios_terrestres.get() + self.num_montacargas.get()
-            self.label_total_recursos.config(text=f"Total de Recursos: {total}")
-        except:
-            self.label_total_recursos.config(text="Total de Recursos: ERROR")
+        """Actualiza el total de recursos - deprecated, kept for compatibility"""
+        # Esta funcionalidad fue movida a "Flota de Agentes"
+        pass
 
     def _validar_staging_distribution(self):
         """Valida que la distribucion de staging sume 100%"""
@@ -667,62 +631,6 @@ class VentanaConfiguracion:
         )
         if filename:
             self.sequence_path_var.set(filename)
-
-    # ========================================================================
-    # METODOS DE ASIGNACION DE RECURSOS
-    # ========================================================================
-
-    def _generar_asignacion_defecto(self):
-        """Genera asignacion de recursos por defecto"""
-        # Limpiar asignaciones existentes
-        self._limpiar_asignaciones()
-
-        # Asignaciones por defecto
-        default_assignments = {
-            "GroundOperator": {1: 1},
-            "Forklift": {1: 2, 2: 1, 3: 1, 4: 1, 5: 1}
-        }
-
-        self.assignment_rules = default_assignments
-        self._update_assignment_display()
-
-    def _limpiar_asignaciones(self):
-        """Limpia todas las asignaciones"""
-        for widget in self.assignment_frame.winfo_children():
-            widget.destroy()
-        self.assignment_widgets = {"GroundOperator": [], "Forklift": []}
-        self.assignment_rules = {"GroundOperator": {}, "Forklift": {}}
-
-    def _update_assignment_display(self):
-        """Actualiza la visualizacion de asignaciones"""
-        self._limpiar_asignaciones()
-
-        row = 0
-        for agent_type in ["GroundOperator", "Forklift"]:
-            # Titulo del tipo de agente
-            label_frame = ttk.LabelFrame(self.assignment_frame, text=agent_type, padding=10)
-            label_frame.grid(row=row, column=0, sticky=tk.EW, padx=5, pady=5)
-            row += 1
-
-            # Encabezados
-            ttk.Label(label_frame, text="Nivel", font=("Arial", 9, "bold")).grid(row=0, column=0, padx=5)
-            ttk.Label(label_frame, text="Prioridad", font=("Arial", 9, "bold")).grid(row=0, column=1, padx=5)
-
-            # Crear fila para cada nivel asignado
-            agent_row = 1
-            if agent_type in self.assignment_rules:
-                for level, priority in sorted(self.assignment_rules[agent_type].items()):
-                    level_var = tk.IntVar(value=level)
-                    priority_var = tk.IntVar(value=priority)
-
-                    ttk.Label(label_frame, text=f"Nivel {level}:").grid(row=agent_row, column=0, sticky=tk.W, padx=5, pady=2)
-                    ttk.Entry(label_frame, textvariable=priority_var, width=10).grid(row=agent_row, column=1, padx=5, pady=2)
-
-                    self.assignment_widgets[agent_type].append({
-                        'level_var': level_var,
-                        'priority_var': priority_var
-                    })
-                    agent_row += 1
 
     # ========================================================================
     # METODOS DE FLOTA
@@ -1036,13 +944,7 @@ class ConfiguradorSimulador:
             self.ventana_config.map_scale_var.set(config.get('map_scale', 1.3))
             self.ventana_config.resolution_var.set(config.get('selected_resolution_key', 'Pequena (800x800)'))
 
-            # Asignacion de recursos
-            assignment_rules = config.get('assignment_rules', {
-                "GroundOperator": {1: 1},
-                "Forklift": {1: 2, 2: 1, 3: 1, 4: 1, 5: 1}
-            })
-            self.ventana_config.assignment_rules = assignment_rules
-            self.ventana_config._update_assignment_display()
+            # Asignacion de recursos eliminada - ahora está en "Flota de Agentes"
 
             # Distribucion de OutboundStaging
             outbound_staging_distribution = config.get('outbound_staging_distribution', {
