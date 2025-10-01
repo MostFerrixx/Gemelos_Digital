@@ -646,29 +646,50 @@ class VentanaConfiguracion:
             import openpyxl
             wb = openpyxl.load_workbook(sequence_file, read_only=True, data_only=True)
 
-            # Buscar hoja Warehouse_Logic
-            if 'Warehouse_Logic' in wb.sheetnames:
-                ws = wb['Warehouse_Logic']
+            # Buscar hoja PickingLocations (nuevo formato) o Warehouse_Logic (formato antiguo)
+            sheet_name = None
+            if 'PickingLocations' in wb.sheetnames:
+                sheet_name = 'PickingLocations'
+            elif 'Warehouse_Logic' in wb.sheetnames:
+                sheet_name = 'Warehouse_Logic'
+
+            if sheet_name:
+                ws = wb[sheet_name]
                 work_areas = set()
 
-                # Leer WorkAreas desde la columna WorkArea
-                for row in ws.iter_rows(min_row=2, values_only=True):
-                    if row and len(row) > 2:
-                        work_area = row[2]  # Columna C
-                        if work_area:
-                            work_areas.add(str(work_area))
+                # Buscar columna WorkArea en los encabezados
+                headers = [cell.value for cell in ws[1]]
+                wa_col_idx = None
+                for idx, header in enumerate(headers):
+                    if header and 'WorkArea' in str(header):
+                        wa_col_idx = idx
+                        break
 
-                self.available_work_areas = sorted(list(work_areas))
-                print(f"[VENTANA_CONFIG] WorkAreas cargadas: {self.available_work_areas}")
+                if wa_col_idx is not None:
+                    # Leer WorkAreas desde la columna encontrada
+                    for row in ws.iter_rows(min_row=2, values_only=True):
+                        if row and len(row) > wa_col_idx:
+                            work_area = row[wa_col_idx]
+                            if work_area:
+                                work_areas.add(str(work_area))
+
+                    self.available_work_areas = sorted(list(work_areas))
+                    print(f"[VENTANA_CONFIG] {len(work_areas)} WorkAreas cargadas desde '{sheet_name}': {self.available_work_areas}")
+                else:
+                    print(f"[VENTANA_CONFIG] WARNING: Columna 'WorkArea' no encontrada en '{sheet_name}'")
+                    self.available_work_areas = ["Area_1", "Area_2", "Area_3"]
             else:
                 # Si no hay hoja, usar valores por defecto
                 self.available_work_areas = ["Area_1", "Area_2", "Area_3"]
-                print("[VENTANA_CONFIG] WorkAreas por defecto cargadas")
+                print(f"[VENTANA_CONFIG] Hojas disponibles: {wb.sheetnames}")
+                print("[VENTANA_CONFIG] WorkAreas por defecto cargadas (hoja no encontrada)")
 
             wb.close()
 
         except Exception as e:
             print(f"[VENTANA_CONFIG ERROR] Error cargando WorkAreas: {e}")
+            import traceback
+            traceback.print_exc()
             # Usar valores por defecto en caso de error
             self.available_work_areas = ["Area_1", "Area_2", "Area_3"]
 
