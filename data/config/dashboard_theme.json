@@ -1,0 +1,71 @@
+{
+    "defaults": {
+        "colours": {
+            "normal_bg": "#2d3142",
+            "normal_text": "#ffffff",
+            "normal_border": "#4f5d75"
+        }
+    },
+    "window": {
+        "colours": {
+            "dark_bg": "#1a1d29",
+            "normal_border": "#4f5d75"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "8",
+            "border_width": "2",
+            "shadow_width": "10",
+            "title_bar_height": "30"
+        }
+    },
+    "window.#title_bar": {
+        "colours": {
+            "dark_bg": "#2d3142",
+            "normal_text": "#ffffff"
+        },
+        "misc": {
+            "text_horiz_alignment": "center"
+        }
+    },
+    "button": {
+        "colours": {
+            "normal_bg": "#4f5d75",
+            "normal_text": "#ffffff",
+            "normal_border": "#6c7b95",
+            "hovered_bg": "#5a6b85",
+            "hovered_text": "#ffffff",
+            "hovered_border": "#7c8ba5",
+            "active_bg": "#3e4c61",
+            "active_text": "#ffffff",
+            "active_border": "#4f5d75"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "6",
+            "border_width": "1"
+        }
+    },
+    "selection_list": {
+        "colours": {
+            "dark_bg": "#1a1d29",
+            "normal_border": "#4f5d75",
+            "normal_text": "#ffffff"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "4",
+            "border_width": "1"
+        }
+    },
+    "selection_list.@selection_list_item": {
+        "colours": {
+            "normal_bg": "#2d3142",
+            "hovered_bg": "#4f5d75",
+            "selected_bg": "#5a6b85",
+            "normal_text": "#ffffff",
+            "hovered_text": "#ffffff",
+            "selected_text": "#ffffff"
+        }
+    }
+}

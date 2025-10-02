@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" width="30" height="20" tilewidth="32" tileheight="32">
+ <properties>
+  <property name="layout_type" value="Layout_Corredor_Central"/>
+  <property name="description" value="Layout con corredor central principal"/>
+ </properties>
+ <tileset firstgid="1" name="warehouse" tilewidth="32" tileheight="32">
+  <image source="warehouse_tileset.png" width="128" height="96"/>
+ </tileset>
+ <layer name="dummy" width="30" height="20">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+  </data>
+ </layer>
+</map>
