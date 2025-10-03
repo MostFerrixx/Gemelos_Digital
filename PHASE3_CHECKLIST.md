@@ -1,17 +1,17 @@
 # PHASE 3 Checklist - Create Missing Subsystems Modules
 
-**Estimated Time:** 30-40 min REMAINING (was 3-4h)
-**Status:** IN PROGRESS - 9/16 DONE (56%)
-**Priority:** Continue with dispatcher.py (last simulation module), then visualization
+**Estimated Time:** 20-30 min REMAINING (was 3-4h)
+**Status:** IN PROGRESS - 10/16 DONE (63%)
+**Priority:** Visualization modules next (state.py, renderer.py critical)
 
 ---
 
 ## Progress Tracker
 
-**Modules Created:** 9 / 16 (56%)
-**Current Module:** Ready for dispatcher.py (last simulation module)
+**Modules Created:** 10 / 16 (63%)
+**Current Module:** Ready for visualization/state.py (CRITICAL next)
 **Last Updated:** 2025-10-03
-**Commits:** 9d8a5ed, 62b904d, bd56371, f9e717c, 680fa92, 0354acb, 6efa86c, pending
+**Commits:** 9d8a5ed, 62b904d, bd56371, f9e717c, 680fa92, 0354acb, 6efa86c, 43ffb1e, pending
 
 ---
 
@@ -63,7 +63,7 @@ grep -n "COLOR_" src/engines/simulation_engine.py
 
 ---
 
-### 2. Simulation Modules (7/8 COMPLETE - 87.5%)
+### 2. Simulation Modules (8/8 COMPLETE ✅✅)
 
 #### [x] `src/subsystems/simulation/warehouse.py` ✅ DONE
 **Priority:** 🔴 CRITICAL
@@ -96,13 +96,28 @@ grep -n "COLOR_" src/engines/simulation_engine.py
 grep -A 50 "class.*Operator\|def crear_operarios" run_simulator.py
 ```
 
-#### [ ] `src/subsystems/simulation/dispatcher.py`
+#### [x] `src/subsystems/simulation/dispatcher.py` ✅ DONE
 **Priority:** 🟡 HIGH
-**Lines:** ~150 lines
+**Lines:** 552 lines (commit pending)
 **Contains:**
-- WorkOrder assignment logic
-- Priority queuing
-- Agent-task matching
+- class DispatcherV11
+- WorkOrder lifecycle management (pending/assigned/in_progress/completed)
+- Operator availability tracking
+- Assignment decisions using AssignmentCostCalculator
+- Tour creation with RouteCalculator
+- Dispatch strategies (FIFO, Global Optimization, Proximity)
+
+**Key Methods:**
+- `agregar_work_orders()` - Add new WorkOrders to queue
+- `solicitar_asignacion(operator)` - Main dispatch logic (returns tour or None)
+- `notificar_completado()` - Callback when tour completes
+- `obtener_estadisticas()` - Current state metrics
+- `simulacion_ha_terminado()` - Check if all WOs completed
+
+**Strategies:**
+- FIFO Estricto: First N WOs that fit capacity
+- Optimizacion Global: Evaluate ALL WOs with cost calculator
+- Cercania: Filter by proximity radius, then optimize
 
 #### [x] `src/subsystems/simulation/layout_manager.py` ✅ DONE
 **Priority:** 🔴 CRITICAL

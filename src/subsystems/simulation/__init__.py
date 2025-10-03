@@ -24,6 +24,7 @@ from subsystems.simulation.assignment_calculator import (
     AssignmentCostCalculator,
     CostResult
 )
+from subsystems.simulation.dispatcher import DispatcherV11
 
 __all__ = [
     'AlmacenMejorado',
@@ -41,4 +42,5 @@ __all__ = [
     'DataManagerError',
     'AssignmentCostCalculator',
     'CostResult',
+    'DispatcherV11',
 ]
