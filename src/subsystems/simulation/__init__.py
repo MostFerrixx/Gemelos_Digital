@@ -19,6 +19,7 @@ from subsystems.simulation.operators import (
 from subsystems.simulation.layout_manager import LayoutManager
 from subsystems.simulation.pathfinder import Pathfinder
 from subsystems.simulation.route_calculator import RouteCalculator
+from subsystems.simulation.data_manager import DataManager, DataManagerError
 
 __all__ = [
     'AlmacenMejorado',
@@ -32,4 +33,6 @@ __all__ = [
     'LayoutManager',
     'Pathfinder',
     'RouteCalculator',
+    'DataManager',
+    'DataManagerError',
 ]

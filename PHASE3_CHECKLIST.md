@@ -1,17 +1,17 @@
 # PHASE 3 Checklist - Create Missing Subsystems Modules
 
-**Estimated Time:** 1 hour REMAINING (was 3-4h)
-**Status:** IN PROGRESS - 7/16 DONE (44%)
-**Priority:** Continue with dispatcher.py, data_manager.py, assignment_calculator.py
+**Estimated Time:** 45-60 min REMAINING (was 3-4h)
+**Status:** IN PROGRESS - 8/16 DONE (50%)
+**Priority:** Continue with dispatcher.py, assignment_calculator.py
 
 ---
 
 ## Progress Tracker
 
-**Modules Created:** 7 / 16 (43.75%)
-**Current Module:** Ready for next batch (dispatcher, data_manager, assignment_calculator)
+**Modules Created:** 8 / 16 (50%)
+**Current Module:** Ready for next batch (dispatcher, assignment_calculator)
 **Last Updated:** 2025-10-03
-**Commits:** 9d8a5ed, 62b904d, bd56371, f9e717c, 680fa92, 0354acb
+**Commits:** 9d8a5ed, 62b904d, bd56371, f9e717c, 680fa92, 0354acb, pending
 
 ---
 
@@ -63,7 +63,7 @@ grep -n "COLOR_" src/engines/simulation_engine.py
 
 ---
 
-### 2. Simulation Modules (5/8 COMPLETE)
+### 2. Simulation Modules (6/8 COMPLETE)
 
 #### [x] `src/subsystems/simulation/warehouse.py` ✅ DONE
 **Priority:** 🔴 CRITICAL
@@ -147,6 +147,32 @@ grep -A 50 "class.*Operator\|def crear_operarios" run_simulator.py
 - `order_work_orders_by_sequence(work_orders)` - Default ordering
 - `calculate_greedy_nearest_neighbor(start, work_orders)` - Alternative TSP
 
+#### [x] `src/subsystems/simulation/data_manager.py` ✅ DONE
+**Priority:** 🟡 HIGH
+**Lines:** 363 lines (commit pending)
+**Contains:**
+- class DataManager
+- class DataManagerError
+- Excel data loading (openpyxl)
+- TMX layout integration via LayoutManager
+- Picking point extraction from Warehouse_Logic.xlsx
+- Outbound staging area loading
+- Data validation and consistency checks
+
+**Key Methods:**
+- `__init__(tmx_file_path, excel_file_path, configuracion)`
+- `get_picking_points()` - Returns List[Dict] with picking locations
+- `get_outbound_staging_locations()` - Returns Dict[int, Tuple[int, int]]
+- `get_layout_manager()` - Returns LayoutManager instance
+- `get_pathfinder()` - Returns Pathfinder instance (convenience)
+
+**Key Features:**
+- Loads PickingLocations sheet (x, y, pick_sequence, WorkArea, etc.)
+- Loads OutboundStaging sheet (staging_id, x, y)
+- Validates coordinates against TMX grid bounds
+- Provides fallback for missing OutboundStaging data
+- Returns raw data dicts (NOT WorkOrder objects)
+
 #### [ ] `src/subsystems/simulation/assignment_calculator.py`
 **Priority:** 🟡 HIGH
 **Lines:** ~120 lines
@@ -154,15 +180,6 @@ grep -A 50 "class.*Operator\|def crear_operarios" run_simulator.py
 - class AssignmentCostCalculator
 - Cost calculation for task assignment
 - Agent-task affinity scoring
-
-#### [ ] `src/subsystems/simulation/data_manager.py`
-**Priority:** 🟡 HIGH
-**Lines:** ~150 lines
-**Contains:**
-- class DataManager
-- Excel data loading (openpyxl)
-- Picking point extraction
-- Work area mapping
 
 ---
 
