@@ -1,17 +1,17 @@
 # PHASE 3 Checklist - Create Missing Subsystems Modules
 
-**Estimated Time:** 45-60 min REMAINING (was 3-4h)
-**Status:** IN PROGRESS - 8/16 DONE (50%)
-**Priority:** Continue with dispatcher.py, assignment_calculator.py
+**Estimated Time:** 30-40 min REMAINING (was 3-4h)
+**Status:** IN PROGRESS - 9/16 DONE (56%)
+**Priority:** Continue with dispatcher.py (last simulation module), then visualization
 
 ---
 
 ## Progress Tracker
 
-**Modules Created:** 8 / 16 (50%)
-**Current Module:** Ready for next batch (dispatcher, assignment_calculator)
+**Modules Created:** 9 / 16 (56%)
+**Current Module:** Ready for dispatcher.py (last simulation module)
 **Last Updated:** 2025-10-03
-**Commits:** 9d8a5ed, 62b904d, bd56371, f9e717c, 680fa92, 0354acb, pending
+**Commits:** 9d8a5ed, 62b904d, bd56371, f9e717c, 680fa92, 0354acb, 6efa86c, pending
 
 ---
 
@@ -63,7 +63,7 @@ grep -n "COLOR_" src/engines/simulation_engine.py
 
 ---
 
-### 2. Simulation Modules (6/8 COMPLETE)
+### 2. Simulation Modules (7/8 COMPLETE - 87.5%)
 
 #### [x] `src/subsystems/simulation/warehouse.py` ✅ DONE
 **Priority:** 🔴 CRITICAL
@@ -149,7 +149,7 @@ grep -A 50 "class.*Operator\|def crear_operarios" run_simulator.py
 
 #### [x] `src/subsystems/simulation/data_manager.py` ✅ DONE
 **Priority:** 🟡 HIGH
-**Lines:** 363 lines (commit pending)
+**Lines:** 408 lines (commit 6efa86c)
 **Contains:**
 - class DataManager
 - class DataManagerError
@@ -173,13 +173,42 @@ grep -A 50 "class.*Operator\|def crear_operarios" run_simulator.py
 - Provides fallback for missing OutboundStaging data
 - Returns raw data dicts (NOT WorkOrder objects)
 
-#### [ ] `src/subsystems/simulation/assignment_calculator.py`
+#### [x] `src/subsystems/simulation/assignment_calculator.py` ✅ DONE
 **Priority:** 🟡 HIGH
-**Lines:** ~120 lines
+**Lines:** 403 lines (commit pending)
 **Contains:**
 - class AssignmentCostCalculator
-- Cost calculation for task assignment
-- Agent-task affinity scoring
+- dataclass CostResult
+- Multi-factor cost calculation for WO -> Operator matching
+- Work area priority penalty system
+- Distance-based cost calculation
+- Batch cost evaluation
+
+**Key Methods:**
+- `__init__(data_manager, route_calculator)` - Initialize with dependencies
+- `calculate_cost(operator, work_order, position)` - Main cost calculation
+- `calculate_costs_for_candidates(operator, work_orders)` - Batch mode
+- `find_best_assignment(operators, work_orders)` - Global optimization
+- `get_cost_parameters()` / `set_cost_parameters()` - Tuning
+
+**Cost Formula:**
+- `total_cost = priority_penalty + (distance * distance_weight)`
+- Priority penalty: 0 (good match), 50k (low priority), 98M (incompatible)
+- Distance weight: 100 per grid cell
+
+**Key Features:**
+- Integrates with RouteCalculator for accurate pathfinding
+- Uses operator.work_area_priorities for affinity
+- Supports parameter tuning for optimization
+- Logs in production format: `[COST-CALC] {agent}_{id} -> {area}: priority={p}, penalty={pen}, distance={d}, total={t}`
+
+#### [ ] `src/subsystems/simulation/dispatcher.py`
+**Priority:** 🟡 HIGH (LAST SIMULATION MODULE)
+**Lines:** ~200-250 lines
+**Contains:**
+- WorkOrder assignment logic
+- Tour creation and dispatch
+- Integration with AssignmentCostCalculator
 
 ---
 

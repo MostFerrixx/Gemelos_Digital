@@ -4,7 +4,7 @@ Hola Claude Code. Estoy desarrollando un **Simulador de Gemelo Digital de Almac�
 
 ### CONTEXTO CRÍTICO
 
-Actualmente estamos en medio de una **Re-arquitectura V11** del proyecto para transformarlo de una estructura caótica a una profesional. El proyecto está **50% completado** (FASE 3 en progreso: 8/16 módulos creados).
+Actualmente estamos en medio de una **Re-arquitectura V11** del proyecto para transformarlo de una estructura caótica a una profesional. El proyecto está **56% completado** (FASE 3 en progreso: 9/16 módulos creados).
 
 **Rama Actual de Trabajo:** `reconstruction/v11-complete`
 **Estado:** Migrando a estructura de paquete Python profesional con layout `src/`
@@ -363,11 +363,11 @@ python -m entry_points.run_live_simulation --headless
 - Dejé el proyecto listo para FASE 3
 
 **Progreso Actual:**
-- **50% completado** (FASE 3 en progreso)
-- **20 commits** de estructura, migración y subsistemas
+- **56% completado** (FASE 3 en progreso)
+- **21 commits** de estructura, migración y subsistemas
 - **61 archivos** migrados exitosamente
-- **8 módulos subsystems creados** (config: 2/2, simulation: 6/8)
-- **8 módulos** pendientes de crear (FASE 3)
+- **9 módulos subsystems creados** (config: 2/2, simulation: 7/8)
+- **7 módulos** pendientes de crear (FASE 3)
 
 ---
 
@@ -496,7 +496,8 @@ python -c "from subsystems.config.settings import LOGICAL_WIDTH"
 - `f9e717c` - Layout manager module
 - `680fa92` - Pathfinder module (A* algorithm)
 - `0354acb` - Route calculator module
-- `pending` - DataManager module (Excel/TMX loader)
+- `6efa86c` - DataManager module (Excel/TMX loader)
+- `pending` - AssignmentCostCalculator module
 
 **Tags importantes:**
 - `BEFORE_V11_RECONSTRUCTION` - Punto de seguridad (volver si hay problemas)
@@ -506,9 +507,9 @@ python -c "from subsystems.config.settings import LOGICAL_WIDTH"
 
 ## RESUMEN EJECUTIVO
 
-**Estado:** Proyecto en migración V11 (50% done)
+**Estado:** Proyecto en migración V11 (56% done)
 **Rama:** `reconstruction/v11-complete`
-**Siguiente:** FASE 3 - Crear 8 módulos restantes en `subsystems/` (8/16 completados)
+**Siguiente:** FASE 3 - Crear 7 módulos restantes en `subsystems/` (9/16 completados)
 
 **Documentación CRÍTICA (LEER EN ORDEN):**
 1. `HANDOFF.md` ← Inicio rápido

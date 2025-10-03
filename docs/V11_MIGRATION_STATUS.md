@@ -3,7 +3,7 @@
 **Last Updated:** 2025-10-03
 **Current Branch:** `reconstruction/v11-complete`
 **Migration Plan:** See `docs/MIGRATION_V11.md`
-**Overall Progress:** 50% (FASE 3: 8/16 modules completed)
+**Overall Progress:** 56% (FASE 3: 9/16 modules completed)
 
 ---
 
@@ -152,27 +152,27 @@ digital-twin-warehouse/
 
 ## PENDING PHASES
 
-### PHASE 3: Create Missing Subsystems Modules ⏳ IN PROGRESS (50%)
+### PHASE 3: Create Missing Subsystems Modules ⏳ IN PROGRESS (56%)
 
-**Status:** 8/16 COMPLETED
-**Priority:** HIGH - Continue with dispatcher.py, assignment_calculator.py
-**Estimated Time:** 45-60 min remaining
+**Status:** 9/16 COMPLETED
+**Priority:** HIGH - Continue with dispatcher.py, then visualization modules
+**Estimated Time:** 30-40 min remaining
 
-**Modules Created (8 files):**
+**Modules Created (9 files):**
 
 #### subsystems/config/ (2/2 COMPLETE ✅)
 - [x] `settings.py` - 132 lines (commit 9d8a5ed)
 - [x] `colors.py` - 165 lines (commit 9d8a5ed)
 
-#### subsystems/simulation/ (6/8 COMPLETE)
+#### subsystems/simulation/ (7/8 COMPLETE - 87.5%)
 - [x] `warehouse.py` - 334 lines (commit 62b904d)
 - [x] `operators.py` - 410 lines (commit bd56371)
 - [x] `layout_manager.py` - 340 lines (commit f9e717c)
 - [x] `pathfinder.py` - 234 lines (commit 680fa92) - A* algorithm ✅
 - [x] `route_calculator.py` - 346 lines (commit 0354acb) - Multi-stop tours ✅
-- [x] `data_manager.py` - 363 lines (commit pending) - Excel/TMX data loader ✅
-- [ ] `dispatcher.py` - WorkOrder dispatcher (HIGH)
-- [ ] `assignment_calculator.py` - Task assignment logic (HIGH)
+- [x] `data_manager.py` - 408 lines (commit 6efa86c) - Excel/TMX data loader ✅
+- [x] `assignment_calculator.py` - 403 lines (commit pending) - Cost calculator ✅
+- [ ] `dispatcher.py` - WorkOrder dispatcher (HIGH - LAST SIMULATION MODULE)
 
 #### subsystems/visualization/ (4 files)
 - [ ] `state.py` - estado_visual global state (CRITICAL)

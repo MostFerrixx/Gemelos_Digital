@@ -20,6 +20,10 @@ from subsystems.simulation.layout_manager import LayoutManager
 from subsystems.simulation.pathfinder import Pathfinder
 from subsystems.simulation.route_calculator import RouteCalculator
 from subsystems.simulation.data_manager import DataManager, DataManagerError
+from subsystems.simulation.assignment_calculator import (
+    AssignmentCostCalculator,
+    CostResult
+)
 
 __all__ = [
     'AlmacenMejorado',
@@ -35,4 +39,6 @@ __all__ = [
     'RouteCalculator',
     'DataManager',
     'DataManagerError',
+    'AssignmentCostCalculator',
+    'CostResult',
 ]
