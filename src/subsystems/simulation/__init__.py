@@ -17,6 +17,7 @@ from subsystems.simulation.operators import (
     crear_operarios
 )
 from subsystems.simulation.layout_manager import LayoutManager
+from subsystems.simulation.pathfinder import Pathfinder
 
 __all__ = [
     'AlmacenMejorado',
@@ -28,4 +29,5 @@ __all__ = [
     'Forklift',
     'crear_operarios',
     'LayoutManager',
+    'Pathfinder',
 ]
