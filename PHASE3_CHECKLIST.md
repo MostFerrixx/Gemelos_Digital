@@ -1,17 +1,17 @@
 # PHASE 3 Checklist - Create Missing Subsystems Modules
 
-**Estimated Time:** 1-2 hours REMAINING (was 3-4h)
-**Status:** IN PROGRESS - 5/16 DONE (31%)
-**Priority:** Awaiting user decision on next modules
+**Estimated Time:** 1 hour REMAINING (was 3-4h)
+**Status:** IN PROGRESS - 7/16 DONE (44%)
+**Priority:** Continue with dispatcher.py, data_manager.py, assignment_calculator.py
 
 ---
 
 ## Progress Tracker
 
-**Modules Created:** 5 / 16 (31.25%)
-**Current Module:** None (awaiting user decision)
+**Modules Created:** 7 / 16 (43.75%)
+**Current Module:** Ready for next batch (dispatcher, data_manager, assignment_calculator)
 **Last Updated:** 2025-10-03
-**Commits:** 9d8a5ed, 62b904d, bd56371, f9e717c, 42e3eea, 4ae2109
+**Commits:** 9d8a5ed, 62b904d, bd56371, f9e717c, 680fa92, 0354acb
 
 ---
 
@@ -63,7 +63,7 @@ grep -n "COLOR_" src/engines/simulation_engine.py
 
 ---
 
-### 2. Simulation Modules (3/8 COMPLETE)
+### 2. Simulation Modules (5/8 COMPLETE)
 
 #### [x] `src/subsystems/simulation/warehouse.py` ✅ DONE
 **Priority:** 🔴 CRITICAL
@@ -118,25 +118,34 @@ grep -A 50 "class.*Operator\|def crear_operarios" run_simulator.py
 - `grid_to_pixel(grid_x, grid_y)`
 - `is_walkable(grid_x, grid_y)`
 
-#### [ ] `src/subsystems/simulation/pathfinder.py`
+#### [x] `src/subsystems/simulation/pathfinder.py` ✅ DONE
 **Priority:** 🔴 CRITICAL (A* algorithm)
-**Lines:** ~120 lines
+**Lines:** 234 lines (commit 680fa92)
 **Contains:**
 - class Pathfinder
 - A* pathfinding implementation
-- Heuristic functions
+- Octile distance heuristic
+- 8-directional movement
 
 **Key Methods:**
-- `find_path(start, goal)`
-- `heuristic(a, b)`
+- `find_path(start, goal)` - Returns path or None
+- `heuristic(a, b)` - Octile distance
+- `get_neighbors(pos)` - 8-directional neighbors with costs
 
-#### [ ] `src/subsystems/simulation/route_calculator.py`
+#### [x] `src/subsystems/simulation/route_calculator.py` ✅ DONE
 **Priority:** 🟡 HIGH
-**Lines:** ~100 lines
+**Lines:** 346 lines (commit 0354acb)
 **Contains:**
 - class RouteCalculator
-- Route optimization
-- Multi-stop tour planning
+- Multi-stop tour optimization
+- Route calculation with segments
+- pick_sequence ordering strategy
+- Greedy nearest-neighbor alternative
+
+**Key Methods:**
+- `calculate_route(start, work_orders, return_to_start)` - Full route info
+- `order_work_orders_by_sequence(work_orders)` - Default ordering
+- `calculate_greedy_nearest_neighbor(start, work_orders)` - Alternative TSP
 
 #### [ ] `src/subsystems/simulation/assignment_calculator.py`
 **Priority:** 🟡 HIGH
