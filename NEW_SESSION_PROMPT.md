@@ -1,9 +1,3 @@
-# Prompt para Nueva Sesión de Claude Code
-
-**Copiar y pegar este prompt completo en una nueva ventana de Claude Code:**
-
----
-
 ## Asunto: Continuación del Desarrollo del Simulador de Gemelo Digital de Almacén
 
 Hola Claude Code. Soy Ferri y estoy desarrollando un **Simulador de Gemelo Digital de Almacén** usando **SimPy** (simulación de eventos discretos) y **Pygame** (visualización en tiempo real).
@@ -525,8 +519,3 @@ python -c "from subsystems.config.settings import LOGICAL_WIDTH"
 ---
 
 **¿Entendiste todo? Confirma que has leído la documentación y estás listo para ayudarme a continuar el desarrollo del simulador.**
-
----
-
-*Este prompt fue generado con Claude Code*
-*Última actualización: 2025-10-02*
