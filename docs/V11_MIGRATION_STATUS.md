@@ -168,12 +168,11 @@ digital-twin-warehouse/
 - [x] `warehouse.py` - 334 lines (commit 62b904d)
 - [x] `operators.py` - 410 lines (commit bd56371)
 - [x] `layout_manager.py` - 340 lines (commit f9e717c)
-- [ ] `pathfinder.py` - A* pathfinding (NEXT - CRITICAL)
-- [ ] `dispatcher.py` - WorkOrder dispatcher
-- [ ] `data_manager.py` - Excel/TMX data loading
-- [ ] `route_calculator.py` - Route optimization
-- [ ] `assignment_calculator.py` - Task assignment logic
-- [ ] `data_manager.py` - Data loading from Excel/TMX
+- [ ] `pathfinder.py` - A* pathfinding (CRITICAL - pending)
+- [ ] `dispatcher.py` - WorkOrder dispatcher (HIGH)
+- [ ] `route_calculator.py` - Route optimization (HIGH)
+- [ ] `assignment_calculator.py` - Task assignment logic (HIGH)
+- [ ] `data_manager.py` - Data loading from Excel/TMX (HIGH)
 
 #### subsystems/visualization/ (4 files)
 - [ ] `state.py` - estado_visual global state (CRITICAL)
