@@ -3,7 +3,7 @@
 **Last Updated:** 2025-10-03
 **Current Branch:** `reconstruction/v11-complete`
 **Migration Plan:** See `docs/MIGRATION_V11.md`
-**Overall Progress:** 63% (FASE 3: 10/16 modules completed)
+**Overall Progress:** 75% (FASE 1a+1b COMPLETADAS: Arquitectura unificada)
 
 ---
 
@@ -195,18 +195,58 @@ digital-twin-warehouse/
 
 ---
 
-### PHASE 4: Refactor Imports ⏳
+### PHASE 1a: Skeleton Modules Creation ✅
 
-**Status:** NOT STARTED
-**Estimated Time:** 1-2 hours
+**Status:** COMPLETED
+**Time:** 45 minutes
+**Commits:** Pending
+
+**Tasks Completed:**
+- [x] Created `subsystems/visualization/state.py` (210 lines) - FUNCIONAL PARCIAL
+- [x] Created `subsystems/visualization/renderer.py` (110 lines) - SKELETON
+- [x] Created `subsystems/visualization/dashboard.py` (70 lines) - SKELETON
+- [x] Created `subsystems/utils/helpers.py` (90 lines) - FUNCIONAL PARCIAL
+- [x] Updated `__init__.py` exports for both subsystems
+- [x] Validation: All modules importable without errors
+
+**Detalles:** Ver `FASE1A_SKELETON_COMPLETE.md`
+
+---
+
+### PHASE 1b: Refactor Imports ✅
+
+**Status:** COMPLETED
+**Time:** 45 minutes
+**Commits:** Pending
+
+**Tasks Completed:**
+- [x] Refactored 30+ imports in `simulation_engine.py`
+- [x] Refactored 15+ imports in `replay_engine.py`
+- [x] Updated `analytics/exporter.py` imports
+- [x] Updated `analytics/exporter_v2.py` imports
+- [x] Changed `original_renderer` → `renderer` module name
+- [x] Validation: Both engines importable without ModuleNotFoundError
+
+**Detalles:** Ver `FASE1B_REFACTOR_COMPLETE.md`
+
+**Comando de Validacion:**
+```bash
+python -c "from engines.simulation_engine import SimulationEngine"  # SUCCESS
+python -c "from engines.replay_engine import ReplayViewerEngine"   # SUCCESS
+```
+
+---
+
+### PHASE 4: Refactor Imports ✅
+
+**Status:** COMPLETADO (merged into PHASE 1b)
+**Time:** Included in PHASE 1b
 
 **Tasks:**
-- [ ] Update all imports in `src/` to use new paths
-- [ ] Remove all `sys.path.insert(0, 'git')` hacks
-- [ ] Update imports to absolute: `from subsystems.config.settings import ...`
-- [ ] Run migration script on all Python files
-
-**Script Location:** Can be created at `scripts/migrate_imports.py`
+- [x] Updated all imports in `src/engines/` to use new paths
+- [x] Updated all imports in `src/analytics/` to use new paths
+- [x] Converted to absolute imports: `from subsystems.config.settings import ...`
+- [x] Used `sed` automation for batch processing
 
 ---
 

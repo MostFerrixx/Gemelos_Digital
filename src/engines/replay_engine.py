@@ -15,17 +15,30 @@ from datetime import datetime
 import logging
 import argparse
 
-from config.settings import *
-from config.colors import *
+# REFACTOR V11: Importaciones actualizadas a arquitectura subsystems/
+from subsystems.config.settings import *
+from subsystems.config.colors import *
+from subsystems.config.settings import SUPPORTED_RESOLUTIONS, LOGICAL_WIDTH, LOGICAL_HEIGHT
 
-from simulation.layout_manager import LayoutManager
-from visualization.state import inicializar_estado, actualizar_metricas_tiempo, toggle_pausa, toggle_dashboard, estado_visual, limpiar_estado, aumentar_velocidad, disminuir_velocidad, obtener_velocidad_simulacion
-from visualization.original_renderer import RendererOriginal, renderizar_diagnostico_layout
-from visualization.original_dashboard import DashboardOriginal
-from config.settings import SUPPORTED_RESOLUTIONS, LOGICAL_WIDTH, LOGICAL_HEIGHT
+from subsystems.simulation.layout_manager import LayoutManager
 
-# KEEP: Config utilities - Necesarios para cargar configuracion
-# REFACTOR: ConfigurationManager replaces cargar_configuracion logic
+# REFACTOR V11: Visualization subsystem imports
+from subsystems.visualization.state import (
+    inicializar_estado,
+    actualizar_metricas_tiempo,
+    toggle_pausa,
+    toggle_dashboard,
+    estado_visual,
+    limpiar_estado,
+    aumentar_velocidad,
+    disminuir_velocidad,
+    obtener_velocidad_simulacion
+)
+from subsystems.visualization.renderer import RendererOriginal, renderizar_diagnostico_layout
+from subsystems.visualization.dashboard import DashboardOriginal
+
+# REFACTOR V11: Config utilities - Necesarios para cargar configuracion
+# ConfigurationManager replaces cargar_configuracion logic
 from core.config_manager import ConfigurationManager, ConfigurationError
 from core.config_utils import get_default_config, mostrar_resumen_config
 
@@ -194,8 +207,8 @@ class ReplayViewerEngine:
         """Bucle principal para visualización de replay - versión simplificada"""
         # KEEP: Core visualization loop - Necesario para mostrar replay
 
-        from visualization.original_renderer import renderizar_agentes, renderizar_dashboard
-        from visualization.state import estado_visual, obtener_velocidad_simulacion
+        from subsystems.visualization.renderer import renderizar_agentes, renderizar_dashboard
+        from subsystems.visualization.state import estado_visual, obtener_velocidad_simulacion
 
         self.corriendo = True
         while self.corriendo:
@@ -213,7 +226,7 @@ class ReplayViewerEngine:
                 self.renderer.renderizar_mapa_tmx(self.virtual_surface, self.layout_manager.tmx_data)
 
             # Obtener lista de agentes para renderizar desde estado visual
-            from visualization.state import estado_visual
+            from subsystems.visualization.state import estado_visual
             agentes_para_renderizar = list(estado_visual.get('operarios', {}).values())
             renderizar_agentes(self.virtual_surface, agentes_para_renderizar, self.layout_manager)
 
@@ -475,11 +488,21 @@ class ReplayViewerEngine:
         pygame.display.set_caption("Simulador de Almacen - Modo Replay")
         self.reloj = pygame.time.Clock()
 
-        # REFACTOR V8.0: Inicializar IPC Manager para PyQt6 Dashboard
-        from git.visualization.ipc_manager import create_ipc_manager
-        ipc_manager = create_ipc_manager()
+        # REFACTOR V11: IPC Manager for PyQt6 Dashboard - STUB for smoke test
+        # TODO: Implement IPC manager using communication subsystem
+        class IPCManagerStub:
+            """Stub class for IPC manager during smoke test"""
+            def start_ui_process(self): return False
+            def stop_ui_process(self): pass
+            def is_ui_process_alive(self): return False
+            def send_simulation_metadata(self, metadata): pass
+            def send_batch_work_orders(self, orders): return 0
+            def send_work_order_delta(self, data): pass
+            def cleanup(self): pass
+
+        ipc_manager = IPCManagerStub()
         dashboard_process_started = False
-        print("[IPC-MANAGER] Inicializado para comunicacion con PyQt6 Dashboard")
+        print("[IPC-MANAGER] STUB: Dashboard deshabilitado para prueba de humo")
 
         # Cargar configuracion desde el evento SIMULATION_START
         configuracion = simulation_start_event.get('config', {}) if simulation_start_event else {}
@@ -494,12 +517,13 @@ class ReplayViewerEngine:
             return 1
 
         # Inicializar arquitectura TMX basica (necesaria para renderizado)
-        from simulation.layout_manager import LayoutManager
-        from visualization.original_renderer import RendererOriginal
-        from visualization.state import inicializar_estado, estado_visual
+        from subsystems.simulation.layout_manager import LayoutManager
+        from subsystems.visualization.renderer import RendererOriginal
+        from subsystems.visualization.state import inicializar_estado, estado_visual
 
-        # Cargar TMX
-        tmx_file = os.path.join(os.path.dirname(__file__), "layouts", "WH1.tmx")
+        # Cargar TMX - REFACTOR V11: Path relative to project root
+        project_root = os.path.join(os.path.dirname(__file__), "..", "..")
+        tmx_file = os.path.join(project_root, "layouts", "WH1.tmx")
         self.layout_manager = LayoutManager(tmx_file)
 
         # Crear superficies
@@ -736,7 +760,7 @@ class ReplayViewerEngine:
                 self.renderer.renderizar_mapa_tmx(virtual_surface, self.layout_manager.tmx_data)
 
             # Renderizar agentes con posiciones actualizadas
-            from visualization.original_renderer import renderizar_agentes
+            from subsystems.visualization.renderer import renderizar_agentes
             if estado_visual.get("operarios"):
                 # CRITICO: Convertir diccionario a lista para renderizar_agentes
                 operarios_a_renderizar = []
@@ -752,7 +776,7 @@ class ReplayViewerEngine:
             self.pantalla.blit(scaled_warehouse, (0, 0))
 
             # Renderizar Dashboard de Agentes
-            from visualization.original_renderer import renderizar_dashboard
+            from subsystems.visualization.renderer import renderizar_dashboard
 
             # Preparar metricas para el dashboard - DUAL COUNTERS
             # Contar WorkOrders completadas segun contrato de renderizar_dashboard

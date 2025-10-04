@@ -6,9 +6,13 @@ Refactorizado para ser solo un lanzador puro - toda la logica esta en ReplayView
 
 import argparse
 import os
+import sys
+
+# REFACTOR V11: Add src/ to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 # Import del motor de replay - Toda la magia esta aqui
-from replay_engine import ReplayViewerEngine
+from engines.replay_engine import ReplayViewerEngine
 
 
 def main():

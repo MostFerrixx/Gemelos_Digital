@@ -11,7 +11,8 @@ import json
 import subprocess
 from datetime import datetime
 from analytics_engine import AnalyticsEngine
-from utils.helpers import exportar_metricas, mostrar_metricas_consola
+# REFACTOR V11: Update to subsystems path
+from subsystems.utils.helpers import exportar_metricas, mostrar_metricas_consola
 
 
 class AnalyticsExporter:
