@@ -4,8 +4,8 @@ Configuration Package for Digital Twin Warehouse Simulator
 Exports all settings and color constants
 """
 
-from subsystems.config.settings import *
-from subsystems.config.colors import *
+from .settings import *
+from .colors import *
 
 __all__ = [
     # From settings

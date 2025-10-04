@@ -2,14 +2,39 @@
 """
 Visualization Renderer - Renderizado Pygame de mapas TMX, agentes y UI
 
-FASE 1a: ESQUELETO FUNCIONAL MINIMO
-Este modulo contiene implementaciones stub que permiten importacion y ejecucion
-sin errores, pero sin funcionalidad completa aun.
+FASE 2: IMPLEMENTACION COMPLETA
+Renderiza todos los elementos visuales leyendo estado_visual y layout_manager.
+Implementa renderizado manual de tiles para evitar bugs de layout_manager.
 
-Estado: SKELETON - Pendiente de implementacion completa
+Autor: Claude Code (Implementacion V11)
+Estado: PRODUCTION - Implementacion completa
 """
 
 import pygame
+from typing import Optional, List, Dict, Any, Tuple
+
+# Importar colores desde config (relative import dentro de src/)
+from ..config.colors import (
+    COLOR_AGENTE_TERRESTRE,
+    COLOR_AGENTE_MONTACARGAS,
+    COLOR_AGENTE_IDLE,
+    COLOR_AGENTE_TRABAJANDO,
+    COLOR_AGENTE_MOVIENDO,
+    COLOR_TAREA_PENDIENTE,
+    COLOR_TAREA_ASIGNADA,
+    COLOR_TAREA_EN_PROGRESO,
+    COLOR_TAREA_COMPLETADA,
+    COLOR_DASHBOARD_BG,
+    COLOR_DASHBOARD_TEXTO,
+    COLOR_DASHBOARD_BORDE,
+    COLOR_DASHBOARD_HIGHLIGHT,
+    COLOR_FONDO_OSCURO,
+    COLOR_EXITO,
+    COLOR_ADVERTENCIA,
+    COLOR_ERROR,
+    COLOR_PUNTO_PICKING,
+    COLOR_DEPOT
+)
 
 
 # =============================================================================
@@ -18,12 +43,21 @@ import pygame
 
 class RendererOriginal:
     """
-    Renderer principal para visualizacion de simulacion.
+    Renderer principal para visualizacion de simulacion con Pygame.
 
-    SKELETON: Implementacion minima - metodos stub
+    Lee estado_visual y layout_manager para renderizar todos los elementos.
+    Implementa renderizado manual de tiles para evitar bugs potenciales.
+
+    Atributos:
+        surface: pygame.Surface donde se renderiza (virtual surface)
+        font_small: Font pequena (16px)
+        font_medium: Font mediana (20px)
+        font_large: Font grande (24px)
+        tmx_cache_surface: Cache del mapa TMX renderizado
+        tmx_cached: Flag indicando si el cache es valido
     """
 
-    def __init__(self, surface):
+    def __init__(self, surface: pygame.Surface):
         """
         Inicializa el renderer con una superficie virtual.
 
@@ -31,109 +65,642 @@ class RendererOriginal:
             surface: pygame.Surface donde se renderizara
         """
         self.surface = surface
-        print("[RENDERER] RendererOriginal inicializado (SKELETON)")
 
-    def renderizar_mapa_tmx(self, surface, tmx_data):
+        # Inicializar fuentes con manejo de errores
+        self._inicializar_fuentes()
+
+        # Cache para renderizado de TMX (optimizacion)
+        self.tmx_cache_surface = None
+        self.tmx_cached = False
+
+        print("[RENDERER] RendererOriginal inicializado (PRODUCTION)")
+
+    def _inicializar_fuentes(self):
         """
-        Renderiza el mapa TMX de fondo en la superficie.
+        Inicializa las fuentes de Pygame con manejo de errores.
+
+        Intenta crear fuentes de diferentes tamanos. Si falla, usa None
+        y los metodos de renderizado usaran fallbacks.
+        """
+        try:
+            self.font_small = pygame.font.Font(None, 16)
+            self.font_medium = pygame.font.Font(None, 20)
+            self.font_large = pygame.font.Font(None, 24)
+            print("[RENDERER] Fuentes inicializadas correctamente")
+        except Exception as e:
+            print(f"[RENDERER] Advertencia: No se pudieron inicializar fuentes: {e}")
+            self.font_small = None
+            self.font_medium = None
+            self.font_large = None
+
+    def renderizar_mapa_tmx(self, surface: pygame.Surface, tmx_data) -> None:
+        """
+        Renderiza el mapa TMX de fondo en la superficie usando renderizado manual.
+
+        IMPORTANTE: Implementa renderizado manual tile-por-tile para evitar
+        dependencias de layout_manager.render() que podria tener bugs.
+
+        Optimizacion: Usa cache para evitar re-renderizar el mapa cada frame.
+        El cache solo se invalida si cambia el tamano de la superficie.
 
         Args:
             surface: pygame.Surface de destino
-            tmx_data: Datos TMX cargados por pytmx
+            tmx_data: Datos TMX cargados por pytmx (pytmx.TiledMap)
 
-        SKELETON: Stub - solo limpia superficie
+        Manejo de errores:
+            - Si tmx_data es None: Llena con color de fondo
+            - Si hay error renderizando: Llena con color de fondo
         """
-        # Por ahora, solo llenar con color de fondo
-        surface.fill((25, 25, 25))  # Fondo oscuro
+        # Validar tmx_data
+        if not tmx_data:
+            print("[RENDERER] Advertencia: tmx_data es None, llenando con fondo")
+            surface.fill(COLOR_FONDO_OSCURO)
+            return
 
-    def actualizar_escala(self, width, height):
+        try:
+            # Optimizacion: Si ya tenemos cache valido, usarlo
+            if self.tmx_cached and self.tmx_cache_surface:
+                surface.blit(self.tmx_cache_surface, (0, 0))
+                return
+
+            # Renderizado manual tile por tile
+            # Acceso directo a pytmx sin intermediarios
+
+            # Limpiar superficie primero
+            surface.fill(COLOR_FONDO_OSCURO)
+
+            # Iterar todas las capas visibles
+            for layer in tmx_data.visible_layers:
+                # Solo procesar capas de tiles (no object layers)
+                if hasattr(layer, 'data'):
+                    # Iterar todo el grid
+                    for y in range(tmx_data.height):
+                        for x in range(tmx_data.width):
+                            try:
+                                # Obtener imagen del tile directamente de pytmx
+                                tile_image = tmx_data.get_tile_image(x, y, layer.id)
+
+                                if tile_image:
+                                    # Calcular posicion pixel (esquina superior izquierda)
+                                    pixel_x = x * tmx_data.tilewidth
+                                    pixel_y = y * tmx_data.tileheight
+
+                                    # Blit tile a la superficie
+                                    surface.blit(tile_image, (pixel_x, pixel_y))
+
+                            except Exception as e:
+                                # Si falla un tile individual, continuar con el siguiente
+                                # No imprimir error para evitar spam (miles de tiles)
+                                pass
+
+            # Crear cache del mapa renderizado
+            self.tmx_cache_surface = surface.copy()
+            self.tmx_cached = True
+
+            print("[RENDERER] Mapa TMX renderizado exitosamente (manual rendering)")
+
+        except Exception as e:
+            # Fallback en caso de error general
+            print(f"[RENDERER] Error renderizando TMX: {e}")
+            surface.fill(COLOR_FONDO_OSCURO)
+
+    def actualizar_escala(self, width: int, height: int) -> None:
         """
         Actualiza la escala de renderizado cuando cambia tamano de ventana.
+
+        Invalida el cache del mapa TMX para forzar re-renderizado.
 
         Args:
             width: Nuevo ancho de ventana
             height: Nuevo alto de ventana
-
-        SKELETON: Stub - no hace nada
         """
-        pass
+        # Invalidar cache de TMX
+        self.tmx_cached = False
+        self.tmx_cache_surface = None
+
+        print(f"[RENDERER] Escala actualizada a {width}x{height}, cache invalidado")
 
 
 # =============================================================================
 # FUNCIONES DE RENDERIZADO DE NIVEL MODULO
 # =============================================================================
 
-def renderizar_agentes(surface, agentes_list, layout_manager):
+def renderizar_agentes(surface: pygame.Surface,
+                      agentes_list: List[Dict[str, Any]],
+                      layout_manager) -> None:
     """
     Renderiza la lista de agentes (operarios) en la superficie.
 
+    Lee los datos de agentes desde estado_visual["operarios"].values()
+    y los dibuja como circulos con colores segun tipo y status.
+
     Args:
         surface: pygame.Surface de destino
-        agentes_list: Lista de dicts con datos de agentes
-        layout_manager: LayoutManager para conversiones grid<->pixel
+        agentes_list: Lista de dicts con datos de agentes (desde estado_visual)
+        layout_manager: LayoutManager para conversiones grid<->pixel (no usado actualmente,
+                       ya que estado_visual provee coordenadas pixel directamente)
 
-    SKELETON: Stub - no renderiza nada
+    Estructura esperada de cada agente:
+        {
+            "id": str,
+            "x": int,  # Posicion pixel X
+            "y": int,  # Posicion pixel Y
+            "tipo": str,  # "terrestre" | "montacargas"
+            "status": str,  # "idle" | "working" | "traveling"
+            "direccion_x": int,  # -1, 0, 1
+            "direccion_y": int,  # -1, 0, 1
+            "accion": str  # Descripcion legible
+        }
+
+    Colores:
+        - Terrestre: Naranja (COLOR_AGENTE_TERRESTRE)
+        - Montacargas: Azul (COLOR_AGENTE_MONTACARGAS)
+        - Idle: Gris (COLOR_AGENTE_IDLE)
+        - Working: Verde (COLOR_AGENTE_TRABAJANDO)
+        - Traveling: Amarillo (COLOR_AGENTE_MOVIENDO)
     """
-    # TODO: Implementar renderizado de agentes
-    pass
+    # Validar entrada
+    if not agentes_list:
+        return
+
+    # Inicializar fuente para IDs
+    try:
+        font = pygame.font.Font(None, 16)
+    except:
+        font = None
+
+    # Renderizar cada agente
+    for agente in agentes_list:
+        try:
+            # Obtener posicion pixel
+            x = agente.get('x', 100)
+            y = agente.get('y', 100)
+
+            # Obtener tipo y status
+            tipo = agente.get('tipo', 'terrestre')
+            status = agente.get('status', 'idle')
+            agent_id = agente.get('id', 'Unknown')
+
+            # Determinar color segun tipo y status
+            color = _determinar_color_agente(tipo, status)
+
+            # Dibujar agente como circulo
+            radio = 8
+            pygame.draw.circle(surface, color, (int(x), int(y)), radio)
+
+            # Dibujar borde negro para mejor visibilidad
+            pygame.draw.circle(surface, (0, 0, 0), (int(x), int(y)), radio, 1)
+
+            # Dibujar direccion si esta en movimiento
+            direccion_x = agente.get('direccion_x', 0)
+            direccion_y = agente.get('direccion_y', 0)
+
+            if direccion_x != 0 or direccion_y != 0:
+                # Dibujar pequena flecha indicando direccion
+                flecha_len = 12
+                end_x = int(x + direccion_x * flecha_len)
+                end_y = int(y + direccion_y * flecha_len)
+                pygame.draw.line(surface, (255, 255, 255),
+                               (int(x), int(y)), (end_x, end_y), 2)
+
+            # Dibujar ID del agente encima
+            if font:
+                # Mostrar solo ultimos caracteres del ID para no saturar
+                id_corto = agent_id.split('_')[-1] if '_' in agent_id else agent_id[-2:]
+                texto = font.render(id_corto, True, (255, 255, 255))
+                texto_rect = texto.get_rect(center=(int(x), int(y) - 15))
+
+                # Fondo semi-transparente para mejor legibilidad
+                fondo_rect = texto_rect.inflate(4, 2)
+                pygame.draw.rect(surface, (0, 0, 0), fondo_rect)
+
+                surface.blit(texto, texto_rect)
+
+        except Exception as e:
+            # Si falla un agente individual, continuar con el siguiente
+            print(f"[RENDERER] Error renderizando agente: {e}")
+            continue
 
 
-def renderizar_tareas_pendientes(surface, tareas_list, layout_manager):
+def renderizar_tareas_pendientes(surface: pygame.Surface,
+                                 tareas_list: List[Any],
+                                 layout_manager) -> None:
     """
     Renderiza marcadores de WorkOrders pendientes en el mapa.
 
+    Solo renderiza WorkOrders que NO estan completadas.
+    Usa colores diferentes segun el status de la WO.
+
     Args:
         surface: pygame.Surface de destino
-        tareas_list: Lista de WorkOrders pendientes
-        layout_manager: LayoutManager para conversiones
+        tareas_list: Lista de WorkOrders (pueden ser objetos o dicts)
+        layout_manager: LayoutManager para conversion grid->pixel
 
-    SKELETON: Stub - no renderiza nada
+    Colores segun status:
+        - pending: Amarillo (COLOR_TAREA_PENDIENTE)
+        - assigned: Naranja (COLOR_TAREA_ASIGNADA)
+        - in_progress: Azul claro (COLOR_TAREA_EN_PROGRESO)
+        - completed: NO se renderiza
     """
-    # TODO: Implementar renderizado de tareas
-    pass
+    # Validar entrada
+    if not tareas_list or not layout_manager:
+        return
+
+    # Inicializar fuente pequena para IDs
+    try:
+        font = pygame.font.Font(None, 12)
+    except:
+        font = None
+
+    # Contador para limitar renderizado (optimizacion)
+    max_tareas_renderizar = 200
+    count = 0
+
+    # Renderizar cada WorkOrder
+    for tarea in tareas_list:
+        # Limite de optimizacion
+        if count >= max_tareas_renderizar:
+            break
+
+        try:
+            # Obtener datos de la tarea (compatible con objetos y dicts)
+            if hasattr(tarea, 'status'):
+                # Es un objeto WorkOrder
+                status = tarea.status
+                location = tarea.location if hasattr(tarea, 'location') else (0, 0)
+                wo_id = tarea.id if hasattr(tarea, 'id') else 'WO-???'
+            else:
+                # Es un dict
+                status = tarea.get('status', 'pending')
+                location = tarea.get('location', (0, 0))
+                wo_id = tarea.get('id', 'WO-???')
+
+            # No renderizar tareas completadas
+            if status == 'completed':
+                continue
+
+            # Convertir posicion grid a pixel
+            grid_x, grid_y = location
+            pixel_x, pixel_y = _convertir_grid_a_pixel_seguro(layout_manager, grid_x, grid_y)
+
+            # Determinar color segun status
+            if status == 'pending':
+                color = COLOR_TAREA_PENDIENTE
+            elif status == 'assigned':
+                color = COLOR_TAREA_ASIGNADA
+            elif status == 'in_progress':
+                color = COLOR_TAREA_EN_PROGRESO
+            else:
+                color = COLOR_TAREA_PENDIENTE  # Fallback
+
+            # Dibujar marcador como pequeno cuadrado
+            tamano = 6
+            rect = pygame.Rect(pixel_x - tamano//2, pixel_y - tamano//2, tamano, tamano)
+            pygame.draw.rect(surface, color, rect)
+
+            # Borde negro para visibilidad
+            pygame.draw.rect(surface, (0, 0, 0), rect, 1)
+
+            count += 1
+
+        except Exception as e:
+            # Si falla una tarea, continuar con la siguiente
+            continue
 
 
-def renderizar_dashboard(pantalla, offset_x, metricas_dict, operarios_list):
+def renderizar_dashboard(pantalla: pygame.Surface,
+                        offset_x: int,
+                        metricas_dict: Dict[str, Any],
+                        operarios_list: List[Dict[str, Any]]) -> None:
     """
-    Renderiza el panel lateral de dashboard con metricas.
+    Renderiza el panel lateral de dashboard con metricas en tiempo real.
+
+    Dibuja directamente en la pantalla principal (no en virtual_surface)
+    en la posicion offset_x (lado derecho de la ventana).
 
     Args:
         pantalla: pygame.Surface principal (ventana completa)
         offset_x: Posicion X donde empieza el panel (ancho del area de simulacion)
-        metricas_dict: Dict con metricas (tiempo, workorders_completadas, etc.)
-        operarios_list: Lista de operarios para mostrar estado
+        metricas_dict: Dict con metricas globales (estado_visual["metricas"])
+        operarios_list: Lista de operarios (estado_visual["operarios"].values())
 
-    SKELETON: Stub - renderiza panel vacio basico
+    Estructura esperada de metricas_dict:
+        {
+            "tiempo_simulacion": float,
+            "workorders_completadas": int,
+            "tareas_completadas": int,
+            "operarios_idle": int,
+            "operarios_working": int,
+            "operarios_traveling": int,
+            "utilizacion_promedio": float
+        }
+
+    Layout:
+        - Panel de 400px de ancho
+        - Fondo blanco (COLOR_DASHBOARD_BG)
+        - Texto negro (COLOR_DASHBOARD_TEXTO)
+        - Secciones: Titulo, Metricas Globales, Estado Operarios, Controles
     """
-    # Renderizar panel de fondo simple
+    # Definir geometria del panel
     panel_width = 400
     panel_height = pantalla.get_height()
+    panel_x = offset_x
 
-    # Fondo del panel
-    pygame.draw.rect(pantalla, (50, 50, 50),
-                    (offset_x, 0, panel_width, panel_height))
+    # Dibujar fondo del panel
+    pygame.draw.rect(pantalla, COLOR_DASHBOARD_BG,
+                    (panel_x, 0, panel_width, panel_height))
 
-    # Titulo simple
+    # Dibujar borde izquierdo del panel
+    pygame.draw.line(pantalla, COLOR_DASHBOARD_BORDE,
+                    (panel_x, 0), (panel_x, panel_height), 2)
+
+    # Inicializar fuentes
     try:
-        font = pygame.font.Font(None, 24)
-        texto = font.render("DASHBOARD (SKELETON)", True, (255, 255, 255))
-        pantalla.blit(texto, (offset_x + 10, 10))
+        font_titulo = pygame.font.Font(None, 28)
+        font_seccion = pygame.font.Font(None, 22)
+        font_texto = pygame.font.Font(None, 18)
+        font_pequeno = pygame.font.Font(None, 16)
     except:
-        pass  # Si falla pygame.font, ignorar
+        # Fallback si pygame.font falla
+        return
+
+    # Posicion Y actual (se va incrementando)
+    y_pos = 20
+    margen_izq = panel_x + 15
+
+    # =========================================================================
+    # TITULO
+    # =========================================================================
+    titulo = font_titulo.render("METRICAS SIMULACION", True, COLOR_DASHBOARD_TEXTO)
+    pantalla.blit(titulo, (margen_izq, y_pos))
+    y_pos += 40
+
+    # Linea separadora
+    pygame.draw.line(pantalla, COLOR_DASHBOARD_BORDE,
+                    (margen_izq, y_pos), (panel_x + panel_width - 15, y_pos), 1)
+    y_pos += 20
+
+    # =========================================================================
+    # METRICAS GLOBALES
+    # =========================================================================
+    seccion_titulo = font_seccion.render("Metricas Globales", True, COLOR_DASHBOARD_TEXTO)
+    pantalla.blit(seccion_titulo, (margen_izq, y_pos))
+    y_pos += 30
+
+    # Extraer metricas con valores default
+    tiempo_sim = metricas_dict.get('tiempo_simulacion', 0.0)
+    wos_completadas = metricas_dict.get('workorders_completadas', 0)
+    tareas_completadas = metricas_dict.get('tareas_completadas', 0)
+    utilizacion = metricas_dict.get('utilizacion_promedio', 0.0)
+
+    # Renderizar metricas
+    metricas_texto = [
+        f"Tiempo: {tiempo_sim:.1f}s",
+        f"WorkOrders: {wos_completadas}",
+        f"Tareas: {tareas_completadas}",
+        f"Utilizacion: {utilizacion:.1f}%"
+    ]
+
+    for texto in metricas_texto:
+        superficie = font_texto.render(texto, True, COLOR_DASHBOARD_TEXTO)
+        pantalla.blit(superficie, (margen_izq + 10, y_pos))
+        y_pos += 25
+
+    y_pos += 10
+
+    # =========================================================================
+    # ESTADO DE OPERARIOS
+    # =========================================================================
+    seccion_titulo = font_seccion.render("Estado Operarios", True, COLOR_DASHBOARD_TEXTO)
+    pantalla.blit(seccion_titulo, (margen_izq, y_pos))
+    y_pos += 30
+
+    # Contadores de status
+    idle_count = metricas_dict.get('operarios_idle', 0)
+    working_count = metricas_dict.get('operarios_working', 0)
+    traveling_count = metricas_dict.get('operarios_traveling', 0)
+
+    # Resumen de status
+    status_texto = [
+        f"Idle: {idle_count}",
+        f"Trabajando: {working_count}",
+        f"Viajando: {traveling_count}"
+    ]
+
+    for texto in status_texto:
+        superficie = font_texto.render(texto, True, COLOR_DASHBOARD_TEXTO)
+        pantalla.blit(superficie, (margen_izq + 10, y_pos))
+        y_pos += 25
+
+    y_pos += 15
+
+    # Detalles de cada operario (limitar a primeros 10)
+    operarios_mostrar = list(operarios_list)[:10]
+
+    for op in operarios_mostrar:
+        op_id = op.get('id', 'Unknown')
+        op_status = op.get('status', 'idle')
+        op_tareas = op.get('tareas_completadas', 0)
+
+        # Color segun status
+        if op_status == 'idle':
+            color_status = COLOR_AGENTE_IDLE
+        elif op_status == 'working':
+            color_status = COLOR_AGENTE_TRABAJANDO
+        else:
+            color_status = COLOR_AGENTE_MOVIENDO
+
+        # ID del operario
+        id_corto = op_id.split('_')[-1] if '_' in op_id else op_id[-3:]
+        texto_id = font_pequeno.render(f"{id_corto}:", True, COLOR_DASHBOARD_TEXTO)
+        pantalla.blit(texto_id, (margen_izq + 15, y_pos))
+
+        # Status con color
+        texto_status = font_pequeno.render(op_status, True, color_status)
+        pantalla.blit(texto_status, (margen_izq + 70, y_pos))
+
+        # Tareas completadas
+        texto_tareas = font_pequeno.render(f"({op_tareas})", True, COLOR_DASHBOARD_TEXTO)
+        pantalla.blit(texto_tareas, (margen_izq + 160, y_pos))
+
+        y_pos += 20
+
+    y_pos += 15
+
+    # =========================================================================
+    # CONTROLES
+    # =========================================================================
+    # Solo mostrar si hay espacio
+    if y_pos < panel_height - 200:
+        seccion_titulo = font_seccion.render("Controles", True, COLOR_DASHBOARD_TEXTO)
+        pantalla.blit(seccion_titulo, (margen_izq, y_pos))
+        y_pos += 30
+
+        controles_texto = [
+            "ESPACIO - Pausar/Reanudar",
+            "+/- - Velocidad",
+            "D - Toggle Dashboard",
+            "M - Metricas consola",
+            "X - Exportar datos",
+            "R - Reiniciar",
+            "ESC - Salir"
+        ]
+
+        for texto in controles_texto:
+            superficie = font_pequeno.render(texto, True, COLOR_DASHBOARD_TEXTO)
+            pantalla.blit(superficie, (margen_izq + 10, y_pos))
+            y_pos += 20
 
 
-def renderizar_diagnostico_layout(surface, layout_manager):
+def renderizar_diagnostico_layout(surface: pygame.Surface, layout_manager) -> None:
     """
-    Renderiza grid de diagnostico del layout (para debugging).
+    Renderiza grid de diagnostico del layout para debugging.
+
+    Muestra:
+        - Grid de celdas con colores segun walkability
+        - Puntos de picking en cyan
+        - Coordenadas de grid cada 5 celdas
 
     Args:
         surface: pygame.Surface de destino
         layout_manager: LayoutManager con datos del grid
 
-    SKELETON: Stub - no renderiza nada
+    Uso:
+        Activar con tecla especial en modo debug
     """
-    # TODO: Implementar renderizado de debug
-    pass
+    # Validar entrada
+    if not layout_manager:
+        return
+
+    try:
+        # Inicializar fuente para coordenadas
+        try:
+            font = pygame.font.Font(None, 12)
+        except:
+            font = None
+
+        # Iterar todo el grid
+        for y in range(layout_manager.grid_height):
+            for x in range(layout_manager.grid_width):
+                # Calcular posicion pixel
+                pixel_x = x * layout_manager.tile_width
+                pixel_y = y * layout_manager.tile_height
+
+                # Determinar color segun walkability
+                if layout_manager.is_walkable(x, y):
+                    # Walkable: verde claro semi-transparente
+                    color = (0, 255, 0, 50)
+                else:
+                    # Blocked: rojo claro semi-transparente
+                    color = (255, 0, 0, 50)
+
+                # Dibujar rectangulo de celda
+                rect = pygame.Rect(pixel_x, pixel_y,
+                                  layout_manager.tile_width,
+                                  layout_manager.tile_height)
+                pygame.draw.rect(surface, color[:3], rect)
+
+                # Borde de celda
+                pygame.draw.rect(surface, (100, 100, 100), rect, 1)
+
+                # Dibujar coordenadas cada 5 celdas
+                if font and x % 5 == 0 and y % 5 == 0:
+                    texto = font.render(f"{x},{y}", True, (200, 200, 200))
+                    surface.blit(texto, (pixel_x + 2, pixel_y + 2))
+
+        # Dibujar puntos de picking
+        for picking_point in layout_manager.picking_points:
+            pixel_pos = picking_point.get('pixel_position', (0, 0))
+            pygame.draw.circle(surface, COLOR_PUNTO_PICKING, pixel_pos, 5)
+            pygame.draw.circle(surface, (0, 0, 0), pixel_pos, 5, 1)
+
+    except Exception as e:
+        print(f"[RENDERER] Error en renderizado de diagnostico: {e}")
+
+
+# =============================================================================
+# FUNCIONES AUXILIARES PRIVADAS
+# =============================================================================
+
+def _determinar_color_agente(tipo: str, status: str) -> Tuple[int, int, int]:
+    """
+    Determina el color de un agente segun su tipo y status.
+
+    Args:
+        tipo: Tipo de agente ("terrestre" | "montacargas")
+        status: Status del agente ("idle" | "working" | "traveling")
+
+    Returns:
+        Tupla RGB (r, g, b)
+
+    Logica de colores:
+        1. Si status == "idle": Siempre gris (COLOR_AGENTE_IDLE)
+        2. Si status == "working": Siempre verde (COLOR_AGENTE_TRABAJANDO)
+        3. Si status == "traveling": Color segun tipo
+           - terrestre: Naranja (COLOR_AGENTE_TERRESTRE)
+           - montacargas: Azul (COLOR_AGENTE_MONTACARGAS)
+    """
+    # Prioridad 1: Status idle
+    if status == 'idle':
+        return COLOR_AGENTE_IDLE
+
+    # Prioridad 2: Status working
+    if status == 'working':
+        return COLOR_AGENTE_TRABAJANDO
+
+    # Prioridad 3: Color segun tipo (para traveling u otros)
+    if tipo == 'montacargas':
+        return COLOR_AGENTE_MONTACARGAS
+    else:
+        return COLOR_AGENTE_TERRESTRE
+
+
+def _convertir_grid_a_pixel_seguro(layout_manager,
+                                   grid_x: int,
+                                   grid_y: int) -> Tuple[int, int]:
+    """
+    Convierte coordenadas grid a pixel con validacion defensiva.
+
+    Implementa multiples niveles de validacion para evitar errores:
+        1. Valida que layout_manager no sea None
+        2. Valida limites del grid
+        3. Valida resultado de la conversion
+        4. Provee fallback en caso de error
+
+    Args:
+        layout_manager: LayoutManager para conversion
+        grid_x: Coordenada X en grid
+        grid_y: Coordenada Y en grid
+
+    Returns:
+        Tupla (pixel_x, pixel_y)
+        En caso de error: (100, 100) como posicion default segura
+    """
+    # Validacion 1: layout_manager existe
+    if not layout_manager:
+        return (100, 100)
+
+    try:
+        # Validacion 2: Clamp a limites del grid
+        grid_x = max(0, min(grid_x, layout_manager.grid_width - 1))
+        grid_y = max(0, min(grid_y, layout_manager.grid_height - 1))
+
+        # Conversion usando metodo de layout_manager
+        pixel_x, pixel_y = layout_manager.grid_to_pixel(grid_x, grid_y)
+
+        # Validacion 3: Resultado es valido
+        if pixel_x < 0 or pixel_y < 0:
+            return (100, 100)
+
+        if pixel_x > layout_manager.pixel_width or pixel_y > layout_manager.pixel_height:
+            return (100, 100)
+
+        return (pixel_x, pixel_y)
+
+    except Exception as e:
+        # Fallback en caso de cualquier error
+        print(f"[RENDERER] Error en conversion grid->pixel: {e}")
+        return (100, 100)
 
 
 # =============================================================================
@@ -152,4 +719,4 @@ __all__ = [
 ]
 
 
-print("[OK] Modulo 'subsystems.visualization.renderer' cargado (SKELETON - Funcional minimo)")
+print("[OK] Modulo 'subsystems.visualization.renderer' cargado (PRODUCTION - Implementacion completa)")
