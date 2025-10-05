@@ -80,7 +80,7 @@ class LayoutManager:
                   for _ in range(self.grid_height)]
 
         # Iterate through all layers
-        for layer in self.tmx_data.visible_layers:
+        for layer_idx, layer in enumerate(self.tmx_data.visible_layers):
             # Only process tile layers (skip ObjectGroup and other layer types)
             if not hasattr(layer, 'data'):
                 continue
@@ -88,8 +88,8 @@ class LayoutManager:
             for y in range(self.grid_height):
                 for x in range(self.grid_width):
                     try:
-                        # Get tile at position
-                        tile = self.tmx_data.get_tile_properties(x, y, layer.id)
+                        # Get tile at position (use layer index, not layer.id)
+                        tile = self.tmx_data.get_tile_properties(x, y, layer_idx)
                     except (AttributeError, IndexError, KeyError):
                         # Skip if layer doesn't have tile data
                         continue
@@ -130,7 +130,7 @@ class LayoutManager:
         picking_points = []
 
         # Iterate through all layers
-        for layer in self.tmx_data.visible_layers:
+        for layer_idx, layer in enumerate(self.tmx_data.visible_layers):
             # Only process tile layers (skip ObjectGroup and other layer types)
             if not hasattr(layer, 'data'):
                 continue
@@ -138,8 +138,8 @@ class LayoutManager:
             for y in range(self.grid_height):
                 for x in range(self.grid_width):
                     try:
-                        # Get tile properties
-                        tile = self.tmx_data.get_tile_properties(x, y, layer.id)
+                        # Get tile properties (use layer index, not layer.id)
+                        tile = self.tmx_data.get_tile_properties(x, y, layer_idx)
                     except (AttributeError, IndexError, KeyError):
                         # Skip if layer doesn't have tile data
                         continue
