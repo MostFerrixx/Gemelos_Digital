@@ -771,9 +771,28 @@ class ReplayViewerEngine:
 
                 renderizar_agentes(virtual_surface, operarios_a_renderizar, self.layout_manager)
 
-            # Escalar y mostrar superficie virtual del almacen
-            scaled_warehouse = pygame.transform.smoothscale(virtual_surface, (warehouse_width, window_height))
-            self.pantalla.blit(scaled_warehouse, (0, 0))
+            # BUGFIX 2025-10-05: Escalar uniformemente para mantener proporcion 1:1
+            # Calcula ratio uniforme usando el menor dimension disponible
+            scale_ratio = min(warehouse_width / 960.0, window_height / 960.0)
+            scaled_width = int(960 * scale_ratio)
+            scaled_height = int(960 * scale_ratio)
+
+            # Escalar superficie manteniendo proporcion de aspecto
+            scaled_warehouse = pygame.transform.smoothscale(
+                virtual_surface,
+                (scaled_width, scaled_height)
+            )
+
+            # Centrar la superficie escalada en el area disponible
+            offset_x = (warehouse_width - scaled_width) // 2
+            offset_y = (window_height - scaled_height) // 2
+
+            # Llenar fondo del area de warehouse (para bordes si hay)
+            warehouse_rect = pygame.Rect(0, 0, warehouse_width, window_height)
+            pygame.draw.rect(self.pantalla, (40, 40, 40), warehouse_rect)
+
+            # Blit superficie escalada centrada
+            self.pantalla.blit(scaled_warehouse, (offset_x, offset_y))
 
             # Renderizar Dashboard de Agentes
             from subsystems.visualization.renderer import renderizar_dashboard
