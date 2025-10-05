@@ -110,6 +110,8 @@ class RendererOriginal:
         Manejo de errores:
             - Si tmx_data es None: Llena con color de fondo
             - Si hay error renderizando: Llena con color de fondo
+
+        BUGFIX 2025-10-04: Corregido uso de layer index en vez de layer.id
         """
         # Validar tmx_data
         if not tmx_data:
@@ -129,40 +131,93 @@ class RendererOriginal:
             # Limpiar superficie primero
             surface.fill(COLOR_FONDO_OSCURO)
 
-            # Iterar todas las capas visibles
-            for layer in tmx_data.visible_layers:
+            # FIX 2: Contador de tiles dibujados para diagnostico
+            tiles_dibujados = 0
+            total_tiles = 0
+
+            # FIX 1: Usar enumerate() para obtener indice correcto de capa
+            for layer_idx, layer in enumerate(tmx_data.visible_layers):
                 # Solo procesar capas de tiles (no object layers)
-                if hasattr(layer, 'data'):
-                    # Iterar todo el grid
-                    for y in range(tmx_data.height):
-                        for x in range(tmx_data.width):
-                            try:
-                                # Obtener imagen del tile directamente de pytmx
-                                tile_image = tmx_data.get_tile_image(x, y, layer.id)
+                if not hasattr(layer, 'data'):
+                    continue
 
-                                if tile_image:
-                                    # Calcular posicion pixel (esquina superior izquierda)
-                                    pixel_x = x * tmx_data.tilewidth
-                                    pixel_y = y * tmx_data.tileheight
+                # Iterar todo el grid
+                for y in range(tmx_data.height):
+                    for x in range(tmx_data.width):
+                        total_tiles += 1
+                        try:
+                            # BUGFIX: Usar layer_idx (indice) en vez de layer.id
+                            tile_image = tmx_data.get_tile_image(x, y, layer_idx)
 
-                                    # Blit tile a la superficie
-                                    surface.blit(tile_image, (pixel_x, pixel_y))
+                            if tile_image:
+                                # Calcular posicion pixel (esquina superior izquierda)
+                                pixel_x = x * tmx_data.tilewidth
+                                pixel_y = y * tmx_data.tileheight
 
-                            except Exception as e:
-                                # Si falla un tile individual, continuar con el siguiente
-                                # No imprimir error para evitar spam (miles de tiles)
-                                pass
+                                # Blit tile a la superficie
+                                surface.blit(tile_image, (pixel_x, pixel_y))
+                                tiles_dibujados += 1
 
-            # Crear cache del mapa renderizado
-            self.tmx_cache_surface = surface.copy()
-            self.tmx_cached = True
+                        except Exception as e:
+                            # FIX 2: Log de errores en modo debug (primera capa solo)
+                            if layer_idx == 0 and tiles_dibujados == 0:
+                                print(f"[RENDERER] Error en tile ({x},{y}): {e}")
 
-            print("[RENDERER] Mapa TMX renderizado exitosamente (manual rendering)")
+            # FIX 2: Logging de tiles dibujados
+            print(f"[RENDERER] Tiles dibujados: {tiles_dibujados}/{total_tiles}")
+
+            # FIX 3: Validar que la superficie NO este vacia antes de cachear
+            if tiles_dibujados > 0 and not self._is_surface_empty(surface):
+                # Crear cache del mapa renderizado
+                self.tmx_cache_surface = surface.copy()
+                self.tmx_cached = True
+                print("[RENDERER] Mapa TMX renderizado exitosamente - Cache creado")
+            else:
+                # FIX 3: No cachear superficie vacia
+                print(f"[RENDERER] ADVERTENCIA: Superficie TMX vacia ({tiles_dibujados} tiles), NO se cachea")
+                self.tmx_cached = False
 
         except Exception as e:
             # Fallback en caso de error general
             print(f"[RENDERER] Error renderizando TMX: {e}")
             surface.fill(COLOR_FONDO_OSCURO)
+
+    def _is_surface_empty(self, surface: pygame.Surface) -> bool:
+        """
+        Verifica si una superficie esta completamente vacia (solo fondo oscuro).
+
+        FIX 3: Previene cachear superficies negras/vacias.
+
+        Args:
+            surface: pygame.Surface a verificar
+
+        Returns:
+            True si la superficie esta vacia, False si tiene contenido
+        """
+        try:
+            # Muestrear algunos pixeles en diferentes posiciones
+            width = surface.get_width()
+            height = surface.get_height()
+
+            sample_points = [
+                (0, 0),
+                (width // 4, height // 4),
+                (width // 2, height // 2),
+                (3 * width // 4, 3 * height // 4),
+                (width - 1, height - 1)
+            ]
+
+            for x, y in sample_points:
+                if 0 <= x < width and 0 <= y < height:
+                    color = surface.get_at((x, y))
+                    # Si algun pixel NO es el fondo oscuro, hay contenido
+                    if color[:3] != COLOR_FONDO_OSCURO:
+                        return False
+
+            return True
+        except Exception:
+            # Si falla la verificacion, asumir que tiene contenido
+            return False
 
     def actualizar_escala(self, width: int, height: int) -> None:
         """

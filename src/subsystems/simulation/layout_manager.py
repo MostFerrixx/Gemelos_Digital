@@ -32,9 +32,10 @@ class LayoutManager:
         print(f"[LAYOUT-MANAGER] Cargando archivo TMX: {tmx_file_path}")
 
         try:
-            # Load TMX file using pytmx
-            self.tmx_data = pytmx.TiledMap(tmx_file_path)
-            print(f"[LAYOUT-MANAGER] TMX cargado exitosamente")
+            # Load TMX file using pytmx with pygame loader
+            # BUGFIX 2025-10-04: Usar load_pygame() para cargar imagenes de tiles
+            self.tmx_data = pytmx.load_pygame(tmx_file_path)
+            print(f"[LAYOUT-MANAGER] TMX cargado exitosamente (con imagenes Pygame)")
 
         except FileNotFoundError:
             raise FileNotFoundError(f"[LAYOUT-MANAGER ERROR] Archivo TMX no encontrado: {tmx_file_path}")
@@ -80,26 +81,32 @@ class LayoutManager:
 
         # Iterate through all layers
         for layer in self.tmx_data.visible_layers:
-            # Only process tile layers
-            if hasattr(layer, 'data'):
-                for y in range(self.grid_height):
-                    for x in range(self.grid_width):
+            # Only process tile layers (skip ObjectGroup and other layer types)
+            if not hasattr(layer, 'data'):
+                continue
+
+            for y in range(self.grid_height):
+                for x in range(self.grid_width):
+                    try:
                         # Get tile at position
                         tile = self.tmx_data.get_tile_properties(x, y, layer.id)
+                    except (AttributeError, IndexError, KeyError):
+                        # Skip if layer doesn't have tile data
+                        continue
 
-                        if tile:
-                            # Check walkable property
-                            walkable = tile.get('walkable', 'true')
+                    if tile:
+                        # Check walkable property
+                        walkable = tile.get('walkable', 'true')
 
-                            # Handle both string and boolean values
-                            if isinstance(walkable, str):
-                                is_walkable = walkable.lower() == 'true'
-                            else:
-                                is_walkable = bool(walkable)
+                        # Handle both string and boolean values
+                        if isinstance(walkable, str):
+                            is_walkable = walkable.lower() == 'true'
+                        else:
+                            is_walkable = bool(walkable)
 
-                            # If any layer marks it as non-walkable, it's blocked
-                            if not is_walkable:
-                                matrix[y][x] = False
+                        # If any layer marks it as non-walkable, it's blocked
+                        if not is_walkable:
+                            matrix[y][x] = False
 
         # Count walkable cells
         walkable_count = sum(sum(row) for row in matrix)
@@ -124,24 +131,31 @@ class LayoutManager:
 
         # Iterate through all layers
         for layer in self.tmx_data.visible_layers:
-            if hasattr(layer, 'data'):
-                for y in range(self.grid_height):
-                    for x in range(self.grid_width):
+            # Only process tile layers (skip ObjectGroup and other layer types)
+            if not hasattr(layer, 'data'):
+                continue
+
+            for y in range(self.grid_height):
+                for x in range(self.grid_width):
+                    try:
                         # Get tile properties
                         tile = self.tmx_data.get_tile_properties(x, y, layer.id)
+                    except (AttributeError, IndexError, KeyError):
+                        # Skip if layer doesn't have tile data
+                        continue
 
-                        if tile:
-                            tile_type = tile.get('type', '')
+                    if tile:
+                        tile_type = tile.get('type', '')
 
-                            # Check if it's a picking location
-                            if tile_type == 'picking_location':
-                                picking_point = {
-                                    'grid_position': (x, y),
-                                    'pixel_position': self.grid_to_pixel(x, y),
-                                    'type': tile_type,
-                                    'name': tile.get('name', f'Pick-{len(picking_points)+1}')
-                                }
-                                picking_points.append(picking_point)
+                        # Check if it's a picking location
+                        if tile_type == 'picking_location':
+                            picking_point = {
+                                'grid_position': (x, y),
+                                'pixel_position': self.grid_to_pixel(x, y),
+                                'type': tile_type,
+                                'name': tile.get('name', f'Pick-{len(picking_points)+1}')
+                            }
+                            picking_points.append(picking_point)
 
         return picking_points
 
