@@ -291,12 +291,12 @@ class LayoutManager:
             surface: Pygame surface to render to
         """
         # Render all visible tile layers
-        for layer in self.tmx_data.visible_layers:
+        for layer_idx, layer in enumerate(self.tmx_data.visible_layers):
             if hasattr(layer, 'data'):
                 for y in range(self.grid_height):
                     for x in range(self.grid_width):
                         # Get tile image
-                        tile_image = self.tmx_data.get_tile_image(x, y, layer.id)
+                        tile_image = self.tmx_data.get_tile_image(x, y, layer_idx)
 
                         if tile_image:
                             # Calculate pixel position (top-left corner)
@@ -322,9 +322,9 @@ class LayoutManager:
             return None
 
         # Check all layers for tile properties
-        for layer in self.tmx_data.visible_layers:
+        for layer_idx, layer in enumerate(self.tmx_data.visible_layers):
             if hasattr(layer, 'data'):
-                tile = self.tmx_data.get_tile_properties(grid_x, grid_y, layer.id)
+                tile = self.tmx_data.get_tile_properties(grid_x, grid_y, layer_idx)
                 if tile:
                     return tile.get('type', None)
 
