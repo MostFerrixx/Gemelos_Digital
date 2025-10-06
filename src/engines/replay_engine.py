@@ -706,9 +706,24 @@ class ReplayViewerEngine:
                         # CRITICO: Usar .update() para fusionar datos sin perder claves existentes
                         estado_visual["operarios"][agent_id].update(event_data)
 
-                        # Extraer position si existe
+                        # BUGFIX 2025-10-05: Recalcular coordenadas pixel desde grid position
+                        # El JSONL contiene coordenadas de esquina (grid_x * 32) en lugar de centro
+                        # Usamos grid_to_pixel() para calcular coordenadas centradas correctas
                         if 'position' in event_data:
                             position = event_data['position']
+                            if isinstance(position, (list, tuple)) and len(position) == 2:
+                                grid_x, grid_y = position[0], position[1]
+
+                                # Recalcular coordenadas pixel centradas
+                                if self.layout_manager:
+                                    pixel_x, pixel_y = self.layout_manager.grid_to_pixel(grid_x, grid_y)
+
+                                    # Sobrescribir coordenadas pixel incorrectas del JSONL
+                                    estado_visual["operarios"][agent_id]['x'] = pixel_x
+                                    estado_visual["operarios"][agent_id]['y'] = pixel_y
+                                else:
+                                    # Fallback si layout_manager no disponible (no deberia ocurrir)
+                                    print(f"[REPLAY-WARNING] layout_manager no disponible para agent {agent_id}")
 
                         # BUGFIX: Extraer WorkOrders anidadas en tour_details
                         tour_details = event_data.get('tour_details', [])
