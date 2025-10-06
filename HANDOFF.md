@@ -33,13 +33,14 @@
 ✅ **PATH RESOLUTION:** BUGFIX complete - All TMX/config paths resolved from project root
 ✅ **SIMPY PROCESSES:** BUGFIX complete - Full pull-based simulation working (agents + dispatcher)
 
-**Latest Commit:** `802ba70` (2025-10-06)
-**Total Commits:** 25+ on reconstruction/v11-complete branch
+**Latest Commit:** `6fdc35e` (2025-10-06)
+**Total Commits:** 26+ on reconstruction/v11-complete branch
 **BUGFIX Session 1:** 2025-10-05 - Agent rendering positioning fixed
 **BUGFIX Session 2:** 2025-10-06 - TMX/config path resolution fixed (5 files)
 **BUGFIX Session 3:** 2025-10-06 - SimPy FASE 1 complete (DispatcherV11 + dispatcher_process)
 **BUGFIX Session 4:** 2025-10-06 - SimPy FASE 2 complete (agent_process + 4 integration bugfixes)
 **BUGFIX Session 5:** 2025-10-06 - Capacity Validation complete (eliminates deadlocks)
+**BUGFIX Session 6:** 2025-10-06 - Dashboard Metrics fixed (replay viewer metrics now update)
 
 ---
 
@@ -90,6 +91,13 @@
 5. ✅ Testing: Headless simulation runs 264,000+ seconds WITHOUT DEADLOCKS
 6. ✅ Result: All WorkOrders now executable, simulation completes successfully
 
+**BUGFIX DASHBOARD METRICS COMPLETADO (2025-10-06):**
+1. ✅ PHASE 3: replay_engine.py - Call actualizar_metricas_tiempo() after events (lines 763-765)
+2. ✅ PHASE 1: replay_engine.py - Fix WorkOrders counter logic (lines 820-826)
+3. ✅ PHASE 2: replay_engine.py - Fix tasks counter from picking_executions (lines 828-832)
+4. ✅ PHASE 4: replay_engine.py - Merge operator metrics into dashboard dict (lines 837-848)
+5. ✅ Result: Dashboard metrics now update in real-time during replay
+
 **MODULOS COMPLETOS:**
 1. ✅ `subsystems/visualization/state.py` - COMPLETADO (558 lines)
 2. ✅ `subsystems/visualization/renderer.py` - COMPLETADO (647 lines, refactorizado)
@@ -102,7 +110,8 @@
 9. ✅ `subsystems/simulation/operators.py` - BUGFIX FASE 2 (agent_process implementations)
 10. ✅ `subsystems/simulation/assignment_calculator.py` - BUGFIX FASE 2 (attribute fix)
 11. ✅ `subsystems/simulation/__init__.py` - BUGFIX FASE 2 (import cleanup)
-12. 🟡 `subsystems/utils/helpers.py` (30min) - PENDIENTE (opcional)
+12. ✅ `engines/replay_engine.py` - BUGFIX DASHBOARD METRICS (4-phase fix)
+13. 🟡 `subsystems/utils/helpers.py` (30min) - PENDIENTE (opcional)
 
 **Current State:**
 - Analyze `src/engines/simulation_engine.py` lines 31-46 for imports

@@ -760,6 +760,10 @@ class ReplayViewerEngine:
                         dashboard_wos_state[work_order_id] = work_order_data.copy()
                         print(f"[DASHBOARD-STATE] WO {work_order_id} actualizada: status={status}")
 
+            # BUGFIX DASHBOARD METRICS: Update operator metrics after processing events
+            if estado_visual.get("operarios"):
+                actualizar_metricas_tiempo(estado_visual["operarios"])
+
             # REFACTOR ARQUITECTONICO: Avanzar tiempo DESPUES de procesar eventos
             # BUGFIX: Solo avanzar tiempo si el replay NO ha finalizado y NO esta pausado
             if not replay_finalizado and not replay_pausado:
@@ -813,30 +817,34 @@ class ReplayViewerEngine:
             from subsystems.visualization.renderer import renderizar_dashboard
 
             # Preparar metricas para el dashboard - DUAL COUNTERS
-            # Contar WorkOrders completadas segun contrato de renderizar_dashboard
+            # BUGFIX PHASE 1: Count completed WorkOrders correctly
             work_orders = estado_visual.get('work_orders', {})
-            workorders_completadas = sum(1 for wo in work_orders.values() if wo.get('status') == 'staged')
+            workorders_completadas = sum(
+                1 for wo in work_orders.values()
+                if wo.get('cantidad_restante', wo.get('cantidad_total', 1)) == 0
+                or wo.get('status') in ['completed', 'staged', 'delivered']
+            )
 
-            # Contar tareas completadas procesando los eventos acumulados hasta playback_time
-            tareas_completadas = 0
-            for evento in eventos:
-                # BUGFIX: Validacion defensiva contra timestamp None que causaba TypeError
-                timestamp = evento.get('timestamp', 0)
-                if timestamp is None:
-                    timestamp = 0  # Fallback seguro
-
-                if timestamp <= playback_time:
-                    if evento.get('type') == 'task_completed' or evento.get('type') == 'operation_completed':
-                        tareas_completadas += 1
+            # BUGFIX PHASE 2: Count tasks from picking_executions in WorkOrders
+            tareas_completadas = sum(
+                wo.get('picking_executions', 0)
+                for wo in work_orders.values()
+            )
 
             # BUGFIX: Usar total fijo de WorkOrders si esta disponible
             total_wos_a_usar = total_work_orders_fijo if total_work_orders_fijo is not None else len(work_orders)
 
+            # BUGFIX PHASE 4: Merge calculated metrics with operator metrics from estado_visual
             metricas = {
                 'tiempo': playback_time,
                 'workorders_completadas': workorders_completadas,  # KPI principal
                 'tareas_completadas': tareas_completadas,  # Metrica granular
-                'total_wos': total_wos_a_usar
+                'total_wos': total_wos_a_usar,
+                # Add operator metrics from estado_visual
+                'operarios_idle': estado_visual["metricas"].get("operarios_idle", 0),
+                'operarios_working': estado_visual["metricas"].get("operarios_working", 0),
+                'operarios_traveling': estado_visual["metricas"].get("operarios_traveling", 0),
+                'utilizacion_promedio': estado_visual["metricas"].get("utilizacion_promedio", 0.0)
             }
 
             # Preparar operarios para el dashboard (convertir a formato esperado)
