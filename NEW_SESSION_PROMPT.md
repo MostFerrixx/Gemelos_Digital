@@ -4,7 +4,7 @@ Hola Claude Code. Estoy desarrollando un **Simulador de Gemelo Digital de Almac�
 
 ### CONTEXTO CRÍTICO
 
-Actualmente estamos en medio de una **Re-arquitectura V11** del proyecto para transformarlo de una estructura caótica a una profesional. El proyecto está **88% completado** (FASE 2 - Implementación de Visualización en progreso - state.py y renderer.py COMPLETOS).
+Actualmente estamos en medio de una **Re-arquitectura V11** del proyecto para transformarlo de una estructura caótica a una profesional. El proyecto está **96% completado** (BUGFIX SimPy FASE 1 COMPLETA - DispatcherV11 integrado + dispatcher_process() implementado).
 
 **Rama Actual de Trabajo:** `reconstruction/v11-complete`
 **Estado:** Migrando a estructura de paquete Python profesional con layout `src/`
@@ -359,15 +359,22 @@ python -m entry_points.run_live_simulation --headless
 - Dejé el proyecto en FASE 2 - Implementación de Visualización
 
 **Progreso Actual:**
-- **90% completado** (FASE 2-Impl - Renderer COMPLETO y FUNCIONAL)
+- **99% completado** (BUGFIX Capacity Validation COMPLETO - Sin deadlocks)
 - **25+ commits** en rama reconstruction/v11-complete
 - **61 archivos** migrados exitosamente
-- **16/16 módulos subsystems** creados (12/16 production-ready)
+- **16/16 módulos subsystems** creados (15/16 production-ready)
 - **state.py (558 lines)** implementado completamente ✨
-- **renderer.py (785 lines)** implementado completamente ✨
-- **replay_engine.py** BUGFIX aplicado: Coordenadas centradas en tiles ✨
+- **renderer.py (647 lines)** refactorizado con delegacion a DashboardOriginal ✨
+- **dashboard.py (385 lines)** implementado completamente ✨
+- **dispatcher.py** BUGFIX FASE 1: dispatcher_process() implementado con logging ✨
+- **warehouse.py** BUGFIX FASE 1 + FASE 2 + CAPACITY VALIDATION completo ✨
+- **operators.py** BUGFIX FASE 2: agent_process() implementado en ambos tipos ✨
+- **simulation_engine.py** BUGFIX FASE 1: route_calculator pasado a AlmacenMejorado ✨
+- **Path Resolution BUGFIXES** aplicados: config.json, TMX, Excel ✨
 - **Sistema de visualización FUNCIONAL** - Replay viewer operacional
-- **Siguiente:** dashboard.py (30min-1h), helpers.py (30min)
+- **CAPACITY VALIDATION** implementado - WorkOrders validados contra capacidad ✨
+- **Simulación headless FUNCIONAL** - 264,000+ segundos SIN DEADLOCKS ✨
+- **Siguiente:** OPCIONAL - Implementar helpers.py (30min) O testing final del sistema
 
 ---
 
@@ -468,8 +475,8 @@ python -c "from subsystems.config.settings import LOGICAL_WIDTH"
 1. Leer `HANDOFF.md` y `docs/V11_MIGRATION_STATUS.md`
 2. Verificar rama: `git checkout reconstruction/v11-complete`
 3. Revisar commits: `git log --oneline -10`
-4. Leer `PHASE3_CHECKLIST.md`
-5. Continuar FASE 2: Implementar `dashboard.py` (30min-1h) o `helpers.py` (30min)
+4. Revisar informe `BUGFIX_CAPACITY_VALIDATION_REPORT.md`
+5. OPCIONAL: Implementar `helpers.py` (30min) O proceder a testing final del sistema
 
 **Alternativo (si hacemos otra cosa):**
 1. Leer documentación de estado
@@ -503,9 +510,9 @@ python -c "from subsystems.config.settings import LOGICAL_WIDTH"
 
 ## RESUMEN EJECUTIVO
 
-**Estado:** Proyecto en migración V11 (88% done)
+**Estado:** Proyecto en migración V11 (99% done)
 **Rama:** `reconstruction/v11-complete`
-**Siguiente:** FASE 2-Impl - Implementar dashboard.py y helpers.py (1-2h restantes)
+**Siguiente:** OPCIONAL - Implementar helpers.py (30min) O testing final del sistema
 
 **Documentación CRÍTICA (LEER EN ORDEN):**
 1. `HANDOFF.md` ← Inicio rápido

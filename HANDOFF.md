@@ -4,13 +4,13 @@
 
 ---
 
-## Current Status: 90% Complete (PHASE 2 IN PROGRESS - Renderer FUNCTIONAL)
+## Current Status: 99% Complete (BUGFIX Capacity Validation COMPLETE ✅)
 
 **Branch:** `reconstruction/v11-complete`
-**Last Commit:** Pending (replay_engine.py BUGFIX - agent positioning)
+**Last Commit:** Pending (BUGFIX CAPACITY VALIDATION: Resolve deadlock)
 **Tag:** `v11.0.0-phase1`
-**Last Updated:** 2025-10-05
-**Next Task:** PHASE 2 - Implement dashboard.py and helpers.py (1-2 hours remaining)
+**Last Updated:** 2025-10-06
+**Next Task:** Optional - Implement helpers.py utilities (30min) OR proceed to final system testing
 
 ---
 
@@ -25,15 +25,21 @@
 ✅ **PHASE 1c:** Smoke test passed (replay viewer validated)
 
 **Subsystems Status:**
-✅ **CONFIG SUBSYSTEM:** Complete (2/2 modules)
-✅ **SIMULATION SUBSYSTEM:** Complete (8/8 modules)
-✅ **VISUALIZATION SUBSYSTEM:** 2/4 complete (state.py + renderer.py PRODUCTION-READY + FUNCTIONAL)
-✅ **UTILS SUBSYSTEM:** Skeleton functional (1/1 module)
+✅ **CONFIG SUBSYSTEM:** Complete (2/2 modules) + BUGFIX (config_manager.py path resolution)
+✅ **SIMULATION SUBSYSTEM:** Complete (8/8 modules) + BUGFIX SimPy (FASE 1 + FASE 2 complete)
+✅ **VISUALIZATION SUBSYSTEM:** 3/4 complete (state.py + renderer.py + dashboard.py PRODUCTION-READY)
+⏳ **UTILS SUBSYSTEM:** Skeleton functional (1/1 module - helpers.py pending)
 ✅ **REPLAY ENGINE:** BUGFIX applied - Agent positioning centered on tiles
+✅ **PATH RESOLUTION:** BUGFIX complete - All TMX/config paths resolved from project root
+✅ **SIMPY PROCESSES:** BUGFIX complete - Full pull-based simulation working (agents + dispatcher)
 
-**Latest Commit:** `92435e1` (2025-10-04)
+**Latest Commit:** `802ba70` (2025-10-06)
 **Total Commits:** 25+ on reconstruction/v11-complete branch
-**BUGFIX Session:** 2025-10-05 - Agent rendering positioning fixed
+**BUGFIX Session 1:** 2025-10-05 - Agent rendering positioning fixed
+**BUGFIX Session 2:** 2025-10-06 - TMX/config path resolution fixed (5 files)
+**BUGFIX Session 3:** 2025-10-06 - SimPy FASE 1 complete (DispatcherV11 + dispatcher_process)
+**BUGFIX Session 4:** 2025-10-06 - SimPy FASE 2 complete (agent_process + 4 integration bugfixes)
+**BUGFIX Session 5:** 2025-10-06 - Capacity Validation complete (eliminates deadlocks)
 
 ---
 
@@ -41,30 +47,62 @@
 
 ### IMMEDIATE TASK: PHASE 2 - Implement Visualization Layer (4-6 hours)
 
-**COMPLETED MODULES (16/16):**
+**COMPLETED MODULES (15/16 PRODUCTION-READY):**
 ✅ `subsystems/config/settings.py` (132 lines) - COMPLETE
 ✅ `subsystems/config/colors.py` (165 lines) - COMPLETE
-✅ `subsystems/simulation/warehouse.py` (334 lines) - COMPLETE
+✅ `core/config_manager.py` - BUGFIX V11 (busca config.json en raiz del proyecto)
+✅ `subsystems/simulation/warehouse.py` - COMPLETE + BUGFIX FASE 1 + CAPACITY VALIDATION
+✅ `subsystems/simulation/dispatcher.py` - COMPLETE + BUGFIX FASE 1 (dispatcher_process implemented)
 ✅ `subsystems/simulation/operators.py` (410 lines) - COMPLETE
-✅ `subsystems/simulation/layout_manager.py` (340 lines) - COMPLETE
+✅ `subsystems/simulation/layout_manager.py` (348 lines) - COMPLETE + BUGFIX V11 (resuelve rutas TMX relativas)
 ✅ `subsystems/simulation/pathfinder.py` (234 lines) - COMPLETE
 ✅ `subsystems/simulation/route_calculator.py` (346 lines) - COMPLETE
 ✅ `subsystems/simulation/data_manager.py` (408 lines) - COMPLETE
 ✅ `subsystems/simulation/assignment_calculator.py` (403 lines) - COMPLETE
 ✅ `subsystems/simulation/dispatcher.py` (552 lines) - COMPLETE
 ✅ `subsystems/visualization/state.py` (558 lines) - ✨ COMPLETE PRODUCTION
-✅ `subsystems/visualization/renderer.py` (785 lines) - ✨ COMPLETE PRODUCTION (BUGFIX applied)
-✅ `subsystems/simulation/layout_manager.py` (323 lines) - COMPLETE (BUGFIX pytmx loader)
-⏳ `subsystems/visualization/dashboard.py` (79 lines) - SKELETON (needs implementation)
+✅ `subsystems/visualization/renderer.py` (647 lines) - ✨ COMPLETE PRODUCTION (REFACTORED -130 lines)
+✅ `subsystems/visualization/dashboard.py` (385 lines) - ✨ COMPLETE PRODUCTION (NEW - clase completa)
+✅ `engines/simulation_engine.py` - BUGFIX V11 (usa config path directamente)
 ❌ `subsystems/visualization/hud.py` - OPTIONAL (no creado aun)
-⏳ `subsystems/utils/helpers.py` (101 lines) - SKELETON FUNCIONAL
+⏳ `subsystems/utils/helpers.py` (101 lines) - SKELETON FUNCIONAL (ULTIMO MODULO PENDIENTE)
 
-**MODULES REQUIRING FULL IMPLEMENTATION (Priority Order):**
-1. ✅ `subsystems/visualization/state.py` - COMPLETADO (558 lines, todas funciones implementadas)
-2. ✅ `subsystems/visualization/renderer.py` - COMPLETADO (785 lines, renderizado completo con cache TMX)
-3. ✅ `src/engines/replay_engine.py` - BUGFIX APLICADO (coordenadas centradas en tiles)
-4. 🔴 `subsystems/visualization/dashboard.py` (30min-1h) - CRITICO para UI
-5. 🟡 `subsystems/utils/helpers.py` (30min) - Export completo
+**BUGFIX SIMPY - FASE 1 COMPLETADA (2025-10-06):**
+1. ✅ BUGFIX #5: AlmacenMejorado.__init__() - Agregado route_calculator parameter
+2. ✅ BUGFIX #4: warehouse.py - Reemplazado Dispatcher stub con DispatcherV11
+3. ✅ BUGFIX #6: warehouse.py - Eliminada clase Dispatcher stub completamente
+4. ✅ BUGFIX #5b: simulation_engine.py - Pasando route_calculator a AlmacenMejorado
+5. ✅ BUGFIX #1: dispatcher.py - Implementado dispatcher_process() con logging/monitoring
+
+**BUGFIX SIMPY - FASE 2 COMPLETADA (2025-10-06):**
+1. ✅ BUGFIX #2: operators.py - Implementado agent_process() real en GroundOperator (101 lines)
+2. ✅ BUGFIX #3: operators.py - Implementado agent_process() real en Forklift (108 lines)
+3. ✅ BUGFIX #7: warehouse.py - Fixed batch WorkOrder addition (agregar_work_orders)
+4. ✅ BUGFIX #8: subsystems/simulation/__init__.py - Removed Dispatcher stub import
+5. ✅ BUGFIX #9: assignment_calculator.py - Fixed operator.tipo -> operator.type
+6. ✅ BUGFIX #10: dispatcher.py - Fixed stats dict keys (pendientes/asignados/etc)
+
+**BUGFIX CAPACITY VALIDATION COMPLETADO (2025-10-06):**
+1. ✅ PHASE 1: warehouse.py - Extract operator capacities from config (lines 147-173)
+2. ✅ PHASE 2: warehouse.py - Implement _validar_y_ajustar_cantidad() helper (lines 194-234)
+3. ✅ PHASE 3: warehouse.py - Integrate validation into generation loop (lines 286-310)
+4. ✅ PHASE 4: warehouse.py - Add statistics reporting (lines 321-327)
+5. ✅ Testing: Headless simulation runs 264,000+ seconds WITHOUT DEADLOCKS
+6. ✅ Result: All WorkOrders now executable, simulation completes successfully
+
+**MODULOS COMPLETOS:**
+1. ✅ `subsystems/visualization/state.py` - COMPLETADO (558 lines)
+2. ✅ `subsystems/visualization/renderer.py` - COMPLETADO (647 lines, refactorizado)
+3. ✅ `subsystems/visualization/dashboard.py` - COMPLETADO (385 lines)
+4. ✅ `src/core/config_manager.py` - BUGFIX V11 (path resolution)
+5. ✅ `subsystems/simulation/layout_manager.py` - BUGFIX V11 (TMX paths)
+6. ✅ `subsystems/simulation/data_manager.py` - BUGFIX V11 (Excel paths)
+7. ✅ `subsystems/simulation/dispatcher.py` - BUGFIX FASE 1 + FASE 2 (full process logic)
+8. ✅ `subsystems/simulation/warehouse.py` - BUGFIX FASE 1 + FASE 2 + CAPACITY VALIDATION
+9. ✅ `subsystems/simulation/operators.py` - BUGFIX FASE 2 (agent_process implementations)
+10. ✅ `subsystems/simulation/assignment_calculator.py` - BUGFIX FASE 2 (attribute fix)
+11. ✅ `subsystems/simulation/__init__.py` - BUGFIX FASE 2 (import cleanup)
+12. 🟡 `subsystems/utils/helpers.py` (30min) - PENDIENTE (opcional)
 
 **Current State:**
 - Analyze `src/engines/simulation_engine.py` lines 31-46 for imports

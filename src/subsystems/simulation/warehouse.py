@@ -67,41 +67,9 @@ class WorkOrder:
         return f"WO({self.id}, {self.sku.id}, {self.cantidad_restante}/{self.cantidad_inicial})"
 
 
-class Dispatcher:
-    """Dispatcher V2.6 - Manages work order assignment and distribution"""
-
-    def __init__(self, env: simpy.Environment, almacen: 'AlmacenMejorado'):
-        self.env = env
-        self.almacen = almacen
-        self.lista_maestra_work_orders: List[WorkOrder] = []
-        self.work_orders_completadas_historicas: List[WorkOrder] = []
-        self.work_orders_total_inicial = 0
-        self.initial_work_orders_snapshot = []
-
-    def agregar_work_order(self, work_order: WorkOrder):
-        """Add a work order to the master list"""
-        self.lista_maestra_work_orders.append(work_order)
-        self.work_orders_total_inicial = len(self.lista_maestra_work_orders)
-
-    def completar_work_order(self, work_order: WorkOrder):
-        """Mark a work order as completed and move to history"""
-        if work_order in self.lista_maestra_work_orders:
-            self.lista_maestra_work_orders.remove(work_order)
-        work_order.status = "completed"
-        work_order.tiempo_fin = self.env.now
-        self.work_orders_completadas_historicas.append(work_order)
-
-    def dispatcher_process(self, operarios: List[Any]):
-        """
-        SimPy process for dispatching work orders to agents
-        This is a placeholder - actual implementation would be in dispatcher.py
-        """
-        while True:
-            # Placeholder logic - real implementation in dispatcher.py module
-            yield self.env.timeout(1.0)
-
-            if self.almacen.simulacion_ha_terminado():
-                break
+# BUGFIX FASE 1: Dispatcher stub eliminado - usando DispatcherV11 real
+# La clase Dispatcher stub (lineas 70-104) ha sido eliminada completamente
+# Ahora se usa DispatcherV11 de dispatcher.py con logica completa implementada
 
 
 class AlmacenMejorado:
@@ -112,9 +80,12 @@ class AlmacenMejorado:
 
     def __init__(self, env: simpy.Environment, configuracion: Dict[str, Any],
                  layout_manager=None, pathfinder=None, data_manager=None,
-                 cost_calculator=None, simulador=None, visual_event_queue=None):
+                 cost_calculator=None, route_calculator=None, simulador=None,
+                 visual_event_queue=None):
         """
         Initialize warehouse with configuration and dependencies
+
+        BUGFIX FASE 1: Agregado route_calculator para integracion con DispatcherV11
 
         Args:
             env: SimPy environment
@@ -123,6 +94,7 @@ class AlmacenMejorado:
             pathfinder: Pathfinder instance for A* navigation
             data_manager: DataManager instance for warehouse data
             cost_calculator: AssignmentCostCalculator for task assignment
+            route_calculator: RouteCalculator for tour optimization
             simulador: Reference to main simulator (optional)
             visual_event_queue: Multiprocessing queue for visual events (optional)
         """
@@ -132,6 +104,7 @@ class AlmacenMejorado:
         self.pathfinder = pathfinder
         self.data_manager = data_manager
         self.cost_calculator = cost_calculator
+        self.route_calculator = route_calculator
         self.simulador = simulador
         self.visual_event_queue = visual_event_queue
 
@@ -151,8 +124,16 @@ class AlmacenMejorado:
         self.workorders_completadas_count = 0  # Main KPI counter
         self.tareas_completadas_count = 0      # Legacy picking tasks counter
 
-        # Dispatcher V2.6
-        self.dispatcher = Dispatcher(env, self)
+        # BUGFIX FASE 1: Reemplazar Dispatcher stub con DispatcherV11 real
+        from .dispatcher import DispatcherV11
+        self.dispatcher = DispatcherV11(
+            env=env,
+            almacen=self,
+            assignment_calculator=cost_calculator,
+            route_calculator=route_calculator,
+            data_manager=data_manager,
+            configuracion=configuracion
+        )
 
         # Event log for analytics
         self.event_log: List[Dict[str, Any]] = []
@@ -163,11 +144,33 @@ class AlmacenMejorado:
         # Simulation state
         self._simulation_finished = False
 
+        # BUGFIX CAPACITY VALIDATION: Extract operator capacities from configuration
+        self.operator_capacities = {}  # {work_area: max_capacity}
+        agent_types = configuracion.get('agent_types', [])
+
+        for agent_config in agent_types:
+            agent_type = agent_config.get('type')
+            capacity = agent_config.get('capacity', 0)
+            work_areas = agent_config.get('work_area_priorities', {})
+
+            # For each work area this agent can handle, track max capacity
+            for work_area in work_areas.keys():
+                current_max = self.operator_capacities.get(work_area, 0)
+                self.operator_capacities[work_area] = max(current_max, capacity)
+
+        # Compute global max capacity (for fallback)
+        self.max_operator_capacity = max(
+            [agent.get('capacity', 0) for agent in agent_types],
+            default=150  # Fallback if no agents defined
+        )
+
         print(f"[ALMACEN] AlmacenMejorado inicializado:")
         print(f"  - Total ordenes configuradas: {self.total_ordenes}")
         print(f"  - Operarios totales: {self.num_operarios_total}")
         print(f"  - Layout Manager: {'ACTIVO' if layout_manager else 'NO DISPONIBLE'}")
         print(f"  - Data Manager: {'ACTIVO' if data_manager else 'NO DISPONIBLE'}")
+        print(f"  - Capacidades por work area: {self.operator_capacities}")
+        print(f"  - Capacidad maxima global: {self.max_operator_capacity}")
 
     def _crear_catalogo_y_stock(self):
         """Create SKU catalog and initialize inventory"""
@@ -188,6 +191,48 @@ class AlmacenMejorado:
         print(f"[ALMACEN] Catalogo creado: {len(self.catalogo_skus)} SKUs")
         print(f"[ALMACEN] Inventario inicial: {sum(self.inventario.values())} unidades")
 
+    def _validar_y_ajustar_cantidad(self, sku: SKU, cantidad_original: int,
+                                     work_area: str) -> int:
+        """
+        Validate WorkOrder quantity against operator capacity
+
+        BUGFIX CAPACITY VALIDATION: Ensures all WorkOrders are physically possible
+        by adjusting quantity if total volume exceeds operator capacity.
+
+        Args:
+            sku: SKU object with volumen attribute
+            cantidad_original: Requested quantity (1-5)
+            work_area: Work area identifier
+
+        Returns:
+            Adjusted quantity (guaranteed to fit in at least one operator)
+        """
+        # Calculate total volume
+        volumen_total = sku.volumen * cantidad_original
+
+        # Determine max capacity for this work area
+        max_capacity = self.operator_capacities.get(
+            work_area,
+            self.max_operator_capacity  # Fallback to global max
+        )
+
+        # Check if volume exceeds capacity
+        if volumen_total > max_capacity:
+            # Calculate max quantity that fits
+            cantidad_ajustada = max_capacity // sku.volumen
+
+            # Ensure at least 1 unit (minimum viable WO)
+            cantidad_ajustada = max(1, cantidad_ajustada)
+
+            # Log adjustment
+            print(f"[ALMACEN WARNING] WO ajustada: SKU {sku.id} "
+                  f"cantidad {cantidad_original} -> {cantidad_ajustada} "
+                  f"(volumen {volumen_total} > capacidad {max_capacity})")
+
+            return cantidad_ajustada
+        else:
+            return cantidad_original
+
     def _generar_flujo_ordenes(self):
         """Generate work orders flow based on configuration"""
         print(f"[ALMACEN] Generando {self.total_ordenes} ordenes de trabajo...")
@@ -201,9 +246,11 @@ class AlmacenMejorado:
             picking_points = [pp['ubicacion_grilla'] for pp in self.data_manager.puntos_de_picking_ordenados]
             work_areas = [pp.get('work_area', 'Area_Ground') for pp in self.data_manager.puntos_de_picking_ordenados]
 
-        # Generate work orders
+        # Generate work orders (collect all first, then add in batch)
         wo_counter = 0
         order_counter = 1
+        all_work_orders = []  # BUGFIX FASE 2: Collect all WOs for batch add
+        wo_adjusted_count = 0  # BUGFIX CAPACITY VALIDATION: Track adjustments
 
         for order_num in range(1, self.total_ordenes + 1):
             # Determine order type based on distribution
@@ -236,24 +283,48 @@ class AlmacenMejorado:
                 ubicacion = picking_points[pick_idx]
                 work_area = work_areas[pick_idx] if pick_idx < len(work_areas) else "Area_Ground"
 
-                # Create work order
+                # BUGFIX CAPACITY VALIDATION: Validate quantity before creating WorkOrder
+                cantidad_solicitada = random.randint(1, 5)
+                cantidad_valida = self._validar_y_ajustar_cantidad(
+                    sku=sku,
+                    cantidad_original=cantidad_solicitada,
+                    work_area=work_area
+                )
+
+                # Track adjustments
+                if cantidad_valida < cantidad_solicitada:
+                    wo_adjusted_count += 1
+
+                # Create work order with validated quantity
                 work_order = WorkOrder(
                     work_order_id=f"WO-{wo_counter:04d}",
                     order_id=f"ORD-{order_counter:04d}",
                     tour_id=f"TOUR-{order_counter:04d}",
                     sku=sku,
-                    cantidad=random.randint(1, 5),
+                    cantidad=cantidad_valida,  # BUGFIX: Use validated quantity
                     ubicacion=ubicacion,
                     work_area=work_area,
                     pick_sequence=wo_counter
                 )
 
-                self.dispatcher.agregar_work_order(work_order)
+                all_work_orders.append(work_order)  # BUGFIX FASE 2: Collect instead of immediate add
 
             order_counter += 1
 
+        # BUGFIX FASE 2: Add all work orders in one batch (DispatcherV11 uses plural method)
+        if all_work_orders:
+            self.dispatcher.agregar_work_orders(all_work_orders)
+
         print(f"[ALMACEN] Generadas {len(self.dispatcher.lista_maestra_work_orders)} WorkOrders")
         print(f"[ALMACEN] Distribucion por tipo: {self.distribucion_tipos}")
+
+        # BUGFIX CAPACITY VALIDATION: Report statistics
+        if wo_adjusted_count > 0:
+            adjustment_percentage = (wo_adjusted_count / len(all_work_orders)) * 100
+            print(f"[ALMACEN] {wo_adjusted_count} WorkOrders ajustadas por capacidad "
+                  f"({adjustment_percentage:.1f}%)")
+        else:
+            print(f"[ALMACEN] Todas las WorkOrders caben dentro de capacidad de operarios")
 
     def adelantar_tiempo(self, tiempo: float):
         """
