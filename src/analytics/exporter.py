@@ -10,7 +10,7 @@ import sys
 import json
 import subprocess
 from datetime import datetime
-from analytics_engine import AnalyticsEngine
+from engines.analytics_engine import AnalyticsEngine
 # REFACTOR V11: Update to subsystems path
 from subsystems.utils.helpers import exportar_metricas, mostrar_metricas_consola
 

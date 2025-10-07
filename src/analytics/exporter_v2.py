@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from typing import Optional
 
-from analytics_engine import AnalyticsEngine
+from engines.analytics_engine import AnalyticsEngine
 from subsystems.utils.helpers import exportar_metricas, mostrar_metricas_consola
 from .context import SimulationContext, ExportResult
 

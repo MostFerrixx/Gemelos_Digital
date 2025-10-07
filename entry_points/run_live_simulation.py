@@ -6,13 +6,17 @@ Refactorizado desde main.py - Solo simulacion live (visual y headless).
 
 import argparse
 import os
+import sys
 import json
 import time
 import multiprocessing
 import pygame
 
+# REFACTOR V11: Add src/ to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
 # Import del motor de simulacion puro
-from simulation_engine import SimulationEngine
+from engines.simulation_engine import SimulationEngine
 
 
 # ELIMINATED: ejecutar_modo_replay() function - All replay functionality removed for pure simulation

@@ -164,24 +164,106 @@ class GroundOperator(BaseOperator):
 
     def agent_process(self):
         """
-        Main SimPy process for ground operator
-        This is a placeholder - actual implementation would go here
+        BUGFIX FASE 2: SimPy process real para GroundOperator
+        Implementa ciclo pull-based de trabajo
+
+        Flujo:
+        1. Solicitar tour del dispatcher
+        2. Navegar a ubicaciones de picking
+        3. Simular picking en cada ubicacion
+        4. Navegar a staging area
+        5. Descargar
+        6. Notificar completado
+        7. Repetir
         """
+        # Configuracion de simulacion
+        TIME_PER_CELL = 0.1  # Segundos por celda de grid (ajustable)
+
+        # Inicializar posicion en depot
+        staging_locs = self.almacen.data_manager.get_outbound_staging_locations()
+        depot_location = staging_locs.get(1, (3, 29))  # Staging 1 como depot default
+        self.current_position = depot_location
+
+        print(f"[{self.id}] Proceso iniciado en depot {depot_location}")
+
         while True:
-            # Placeholder process
-            # Real implementation would:
-            # 1. Wait for task assignment from dispatcher
-            # 2. Navigate to pickup location
-            # 3. Pick items
-            # 4. Navigate to dropoff location
-            # 5. Drop items
-            # 6. Update metrics
+            # PASO 1: Solicitar asignacion de tour
+            self.status = "idle"
+            tour = self.almacen.dispatcher.solicitar_asignacion(self)
 
-            yield self.env.timeout(1.0)
+            if tour is None:
+                # No hay trabajo disponible, esperar
+                yield self.env.timeout(1.0)
 
-            # Check if simulation has ended
-            if self.almacen.simulacion_ha_terminado():
-                break
+                # Verificar si termino la simulacion
+                if self.almacen.simulacion_ha_terminado():
+                    print(f"[{self.id}] Simulacion finalizada, saliendo...")
+                    break
+                continue
+
+            # PASO 2: Procesar tour asignado
+            self.status = "working"
+            work_orders = tour['work_orders']
+            route_info = tour['route']
+
+            print(f"[{self.id}] t={self.env.now:.1f} Tour asignado: "
+                  f"{len(work_orders)} WOs, distancia: {tour['total_distance']:.1f}")
+
+            # Notificar inicio del primer WO
+            if work_orders:
+                self.almacen.dispatcher.notificar_inicio_trabajo(self, work_orders[0])
+
+            # PASO 3: Visitar cada ubicacion de picking
+            visit_sequence = route_info['visit_sequence']
+            segment_distances = route_info['segment_distances']
+
+            for idx, wo in enumerate(visit_sequence):
+                # Navegar a ubicacion de picking
+                segment_distance = segment_distances[idx] if idx < len(segment_distances) else 0
+                travel_time = segment_distance * TIME_PER_CELL * self.default_speed
+
+                if travel_time > 0:
+                    self.status = "moving"
+                    print(f"[{self.id}] t={self.env.now:.1f} Navegando a {wo.ubicacion} "
+                          f"(dist: {segment_distance:.1f})")
+                    yield self.env.timeout(travel_time)
+
+                # Actualizar posicion
+                self.current_position = wo.ubicacion
+                self.total_distance_traveled += segment_distance
+
+                # Simular picking
+                self.status = "picking"
+                print(f"[{self.id}] t={self.env.now:.1f} Picking en {wo.ubicacion}")
+                yield self.env.timeout(self.discharge_time)
+
+                # Actualizar cargo
+                self.cargo_volume += wo.calcular_volumen_restante()
+
+            # PASO 4: Navegar a staging area para descarga
+            final_segment_distance = segment_distances[-1] if segment_distances else 0
+            travel_time = final_segment_distance * TIME_PER_CELL * self.default_speed
+
+            if travel_time > 0:
+                self.status = "moving"
+                print(f"[{self.id}] t={self.env.now:.1f} Regresando a staging")
+                yield self.env.timeout(travel_time)
+
+            self.current_position = depot_location
+            self.total_distance_traveled += final_segment_distance
+
+            # PASO 5: Descargar
+            self.status = "unloading"
+            print(f"[{self.id}] t={self.env.now:.1f} Descargando en staging")
+            yield self.env.timeout(self.discharge_time)
+            self.cargo_volume = 0
+
+            # PASO 6: Notificar completado
+            self.almacen.dispatcher.notificar_completado(self, work_orders)
+            self.tasks_completed += len(work_orders)
+
+            print(f"[{self.id}] t={self.env.now:.1f} Tour completado, "
+                  f"total completadas: {self.tasks_completed}")
 
 
 class Forklift(BaseOperator):
@@ -226,26 +308,113 @@ class Forklift(BaseOperator):
 
     def agent_process(self):
         """
-        Main SimPy process for forklift
-        This is a placeholder - actual implementation would go here
+        BUGFIX FASE 2: SimPy process real para Forklift
+        Implementa ciclo pull-based con mecanica de elevacion
+
+        Diferencias vs GroundOperator:
+        - Tiempo de elevacion/bajada de horquilla
+        - Velocidad mas lenta (default_speed = 0.8)
         """
+        # Configuracion de simulacion
+        TIME_PER_CELL = 0.1  # Segundos por celda de grid
+        LIFT_TIME = 2.0      # Segundos para elevar/bajar horquilla
+
+        # Inicializar posicion en depot
+        staging_locs = self.almacen.data_manager.get_outbound_staging_locations()
+        depot_location = staging_locs.get(1, (3, 29))  # Staging 1 como depot default
+        self.current_position = depot_location
+
+        print(f"[{self.id}] Proceso iniciado en depot {depot_location}")
+
         while True:
-            # Placeholder process
-            # Real implementation would:
-            # 1. Wait for task assignment from dispatcher
-            # 2. Navigate to pickup location
-            # 3. Lift to appropriate height
-            # 4. Pick items
-            # 5. Lower lift
-            # 6. Navigate to dropoff location
-            # 7. Drop items
-            # 8. Update metrics
+            # PASO 1: Solicitar asignacion de tour
+            self.status = "idle"
+            tour = self.almacen.dispatcher.solicitar_asignacion(self)
 
-            yield self.env.timeout(1.0)
+            if tour is None:
+                # No hay trabajo disponible, esperar
+                yield self.env.timeout(1.0)
 
-            # Check if simulation has ended
-            if self.almacen.simulacion_ha_terminado():
-                break
+                # Verificar si termino la simulacion
+                if self.almacen.simulacion_ha_terminado():
+                    print(f"[{self.id}] Simulacion finalizada, saliendo...")
+                    break
+                continue
+
+            # PASO 2: Procesar tour asignado
+            self.status = "working"
+            work_orders = tour['work_orders']
+            route_info = tour['route']
+
+            print(f"[{self.id}] t={self.env.now:.1f} Tour asignado: "
+                  f"{len(work_orders)} WOs, distancia: {tour['total_distance']:.1f}")
+
+            # Notificar inicio del primer WO
+            if work_orders:
+                self.almacen.dispatcher.notificar_inicio_trabajo(self, work_orders[0])
+
+            # PASO 3: Visitar cada ubicacion de picking
+            visit_sequence = route_info['visit_sequence']
+            segment_distances = route_info['segment_distances']
+
+            for idx, wo in enumerate(visit_sequence):
+                # Navegar a ubicacion de picking
+                segment_distance = segment_distances[idx] if idx < len(segment_distances) else 0
+                travel_time = segment_distance * TIME_PER_CELL * self.default_speed
+
+                if travel_time > 0:
+                    self.status = "moving"
+                    print(f"[{self.id}] t={self.env.now:.1f} Navegando a {wo.ubicacion} "
+                          f"(dist: {segment_distance:.1f})")
+                    yield self.env.timeout(travel_time)
+
+                # Actualizar posicion
+                self.current_position = wo.ubicacion
+                self.total_distance_traveled += segment_distance
+
+                # FORKLIFT SPECIFIC: Elevar horquilla
+                self.status = "lifting"
+                print(f"[{self.id}] t={self.env.now:.1f} Elevando horquilla")
+                yield self.env.timeout(LIFT_TIME)
+                self.set_lift_height(1)  # Altura elevada
+
+                # Simular picking
+                self.status = "picking"
+                print(f"[{self.id}] t={self.env.now:.1f} Picking en {wo.ubicacion}")
+                yield self.env.timeout(self.discharge_time)
+
+                # FORKLIFT SPECIFIC: Bajar horquilla
+                print(f"[{self.id}] t={self.env.now:.1f} Bajando horquilla")
+                yield self.env.timeout(LIFT_TIME)
+                self.set_lift_height(0)  # Altura baja
+
+                # Actualizar cargo
+                self.cargo_volume += wo.calcular_volumen_restante()
+
+            # PASO 4: Navegar a staging area para descarga
+            final_segment_distance = segment_distances[-1] if segment_distances else 0
+            travel_time = final_segment_distance * TIME_PER_CELL * self.default_speed
+
+            if travel_time > 0:
+                self.status = "moving"
+                print(f"[{self.id}] t={self.env.now:.1f} Regresando a staging")
+                yield self.env.timeout(travel_time)
+
+            self.current_position = depot_location
+            self.total_distance_traveled += final_segment_distance
+
+            # PASO 5: Descargar
+            self.status = "unloading"
+            print(f"[{self.id}] t={self.env.now:.1f} Descargando en staging")
+            yield self.env.timeout(self.discharge_time)
+            self.cargo_volume = 0
+
+            # PASO 6: Notificar completado
+            self.almacen.dispatcher.notificar_completado(self, work_orders)
+            self.tasks_completed += len(work_orders)
+
+            print(f"[{self.id}] t={self.env.now:.1f} Tour completado, "
+                  f"total completadas: {self.tasks_completed}")
 
 
 def crear_operarios(env: simpy.Environment, almacen: Any,

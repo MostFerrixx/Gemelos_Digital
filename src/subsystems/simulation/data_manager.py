@@ -13,6 +13,7 @@ Author: Digital Twin Warehouse Team
 Version: V11 - Migration Phase 3
 """
 
+import os
 import openpyxl
 from typing import List, Dict, Tuple, Optional, Any
 from .layout_manager import LayoutManager
@@ -52,7 +53,14 @@ class DataManager:
               f"y archivo de secuencia '{excel_file_path}'...")
 
         self.tmx_file_path = tmx_file_path
-        self.excel_file_path = excel_file_path
+
+        # BUGFIX V11: Resolver ruta relativa del archivo Excel desde raiz del proyecto
+        if not os.path.isabs(excel_file_path):
+            # Obtener raiz del proyecto (3 niveles arriba desde src/subsystems/simulation/)
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+            excel_file_path = os.path.join(project_root, excel_file_path)
+
+        self.excel_file_path = os.path.abspath(excel_file_path)
         self.configuracion = configuracion or {}
 
         # Create LayoutManager first (needed for validation)

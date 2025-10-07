@@ -41,10 +41,12 @@ class ConfigurationManager:
 
         Args:
             config_path: Ruta al archivo de configuracion. Si None, usa 'config.json'
+
+        BUGFIX V11: Busca config.json en raiz del proyecto (2 niveles arriba de src/core/)
         """
         if config_path is None:
-            # Usar config.json en el directorio del proyecto
-            project_root = os.path.dirname(os.path.dirname(__file__))
+            # BUGFIX: Usar config.json en raiz del proyecto (2 niveles arriba de src/core/)
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
             config_path = os.path.join(project_root, "config.json")
 
         self.config_path = config_path

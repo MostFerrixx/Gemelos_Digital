@@ -9,6 +9,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'git'))
 
 import pygame
+import pygame_gui
 import json
 import time
 from datetime import datetime
@@ -35,7 +36,7 @@ from subsystems.visualization.state import (
     obtener_velocidad_simulacion
 )
 from subsystems.visualization.renderer import RendererOriginal, renderizar_diagnostico_layout
-from subsystems.visualization.dashboard import DashboardOriginal
+from subsystems.visualization.dashboard import DashboardOriginal, DashboardGUI
 
 # REFACTOR V11: Config utilities - Necesarios para cargar configuracion
 # ConfigurationManager replaces cargar_configuracion logic
@@ -62,6 +63,8 @@ class ReplayViewerEngine:
         self.pantalla = None
         self.renderer = None
         self.dashboard = None
+        self.dashboard_gui = None  # Nueva instancia de DashboardGUI
+        self.ui_manager = None     # UIManager de pygame_gui
         self.reloj = None
         self.corriendo = True
         self.order_dashboard_process = None
@@ -100,6 +103,61 @@ class ReplayViewerEngine:
         self.reloj = pygame.time.Clock()
         self.renderer = RendererOriginal(self.virtual_surface)
         self.dashboard = DashboardOriginal()
+        
+        # PYGAME_GUI FASE 2.5: Inicializar UIManager y DashboardGUI refactorizada
+        self._inicializar_pygame_gui()
+
+    def _inicializar_pygame_gui(self):
+        """
+        Inicializa pygame_gui UIManager y DashboardGUI refactorizada.
+        
+        FASE 2.5: Integración de DashboardGUI Refactorizada
+        Crea el UIManager cargando el tema JSON y la instancia de DashboardGUI
+        con la nueva arquitectura de layout responsivo.
+        """
+        print("[PYGAME-GUI] Iniciando inicializacion de pygame_gui con DashboardGUI refactorizada...")
+        try:
+            # Crear UIManager con el tamaño de la ventana
+            window_width = self.window_size[0] + 400  # +400 para el panel del dashboard
+            window_height = self.window_size[1]
+            
+            print(f"[PYGAME-GUI] Creando UIManager con tamaño: {window_width}x{window_height}")
+            print(f"[PYGAME-GUI] Tema path: data/themes/dashboard_theme.json")
+            
+            self.ui_manager = pygame_gui.UIManager(
+                (window_width, window_height),
+                theme_path='data/themes/dashboard_theme.json'
+            )
+            
+            print("[PYGAME-GUI] UIManager creado exitosamente")
+            
+            # Crear rectángulo para el dashboard (panel derecho)
+            # FASE 2.5: Usar coordenadas relativas para el dashboard
+            dashboard_rect = pygame.Rect(
+                0,                    # x: coordenada relativa (0)
+                0,                    # y: coordenada relativa (0)
+                400,                  # width: ancho del panel
+                window_height         # height: altura completa
+            )
+            
+            print(f"[PYGAME-GUI] Creando DashboardGUI refactorizada con rect: {dashboard_rect}")
+            
+            # FASE 2.5: Crear instancia de DashboardGUI refactorizada
+            # Esta versión usa DashboardLayoutManager y ResponsiveGrid
+            self.dashboard_gui = DashboardGUI(self.ui_manager, dashboard_rect)
+            
+            print("[PYGAME-GUI] DashboardGUI refactorizada inicializada exitosamente")
+            print(f"[PYGAME-GUI] Dashboard rect: {dashboard_rect}")
+            print("[PYGAME-GUI] Arquitectura de layout responsivo activa")
+            
+        except Exception as e:
+            print(f"[PYGAME-GUI ERROR] Error inicializando pygame_gui: {e}")
+            print(f"[PYGAME-GUI ERROR] Tipo de error: {type(e).__name__}")
+            import traceback
+            print(f"[PYGAME-GUI ERROR] Traceback: {traceback.format_exc()}")
+            print("[PYGAME-GUI] Fallback: Continuando sin pygame_gui")
+            self.ui_manager = None
+            self.dashboard_gui = None
 
     # REFACTOR: Method replaced by ConfigurationManager integration in __init__
     # Original method preserved below (commented out) for reference
@@ -214,8 +272,23 @@ class ReplayViewerEngine:
         while self.corriendo:
             # 1. KEEP: Manejar eventos (siempre necesario)
             for event in pygame.event.get():
+                # PYGAME_GUI FASE 2.5: Procesar eventos pygame_gui
+                if self.ui_manager:
+                    self.ui_manager.process_events(event)
+                
                 if not self._manejar_evento(event):
                     self.corriendo = False
+
+            # 2. PYGAME_GUI FASE 2.5: Actualizar UI Manager y DashboardGUI refactorizada
+            time_delta = self.reloj.tick(30) / 1000.0  # Convertir a segundos
+            if self.ui_manager:
+                self.ui_manager.update(time_delta)
+            
+            # FASE 2.5: Actualizar DashboardGUI refactorizada con estado visual
+            if self.dashboard_gui:
+                # Obtener estado visual actualizado
+                from subsystems.visualization.state import estado_visual
+                self.dashboard_gui.update_data(estado_visual)
 
             # 3. Renderizado - Core para mostrar replay
             self.pantalla.fill((240, 240, 240))  # Fondo gris claro
@@ -234,10 +307,12 @@ class ReplayViewerEngine:
             scaled_surface = pygame.transform.smoothscale(self.virtual_surface, self.window_size)
             self.pantalla.blit(scaled_surface, (0, 0))  # Dibujar el mundo a la izquierda
 
-            # 6. KEEP: Dibujar el dashboard - Modificado para replay
-            # ELIMINATED: renderizar_dashboard(self.pantalla, self.window_size[0], self.almacen, estado_visual["operarios"])
-            # Renderizar dashboard simplificado para replay
-            self._renderizar_dashboard_replay()
+            # 6. PYGAME_GUI FASE 2.5: Dibujar UI de pygame_gui con DashboardGUI refactorizada
+            if self.ui_manager:
+                self.ui_manager.draw_ui(self.pantalla)
+            else:
+                # Fallback: Dashboard original para replay
+                self._renderizar_dashboard_replay()
 
             # 7. ELIMINATED: Verificación de finalización - No simulation to finish
 
@@ -475,18 +550,16 @@ class ReplayViewerEngine:
             print(f"[REPLAY ERROR] No se pudo cargar archivo de replay: {e}")
             return 1
 
-        # Inicializar pygame
+        # Inicializar pygame y pygame_gui
         pygame.init()
-
-        # Crear ventana con espacio para dashboard
+        
+        # Usar el metodo inicializar_pygame() que incluye pygame_gui
+        self.window_size = (960, 1000)  # Establecer tamaño antes de inicializar
+        self.inicializar_pygame()
+        
+        # Variables para compatibilidad con codigo existente
         warehouse_width = 960
         dashboard_width = 380
-        window_width = warehouse_width + dashboard_width
-        window_height = 1000
-        window_size = (window_width, window_height)
-        self.pantalla = pygame.display.set_mode(window_size)
-        pygame.display.set_caption("Simulador de Almacen - Modo Replay")
-        self.reloj = pygame.time.Clock()
 
         # REFACTOR V11: IPC Manager for PyQt6 Dashboard - STUB for smoke test
         # TODO: Implement IPC manager using communication subsystem
@@ -530,7 +603,7 @@ class ReplayViewerEngine:
         virtual_surface = pygame.Surface((warehouse_width, warehouse_width))  # Superficie virtual para el mapa
         self.renderer = RendererOriginal(virtual_surface)
         self.virtual_surface = virtual_surface
-        self.window_size = window_size
+        # self.window_size ya está establecido en inicializar_pygame()
 
         # Inicializar estado visual basico
         inicializar_estado(None, None, configuracion, self.layout_manager)
@@ -554,9 +627,9 @@ class ReplayViewerEngine:
         agentes_iniciales = {}
         for evento in eventos[:10]:  # Solo mirar los primeros eventos
             if evento.get('type') == 'estado_agente':
-                agent_id = evento.get('agent_id')
+                agent_id = evento.get('agent_id')  # BUGFIX: agent_id está en nivel raíz
                 data = evento.get('data', {})
-                if agent_id and 'position' in data:
+                if agent_id and 'position' in data:  # BUGFIX: Buscar position como antes
                     agentes_iniciales[agent_id] = data
 
         # Configurar agentes en estado visual
@@ -692,13 +765,16 @@ class ReplayViewerEngine:
                     print(f"[BUGFIX] Replay pausado - replay_finalizado = {replay_finalizado}")
 
                 if evento.get('type') == 'estado_agente':
-                    agent_id = evento.get('agent_id')
+                    agent_id = evento.get('agent_id')  # BUGFIX: agent_id está en nivel raíz
                     event_data = evento.get('data', {})
                     event_timestamp = evento.get('timestamp', 0.0)
 
                     real_time = time.time()
 
                     if agent_id and event_data:
+                        # DEBUG: Log para confirmar procesamiento correcto
+                        print(f"[DEBUG] Procesando evento estado_agente: agent_id={agent_id}, data_keys={list(event_data.keys())}")
+                        
                         # Inicializar agente si no existe
                         if agent_id not in estado_visual["operarios"]:
                             estado_visual["operarios"][agent_id] = {}
@@ -706,24 +782,21 @@ class ReplayViewerEngine:
                         # CRITICO: Usar .update() para fusionar datos sin perder claves existentes
                         estado_visual["operarios"][agent_id].update(event_data)
 
-                        # BUGFIX 2025-10-05: Recalcular coordenadas pixel desde grid position
-                        # El JSONL contiene coordenadas de esquina (grid_x * 32) en lugar de centro
-                        # Usamos grid_to_pixel() para calcular coordenadas centradas correctas
+                        # BUGFIX: Usar position como en la versión anterior y convertir a píxeles
                         if 'position' in event_data:
                             position = event_data['position']
-                            if isinstance(position, (list, tuple)) and len(position) == 2:
-                                grid_x, grid_y = position[0], position[1]
-
-                                # Recalcular coordenadas pixel centradas
-                                if self.layout_manager:
-                                    pixel_x, pixel_y = self.layout_manager.grid_to_pixel(grid_x, grid_y)
-
-                                    # Sobrescribir coordenadas pixel incorrectas del JSONL
-                                    estado_visual["operarios"][agent_id]['x'] = pixel_x
-                                    estado_visual["operarios"][agent_id]['y'] = pixel_y
-                                else:
-                                    # Fallback si layout_manager no disponible (no deberia ocurrir)
-                                    print(f"[REPLAY-WARNING] layout_manager no disponible para agent {agent_id}")
+                            estado_visual["operarios"][agent_id]['position'] = position
+                            
+                            # Convertir coordenadas de grid a píxeles para renderizado
+                            try:
+                                pixel_x, pixel_y = self.layout_manager.grid_to_pixel(position[0], position[1])
+                                estado_visual["operarios"][agent_id]['x'] = pixel_x
+                                estado_visual["operarios"][agent_id]['y'] = pixel_y
+                            except Exception as e:
+                                print(f"[DEBUG] Error convirtiendo posición {position} a píxeles: {e}")
+                                # Fallback: usar coordenadas originales si hay error
+                                estado_visual["operarios"][agent_id]['x'] = event_data.get('x', 0)
+                                estado_visual["operarios"][agent_id]['y'] = event_data.get('y', 0)
 
                         # BUGFIX: Extraer WorkOrders anidadas en tour_details
                         tour_details = event_data.get('tour_details', [])
@@ -792,7 +865,7 @@ class ReplayViewerEngine:
 
             # BUGFIX 2025-10-05: Escalar uniformemente para mantener proporcion 1:1
             # Calcula ratio uniforme usando el menor dimension disponible
-            scale_ratio = min(warehouse_width / 960.0, window_height / 960.0)
+            scale_ratio = min(warehouse_width / 960.0, self.window_size[1] / 960.0)
             scaled_width = int(960 * scale_ratio)
             scaled_height = int(960 * scale_ratio)
 
@@ -804,10 +877,10 @@ class ReplayViewerEngine:
 
             # Centrar la superficie escalada en el area disponible
             offset_x = (warehouse_width - scaled_width) // 2
-            offset_y = (window_height - scaled_height) // 2
+            offset_y = (self.window_size[1] - scaled_height) // 2
 
             # Llenar fondo del area de warehouse (para bordes si hay)
-            warehouse_rect = pygame.Rect(0, 0, warehouse_width, window_height)
+            warehouse_rect = pygame.Rect(0, 0, warehouse_width, self.window_size[1])
             pygame.draw.rect(self.pantalla, (40, 40, 40), warehouse_rect)
 
             # Blit superficie escalada centrada

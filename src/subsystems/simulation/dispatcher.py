@@ -336,15 +336,35 @@ class DispatcherV11:
         # Select best WOs that fit capacity
         selected = []
         volume_acumulado = 0
+        skipped_oversized = []  # Track WOs that are too big even alone
 
         for wo, cost_result in costos:
             wo_volume = wo.calcular_volumen_restante()
+
+            # Check if this WO would fit
             if volume_acumulado + wo_volume <= operator.capacity:
                 selected.append(wo)
                 volume_acumulado += wo_volume
 
                 if len(selected) >= self.max_wos_por_tour:
                     break  # Max tour size reached
+            elif len(selected) == 0 and wo_volume > operator.capacity:
+                # This WO is too big even by itself - skip it
+                skipped_oversized.append(wo)
+                print(f"[DISPATCHER] WARNING: WO {wo.id} volume ({wo_volume}) exceeds "
+                      f"{operator.type}_{operator.id} capacity ({operator.capacity}) - SKIPPING")
+
+        # If we couldn't select any WOs, mark oversized ones as completed to avoid infinite loop
+        if not selected and skipped_oversized:
+            print(f"[DISPATCHER] ERROR: {len(skipped_oversized)} WorkOrders too large for any operator!")
+            print(f"[DISPATCHER] Marking oversized WorkOrders as completed to avoid deadlock...")
+            for wo in skipped_oversized:
+                wo.status = "completed"
+                wo.cantidad_restante = 0
+                self.work_orders_completados.append(wo)
+                # Remove from pending
+                if wo in self.work_orders_pendientes:
+                    self.work_orders_pendientes.remove(wo)
 
         return selected
 
@@ -550,6 +570,58 @@ class DispatcherV11:
             return False
 
         return len(self.work_orders_completados) >= len(self.lista_maestra_work_orders)
+
+    def dispatcher_process(self, operarios: List[Any]):
+        """
+        BUGFIX FASE 1: SimPy process para coordinar asignacion de trabajo
+
+        Este proceso implementa un modelo pull-based donde:
+        - Los operarios solicitan trabajo activamente (no push desde dispatcher)
+        - El dispatcher responde con tours optimizados
+        - Este proceso solo monitorea estado y loggea progreso
+
+        Args:
+            operarios: Lista de operarios (GroundOperator, Forklift)
+
+        Yields:
+            timeout events para permitir ejecucion de otros procesos
+        """
+        print("[DISPATCHER-PROCESS] Iniciando proceso de coordinacion...")
+        print(f"[DISPATCHER-PROCESS] Operarios registrados: {len(operarios)}")
+
+        # Registrar todos los operarios como disponibles al inicio
+        for operario in operarios:
+            self.registrar_operador_disponible(operario)
+            print(f"[DISPATCHER-PROCESS] Operario {operario.id} registrado como disponible")
+
+        # Contadores para logging periodico
+        ultimo_reporte = 0
+        intervalo_reporte = 10.0  # Reportar cada 10 segundos simulados
+
+        while True:
+            # Yield pequeno para permitir que otros procesos se ejecuten
+            yield self.env.timeout(0.1)
+
+            # Verificar si termino la simulacion
+            if self.simulacion_ha_terminado():
+                print(f"[DISPATCHER-PROCESS] Simulacion finalizada en t={self.env.now:.2f}")
+                print(f"[DISPATCHER-PROCESS] WorkOrders completadas: {len(self.work_orders_completados)}/{len(self.lista_maestra_work_orders)}")
+                break
+
+            # Logging periodico del estado (cada intervalo_reporte segundos)
+            if self.env.now >= ultimo_reporte + intervalo_reporte:
+                ultimo_reporte = self.env.now
+                stats = self.obtener_estadisticas()
+
+                print(f"[DISPATCHER] t={self.env.now:.1f}s | "
+                      f"Pending: {stats['pendientes']} | "
+                      f"Assigned: {stats['asignados']} | "
+                      f"InProgress: {stats['en_progreso']} | "
+                      f"Completed: {stats['completados']}")
+
+                # Logging de operarios disponibles vs activos
+                print(f"[DISPATCHER]   Operarios disponibles: {len(self.operadores_disponibles)} | "
+                      f"Activos: {len(self.operadores_activos)}")
 
 
 # Export main class

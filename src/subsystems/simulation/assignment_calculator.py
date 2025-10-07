@@ -165,7 +165,7 @@ class AssignmentCostCalculator:
         }
 
         # Log calculation (format matches production logs)
-        print(f"[COST-CALC] {operator.tipo}_{operator.id} -> {work_area}: "
+        print(f"[COST-CALC] {operator.type}_{operator.id} -> {work_area}: "
               f"priority={priority_score}, penalty={int(priority_penalty)}, "
               f"distance={int(distance)}, total={int(total_cost)}")
 

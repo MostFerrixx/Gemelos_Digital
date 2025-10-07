@@ -430,6 +430,9 @@ def renderizar_dashboard(pantalla: pygame.Surface,
     """
     Renderiza el panel lateral de dashboard con metricas en tiempo real.
 
+    REFACTORED V11: Esta funcion ahora delega a DashboardOriginal.
+    Mantenida por compatibilidad con codigo existente.
+
     Dibuja directamente en la pantalla principal (no en virtual_surface)
     en la posicion offset_x (lado derecho de la ventana).
 
@@ -456,155 +459,22 @@ def renderizar_dashboard(pantalla: pygame.Surface,
         - Texto negro (COLOR_DASHBOARD_TEXTO)
         - Secciones: Titulo, Metricas Globales, Estado Operarios, Controles
     """
-    # Definir geometria del panel
-    panel_width = 400
-    panel_height = pantalla.get_height()
-    panel_x = offset_x
+    # REFACTOR V11: Delegacion a DashboardOriginal
+    # Crear instancia singleton en primer uso
+    if not hasattr(renderizar_dashboard, '_dashboard_instance'):
+        from .dashboard import DashboardOriginal
+        renderizar_dashboard._dashboard_instance = DashboardOriginal()
+        print("[RENDERER] Dashboard delegando a DashboardOriginal (REFACTOR V11)")
 
-    # Dibujar fondo del panel
-    pygame.draw.rect(pantalla, COLOR_DASHBOARD_BG,
-                    (panel_x, 0, panel_width, panel_height))
+    # Reconstruir estado_visual desde parametros legacy
+    # (para compatibilidad con codigo que llama con firma antigua)
+    estado_visual = {
+        'metricas': metricas_dict,
+        'operarios': {op.get('id', f'op_{i}'): op for i, op in enumerate(operarios_list)}
+    }
 
-    # Dibujar borde izquierdo del panel
-    pygame.draw.line(pantalla, COLOR_DASHBOARD_BORDE,
-                    (panel_x, 0), (panel_x, panel_height), 2)
-
-    # Inicializar fuentes
-    try:
-        font_titulo = pygame.font.Font(None, 28)
-        font_seccion = pygame.font.Font(None, 22)
-        font_texto = pygame.font.Font(None, 18)
-        font_pequeno = pygame.font.Font(None, 16)
-    except:
-        # Fallback si pygame.font falla
-        return
-
-    # Posicion Y actual (se va incrementando)
-    y_pos = 20
-    margen_izq = panel_x + 15
-
-    # =========================================================================
-    # TITULO
-    # =========================================================================
-    titulo = font_titulo.render("METRICAS SIMULACION", True, COLOR_DASHBOARD_TEXTO)
-    pantalla.blit(titulo, (margen_izq, y_pos))
-    y_pos += 40
-
-    # Linea separadora
-    pygame.draw.line(pantalla, COLOR_DASHBOARD_BORDE,
-                    (margen_izq, y_pos), (panel_x + panel_width - 15, y_pos), 1)
-    y_pos += 20
-
-    # =========================================================================
-    # METRICAS GLOBALES
-    # =========================================================================
-    seccion_titulo = font_seccion.render("Metricas Globales", True, COLOR_DASHBOARD_TEXTO)
-    pantalla.blit(seccion_titulo, (margen_izq, y_pos))
-    y_pos += 30
-
-    # Extraer metricas con valores default
-    tiempo_sim = metricas_dict.get('tiempo_simulacion', 0.0)
-    wos_completadas = metricas_dict.get('workorders_completadas', 0)
-    tareas_completadas = metricas_dict.get('tareas_completadas', 0)
-    utilizacion = metricas_dict.get('utilizacion_promedio', 0.0)
-
-    # Renderizar metricas
-    metricas_texto = [
-        f"Tiempo: {tiempo_sim:.1f}s",
-        f"WorkOrders: {wos_completadas}",
-        f"Tareas: {tareas_completadas}",
-        f"Utilizacion: {utilizacion:.1f}%"
-    ]
-
-    for texto in metricas_texto:
-        superficie = font_texto.render(texto, True, COLOR_DASHBOARD_TEXTO)
-        pantalla.blit(superficie, (margen_izq + 10, y_pos))
-        y_pos += 25
-
-    y_pos += 10
-
-    # =========================================================================
-    # ESTADO DE OPERARIOS
-    # =========================================================================
-    seccion_titulo = font_seccion.render("Estado Operarios", True, COLOR_DASHBOARD_TEXTO)
-    pantalla.blit(seccion_titulo, (margen_izq, y_pos))
-    y_pos += 30
-
-    # Contadores de status
-    idle_count = metricas_dict.get('operarios_idle', 0)
-    working_count = metricas_dict.get('operarios_working', 0)
-    traveling_count = metricas_dict.get('operarios_traveling', 0)
-
-    # Resumen de status
-    status_texto = [
-        f"Idle: {idle_count}",
-        f"Trabajando: {working_count}",
-        f"Viajando: {traveling_count}"
-    ]
-
-    for texto in status_texto:
-        superficie = font_texto.render(texto, True, COLOR_DASHBOARD_TEXTO)
-        pantalla.blit(superficie, (margen_izq + 10, y_pos))
-        y_pos += 25
-
-    y_pos += 15
-
-    # Detalles de cada operario (limitar a primeros 10)
-    operarios_mostrar = list(operarios_list)[:10]
-
-    for op in operarios_mostrar:
-        op_id = op.get('id', 'Unknown')
-        op_status = op.get('status', 'idle')
-        op_tareas = op.get('tareas_completadas', 0)
-
-        # Color segun status
-        if op_status == 'idle':
-            color_status = COLOR_AGENTE_IDLE
-        elif op_status == 'working':
-            color_status = COLOR_AGENTE_TRABAJANDO
-        else:
-            color_status = COLOR_AGENTE_MOVIENDO
-
-        # ID del operario
-        id_corto = op_id.split('_')[-1] if '_' in op_id else op_id[-3:]
-        texto_id = font_pequeno.render(f"{id_corto}:", True, COLOR_DASHBOARD_TEXTO)
-        pantalla.blit(texto_id, (margen_izq + 15, y_pos))
-
-        # Status con color
-        texto_status = font_pequeno.render(op_status, True, color_status)
-        pantalla.blit(texto_status, (margen_izq + 70, y_pos))
-
-        # Tareas completadas
-        texto_tareas = font_pequeno.render(f"({op_tareas})", True, COLOR_DASHBOARD_TEXTO)
-        pantalla.blit(texto_tareas, (margen_izq + 160, y_pos))
-
-        y_pos += 20
-
-    y_pos += 15
-
-    # =========================================================================
-    # CONTROLES
-    # =========================================================================
-    # Solo mostrar si hay espacio
-    if y_pos < panel_height - 200:
-        seccion_titulo = font_seccion.render("Controles", True, COLOR_DASHBOARD_TEXTO)
-        pantalla.blit(seccion_titulo, (margen_izq, y_pos))
-        y_pos += 30
-
-        controles_texto = [
-            "ESPACIO - Pausar/Reanudar",
-            "+/- - Velocidad",
-            "D - Toggle Dashboard",
-            "M - Metricas consola",
-            "X - Exportar datos",
-            "R - Reiniciar",
-            "ESC - Salir"
-        ]
-
-        for texto in controles_texto:
-            superficie = font_pequeno.render(texto, True, COLOR_DASHBOARD_TEXTO)
-            pantalla.blit(superficie, (margen_izq + 10, y_pos))
-            y_pos += 20
+    # Delegar renderizado a clase DashboardOriginal
+    renderizar_dashboard._dashboard_instance.renderizar(pantalla, estado_visual, offset_x)
 
 
 def renderizar_diagnostico_layout(surface: pygame.Surface, layout_manager) -> None:

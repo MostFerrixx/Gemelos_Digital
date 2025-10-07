@@ -1,0 +1,18 @@
+# Simulador de Gemelo Digital de Almacen - Dependencias
+# Proyecto V11 Migration - Arquitectura Profesional
+
+# Core dependencies
+pygame>=2.1.4
+simpy>=4.0.1
+pytmx>=3.31
+numpy>=1.21.0
+openpyxl>=3.0.9
+
+# UI Framework - FASE 1: pygame_gui Integration
+pygame_gui>=0.6.0
+
+# Optional dependencies
+python-i18n>=0.3.6
+
+# Development dependencies (optional)
+pytest>=6.0.0

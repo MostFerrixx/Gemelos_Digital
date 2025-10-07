@@ -32,7 +32,7 @@ from subsystems.config.settings import *
 from subsystems.config.colors import *
 from subsystems.simulation.warehouse import AlmacenMejorado
 from subsystems.simulation.operators import crear_operarios
-from analytics_engine import AnalyticsEngine
+from engines.analytics_engine import AnalyticsEngine
 from subsystems.simulation.layout_manager import LayoutManager
 from subsystems.simulation.assignment_calculator import AssignmentCostCalculator
 from subsystems.simulation.data_manager import DataManager
@@ -292,10 +292,11 @@ class SimulationEngine:
                 pygame.init()
                 pygame.display.set_mode((100, 100))  # Ventana temporal para TMX
         
-        # 1. Inicializar LayoutManager con archivo TMX por defecto (OBLIGATORIO)
-        tmx_file = os.path.join(os.path.dirname(__file__), "layouts", "WH1.tmx")
+        # 1. Inicializar LayoutManager con archivo TMX de configuracion (OBLIGATORIO)
+        # BUGFIX V11: Usar ruta de config directamente (LayoutManager resuelve rutas relativas)
+        tmx_file = self.configuracion.get('layout_file', 'data/layouts/WH1.tmx')
         print(f"[TMX] Cargando layout: {tmx_file}")
-        
+
         try:
             self.layout_manager = LayoutManager(tmx_file)
         except Exception as e:
@@ -340,6 +341,7 @@ class SimulationEngine:
             pathfinder=self.pathfinder,          # OBLIGATORIO
             data_manager=self.data_manager,      # NUEVO V2.6
             cost_calculator=self.cost_calculator, # NUEVO V2.6
+            route_calculator=self.route_calculator, # BUGFIX FASE 1: Para DispatcherV11
             simulador=self  # REFACTOR: Pasar referencia del simulador
         )
         

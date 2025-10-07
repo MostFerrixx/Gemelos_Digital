@@ -23,12 +23,23 @@ class LayoutManager:
         Initialize Layout Manager with TMX file
 
         Args:
-            tmx_file_path: Path to TMX map file
+            tmx_file_path: Path to TMX map file (absolute or relative from project root)
 
         Raises:
             FileNotFoundError: If TMX file doesn't exist
             RuntimeError: If TMX file is invalid
+
+        BUGFIX V11: Resolves relative paths from project root
         """
+        # BUGFIX: Si es ruta relativa, resolver desde raiz del proyecto
+        import os
+        if not os.path.isabs(tmx_file_path):
+            # Obtener raiz del proyecto (3 niveles arriba desde src/subsystems/simulation/)
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+            tmx_file_path = os.path.join(project_root, tmx_file_path)
+
+        tmx_file_path = os.path.abspath(tmx_file_path)
+
         print(f"[LAYOUT-MANAGER] Cargando archivo TMX: {tmx_file_path}")
 
         try:

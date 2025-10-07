@@ -1,0 +1,1268 @@
+commit 578039f8b919f65ec7ef24de6ce95c30ae88f80a
+Merge: 8855868 f841bae
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Tue Sep 30 13:29:48 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Tue Sep 30 13:29:48 2025 -0300
+
+    WIP on (no branch): 8855868 feat(ui): Refactor a PyQt6 con dashboard de alto rendimiento en proceso separado
+
+commit f841bae1b04be6b213db018449a56dfac3349b88
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Tue Sep 30 13:29:48 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Tue Sep 30 13:29:48 2025 -0300
+
+    index on (no branch): 8855868 feat(ui): Refactor a PyQt6 con dashboard de alto rendimiento en proceso separado
+
+commit f5832b2e23bcfc882af490d152153f207e5b60bd
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Fri Sep 26 12:08:30 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Fri Sep 26 12:08:30 2025 -0300
+
+    chore(cleanup): Remove obsolete commented code after refactoring
+    
+    Completes the refactoring cycles for ConfigurationManager, AnalyticsExporter, and DashboardCommunicator by removing the legacy code that was preserved as commented blocks.
+    
+    This cleanup removes over 280 lines of dead code from `simulation_engine.py` and `replay_engine.py`, significantly improving readability and maintainability.
+    
+    System integrity and full functionality across all three execution modes have been confirmed with a comprehensive TPRF post-cleanup.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 060b65a85e46b400e92bb8b451ffce70e29edfef
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Fri Sep 26 11:10:17 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Fri Sep 26 11:10:17 2025 -0300
+
+    refactor(engine): Extract DashboardCommunicator from SimulationEngine
+    
+    Continues the dismantling of SimulationEngine by extracting all dashboard communication logic into a new, robust `communication` package.
+    
+    - Implements a professional-grade `DashboardCommunicator` component with explicit process lifecycle management and structured IPC protocols.
+    - The new component has been successfully integrated into the `SimulationEngine`, replacing the legacy implementation.
+    - The functionality has been fully verified via a thorough TPRF in the live simulation context.
+    
+    Note: The `ReplayEngine` has not yet been migrated to this new component and still uses its own legacy dashboard logic. This will be addressed in a future refactoring task.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 20ac90a7a28ced49084cf0761c6ac97678a11388
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Sep 25 23:37:41 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Sep 25 23:37:41 2025 -0300
+
+    refactor(engine): Extract and enhance AnalyticsExporter component
+    
+    Continues the dismantling of SimulationEngine by extracting and significantly enhancing the analytics exporting functionality.
+    
+    - A new `analytics` package has been created.
+    - The `AnalyticsExporterV2` class now encapsulates all logic for generating final simulation artifacts.
+    - Implements the SimulationContext pattern to create a clean data contract between the engine and the exporter.
+    - Implements the ExportResult pattern for robust, structured feedback and error handling.
+    
+    The SimulationEngine is now cleaner and delegates all exporting tasks. Functionality has been fully verified via TPRF.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 1379bc056b6abc5e26c3d8a1f36fcf18d47ee454
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Sep 25 18:03:58 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Sep 25 18:03:58 2025 -0300
+
+    refactor(engine): Extract diagnostic tools to a separate module
+    
+    Continues the incremental dismantling of SimulationEngine by extracting diagnostic functionalities.
+    
+    - A new `utils/diagnostic_tools.py` module has been created.
+    - The `_diagnosticar_route_calculator` method has been moved to this module as a pure function, `diagnosticar_route_calculator(almacen)`, to improve separation of concerns.
+    - The unused legacy method `_diagnosticar_data_manager` has been removed.
+    
+    This change reduces the responsibilities of the SimulationEngine class and improves code modularity. Functionality has been fully verified.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 8dc8c53a3725b664337be2dfd0410ea96f0b9852
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Sep 25 17:21:52 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Sep 25 17:21:52 2025 -0300
+
+    fix(simulation): Restore replay generation pipeline in V10 architecture
+    
+    Fixes a critical regression introduced during the V10.0.0 architectural bifurcation.
+    The live simulation application had lost its ability to generate replay files.
+    
+    This commit restores the complete replay generation pipeline by:
+    - Re-integrating the ReplayBuffer and replay_utils into the SimulationEngine
+    - Repairing broken references in dependent modules
+    - Unifying the output file path and timestamp logic to ensure all simulation artifacts are saved into a single, consistent directory
+    - Adding ConfigurationManager integration for centralized config handling
+    
+    The end-to-end pipeline (simulation -> .jsonl generation -> replay viewing) has been fully validated.
+    
+    Changes:
+    - simulation_engine.py: Restore replay imports, buffer initialization, and unified timestamp logic
+    - core/config_manager.py: Add centralized configuration management
+    - git/: Fix broken module references for event capture
+    - .gitignore: Add V10.0.1 testing artifacts exclusions
+    
+    Closes regression in V10.0.0 bifurcated architecture.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit ed70d86d3e204c0f6582c8746a6e035fe026baef
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Sep 25 04:15:45 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Sep 25 04:15:45 2025 -0300
+
+    refactor(arch): Finalize bifurcation by removing legacy files
+    
+    Completes the architectural bifurcation by removing the legacy `main.py` and `run_simulator.py` files.
+    
+    The new architecture, consisting of separate applications for live simulation and replay viewing, has been fully validated and is now the sole structure of the project.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 836b5e237e82fb5eee532c2ce45a4557119e0f73
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Sep 25 03:56:15 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Sep 25 03:56:15 2025 -0300
+
+    feat(arch): Add new bifurcated simulation and replay applications
+    
+    Introduces the new bifurcated application structure, adding separate, functional executables and engines for live simulation and replay viewing.
+    
+    - `run_live_simulation.py` + `simulation_engine.py`: Application for running new simulations.
+    - `run_replay_viewer.py` + `replay_engine.py`: Application for viewing replay files.
+    
+    This commit establishes a safe checkpoint with both the old and new architectures coexisting. Both new applications have been fully validated via TPRF. The next step will be to remove the legacy files.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit f087c7b0d6e6cd62657324344a03bc4f6295d484
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Wed Sep 24 11:50:13 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Wed Sep 24 11:50:13 2025 -0300
+
+    chore(refactor): Remove dead code from run_simulator.py
+    
+    Completes the refactoring cycle by removing obsolete commented code from `run_simulator.py`.
+    
+    This cleanup removes approximately 577 lines of dead code corresponding to functions and methods that were previously moved to the `core/` modules and `main.py`.
+    
+    The removal improves code readability and maintainability. System integrity and full functionality have been confirmed with a comprehensive TPRF.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 7634171925e08c74b29d8d8cee8051d7c34c028e
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Wed Sep 24 03:13:03 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Wed Sep 24 03:13:03 2025 -0300
+
+    fix(renderer): Correct missing arguments in render calls
+    
+    Fixes a critical crash in the visual simulation mode and restores full rendering functionality.
+    
+    The main bug was a TypeError in `renderizar_tareas_pendientes` caused by calling it with missing arguments. The fix provides the correct list of pending work orders from the dispatcher.
+    
+    During the fix, a similar latent bug was identified and corrected in `renderizar_agentes`, which was also being called incorrectly.
+    
+    Both fixes have been verified with a TPRF, confirming that the visual mode is now fully operational without regressions.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit c3a608ccd15fdba8aee938a3c1839b6a75c10edf
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Wed Sep 24 02:27:18 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Wed Sep 24 02:27:18 2025 -0300
+
+    refactor(core): Separate application entry point to main.py
+    
+    Completes a major architectural refactoring by separating the application's entry point from its core library logic.
+    
+    - The `main()` and `ejecutar_modo_replay()` functions have been moved from `run_simulator.py` to a new `main.py` script.
+    - `run_simulator.py` is now a pure library, containing the `SimuladorAlmacen` class and its supporting methods.
+    - The new entry point `main.py` is responsible for parsing command-line arguments and launching the appropriate simulation mode.
+    
+    This change significantly improves modularity and clarifies the separation of concerns, paving the way for easier testing and future development. The functionality of all three execution modes has been verified via a comprehensive TPRF.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 87e43b86a3e1f7e59d92d99a3d33d10b8b689bc1
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Tue Sep 23 22:27:22 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Tue Sep 23 22:27:22 2025 -0300
+
+    refactor: Modularize utility functions from simulator
+    
+    Inicia la refactorizacion incremental del monolito run_simulator.py para mejorar la modularidad y el mantenimiento a largo plazo.
+    
+    Este commit extrae cuatro funciones de utilidad clave a modulos dedicados, siguiendo un estricto proceso de AUDIT-REFACTOR-TPRF para garantizar cero regresiones.
+    
+    Cambios principales:
+    - Se crea el nuevo modulo `core/config_utils.py`.
+      - Se mueve `_get_default_config` como `get_default_config`.
+      - Se mueve `_mostrar_resumen_config` como `mostrar_resumen_config`.
+    - Se crea el nuevo modulo `core/replay_utils.py`.
+      - Se mueve `agregar_evento_replay`.
+      - Se mueve la funcion critica `volcar_replay_a_archivo`.
+    
+    Todos los cambios han sido verificados con pruebas de regresion focalizadas para asegurar que la funcionalidad del simulador (carga de configuracion y generacion de replay) permanece 100% intacta.
+    
+    Este commit reemplaza al anterior tag V9.1.0 que correspondia a una refactorizacion fallida.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit cec004d337119ad11555dae0becb71c3bdef58c0
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Mon Sep 15 04:50:27 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Mon Sep 15 04:50:27 2025 -0300
+
+    feat(core): Refactor de dominio a 'staged' y añade pausa/velocidad al replay
+    
+    Este commit monumental establece la versión 9.0.0, "Dominio y Control", marcando la culminación de un ciclo de trabajo mayor que ha abarcado tanto el Productor como el Consumidor.
+    
+    Las mejoras clave incluyen:
+    - Un refactor fundamental en el Productor que alinea el modelo de datos con el dominio del negocio, reemplazando el estado 'completed' por 'staged'.
+    - La adición de funcionalidades de control críticas al Replay Viewer: una pausa integral y sincronizada (barra espaciadora) y velocidades de replay expandidas hasta 64x.
+    - Una limpieza final del código, eliminando todos los logs de depuración y puliendo la UI para una experiencia de producción.
+    
+    Con la versión V9.0.0, el Gemelo Digital alcanza un nuevo nivel de madurez, con un modelo de datos más preciso y un control de la simulación sin precedentes.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit afa3630c0fe5d801c09d7984cc401039220af6c3
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Mon Sep 15 01:59:53 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Mon Sep 15 01:59:53 2025 -0300
+
+    feat(replay): Añade pausa integral, velocidad expandida y limpieza de logs
+    
+    Este commit consolida la versión V8.3.0, "Control Total", que representa la culminación del ciclo de mejora del Replay Viewer.
+    
+    Se introducen tres mejoras clave de funcionalidad y calidad:
+    1.  **Pausa Integral:** Se ha implementado un sistema de pausa y reanudación robusto con la barra espaciadora, que congela de forma sincronizada el tiempo, el procesamiento de eventos y las actualizaciones de la UI.
+    2.  **Velocidad Expandida:** Las velocidades de replay se han aumentado hasta 64x para permitir análisis de alta velocidad.
+    3.  **Limpieza de Logs:** Se han eliminado todos los logs de depuración verbosos, dejando una salida de consola limpia y profesional, adecuada para producción.
+    
+    Con esta versión, el Replay Viewer alcanza su estado más avanzado, estable y pulido, cerrando este ciclo de desarrollo y estableciendo una base sólida para futuras expansiones del proyecto.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit c0f3e1e291b0421766cd48101ff776e2d82688f6
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Mon Sep 15 00:46:18 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Mon Sep 15 00:46:18 2025 -0300
+
+    chore: update submodule reference to include V8.2.0 dashboard improvements
+    
+    Updated submodule to include latest commit with progress calculation
+    and column renaming enhancements for the "Inteligencia de Datos" release.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 55c574925f402f4be5bb3dbdd8d150a00866f54f
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Mon Sep 15 00:46:04 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Mon Sep 15 00:46:04 2025 -0300
+
+    feat(ui): Expansión a dashboard de datos completo y pulido final
+    
+    Este commit consolida la versión final "feature-complete" del dashboard
+    de análisis, nombre clave "Inteligencia de Datos".
+    
+    Sobre la base de la arquitectura PyQt6, se han realizado las siguientes
+    expansiones y mejoras finales:
+    - El dashboard ha sido expandido para mostrar más de 16 columnas,
+      exponiendo toda la riqueza de datos disponible en los archivos de replay.
+    - Se han corregido todos los bugs de mapeo de datos conocidos,
+      garantizando la integridad de la información presentada.
+    - Se ha implementado un cálculo de progreso óptimo y se han renombrado
+      todas las columnas para una máxima claridad y usabilidad.
+    
+    La V8.2.0 representa la culminación de nuestro objetivo de crear una
+    herramienta de visualización de "clase mundial", con una funcionalidad
+    y granularidad de datos de nivel profesional. Esta versión contiene logs
+    de depuración detallados que se limpiarán en el próximo ciclo.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 4d58b892c4baa076ff1118be8c6d1eb7a5b53ab7
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Mon Sep 15 00:04:00 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Mon Sep 15 00:04:00 2025 -0300
+
+    feat(ui): Pulido final del dashboard PyQt6 con QSS y datos completos
+    
+    Este commit consolida la versión final y pulida del dashboard "world class" V1, nombre clave "Pulido Profesional".
+    
+    Sobre la base de la robusta arquitectura PyQt6, se han realizado las siguientes mejoras finales:
+    - Se ha aplicado un tema visual QSS personalizado y de alta calidad que le da a la aplicación un aspecto industrial y profesional.
+    - Se ha corregido el mapeo de datos para asegurar que toda la información disponible de la WorkOrder (Agente, Prioridad, Cantidad Restante) se muestre correctamente.
+    - Se ha introducido una lógica de negocio para calcular y mostrar el progreso de cada orden de trabajo, enriqueciendo el análisis visual.
+    
+    Con la versión V8.1.0, el Replay Viewer alcanza un estado de madurez, estabilidad y calidad visual sin precedentes. Este commit cierra el ciclo de trabajo en el Consumidor y establece una base sólida para el próximo ciclo, que se centrará en enriquecer el Productor con nuevos campos de datos.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 8855868661b454b04fb41f64cec33ddb4db9cf69
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Sun Sep 14 21:48:37 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Sun Sep 14 21:48:37 2025 -0300
+
+    feat(ui): Refactor a PyQt6 con dashboard de alto rendimiento en proceso separado
+    
+    Este commit monumental establece la version 8.0.0, "Arquitectura Nativa", y representa un salto cualitativo en la arquitectura de la UI del Gemelo Digital.
+    
+    Se ha reemplazado por completo la UI basada en pygame_gui por una aplicacion de escritorio nativa y de alto rendimiento construida con PyQt6. Esta nueva UI se ejecuta en un proceso separado y se comunica con la simulacion principal a traves de un robusto sistema de IPC basado en colas.
+    
+    Cambios principales:
+    - Elimina completamente pygame_gui del proceso principal
+    - Implementa PyQt6 Dashboard con QTableView + QAbstractTableModel
+    - Sistema IPC robusto con multiprocessing.Queue
+    - Manejador de eventos tecla 'O' completamente refactorizado
+    - Actualizaciones delta O(1) sin reconstruccion de tabla
+    
+    Beneficios clave de esta nueva arquitectura:
+    - Rendimiento extremo gracias a la virtualizacion de scroll nativa de QTableView.
+    - Experiencia de usuario de "clase mundial" con ordenamiento, filtrado y redimensionamiento de columnas nativos.
+    - Estabilidad total al aislar la UI de la simulacion principal, eliminando conflictos de bucles de eventos.
+    
+    Con esta implementacion, el Replay Viewer se consolida como una herramienta de analisis de datos de nivel profesional, cerrando el ciclo de refactorizacion de la UI y estableciendo una base solida para el futuro.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 25605eb0f949e2c0e0d61abfb4d1ccc84efca412
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Sun Sep 14 19:33:18 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Sun Sep 14 19:33:18 2025 -0300
+
+    feat(ui): Implementacion completa de Dashboard v1 con pygame_gui
+    
+    Este commit consolida la primera version completa y estable del nuevo Dashboard de Ordenes, refactorizado para usar la libreria pygame_gui.
+    
+    Se ha alcanzado un estado "feature-complete" que incluye:
+    - Una ventana de dashboard movible y redimensionable.
+    - Scroll persistente que preserva la posicion del usuario durante las actualizaciones.
+    - Ordenamiento de columnas persistente y bidireccional.
+    - Un ciclo de vida de la ventana robusto que maneja el cierre y la reapertura de manera consistente.
+    - Una base estetica profesional a traves de un sistema de theming externo.
+    
+    Esta version V7.1.0 representa un hito en la usabilidad del Replay Viewer y establece una base solida para futuras mejoras de la UI, como la implementacion de una tabla de datos virtualizada de alto rendimiento.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 5c94cdc82027495312d00ec633cbad4a8e36a311
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Sun Sep 14 00:54:21 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Sun Sep 14 00:54:21 2025 -0300
+
+    feat(replay): Implementacion de Dashboard Pygame y Correccion Arquitectonica
+    
+    Este commit marca un hito transformador, culminando la restauracion completa
+    y la mejora fundamental del Replay Viewer (Consumidor). Se introduce la version
+    7.0.0, nombre clave "Visibilidad Total".
+    
+    El cambio principal es la implementacion de un nuevo Dashboard de Ordenes
+    nativo de Pygame, que reemplaza la anterior implementacion inestable. Esta
+    nueva UI es robusta, se basa en un motor de estado persistente que garantiza
+    la integridad de los datos, e incluye una funcionalidad de scroll completa
+    que permite visualizar el 100% de las ordenes.
+    
+    Adicionalmente, se han realizado correcciones arquitectonicas criticas:
+    - Se ha reparado el bucle de tiempo principal para eliminar la perdida de eventos.
+    - Se ha implementado un final de replay controlado que pausa la simulacion al detectar el evento SIMULATION_END.
+    - Se ha normalizado el codigo base a ASCII para mejorar la robustez.
+    
+    Con este commit, el modo replay pasa de ser una herramienta inestable a una
+    plataforma de analisis de datos fiable y funcional, sentando las bases para
+    el desarrollo de futuras funcionalidades de alto nivel.
+    
+    CAMBIOS PRINCIPALES:
+    - Dashboard nativo Pygame con scroll completo (tecla 'O')
+    - Control de finalizacion de replay con SIMULATION_END
+    - Sondas de auditoria para diagnostico de flujo de eventos
+    - Motor de estado continuo para WorkOrders
+    - Normalizacion ASCII completa del codigo fuente
+    - Actualizacion de .gitignore para archivos temporales V7.0.0
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 7167e6a7d2d6195225d7774e1eca738b97d54ebc
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Sat Sep 13 01:05:19 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Sat Sep 13 01:05:19 2025 -0300
+
+    feat(replay): Estabilización y Diagnóstico Arquitectónico Crítico
+    
+    Este commit consolida un ciclo de trabajo intensivo de estabilización y diagnóstico del ecosistema del Gemelo Digital.
+    
+    Se ha logrado una versión funcional y estable del Replay Viewer (Consumidor) que opera de forma segura con una UI multiproceso (Pygame + Tkinter). Se han corregido numerosos bugs que causaban crashes y se han implementado mejoras de UX como los controles de velocidad.
+    
+    Lo más importante es que este ciclo culmina con el descubrimiento, a través de una auditoría exhaustiva, de un defecto arquitectónico fundamental en la lógica del bucle de tiempo del motor de replay. Este defecto es la causa raíz confirmada de la pérdida de datos y las inconsistencias de estado.
+    
+    Este commit marca un punto de guardado estable y crucial antes de proceder con el REFACTOR arquitectónico necesario para corregir el bucle de tiempo.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 495920f76303227c13fe1e796d16902b22b5cff7
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Fri Sep 12 14:56:25 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Fri Sep 12 14:56:25 2025 -0300
+
+    fix(replay): Solve temporal corruption and enable real-time dashboard
+    
+    This commit resolves a critical and persistent bug causing temporal data
+    corruption in replay files. The root cause, incorrect timestamp generation
+    for work_order_update events, has been fixed at the source.
+    
+    The Order Dashboard's data pipeline for Replay mode has been completely
+    refactored. It now runs on a dedicated, decoupled state engine that rebuilds
+    state strictly based on playback_time, ensuring perfect temporal accuracy.
+    
+    As a result, the Order Dashboard is now fully functional in Replay mode,
+    providing a correct initial state and reliable real-time updates. This marks
+    the completion of the dashboard restoration phase.
+    
+    Known Issues for Future Sprints:
+    - The dashboard currently does not display pending WorkOrders, as they
+      transition to assigned almost instantly in the simulation logic.
+    - The WorkOrder state model is simplified; it transitions directly to
+      completed upon picking. A more granular state model (e.g., adding a
+      picked or in_transit state) is a candidate for future business logic
+      refinement.
+    
+    Generated with Claude Code (https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 8766cc9805b7a4e296d4406b7f493887a771e43e
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Fri Sep 12 08:20:02 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Fri Sep 12 08:20:02 2025 -0300
+
+    refactor(replay): Prepare for dashboard state engine redesign
+    
+    This commit captures a stable state after successfully integrating the Order Dashboard UI into the Replay mode. The system is functional but exhibits critical logic bugs related to data timing.
+    
+    Extensive diagnostics have been performed, leading to the definitive root cause: the dashboard's reliance on a globally updated estado_visual that is contaminated with future event data.
+    
+    Strategic Note: This commit serves as a secure rollback point before executing a major architectural refactor. The next phase will replace the current flawed data pipeline with a continuous, decoupled state engine for the dashboard, ensuring temporal accuracy.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit f536ac3dd22a3a8a81f72b815dcbc36907d93cd8
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Sep 11 23:17:28 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Sep 11 23:17:28 2025 -0300
+
+    feat(replay): Integrate multi-process Order Dashboard
+    
+    This commit successfully integrates the existing multi-process Tkinter Order Dashboard into the Pygame-based Replay Viewer. The dashboard can be toggled with the 'O' key.
+    
+    The core architectural challenge of running Pygame and Tkinter event loops concurrently has been solved by leveraging the existing robust multiprocessing architecture.
+    
+    Strategic Note: This version is tagged as an alpha. While functionally integrated, two critical logic bugs have been identified and diagnosed:
+    
+    1. The dashboard initializes with a future state instead of the current playback state.
+    2. Real-time "delta" updates are not being processed correctly.
+    
+    This commit establishes a stable baseline for tackling these final logic fixes.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 383d24d451825aa0c7c00dee09c73ad7778ac935
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Sep 11 17:11:32 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Sep 11 17:11:32 2025 -0300
+
+    feat(architecture): Refactor replay system with centralized buffer and speed controls
+    
+    - Replace global buffer system with ReplayBuffer class using dependency injection
+    - Eliminate all global state dependencies for improved maintainability
+    - Modify agregar_evento_replay to require explicit buffer instances
+    - Propagate simulador references through call chain in all modules
+    - Add comprehensive speed controls (0.25x to 8.0x) with visual feedback
+    - Remove obsolete global buffer code and fallback logic
+    - Enhance .gitignore with replay buffer and speed control test patterns
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 99a50688621cb47f2a7c95ba7da3038cd70a8758
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Sep 11 13:09:37 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Sep 11 13:09:37 2025 -0300
+
+    feat(replay): Full restoration of Replay Viewer and Producer fixes
+    
+    This commit marks a major milestone in the "Restoration" roadmap,
+    achieving a fully functional, albeit architecturally flawed, state.
+    
+    Restores the Replay Viewer from its broken state in v6.2.1 to a
+    runnable application that correctly displays agent movement and
+    WorkOrder progress with a stable progress bar.
+    
+    Fixes a critical regression in the headless Producer, re-enabling
+    the generation of replay.jsonl files.
+    
+    Adds total_work_orders metadata to the SIMULATION_START event to
+    provide a stable denominator for progress calculation.
+    
+    Strategic Note: This version is tagged as an alpha because a
+    deep-rooted architectural issue related to global state management
+    has been identified. The system is functionally complete for this
+    phase, but the next phase will involve a significant refactor to
+    eliminate this global state and ensure long-term stability.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 1cdb64580ff2d15eebf87db4e609c3a1a40f8652
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Tue Sep 9 00:48:53 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Tue Sep 9 00:48:53 2025 -0300
+
+    feat(headless): Implement robust .jsonl replay generation
+    
+    Completes Stage 1 of the "File as API" architecture by enabling the
+    headless mode to generate a comprehensive .jsonl replay file.
+    
+    - Implements an in-memory event buffer to capture all simulation events
+      without impacting performance.
+    - Resolves a critical JSON serialization bug by converting complex
+      objects (e.g., WorkOrder) into a serializable dictionary format
+      before they are added to the buffer.
+    - The headless mode now reliably produces a complete and valid .jsonl
+      file containing thousands of events, suitable for consumption by a
+      future replay viewer.
+    - This feature establishes a clean separation between the simulation
+      engine (Producer) and the visualization layer (Consumer).
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit ca646b6eb0b63a0c3d2e89fa60fb34078c40315b
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Mon Sep 8 01:23:17 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Mon Sep 8 01:23:17 2025 -0300
+
+    feat(headless): Stabilize headless mode and analytics pipeline
+    
+    Implementa la corrección final para el modo de ejecución headless,
+    asegurando una terminación limpia y la ejecución completa del pipeline
+    de analíticas.
+    
+    - Resuelve el deadlock final causado por la gestión incorrecta del
+      ciclo de vida del proceso productor, garantizando que el script
+      principal espere su finalización.
+    - El modo headless ahora es completamente funcional, no deja procesos
+      zombis y devuelve el control a la terminal.
+    - Esto completa la estabilización de la arquitectura V6 "Phoenix
+      Reborn", logrando un estado "Golden Master" para futuras
+      funcionalidades.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 53edb4b93d33f6f903c4bf29cf9b35feb8223a9a
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Sun Sep 7 04:09:52 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Sun Sep 7 04:09:52 2025 -0300
+
+    refactor(core): Desacopla el motor de tiempo SimPy del bucle de renderizado
+    
+    Refactoriza el núcleo del motor de tiempo para una mayor eficiencia, precisión y escalabilidad.
+    
+    ## Cambios Clave:
+    
+    ### Motor de Tiempo Desacoplado (Fase 11)
+    - El reloj de SimPy ya no es forzado a avanzar por el bucle principal de Pygame
+    - Ahora utiliza `env.step()`, operando como un verdadero motor de eventos discretos
+    - Elimina ineficiencias y errores de redondeo del sistema anterior
+    
+    ### Control de Velocidad Dinámico
+    - Implementa sistema de control de velocidad de simulación dinámico
+    - Las teclas +/- modifican un "Factor de Aceleración" (1x a 60x)
+    - Centraliza el control del tiempo através de función wrapper `adelantar_tiempo()`
+    
+    ### TrafficManager para Control de Colisiones
+    - Nueva clase TrafficManager con métodos asíncronos para prevenir colisiones
+    - Sistema compatible con SimPy usando yield para espera no bloqueante
+    - Preparación para integración completa en operadores
+    
+    ### Mejoras del AnalyticsEngine
+    - Refactoriza agregación simple usando duraciones explícitas
+    - Mejora compatibilidad con eventos ricos en duración
+    - Optimiza procesamiento de métricas de rendimiento
+    
+    Este cambio mejora drásticamente el rendimiento potencial y la validez
+    de la simulación, sentando las bases para el modo de ejecución headless.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 73ded632ee6d66a12af4af7fb05a293c4c0448c5
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Sun Sep 7 01:08:49 2025 -0300
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Sun Sep 7 01:08:49 2025 -0300
+
+    feat(simulation): Implementa modelo de tiempo realista y corrige unidades
+    
+    Introduce un modelo de tiempo y velocidad configurable para aumentar el realismo de la simulación. Esta versión permite una calibración detallada del comportamiento de los agentes.
+    
+    Características y Mejoras:
+    - Agrega velocidades configurables para agentes (vacíos y cargados) y tiempos de operación base por parada.
+    - Introduce una escala de mapa (metros/celda) para anclar la simulación a la realidad física.
+    - Extiende la UI "Flota de Agentes" para permitir la configuración de estos nuevos parámetros.
+    - Establece "segundos" como la unidad de tiempo canónica en todo el sistema.
+    
+    Correcciones Críticas:
+    - Soluciona un bug fundamental de inconsistencia de unidades donde el tiempo en segundos se etiquetaba incorrectamente como minutos.
+    - Refactoriza la capa de visualización para mostrar el cronómetro de la simulación en formato HH:MM:SS, mejorando la claridad y la precisión.
+    
+    Este commit establece una base temporalmente coherente, preparando el sistema para futuros refactors del motor de simulación.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 3fea927c23d4b91d39b77bd2ea6898e7b9eed93d
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Sat Aug 30 14:03:44 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Sat Aug 30 14:03:44 2025 -0400
+
+    feat(core): Refactor a modelo WorkArea y UI de Flota Unificada
+    
+    Implementa el refactor arquitectónico V5, reemplazando el sistema de 'level' y 'zone' por un modelo unificado 'WorkGroup/WorkArea' inspirado en estándares de WMS.
+    
+    Características y Refactors Clave:
+    - Centraliza toda la configuración de agentes en una nueva pestaña de UI "Flota de Agentes", permitiendo la definición de grupos con propiedades y prioridades de WA únicas.
+    - Consolida toda la configuración de la flota en una estructura de datos anidada dentro de `config.json`, mejorando la coherencia y eliminando archivos redundantes.
+    - Actualiza el motor de decisión (`AssignmentCostCalculator`) para operar con el nuevo modelo de `WorkArea`.
+    - Corrige el flujo de inicialización para eliminar agentes "fantasma" y asegura que la UI sea la fuente de verdad.
+    - Restaura y actualiza el `OrderDashboard` para que sea compatible con la nueva arquitectura.
+    
+    Este commit marca la transición a la V5, una base más robusta, flexible y realista para futuras simulaciones.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 65150250b12402496f2717a43fd404ca91cdb117
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Fri Aug 29 02:29:49 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Fri Aug 29 02:29:49 2025 -0400
+
+    Actualizar referencia del submódulo git con Dashboard Golden Master V4.2.0
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 43a83533413466193462eaa4ea5d6cd2ddc4961d
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Fri Aug 29 02:27:53 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Fri Aug 29 02:27:53 2025 -0400
+
+    Mejoras en el Dashboard de Órdenes y fix de logs en la Terminal
+    
+    - Dashboard: Implementar ordenamiento interactivo por columnas con arquitectura thread-safe
+    - Dashboard: Agregar bucle de comandos UI desacoplado para funcionalidad post-simulación
+    - Dashboard: Corregir mapeo de columnas Status (índice 4 vs 2) para contadores en tiempo real
+    - Dashboard: Resolver TclError en cierre manual con protocolo de cleanup robusto
+    - Dashboard: Sincronización automática de hibernación para dashboards post-simulación
+    - Terminal: Eliminar bucle infinito de logs "Comprobando cola de datos" tras finalización
+    - Arquitectura: Separar responsabilidades entre bucle de datos (1000ms) y bucle UI (500ms)
+    - Performance: Optimizar OrderedDict para preservar ordenamiento personalizado del usuario
+    - UX: Habilitar funcionalidad completa del dashboard durante y después de la simulación
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 2fb876edb523b678105a32bbc613cc02cf73f919
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Aug 28 20:44:23 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Aug 28 20:44:23 2025 -0400
+
+    Limpiar componentes de interfaz de usuario obsoletos (Optimización de Ruta)
+    
+    - Eliminada sección completa "Optimización de Ruta" del configurador
+    - Removidas variables strategy_var y strategy_options obsoletas
+    - Eliminadas referencias a clave 'strategy' en funciones de carga/guardado
+    - Actualizado comentario "Estrategia de Agrupación" a "Estrategias de Despacho y Tours"
+    - Removido archivo legacy strategies.py con clases obsoletas
+    - Añadidas restricciones .gitignore para archivos de limpieza UI
+    - UI del configurador completamente alineada con arquitectura V4.1.0
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 973fb04c4e463873cebf213008ffb69ce934bf95
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Aug 28 20:08:26 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Aug 28 20:08:26 2025 -0400
+
+    Actualizar referencia del submódulo git con panel de status de pedidos
+
+commit e021a567b0371e3135d306d9973e9bf8b71bcb59
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Aug 28 19:47:52 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Aug 28 19:47:52 2025 -0400
+
+    Crear el panel de status de pedidos y eliminar Método de Construcción de Tours
+    
+    - Añadido tour_id al modelo WorkOrder para trazabilidad completa
+    - Implementado Dashboard de Órdenes con columnas Order ID y Tour ID
+    - Actualizado protocolo de comunicación para incluir order_id y tour_id
+    - Refactorizado estrategias de asignación para asignar tour_id automáticamente
+    - Eliminados componentes UI obsoletos del configurador
+    - Corregido ciclo de vida del widget Tipo de Tour de Picking
+    - Añadidas restricciones adicionales al .gitignore para archivos temporales
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 64959f4ef0a03b1ca3e0205f11e039a9fa1f9364
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Aug 28 12:04:13 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Aug 28 12:04:13 2025 -0400
+
+    Actualizar referencia del submódulo git con WorkOrder Architecture
+
+commit 60c1157a0dcd45f649023637b65f925f818f8667
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Aug 28 12:03:46 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Aug 28 12:03:46 2025 -0400
+
+    Implementar la arquitectura de WorkOrder y el panel de diagnóstico de WO
+    
+    - Migración completa de PickingTask a WorkOrder Architecture V3.0 con picking parcial autónomo
+    - Implementación de clases GroundOperator y Forklift refactorizadas con lógica de picking parcial
+    - Sistema de delta updates para dashboard multiproceso reduciendo latencia de comunicación 98%
+    - Panel de diagnóstico de WorkOrder con visualización en tiempo real de estados (pending/partial/completed)
+    - Corrección de bug de estancamiento en WorkOrders con status 'partial' para reasignación automática
+    - Optimización de comunicación multiproceso con Queue-based messaging y graceful shutdown
+    - Integración de Tour Mixto (multi-destino) con descarga parcial inteligente por staging_id
+    - Sistema de trazabilidad completa de picking executions por agente con histórico preservado
+    - Gestión robusta de terminación de simulación con contadores unificados de WorkOrders
+    - Instrumentación completa de eventos para analytics_engine con métricas de tiempo precisas
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 64713df9d1bf0026c1b3fe380673dcf223578033
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Wed Aug 27 01:16:42 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Wed Aug 27 01:16:42 2025 -0400
+
+    Implementar protocolo formal de rechazo de tareas
+    
+    Cambios principales:
+    - Corregir procesamiento de eventos task_completed en AnalyticsEngine para manejar ambos formatos de ubicación
+    - Actualizar .gitignore con exclusiones para archivos de testing del protocolo de rechazo
+    - Actualizar referencia del submódulo git con implementación del protocolo de rechazo
+    
+    Funcionalidades implementadas:
+    - Protocolo formal de comunicación agente→dispatcher para rechazos por sobrecapacidad
+    - Sistema de reasignación automática de tareas rechazadas
+    - Instrumentación completa de eventos task_rejected para analíticas
+    - Fix del cálculo de tiempo_trabajo en heatmaps Excel
+    
+    El sistema ahora maneja formalmente las tareas que exceden la capacidad de los agentes,
+    evitando pérdidas de datos y proporcionando trazabilidad completa del proceso.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit d6d3748347501a4a63fdc64d1b69eb330a58afc6
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Tue Aug 26 20:31:19 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Tue Aug 26 20:31:19 2025 -0400
+
+    Automatizar y organizar el flujo de trabajo de análisis
+    
+    PARTE 1: Organización de Salidas
+    - Crear estructura de directorios output/simulation_TIMESTAMP/ para archivos generados
+    - Organizar todos los reportes (JSON, Excel, PNG) en subdirectorios únicos
+    - Actualizar pipeline de run_simulator.py para usar rutas organizadas
+    - Implementar método _exportar_eventos_crudos_organizado() con logging estructurado
+    
+    PARTE 2: Instrumentación Completa de Eventos
+    - Instrumentar agentes GroundOperator y Forklift con telemetría detallada
+    - Registrar eventos de movimiento (agent_moved) en cada desplazamiento
+    - Capturar eventos de tareas completadas (task_completed) con métricas completas
+    - Implementar eventos de descarga (discharge_started/completed) con timing preciso
+    - Corregir flujo de datos para resolver bug de "cero eventos" en AnalyticsEngine
+    
+    PARTE 3: Pipeline Automatizado de Análisis TMX + Heatmap
+    - Crear inspect_tmx.py para diagnóstico de estructura de datos geométricos TMX
+    - Implementar visualizer.py para fusión automática TMX + Excel �?PNG
+    - Corregir mapeo de GIDs en tileset (GID 4 = muros, no GID 2)
+    - Establecer diccionario visual definitivo de tipos de tiles con colores diferenciados
+    
+    RESULTADO: Pipeline completo "un clic" que genera automáticamente:
+    - Reportes ejecutivos en Excel con heatmaps visuales
+    - Imágenes PNG geométricas del almacén con actividad espacial
+    - Todos los archivos organizados en directorios timestamped
+    - Telemetría completa de agentes durante la simulación
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 46f8e2cecc3794c94c3f0787ead55d5d45696c4e
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Tue Aug 26 03:11:52 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Tue Aug 26 03:11:52 2025 -0400
+
+    Actualizar referencia del submódulo git con limpieza de analytics_engine
+
+commit a14dd409ab1ba29df272e474c5a48253e1ad59c6
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Tue Aug 26 03:11:45 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Tue Aug 26 03:11:45 2025 -0400
+
+    Agregar generación de mapas de calor visuales en Excel
+    
+    - Trasladar analytics_engine.py al directorio principal como herramienta independiente
+    - Implementar desacoplamiento completo para post-procesamiento de eventos
+    - Agregar funcionalidad de heatmap visual con formato condicional Excel
+    - Actualizar .gitignore para excluir archivos de prueba de analytics
+    - Soporte para ejecución standalone: python analytics_engine.py input.json output.xlsx
+    
+    Nueva funcionalidad incluye:
+    �?Método from_json_file() para carga independiente de eventos
+    �?Hoja VisualHeatmap con matriz 2D coloreada automáticamente
+    �?Formato condicional Verde-Amarillo-Rojo basado en intensidad de actividad
+    �?CLI completa con argparse y manejo de errores robusto
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 2ccb817f5cb8fbe2df3ee246e83cde58d9923b98
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Tue Aug 26 01:25:24 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Tue Aug 26 01:25:24 2025 -0400
+
+    Actualizar referencia del submódulo git con métricas de tiempo precisas
+
+commit edb196ff0e190164e74805221fe4c676bfc8cd77
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Tue Aug 26 01:25:13 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Tue Aug 26 01:25:13 2025 -0400
+
+    Implementar métricas de tiempo precisas en AnalyticsEngine
+    
+    - Integrar AnalyticsEngine en configurador y simulador principal
+    - Actualizar .gitignore para excluir reportes PDF y archivos temporales
+    - Soporte completo para generación automática de reportes Excel
+    - Exportación de eventos crudos en formato JSON para análisis avanzado
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 719401a9d0f28e2500517ae8acccdcff4215886a
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Mon Aug 25 15:41:15 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Mon Aug 25 15:41:15 2025 -0400
+
+    Implementar y estabilizar la lógica de los recorridos mixtos (multidestino)
+    
+    - Refactorizar bucle de picking de agentes para evitar errores de capacidad
+    - Implementar lógica 'comprobar primero, recoger después' en operators.py
+    - Corregir error crítico 'No se encontró ubicación de descarga' en Tour Mixto
+    - Añadir manejo robusto de tareas imposibles y descarga parcial inteligente
+    - Eliminar código de rollback complejo y simplificar flujo de control
+    - Limpiar logs detallados y optimizar dispatcher
+    
+    Tour Mixto ahora funciona correctamente para GroundOperator y Forklift.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 5545d5d2efe4db24fc0993ec3b9da3628549a693
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Sun Aug 24 23:27:59 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Sun Aug 24 23:27:59 2025 -0400
+
+    Consolidación de los botones de acción e implementación de páginas desplazables
+    
+    - Eliminadas referencias obsoletas a bottom_frame en configurator.py
+    - Removido método _modificar_botones obsoleto
+    - Actualizado .gitignore para archivos temporales de Microsoft Office
+    - Consolidada funcionalidad de UI en window_config.py para mejor mantenimiento
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit d937a543668dac85a3e8b3cb5c7414b0cf8c0b74
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Sun Aug 24 20:10:41 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Sun Aug 24 20:10:41 2025 -0400
+
+    Añade la característica de operaciones multi-depot con Outbound Staging
+    
+    - Implementa distribución de órdenes por staging_id usando configuración UI
+    - Añade tours homogéneos que respetan el destino de staging
+    - Integra lógica de retorno dinámico de agentes por staging area
+    - Actualiza configurador con controles de OutboundStaging distribution
+    - Migra referencias depot hacia sistema DataManager outbound_staging_locations
+    - Incluye datos de staging en Warehouse_Logic.xlsx con 7 áreas configurables
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit a21617130273c27cfddb4398dc9da9315567b1f9
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Sun Aug 24 13:14:25 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Sun Aug 24 13:14:25 2025 -0400
+
+    Migrar la fuente de datos de CSV al formato XLSX de varias hojas
+    
+    - Refactorizar DataManager para leer archivos Excel con hoja específica
+    - Crear archivo Warehouse_Logic.xlsx como nueva fuente de verdad
+    - Migrar 360 registros desde WH1_sequence.csv a hoja 'PickingLocations'
+    - Actualizar configuraciones por defecto para usar formato Excel
+    - Añadir dependencias pandas y openpyxl para procesamiento Excel
+    - Mantener compatibilidad hacia atrás con CSV (marcado como legacy)
+    
+    Preparación para soporte de múltiples hojas en futuras fases:
+    - OutboundStaging, InboundStaging, etc.
+    - Estructura escalable para lógica compleja de almacén
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 3a3c0c503f3964284b66b53b5f88c610feaec756
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Sat Aug 23 20:28:38 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Sat Aug 23 20:28:38 2025 -0400
+
+    Añade la característica de desacoplar la UI de configuración del ejecutable de la simulación
+    
+    - Crea configurator.py como herramienta independiente de configuración
+    - Modifica run_simulator.py para modo automatizado sin UI interactiva
+    - Añade soporte para carga automática de config.json
+    - Implementa configuración por defecto hardcodeada como fallback
+    - Mejora .gitignore para excluir archivos temporales y de testing
+    - Añade archivo WH1_sequence.csv requerido para funcionamiento
+    
+    Separación clara entre configuración (configurator.py) y ejecución (run_simulator.py)
+    Facilita automatización y uso programático del simulador
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 8ed8a6fb4d60932254589339c7fd2093378ca9ca
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Sat Aug 23 01:40:36 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Sat Aug 23 01:40:36 2025 -0400
+
+    Finalizar y auditar la lógica de GlobalCostStrategy
+    
+    Actualiza submodule git con implementación completa del modelo de estrategia dual:
+    
+    🔄 Estrategias disponibles:
+    - SequentialPlanStrategy: Sigue secuencia CSV estrictamente (rápida, predecible)
+    - GlobalCostStrategy: Optimización por menor costo global (distancia + penalizaciones)
+    
+    🎯 Funcionalidades implementadas:
+    - Selector UI en pestaña "Recursos y Estrategia"
+    - Dispatcher dinámico que instancia estrategia según elección del usuario
+    - Auditoría completa con logging detallado de evaluación de costos
+    - Cálculo optimizado: distancia Manhattan + penalizaciones de prioridad
+    
+    📊 Flujo de optimización:
+    Evalúa todos los agentes �?Selecciona menor costo �?Construye tour consecutivo
+    
+    Esta versión permite al usuario elegir entre eficiencia computacional (Plan)
+    o optimización espacial (Costo Global) según las necesidades de simulación.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 09c0b4602c2360c0ad87769b6aef590540719c78
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Sat Aug 23 01:11:32 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Sat Aug 23 01:11:32 2025 -0400
+
+    Version de base estable con SequentialPlanStrategy
+    
+    Actualiza submodule git con mejoras de arquitectura:
+    - Patrón Strategy implementado para algoritmos de batching
+    - KPIs de dashboard corregidos (tareas_completadas_count)
+    - Lógica de terminación robusta (tareas vacías + agentes ociosos)
+    - Métodos esta_ocioso() en agentes para control de estado
+    - Actualiza .gitignore para excluir archivos de test temporales
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit d76662c5a8e472696bc3addd89bbcfc6c144d549
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Fri Aug 22 03:38:38 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Fri Aug 22 03:38:38 2025 -0400
+
+    version previa a Preparar el código base para las estrategias de procesamiento por lotes conectables.
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 361b76e78c1251e913e1e0aaae62486d24cfc439
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Wed Aug 20 16:35:47 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Wed Aug 20 16:35:47 2025 -0400
+
+    Estrategia de Línea Base Orden por Orden
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 54f8443b11c566802395008759cd12f2197b04e1
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Tue Aug 19 14:42:23 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Tue Aug 19 14:42:23 2025 -0400
+
+    Actualiza referencia del submodule git con mejoras de UI y configuración
+    
+    - Rediseño completo de interfaz con pestañas
+    - Sistema robusto de estilos TTK
+    - Conexión completa UI-Simulación
+    - Correcciones de referencias obsoletas
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 64859487a0996ce6969e0d2af8bdcb95a90c74ff
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Tue Aug 19 11:57:05 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Tue Aug 19 11:57:05 2025 -0400
+
+    Implementa sistema de órdenes con SKU y corrige problemas de rendimiento
+    
+    - Transforma tareas básicas en órdenes profesionales (producto + cantidad + ubicación)
+    - Resuelve deadlocks que congelaban la simulación
+    - Optimiza inicialización del inventario (200x mejora)
+    - Actualiza interfaz para mostrar estadísticas de órdenes
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 40911947d90abf670d861f19e2ffdebce7348da0
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Mon Aug 18 22:31:47 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Mon Aug 18 22:35:11 2025 -0400
+
+    Version 2.0 con el uso de TMX funcionando correctamente
+
+commit ea1333ed3b7e3d9a52f5f588e9d91fdc3bf5ddf0
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Mon Aug 18 22:31:08 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Mon Aug 18 22:31:08 2025 -0400
+
+    Interfaz de Operaciones con Trazabilidad: Sistema completo de visualización de rutas
+    
+    - FEAT: Colores centralizados para tipos de agente (Verde: GroundOperator, Naranja: Forklift)
+    - FEAT: Tracking detallado de estado de tours (pending/completed) en tiempo real
+    - FEAT: Renderizador de tareas con trazabilidad visual completa
+    - FEAT: Dashboard lateral con información detallada de agentes
+    - FEAT: Líneas de ruta conectando agentes con tareas pendientes
+    - FEAT: Numeración secuencial de tareas pendientes
+    - FEAT: Indicadores visuales diferenciados por estado (completado/pendiente)
+    
+    TECHNICAL:
+    - Centralización de AGENT_TYPE_COLORS en config/colors.py
+    - Mejoras en operators.py con tour_details tracking
+    - Sistema de renderizado extensible y modular
+    - Limpieza de archivos obsoletos de pruebas y desarrollo
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit 67cebefca3311e95add133b7c069334b63403dee
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Fri Aug 15 00:25:45 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Fri Aug 15 00:25:45 2025 -0400
+
+    Añadir instrucciones de instalación v1.0-stable
+    
+    - Guía completa de instalación y configuración
+    - Documentación de arquitectura TMX unificada
+    - Controles del simulador y pruebas disponibles
+    - Resolución de problemas comunes
+    - Changelog detallado v1.0-stable
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit b0a79f1d80bdd50401f266644fb23e613d10217f
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Fri Aug 15 00:20:01 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Fri Aug 15 00:20:01 2025 -0400
+
+    FINAL: TMX unificado, coordenadas centradas, matriz colisión corregida, navegación funcional
+    
+    - Matriz de colisión lee walkable='true'/'false' correctamente
+    - Depot encontrado automáticamente desde tiles TMX
+    - Coordenadas centradas en tiles (grid_to_pixel + tile_size/2)
+    - Renderer simplificado (siempre modo TMX 1:1)
+    - Operarios no atraviesan racks ni van a (0,0)
+    - Cache limpiado y entorno sincronizado
+    - Sistema 100% TMX sin fallbacks
+    
+    🤖 Generated with [Claude Code](https://claude.ai/code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+commit e436bac8e855fb29997000c05f5054f203ed4922
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Thu Aug 14 17:44:34 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Thu Aug 14 17:44:34 2025 -0400
+
+    Version transitoria, correcciones y mejoras en el sistema TMX, pero aún en fase de pruebas
+
+commit a20f647e7e137055344f6cf03455d72cefce3cb3
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Wed Aug 13 12:10:14 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Wed Aug 13 12:10:14 2025 -0400
+
+    FASE 0 COMPLETADA: Documentación y preparación para migración Tiled+PyTMX
+
+commit ed4f925bcd382f0b4ced83dafe85ef1ae7da67b2
+Author:     ferrixx <MostFerrixx@users.noreply.github.com>
+AuthorDate: Wed Aug 13 12:04:03 2025 -0400
+Commit:     ferrixx <MostFerrixx@users.noreply.github.com>
+CommitDate: Wed Aug 13 12:04:03 2025 -0400
+
+    BACKUP: Estado original del proyecto antes de migración a Tiled+PyTMX
+

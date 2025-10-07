@@ -37,6 +37,10 @@ simulation_report_*.xlsx
 !layouts/custom_tileset_mapping.json
 !layouts/layouts_personalizados.json
 !tilesets/tileset_metadata.json
+!config.json
+!requirements.txt
+!dashboard_theme.json
+!setup.py
 
 # Configuración de Claude Code
 .claude/
@@ -68,9 +72,9 @@ temp/
 tmp/
 
 # Archivos de configuración personal/temporal
-config.json
 config_temp.json
 settings_local.py
+# NOTA: config.json es crítico y NO debe ignorarse
 
 # Screenshots y videos de prueba
 screenshots/
@@ -138,8 +142,11 @@ documentacion_temporal/
 
 # Archivos de configuración específicos del usuario (ya existía config.json)
 # Añadiendo patrones adicionales para evitar commits accidentales de configuraciones locales
-config_*.json
+config_*test*.json
+config_*backup*.json
+config_*validation*.json
 *.config.json
+# NOTA: config.json principal NO debe ignorarse
 
 # Archivos temporales del dashboard de órdenes
 dashboard_*.log
@@ -404,6 +411,7 @@ PyQt6-*.whl
 *_requirements_*.txt
 venv_pyqt6/
 qt_env/
+# NOTA: requirements.txt es crítico y NO debe ignorarse
 
 # Archivos temporales de testing UI nativa
 native_ui_test_*.py
