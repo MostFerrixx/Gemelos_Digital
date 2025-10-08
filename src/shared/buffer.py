@@ -1,10 +1,10 @@
 """
-Simulation Buffer - Gestión de estado de eventos de replay
+Simulation Buffer - Gestion de estado de eventos de replay
 
-Este módulo proporciona una clase para gestionar de manera explícita 
-el buffer de eventos de replay, reemplazando el estado global problemático.
+Este modulo proporciona una clase para gestionar de manera explicita 
+el buffer de eventos de replay, reemplazando el estado global problematico.
 
-Versión: 1.0.0
+Version: 1.0.0
 Autor: Claude Code Assistant
 Fecha: 2025-09-11
 """
@@ -14,11 +14,11 @@ from typing import List, Dict, Any
 
 class ReplayBuffer:
     """
-    Gestiona el buffer de eventos para replay de manera explícita.
+    Gestiona el buffer de eventos para replay de manera explicita.
     
-    Esta clase encapsula la gestión de eventos de replay, eliminando
+    Esta clase encapsula la gestion de eventos de replay, eliminando
     la dependencia de variables globales que causaban problemas de
-    referencias múltiples y pérdida de eventos.
+    referencias multiples y perdida de eventos.
     
     Attributes:
         _events (List[Dict[str, Any]]): Lista privada de eventos almacenados
@@ -26,16 +26,16 @@ class ReplayBuffer:
     
     def __init__(self):
         """
-        Inicializa un buffer de eventos vacío.
+        Inicializa un buffer de eventos vacio.
         """
         self._events: List[Dict[str, Any]] = []
     
     def add_event(self, event: Dict[str, Any]) -> None:
         """
-        Añade un nuevo evento al buffer.
+        Anade un nuevo evento al buffer.
         
         Args:
-            event (Dict[str, Any]): Evento a añadir al buffer
+            event (Dict[str, Any]): Evento a anadir al buffer
         """
         self._events.append(event)
     
@@ -56,18 +56,18 @@ class ReplayBuffer:
     
     def __len__(self) -> int:
         """
-        Obtiene el número de eventos en el buffer.
+        Obtiene el numero de eventos en el buffer.
         
         Returns:
-            int: Número total de eventos almacenados
+            int: Numero total de eventos almacenados
         """
         return len(self._events)
     
     def __repr__(self) -> str:
         """
-        Representación string del buffer para debugging.
+        Representacion string del buffer para debugging.
         
         Returns:
-            str: Representación del estado actual del buffer
+            str: Representacion del estado actual del buffer
         """
         return f"ReplayBuffer(events={len(self._events)})"

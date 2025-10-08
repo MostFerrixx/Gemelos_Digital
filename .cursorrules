@@ -1,0 +1,47 @@
+# 🚨 REGLAS OBLIGATORIAS DE DOCUMENTACIÓN PARA CURSOR
+
+## CONTEXTO DEL PROYECTO:
+- Proyecto: Simulador de Gemelo Digital de Almacén
+- Rama: reconstruction/v11-complete
+- Estado: Sistema 100% funcional, dashboard pygame_gui integrado completamente
+
+## REGLAS OBLIGATORIAS:
+
+### AL INICIAR CADA SESIÓN (OBLIGATORIO):
+1. **LECTURA AUTOMÁTICA** de archivos clave en orden:
+   - CURSOR_DOCUMENTATION_RULES.md
+   - ACTIVE_SESSION_STATE.md  
+   - HANDOFF.md
+   - INSTRUCCIONES.md
+
+2. **VERIFICACIÓN** del estado real: git status && git log --oneline -3
+
+3. **IDENTIFICACIÓN** de contexto actual y próxima acción
+
+4. **RESUMEN** del estado para el usuario
+
+5. **CONFIRMACIÓN** de que estás listo para recibir instrucciones
+
+### DURANTE LA SESIÓN:
+- Actualizar ACTIVE_SESSION_STATE.md al completar fases
+- Documentar problemas encontrados inmediatamente
+- Actualizar próxima acción cuando cambie el enfoque
+- Actualizar HANDOFF.md si completas fase importante
+- Actualizar INSTRUCCIONES.md si cambias algo técnico
+
+### AL FINALIZAR SESIÓN (OBLIGATORIO):
+- Actualizar ACTIVE_SESSION_STATE.md con estado real
+- Marcar fases completadas como ✅
+- Definir próxima acción claramente
+- Ejecutar checklist de validación obligatorio
+
+## ARCHIVOS CLAVE:
+- ACTIVE_SESSION_STATE.md - Contexto inmediato
+- HANDOFF.md - Estado del proyecto
+- INSTRUCCIONES.md - Instrucciones técnicas
+- CURSOR_DOCUMENTATION_RULES.md - Reglas completas
+
+## OBJETIVO:
+Garantizar que cada nueva sesión pueda continuar exactamente donde quedó la anterior, sin pérdida de contexto.
+
+ESTAS REGLAS SON OBLIGATORIAS Y NO TIENEN EXCEPCIONES.

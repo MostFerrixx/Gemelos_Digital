@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Analytics Engine para generar reportes ejecutivos en Excel.
-Procesa eventos de simulación y calcula métricas clave de rendimiento.
+Procesa eventos de simulacion y calcula metricas clave de rendimiento.
 """
 
 import pandas as pd
@@ -13,15 +13,15 @@ from openpyxl.formatting.rule import ColorScaleRule
 
 
 class AnalyticsEngine:
-    """Motor de analíticas para generar reportes ejecutivos a partir de eventos de simulación"""
+    """Motor de analiticas para generar reportes ejecutivos a partir de eventos de simulacion"""
     
     def __init__(self, event_log: list, config: dict):
         """
-        Inicializa el motor de analíticas.
+        Inicializa el motor de analiticas.
         
         Args:
-            event_log: Lista de eventos capturados durante la simulación
-            config: Configuración utilizada en la simulación
+            event_log: Lista de eventos capturados durante la simulacion
+            config: Configuracion utilizada en la simulacion
         """
         self.event_log = event_log
         self.config = config
@@ -49,16 +49,16 @@ class AnalyticsEngine:
             with open(json_filepath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # Extraer eventos y configuración del archivo JSON
+            # Extraer eventos y configuracion del archivo JSON
             if isinstance(data, dict):
                 # Formato: {"events": [...], "config": {...}}
                 event_log = data.get('events', [])
                 config = data.get('config', {})
             elif isinstance(data, list):
-                # Formato: Lista directa de eventos (sin configuración embebida)
+                # Formato: Lista directa de eventos (sin configuracion embebida)
                 event_log = data
                 config = {}
-                print("[ANALYTICS-ENGINE] ADVERTENCIA: No se encontró configuración en el archivo JSON")
+                print("[ANALYTICS-ENGINE] ADVERTENCIA: No se encontro configuracion en el archivo JSON")
             else:
                 raise ValueError("Formato de archivo JSON no reconocido")
             
@@ -77,11 +77,11 @@ class AnalyticsEngine:
     
     def process_events(self):
         """
-        Método principal que procesa todos los eventos y calcula métricas.
+        Metodo principal que procesa todos los eventos y calcula metricas.
         """
         print("[ANALYTICS-ENGINE] Procesando eventos...")
         
-        # Convertir eventos a DataFrame para facilitar análisis
+        # Convertir eventos a DataFrame para facilitar analisis
         if not self.event_log:
             print("[ANALYTICS-ENGINE] ADVERTENCIA: No hay eventos para procesar")
             return
@@ -89,7 +89,7 @@ class AnalyticsEngine:
         self.events_df = pd.DataFrame(self.event_log)
         print(f"[ANALYTICS-ENGINE] DataFrame creado con {len(self.events_df)} filas")
         
-        # Calcular métricas
+        # Calcular metricas
         self.summary_kpis = self._calculate_summary_kpis()
         self.agent_performance = self._calculate_agent_performance()
         self.heatmap_data = self._calculate_heatmap_data()
@@ -98,17 +98,17 @@ class AnalyticsEngine:
     
     def _calculate_summary_kpis(self) -> pd.DataFrame:
         """
-        Calcula las métricas clave para la hoja "Resumen Ejecutivo".
+        Calcula las metricas clave para la hoja "Resumen Ejecutivo".
         
         Returns:
-            DataFrame con métricas de resumen ejecutivo
+            DataFrame con metricas de resumen ejecutivo
         """
         print("[ANALYTICS-ENGINE] Calculando KPIs de resumen ejecutivo...")
         
         if self.events_df is None or self.events_df.empty:
             return pd.DataFrame()
         
-        # Tiempo total de simulación - CORREGIDO: timestamps están en segundos
+        # Tiempo total de simulacion - CORREGIDO: timestamps estan en segundos
         tiempo_inicio = self.events_df['timestamp'].min()
         tiempo_fin = self.events_df['timestamp'].max()
         tiempo_total_sim = tiempo_fin - tiempo_inicio
@@ -126,8 +126,8 @@ class AnalyticsEngine:
         
         # Crear DataFrame de resumen
         summary_data = {
-            'Métrica': [
-                'Tiempo Total de Simulación (horas)',
+            'Metrica': [
+                'Tiempo Total de Simulacion (horas)',
                 'Total de Tareas Completadas',
                 'Productividad (Tareas/Hora)',
                 'Tiempo de Inicio (sim)',
@@ -143,26 +143,26 @@ class AnalyticsEngine:
         }
         
         summary_df = pd.DataFrame(summary_data)
-        print(f"[ANALYTICS-ENGINE] KPIs calculados: {len(summary_df)} métricas")
+        print(f"[ANALYTICS-ENGINE] KPIs calculados: {len(summary_df)} metricas")
         return summary_df
     
     def _calculate_agent_performance(self) -> pd.DataFrame:
         """
-        REFACTOR: Calcula las métricas de rendimiento por agente usando agregación simple
+        REFACTOR: Calcula las metricas de rendimiento por agente usando agregacion simple
         de los nuevos eventos ricos (trip_completed, operation_completed, work_order_completed).
         
         Returns:
-            DataFrame con métricas de rendimiento por agente
+            DataFrame con metricas de rendimiento por agente
         """
-        print("[ANALYTICS-ENGINE] Calculando rendimiento de agentes con nueva lógica simplificada...")
+        print("[ANALYTICS-ENGINE] Calculando rendimiento de agentes con nueva logica simplificada...")
         
         if self.events_df is None or self.events_df.empty:
             return pd.DataFrame()
         
-        # Tiempo total de simulación para cálculo de tiempo ocioso
+        # Tiempo total de simulacion para calculo de tiempo ocioso
         tiempo_total_simulacion = self.events_df['timestamp'].max() - self.events_df['timestamp'].min()
         
-        # Obtener lista única de agentes
+        # Obtener lista unica de agentes
         agent_ids = self.events_df['agent_id'].unique()
         performance_data = []
         
@@ -170,25 +170,25 @@ class AnalyticsEngine:
             # Filtrar eventos por agente
             agent_events = self.events_df[self.events_df['agent_id'] == agent_id]
             
-            # NUEVA LÓGICA: Contar work_orders completadas por agente
+            # NUEVA LOGICA: Contar work_orders completadas por agente
             work_order_events = agent_events[agent_events['event_type'] == 'work_order_completed']
             tareas_completadas = len(work_order_events)
             
-            # NUEVA LÓGICA: Sumar duraciones de trip_completed para tiempo de viaje
+            # NUEVA LOGICA: Sumar duraciones de trip_completed para tiempo de viaje
             trip_events = agent_events[agent_events['event_type'] == 'trip_completed']
             tiempo_viaje_total = 0
             for _, event in trip_events.iterrows():
                 if 'data' in event and event['data'] and 'duration' in event['data']:
                     tiempo_viaje_total += event['data']['duration']
             
-            # NUEVA LÓGICA: Sumar duraciones de operation_completed para tiempo de picking
+            # NUEVA LOGICA: Sumar duraciones de operation_completed para tiempo de picking
             operation_events = agent_events[agent_events['event_type'] == 'operation_completed']
             tiempo_picking_total = 0
             for _, event in operation_events.iterrows():
                 if 'data' in event and event['data'] and 'duration' in event['data']:
                     tiempo_picking_total += event['data']['duration']
             
-            # Tiempo de descarga (mantener lógica existente para discharge_completed)
+            # Tiempo de descarga (mantener logica existente para discharge_completed)
             tiempo_descarga_total = 0
             discharge_completed_events = agent_events[agent_events['event_type'] == 'discharge_completed']
             for _, event in discharge_completed_events.iterrows():
@@ -201,7 +201,7 @@ class AnalyticsEngine:
             # Calcular tiempo ocioso
             tiempo_ocioso = max(0, tiempo_total_simulacion - tiempo_total_activo)
             
-            # Utilización de capacidad (mantener lógica existente)
+            # Utilizacion de capacidad (mantener logica existente)
             discharge_events = agent_events[agent_events['event_type'] == 'discharge_started']
             utilizacion_capacidad_promedio = 0
             if not discharge_events.empty:
@@ -244,8 +244,8 @@ class AnalyticsEngine:
     
     def _calculate_heatmap_data(self) -> pd.DataFrame:
         """
-        Calcula los datos necesarios para generar heatmaps de actividad en el almacén.
-        Analiza tiempo de tránsito y tiempo de trabajo por coordenada.
+        Calcula los datos necesarios para generar heatmaps de actividad en el almacen.
+        Analiza tiempo de transito y tiempo de trabajo por coordenada.
         
         Returns:
             DataFrame con columnas: x, y, tiempo_trabajo, tiempo_transito, tiempo_total
@@ -255,14 +255,14 @@ class AnalyticsEngine:
         if self.events_df is None or self.events_df.empty:
             return pd.DataFrame()
         
-        # Obtener dimensiones del almacén desde configuración
-        # Valores por defecto si no están disponibles
+        # Obtener dimensiones del almacen desde configuracion
+        # Valores por defecto si no estan disponibles
         warehouse_width = self.config.get('warehouse_width', 50)
         warehouse_height = self.config.get('warehouse_height', 35)
         
-        print(f"[ANALYTICS-ENGINE] Dimensiones del almacén: {warehouse_width}x{warehouse_height}")
+        print(f"[ANALYTICS-ENGINE] Dimensiones del almacen: {warehouse_width}x{warehouse_height}")
         
-        # Crear DataFrame base con todas las coordenadas del almacén
+        # Crear DataFrame base con todas las coordenadas del almacen
         heatmap_data = []
         for x in range(warehouse_width):
             for y in range(warehouse_height):
@@ -277,7 +277,7 @@ class AnalyticsEngine:
         heatmap_df = pd.DataFrame(heatmap_data)
         print(f"[ANALYTICS-ENGINE] Creada grilla base con {len(heatmap_df)} coordenadas")
         
-        # Calcular tiempo de tránsito (eventos agent_moved)
+        # Calcular tiempo de transito (eventos agent_moved)
         move_events = self.events_df[self.events_df['event_type'] == 'agent_moved']
         transito_count = 0
         
@@ -287,7 +287,7 @@ class AnalyticsEngine:
                     position = event['data']['position']
                     if isinstance(position, list) and len(position) >= 2:
                         x, y = int(position[0]), int(position[1])
-                        # Verificar que las coordenadas estén dentro del rango válido
+                        # Verificar que las coordenadas esten dentro del rango valido
                         if 0 <= x < warehouse_width and 0 <= y < warehouse_height:
                             # Buscar la fila correspondiente e incrementar tiempo_transito
                             mask = (heatmap_df['x'] == x) & (heatmap_df['y'] == y)
@@ -297,7 +297,7 @@ class AnalyticsEngine:
                     # Saltar eventos con coordenadas malformadas
                     continue
         
-        print(f"[ANALYTICS-ENGINE] Procesados {transito_count} eventos de tránsito")
+        print(f"[ANALYTICS-ENGINE] Procesados {transito_count} eventos de transito")
         
         # Calcular tiempo de trabajo (eventos task_completed)
         task_events = self.events_df[self.events_df['event_type'] == 'task_completed']
@@ -317,7 +317,7 @@ class AnalyticsEngine:
                     
                     if ubicacion and isinstance(ubicacion, list) and len(ubicacion) >= 2 and tiempo_picking > 0:
                         x, y = int(ubicacion[0]), int(ubicacion[1])
-                        # Verificar que las coordenadas estén dentro del rango válido
+                        # Verificar que las coordenadas esten dentro del rango valido
                         if 0 <= x < warehouse_width and 0 <= y < warehouse_height:
                             # Buscar la fila correspondiente e incrementar tiempo_trabajo
                             mask = (heatmap_df['x'] == x) & (heatmap_df['y'] == y)
@@ -329,22 +329,22 @@ class AnalyticsEngine:
         
         print(f"[ANALYTICS-ENGINE] Procesados {trabajo_count} eventos de trabajo")
         
-        # Calcular tiempo total (suma de trabajo y tránsito)
+        # Calcular tiempo total (suma de trabajo y transito)
         heatmap_df['tiempo_total'] = heatmap_df['tiempo_trabajo'] + heatmap_df['tiempo_transito']
         
-        # Estadísticas de resumen
+        # Estadisticas de resumen
         total_tiempo_trabajo = heatmap_df['tiempo_trabajo'].sum()
         total_tiempo_transito = heatmap_df['tiempo_transito'].sum()
         coordenadas_activas = len(heatmap_df[heatmap_df['tiempo_total'] > 0])
         
         print(f"[ANALYTICS-ENGINE] Heatmap calculado: {coordenadas_activas} coordenadas activas")
-        print(f"[ANALYTICS-ENGINE] Tiempo total trabajo: {total_tiempo_trabajo:.2f}, tránsito: {total_tiempo_transito:.2f}")
+        print(f"[ANALYTICS-ENGINE] Tiempo total trabajo: {total_tiempo_trabajo:.2f}, transito: {total_tiempo_transito:.2f}")
         
         return heatmap_df
     
     def export_to_excel(self, filepath: str):
         """
-        Exporta todos los DataFrames a un archivo Excel con múltiples hojas.
+        Exporta todos los DataFrames a un archivo Excel con multiples hojas.
         
         Args:
             filepath: Ruta del archivo Excel a crear
@@ -359,7 +359,7 @@ class AnalyticsEngine:
                     self.summary_kpis.to_excel(writer, sheet_name='Resumen Ejecutivo', index=False)
                     print("[ANALYTICS-ENGINE] Hoja 'Resumen Ejecutivo' exportada")
                 else:
-                    # Crear hoja vacía si no hay datos
+                    # Crear hoja vacia si no hay datos
                     pd.DataFrame({'Mensaje': ['No hay datos de KPIs disponibles']}).to_excel(
                         writer, sheet_name='Resumen Ejecutivo', index=False)
                 
@@ -368,13 +368,13 @@ class AnalyticsEngine:
                     self.agent_performance.to_excel(writer, sheet_name='Rendimiento de Agentes', index=False)
                     print("[ANALYTICS-ENGINE] Hoja 'Rendimiento de Agentes' exportada")
                 else:
-                    # Crear hoja vacía si no hay datos
+                    # Crear hoja vacia si no hay datos
                     pd.DataFrame({'Mensaje': ['No hay datos de agentes disponibles']}).to_excel(
                         writer, sheet_name='Rendimiento de Agentes', index=False)
                 
-                # Hoja 3: Configuración
+                # Hoja 3: Configuracion
                 config_df = pd.DataFrame([
-                    {'Parámetro': key, 'Valor': str(value)}
+                    {'Parametro': key, 'Valor': str(value)}
                     for key, value in self.config.items()
                 ])
                 config_df.to_excel(writer, sheet_name='Configuracion', index=False)
@@ -385,7 +385,7 @@ class AnalyticsEngine:
                     self.heatmap_data.to_excel(writer, sheet_name='HeatmapData', index=False)
                     print("[ANALYTICS-ENGINE] Hoja 'HeatmapData' exportada")
                 else:
-                    # Crear hoja vacía si no hay datos
+                    # Crear hoja vacia si no hay datos
                     pd.DataFrame({'Mensaje': ['No hay datos de heatmap disponibles']}).to_excel(
                         writer, sheet_name='HeatmapData', index=False)
                 
@@ -401,8 +401,8 @@ class AnalyticsEngine:
     
     def _add_visual_heatmap_sheet(self, writer):
         """
-        Crea una hoja VisualHeatmap con representación gráfica del almacén coloreada
-        según intensidad de actividad usando formato condicional.
+        Crea una hoja VisualHeatmap con representacion grafica del almacen coloreada
+        segun intensidad de actividad usando formato condicional.
         
         Args:
             writer: pandas ExcelWriter object
@@ -410,21 +410,21 @@ class AnalyticsEngine:
         print("[ANALYTICS-ENGINE] Creando hoja VisualHeatmap...")
         
         if self.heatmap_data is None or self.heatmap_data.empty:
-            # Crear hoja vacía si no hay datos
-            pd.DataFrame({'Mensaje': ['No hay datos de heatmap para visualización']}).to_excel(
+            # Crear hoja vacia si no hay datos
+            pd.DataFrame({'Mensaje': ['No hay datos de heatmap para visualizacion']}).to_excel(
                 writer, sheet_name='VisualHeatmap', index=False)
-            print("[ANALYTICS-ENGINE] Hoja 'VisualHeatmap' vacía creada")
+            print("[ANALYTICS-ENGINE] Hoja 'VisualHeatmap' vacia creada")
             return
         
         # Pivotar datos de formato largo (x, y, tiempo_total) a matriz 2D
-        # x será las columnas, y será las filas
+        # x sera las columnas, y sera las filas
         heatmap_matrix = self.heatmap_data.pivot(
             index='y',           # Filas (eje vertical)
             columns='x',         # Columnas (eje horizontal)
             values='tiempo_total' # Valores de las celdas
         )
         
-        # Ordenar índice y columnas para presentación correcta del almacén
+        # Ordenar indice y columnas para presentacion correcta del almacen
         # y=0 en la parte superior, x=0 en la izquierda
         heatmap_matrix = heatmap_matrix.sort_index(ascending=False)  # y invertido (arriba-abajo)
         heatmap_matrix = heatmap_matrix.sort_index(axis=1)           # x normal (izquierda-derecha)
@@ -434,7 +434,7 @@ class AnalyticsEngine:
         
         print(f"[ANALYTICS-ENGINE] Matriz de heatmap creada: {heatmap_matrix.shape[0]}x{heatmap_matrix.shape[1]}")
         
-        # Escribir matriz en nueva hoja sin índices ni cabeceras (puramente visual)
+        # Escribir matriz en nueva hoja sin indices ni cabeceras (puramente visual)
         heatmap_matrix.to_excel(
             writer, 
             sheet_name='VisualHeatmap', 
@@ -449,7 +449,7 @@ class AnalyticsEngine:
         num_rows = heatmap_matrix.shape[0]
         num_cols = heatmap_matrix.shape[1]
         
-        # Convertir a notación de Excel (A1:ZZ99)
+        # Convertir a notacion de Excel (A1:ZZ99)
         from openpyxl.utils import get_column_letter
         start_cell = 'A1'
         end_col_letter = get_column_letter(num_cols)
@@ -461,19 +461,19 @@ class AnalyticsEngine:
         # Crear regla de formato condicional: Verde-Amarillo-Rojo
         # Verde = baja actividad, Amarillo = media, Rojo = alta actividad
         color_scale = ColorScaleRule(
-            start_type='min',        # Valores mínimos
+            start_type='min',        # Valores minimos
             start_color='00FF00',    # Verde para baja actividad
             mid_type='percentile',   # Percentil 50 (mediana)
             mid_value=50,
             mid_color='FFFF00',      # Amarillo para actividad media
-            end_type='max',          # Valores máximos  
+            end_type='max',          # Valores maximos  
             end_color='FF0000'       # Rojo para alta actividad
         )
         
         # Aplicar la regla al rango de datos
         worksheet.conditional_formatting.add(cell_range, color_scale)
         
-        # Ajustar ancho de columnas para mejor visualización
+        # Ajustar ancho de columnas para mejor visualizacion
         for col in range(1, num_cols + 1):
             col_letter = get_column_letter(col)
             worksheet.column_dimensions[col_letter].width = 3  # Celdas estrechas tipo pixel
@@ -486,9 +486,9 @@ class AnalyticsEngine:
 
 
 def main():
-    """Función principal para ejecución independiente del AnalyticsEngine"""
+    """Funcion principal para ejecucion independiente del AnalyticsEngine"""
     parser = argparse.ArgumentParser(
-        description='Motor de Analíticas para Simulador de Almacén - Procesamiento independiente de eventos',
+        description='Motor de Analiticas para Simulador de Almacen - Procesamiento independiente de eventos',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Ejemplos de uso:
@@ -508,7 +508,7 @@ Ejemplos de uso:
     parser.add_argument(
         '--verbose', '-v',
         action='store_true',
-        help='Mostrar información detallada del procesamiento'
+        help='Mostrar informacion detallada del procesamiento'
     )
     
     args = parser.parse_args()
@@ -521,7 +521,7 @@ Ejemplos de uso:
         # Cargar AnalyticsEngine desde archivo JSON
         engine = AnalyticsEngine.from_json_file(args.input_json)
         
-        # Procesar eventos y calcular métricas
+        # Procesar eventos y calcular metricas
         engine.process_events()
         
         # Exportar reporte a Excel
@@ -557,4 +557,4 @@ if __name__ == "__main__":
     sys.exit(main())
 
 
-print("[OK] Módulo 'analytics_engine' cargado - Motor de analíticas para reportes ejecutivos.")
+print("[OK] Modulo 'analytics_engine' cargado - Motor de analiticas para reportes ejecutivos.")

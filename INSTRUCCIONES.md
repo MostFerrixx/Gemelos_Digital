@@ -1,161 +1,378 @@
-# Simulador de Almacén - Gemelo Digital v1.0-stable
+# INSTRUCCIONES TÉCNICAS DEL SISTEMA
 
-## Instalación y Configuración
+**Proyecto:** Simulador de Gemelo Digital de Almacén  
+**Versión:** V11 Complete  
+**Última Actualización:** 2025-10-08
 
-### Requisitos Previos
-- Python 3.8+
-- pygame
-- simpy
-- pytmx
-- numpy
+---
 
-### Instalación Rápida
+## 🚀 INICIO RÁPIDO
 
-1. **Clonar el repositorio:**
+### Ejecutar Simulación Visual:
 ```bash
-git clone [URL_DEL_REPOSITORIO]
-cd gemelos-digital-warehouse
+python entry_points/run_live_simulation.py
 ```
 
-2. **Instalar dependencias:**
+### Ejecutar Simulación Headless (sin GUI):
 ```bash
-pip install pygame simpy pytmx numpy
+python entry_points/run_live_simulation.py --headless
 ```
 
-3. **Verificar instalación:**
+### Ejecutar Test Rápido (debugging):
 ```bash
-python test_environment_sync.py
+python test_quick_jsonl.py
 ```
-Debe mostrar el mensaje "*** EJECUTANDO CÓDIGO NUEVO ***"
 
-4. **Ejecutar simulador:**
+### Ver Replay de Simulación:
 ```bash
-python run_simulator.py
-```
-
-## Arquitectura TMX Unificada
-
-### Características Principales
-- **Sistema TMX obligatorio:** Sin fallback a sistema legacy
-- **Correspondencia 1:1:** Píxel TMX = píxel pantalla (sin escalado)
-- **Coordenadas centradas:** Los operarios se posicionan en el centro de los tiles
-- **Matriz de colisión corregida:** Lee propiedades walkable='true'/'false' del TMX
-- **Navegación funcional:** Los operarios no atraviesan racks ni van a (0,0)
-
-### Archivos Principales
-
-#### Core del Sistema
-- `run_simulator.py` - Ejecutor principal con verificación de entorno
-- `git/simulation/layout_manager.py` - Gestión TMX y matriz de colisión
-- `git/simulation/pathfinder.py` - Sistema de pathfinding A*
-- `git/visualization/original_renderer.py` - Renderizado sin escalado
-
-#### Layout TMX
-- `layouts/WH1.tmx` - Layout de almacén principal (30x30, 32x32px tiles)
-- `layouts/custom_warehouse_tileset.tsx` - Tileset personalizado
-
-### Controles del Simulador
-- **ESPACIO:** Pausa/Reanuda
-- **R:** Reiniciar simulación  
-- **M:** Mostrar métricas en consola
-- **X:** Exportar datos a JSON
-- **D:** Toggle dashboard
-- **+/-:** Aumentar/disminuir velocidad
-- **ESC:** Salir
-
-### Pruebas Disponibles
-
-#### Verificación de Entorno
-```bash
-python test_environment_sync.py
-```
-Verifica que se ejecute el código corregido.
-
-#### Pruebas TMX
-```bash
-python test_tmx_corrections.py
-```
-Valida matriz de colisión, depot y pathfinding.
-
-#### Pruebas de Renderizado
-```bash
-python test_renderizado_corregido.py
-```
-Verifica el renderizado sin escalado.
-
-## Resolución de Problemas
-
-### Cache Obsoleto
-Si encuentras comportamiento antiguo:
-```bash
-# Limpiar cache Python
-find . -name "*.pyc" -delete
-find . -name "__pycache__" -exec rm -rf {} +
-
-# O en Windows:
-del /s *.pyc
-for /d /r . %d in (__pycache__) do @if exist "%d" rd /s /q "%d"
-```
-
-### Errores Comunes
-
-**Error: "cannot convert without pygame.display initialized"**
-- Solución: pygame.init() se llama automáticamente en crear_simulacion()
-
-**Error: "center argument must be a pair of numbers"**  
-- Solución: Escalado legacy eliminado, usa correspondencia 1:1
-
-**Operarios en (0,0) o atravesando racks**
-- Solución: Matriz de colisión y depot corregidos en v1.0
-
-### Configuración de Ventana
-La ventana se dimensiona automáticamente según el TMX:
-- WH1.tmx: 30x30 tiles × 32x32px = 960x960px
-- Sin escalado, correspondencia directa 1:1
-
-## Changelog v1.0-stable
-
-### Nuevas Características
-✅ Sistema TMX unificado obligatorio  
-✅ Coordenadas centradas en tiles  
-✅ Matriz de colisión lee propiedades TMX  
-✅ Validación estricta de depot  
-✅ Renderizado sin escalado  
-✅ Navegación funcional sin atravesar obstáculos  
-
-### Eliminado
-❌ Sistema legacy de layout  
-❌ Fallback a coordenadas predefinidas  
-❌ Escalado automático de ventana  
-❌ Detección de modo visual  
-
-### Archivos de Diagnóstico Removidos
-Se eliminaron ~80 archivos de prueba y diagnóstico de versiones anteriores para mantener el repositorio limpio.
-
-## Estructura del Proyecto
-```
-gemelos-digital-warehouse/
-├── run_simulator.py              # Ejecutor principal
-├── layouts/
-│   ├── WH1.tmx                   # Layout principal
-│   └── custom_warehouse_tileset.tsx
-├── git/
-│   ├── simulation/
-│   │   ├── layout_manager.py     # Gestión TMX
-│   │   ├── pathfinder.py         # Pathfinding A*
-│   │   ├── warehouse.py          # Lógica de almacén
-│   │   └── operators.py          # Operarios
-│   ├── visualization/
-│   │   ├── original_renderer.py  # Renderizado
-│   │   └── state.py              # Estado visual
-│   └── config/
-│       ├── settings.py           # Configuración
-│       └── colors.py             # Colores
-├── test_*.py                     # Pruebas de verificación
-└── INSTRUCCIONES.md              # Este archivo
+python entry_points/run_replay_viewer.py output/simulation_YYYYMMDD_HHMMSS/replay_YYYYMMDD_HHMMSS.jsonl
 ```
 
 ---
-**Versión:** v1.0-stable  
-**Fecha:** 2024  
-**Estado:** Producción estable
+
+## 📁 ESTRUCTURA DEL PROYECTO
+
+```
+Gemelos Digital/
+├── entry_points/
+│   ├── run_live_simulation.py       # Punto de entrada principal
+│   └── run_replay_viewer.py         # Visualizador de replay
+│
+├── src/
+│   ├── engines/
+│   │   ├── simulation_engine.py     # Motor principal de simulación
+│   │   ├── analytics_engine.py      # Motor de análisis y reportes
+│   │   └── replay_engine.py         # Motor de replay
+│   │
+│   ├── subsystems/
+│   │   ├── simulation/
+│   │   │   ├── warehouse.py         # Almacén (entidad principal)
+│   │   │   ├── dispatcher.py        # Despachador de tareas
+│   │   │   └── operators.py         # Operarios y montacargas
+│   │   │
+│   │   └── visualization/
+│   │       ├── dashboard.py         # Dashboard pygame_gui
+│   │       ├── renderer.py          # Renderizado de agentes
+│   │       └── state.py             # Estado de visualización
+│   │
+│   ├── core/
+│   │   ├── config_manager.py        # Gestor de configuración
+│   │   ├── replay_utils.py          # Utilidades para .jsonl
+│   │   └── pathfinder.py            # Algoritmo A* para rutas
+│   │
+│   └── shared/
+│       └── buffer.py                # ReplayBuffer para eventos
+│
+├── data/
+│   ├── layouts/
+│   │   ├── WH1.tmx                  # Mapa del almacén (Tiled)
+│   │   └── Warehouse_Logic.xlsx    # Plan maestro de picking
+│   │
+│   └── themes/
+│       └── dashboard_theme.json     # Tema del dashboard
+│
+├── output/                          # Resultados de simulaciones
+│   └── simulation_YYYYMMDD_HHMMSS/
+│       ├── replay_YYYYMMDD_HHMMSS.jsonl      # Archivo de replay
+│       ├── raw_events_YYYYMMDD_HHMMSS.json   # Eventos sin procesar
+│       └── metricas_YYYYMMDD_HHMMSS.xlsx     # Reporte ejecutivo
+│
+├── config.json                      # Configuración principal
+├── config_test_quick.json           # Config para testing (3 órdenes)
+└── test_quick_jsonl.py              # Script de test rápido
+```
+
+---
+
+## ⚙️ CONFIGURACIÓN
+
+### config.json - Parámetros principales:
+
+```json
+{
+  "total_ordenes": 50,                    // Número de órdenes a simular
+  "num_operarios_terrestres": 2,          // Operarios a pie
+  "num_montacargas": 1,                   // Montacargas
+  "capacidad_carro": 150,                 // Capacidad de carga (unidades vol.)
+  "capacidad_montacargas": 1000,          // Capacidad de montacargas
+  "tiempo_descarga_por_tarea": 5,         // Tiempo de descarga (segundos sim.)
+  
+  "dispatch_strategy": "Optimizacion Global",  // Estrategia de asignación
+  "tour_type": "Tour Mixto (Multi-Destino)",   // Tipo de tour
+  
+  "layout_file": "data/layouts/WH1.tmx",         // Mapa TMX
+  "sequence_file": "data/layouts/Warehouse_Logic.xlsx",  // Plan maestro
+  
+  "distribucion_tipos": {
+    "pequeno": { "porcentaje": 70, "volumen": 5 },
+    "mediano": { "porcentaje": 25, "volumen": 15 },
+    "grande":  { "porcentaje": 5,  "volumen": 30 }
+  },
+  
+  "assignment_rules": {
+    "GroundOperator": { /* ... */ },
+    "Forklift": { /* ... */ }
+  }
+}
+```
+
+### Estrategias de Despacho:
+- `"FIFO"` - First In First Out
+- `"Proximidad"` - Asignar tareas más cercanas
+- `"Optimizacion Global"` - Optimización por costo/distancia
+- `"Ejecucion de Plan (Filtro por Prioridad)"` - Seguir plan maestro
+
+### Tipos de Tour:
+- `"Tour Simple (Un Solo Destino)"` - Una tarea por tour
+- `"Tour Mixto (Multi-Destino)"` - Múltiples tareas por tour
+
+---
+
+## 🔧 ARQUITECTURA TÉCNICA
+
+### Modo Visual (Multiproceso):
+```
+┌─────────────────────────────────┐
+│  PROCESO PRODUCTOR (SimPy)      │
+│  - SimulationEngine              │
+│  - AlmacenMejorado               │
+│  - Dispatcher                    │
+│  - Operadores                    │
+│  - Genera eventos de simulación │
+└────────────┬────────────────────┘
+             │ visual_event_queue
+             ↓
+┌─────────────────────────────────┐
+│  PROCESO CONSUMIDOR (Pygame)    │
+│  - Lee eventos de la cola        │
+│  - Actualiza estado_visual       │
+│  - Renderiza dashboard           │
+│  - Copia eventos a replay_buffer │
+└─────────────────────────────────┘
+```
+
+### Modo Headless (Proceso único):
+```
+┌─────────────────────────────────┐
+│  SimulationEngine (headless)    │
+│  - AlmacenMejorado               │
+│    └─ registrar_evento()         │
+│       ├─ event_log.append()      │
+│       └─ replay_buffer.add()     │  ← PROBLEMA ACTUAL
+│  - Sin GUI, máxima velocidad     │
+└─────────────────────────────────┘
+```
+
+### Flujo de Eventos:
+```
+1. Operario completa WorkOrder
+   ↓
+2. Dispatcher.notificar_completado()
+   ↓
+3. AlmacenMejorado.registrar_evento('work_order_update', {...})
+   ↓
+4. event_log.append(evento)         ✅ Funciona
+   ↓
+5. replay_buffer.add_event(evento)  ❌ Problema (buffer=None)
+   ↓
+6. volcar_replay_a_archivo()        ❌ Buffer vacío
+```
+
+---
+
+## 🐛 BUGS CONOCIDOS Y WORKAROUNDS
+
+### 🔴 CRÍTICO: replay_buffer vacío
+
+**Síntoma:**
+```
+[REPLAY DEBUG] replay_buffer len: 0
+[REPLAY WARNING] No replay data to save (buffer empty or missing)
+```
+
+**Causa:**
+`AlmacenMejorado.replay_buffer` es `None` cuando se llama `registrar_evento()`.
+
+**Estado:** Debugging activo, logs habilitados en:
+- `src/subsystems/simulation/warehouse.py:152-153` (init)
+- `src/subsystems/simulation/warehouse.py:444-449` (registrar_evento)
+- `src/engines/simulation_engine.py:1393-1395` (finally)
+
+**Workaround:** Ninguno. Sistema funciona pero no genera `.jsonl`.
+
+**Fix estimado:** 30-60 minutos.
+
+---
+
+### 🟡 MEDIO: Error en analytics
+
+**Síntoma:**
+```
+Error exportando metricas JSON: exportar_metricas() takes 1 positional argument but 2 were given
+Error en pipeline de analiticas: 'event_type'
+```
+
+**Impacto:** No se generan archivos JSON/XLSX de métricas.
+
+**Workaround:** Analytics falla pero simulación continúa normalmente.
+
+**Fix sugerido:**
+- `src/engines/analytics_engine.py`: Revisar firma de `exportar_metricas()`
+- Cambiar `evento['event_type']` a `evento.get('type') or evento.get('event_type', 'unknown')`
+
+---
+
+## 📊 SALIDAS DEL SISTEMA
+
+### Archivos Generados (Esperados):
+
+```
+output/simulation_20251008_193000/
+├── replay_20251008_193000.jsonl              ❌ No se genera (bug)
+├── raw_events_20251008_193000.json           ✅ Se genera
+├── simulacion_completada_20251008_193000.json  ❌ No se genera (analytics)
+├── metricas_20251008_193000.xlsx             ❌ No se genera (analytics)
+└── dashboard_screenshot_20251008_193000.png  ⚠️ Solo en modo visual
+```
+
+### Formato de replay_YYYYMMDD_HHMMSS.jsonl:
+
+```jsonl
+{"type":"SIMULATION_START","timestamp":0.0,"config":{...}}
+{"type":"work_order_update","timestamp":125.5,"id":"WO-0001","status":"completed",...}
+{"type":"work_order_update","timestamp":142.3,"id":"WO-0002","status":"completed",...}
+...
+{"type":"SIMULATION_END","timestamp":4907.0,"summary":{...}}
+```
+
+**Cada línea:** Un evento en formato JSON  
+**Tipos de eventos:**
+- `SIMULATION_START` - Inicio de simulación
+- `work_order_update` - Actualización de WorkOrder
+- `agent_state` - Estado de operario (FASE 2, pendiente)
+- `SIMULATION_END` - Fin de simulación
+
+---
+
+## 🧪 TESTING
+
+### Test Rápido:
+```bash
+python test_quick_jsonl.py
+```
+
+**Propósito:** Debugging rápido con 3 órdenes  
+**Duración:** 20-40 segundos  
+**Output:** Reporte en consola + archivos en `output/`
+
+### Test Completo:
+```bash
+python entry_points/run_live_simulation.py --headless
+```
+
+**Propósito:** Simulación completa de 50 órdenes  
+**Duración:** 1-3 minutos  
+**Output:** Archivos en `output/`
+
+### Verificación de Archivos:
+```powershell
+# Listar archivos generados
+Get-ChildItem output/simulation_*/ | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | Get-ChildItem
+
+# Inspeccionar .jsonl
+Get-Content output/simulation_*/replay_*.jsonl | Select-Object -First 5
+
+# Contar líneas
+(Get-Content output/simulation_*/replay_*.jsonl).Count
+```
+
+---
+
+## 🔍 DEBUGGING
+
+### Logs Importantes:
+
+**Inicialización:**
+```
+[ALMACEN DEBUG] __init__ replay_buffer: ReplayBuffer(events=0)
+```
+
+**Durante Ejecución:**
+```
+[REPLAY DEBUG] Evento agregado al buffer: work_order_update, total: 1
+[REPLAY ERROR] replay_buffer is None at registrar_evento!
+```
+
+**Al Finalizar:**
+```
+[REPLAY DEBUG] replay_buffer len: 609
+[REPLAY] Generating replay file: output/simulation_YYYYMMDD_HHMMSS/replay_YYYYMMDD_HHMMSS.jsonl
+[REPLAY] Replay file generated successfully: 609 events
+```
+
+### Variables de Entorno:
+
+```bash
+# Modo headless sin ventanas
+export SDL_VIDEODRIVER=dummy
+
+# Debug de pygame
+export PYGAME_DEBUG=1
+```
+
+---
+
+## 📚 DOCUMENTACIÓN ADICIONAL
+
+- `ACTIVE_SESSION_STATE.md` - Estado actual del debugging
+- `HANDOFF.md` - Overview completo del proyecto
+- `AUDITORIA_JSONL_GENERATION.md` - Diagnóstico inicial
+- `PLAN_REPARACION_JSONL.md` - Plan de reparación
+- `PROBLEMA_BUCLE_INFINITO.md` - Análisis bucle infinito (RESUELTO)
+- `ANALISIS_PROBLEMA_REAL.md` - Problema buffer vacío (EN PROGRESO)
+- `INSTRUCCIONES_TESTING_FINAL.md` - Guía de testing
+
+---
+
+## 🚨 REGLAS OBLIGATORIAS
+
+### AL INICIAR SESIÓN:
+1. Leer `ACTIVE_SESSION_STATE.md`
+2. Leer `HANDOFF.md`
+3. Ejecutar `git status`
+4. Ejecutar `git log --oneline -3`
+
+### DURANTE LA SESIÓN:
+- Actualizar `ACTIVE_SESSION_STATE.md` al completar fases
+- Documentar problemas encontrados
+- No commitear con logs de debug activos
+- Verificar que código usa solo caracteres ASCII
+
+### AL FINALIZAR SESIÓN:
+- Actualizar `ACTIVE_SESSION_STATE.md`
+- Actualizar `HANDOFF.md`
+- Actualizar `INSTRUCCIONES.md` si cambió algo técnico
+- Ejecutar checklist de validación
+
+---
+
+## 📞 SOPORTE
+
+**Para nueva sesión de debugging:**
+1. Leer documentación en orden: ACTIVE_SESSION_STATE → HANDOFF → INSTRUCCIONES
+2. Ejecutar `python test_quick_jsonl.py`
+3. Analizar logs de `[REPLAY ERROR]` y `[REPLAY DEBUG]`
+4. Revisar stacktrace para identificar flujo
+5. Implementar fix
+6. Validar con test completo
+
+**Archivos críticos para modificar:**
+- `src/subsystems/simulation/warehouse.py` (registrar_evento)
+- `src/engines/simulation_engine.py` (finally block)
+- `src/shared/buffer.py` (ReplayBuffer)
+
+---
+
+**Última Actualización:** 2025-10-08 19:40 UTC  
+**Autor:** AI Assistant (Claude Sonnet 4.5)  
+**Estado:** Sistema funcional con 1 bug en resolución

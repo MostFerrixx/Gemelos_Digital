@@ -406,7 +406,7 @@ def actualizar_metricas_tiempo(operarios_dict):
             idle_count += 1
         elif status in ['working', 'Trabajando']:  # Para futuras implementaciones
             working_count += 1
-        elif status in ['traveling', 'moving', 'Moviéndose']:
+        elif status in ['traveling', 'moving', 'Moviendose']:
             traveling_count += 1
 
     # Calcular utilizacion (porcentaje de operarios no idle)

@@ -342,7 +342,8 @@ class SimulationEngine:
             data_manager=self.data_manager,      # NUEVO V2.6
             cost_calculator=self.cost_calculator, # NUEVO V2.6
             route_calculator=self.route_calculator, # BUGFIX FASE 1: Para DispatcherV11
-            simulador=self  # REFACTOR: Pasar referencia del simulador
+            simulador=self,  # REFACTOR: Pasar referencia del simulador
+            replay_buffer=self.replay_buffer  # BUGFIX JSONL: Pasar replay_buffer
         )
         
         inicializar_estado(self.almacen, self.env, self.configuracion, layout_manager=self.layout_manager)
@@ -639,6 +640,10 @@ class SimulationEngine:
                         
                         # Agregar evento al buffer ordenado por timestamp
                         self.event_buffer.append(mensaje)
+                        
+                        # BUGFIX JSONL: Tambien copiar al replay_buffer para .jsonl
+                        if self.replay_buffer:
+                            self.replay_buffer.add_event(mensaje)
                         
                     except queue.Empty:
                         break
@@ -1375,15 +1380,6 @@ class SimulationEngine:
                 # 5. Ejecutar bucle de visualizacion principal
                 self.ejecutar_bucle_principal()
 
-            # UNIFIED: Use session timestamp and directory for replay file
-            # RESTORED: Generate replay file after simulation completion
-            if self.replay_buffer and len(self.replay_buffer) > 0:
-                os.makedirs(self.session_output_dir, exist_ok=True)
-                output_file = os.path.join(self.session_output_dir, f"replay_{self.session_timestamp}.jsonl")
-                print(f"[REPLAY] Generating replay file: {output_file}")
-                initial_snapshot = getattr(self.almacen.dispatcher, 'initial_work_orders_snapshot', []) if hasattr(self, 'almacen') and self.almacen else []
-                volcar_replay_a_archivo(self.replay_buffer, output_file, self.configuracion, self.almacen, initial_snapshot)
-
         except KeyboardInterrupt:
             print("\nInterrupcion del usuario. Saliendo...")
         except Exception as e:
@@ -1391,6 +1387,24 @@ class SimulationEngine:
             import traceback
             traceback.print_exc()
         finally:
+            # BUGFIX JSONL: Generar archivo .jsonl en finally para garantizar generacion
+            # UNIFIED: Use session timestamp and directory for replay file
+            try:
+                if hasattr(self, 'replay_buffer') and self.replay_buffer and len(self.replay_buffer) > 0:
+                    os.makedirs(self.session_output_dir, exist_ok=True)
+                    output_file = os.path.join(self.session_output_dir, f"replay_{self.session_timestamp}.jsonl")
+                    print(f"[REPLAY] Generating replay file: {output_file}")
+                    initial_snapshot = getattr(self.almacen.dispatcher, 'initial_work_orders_snapshot', []) if hasattr(self, 'almacen') and self.almacen else []
+                    volcar_replay_a_archivo(self.replay_buffer, output_file, self.configuracion, self.almacen, initial_snapshot)
+                    print(f"[REPLAY] Replay file generated successfully: {len(self.replay_buffer)} events")
+                else:
+                    print(f"[REPLAY WARNING] No replay data to save (buffer empty or missing)")
+            except Exception as e:
+                print(f"[REPLAY ERROR] Failed to generate replay file: {e}")
+                import traceback
+                traceback.print_exc()
+            
+            # Limpiar recursos
             self.limpiar_recursos()
 
     def limpiar_recursos(self):
@@ -1490,6 +1504,9 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
         
         # 6. REFACTOR: Crear AlmacenMejorado con cola de eventos
         print("[PROCESO-SIMPY] Creando AlmacenMejorado con cola de eventos...")
+        # NOTA JSONL: En proceso productor NO se pasa replay_buffer porque es un proceso
+        # separado. Los eventos se envian via visual_event_queue y se copian al
+        # replay_buffer en el proceso consumidor (ver ejecutar_bucle_principal)
         almacen = AlmacenMejorado(
             env,
             configuracion,
@@ -1498,7 +1515,8 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
             data_manager=data_manager,
             cost_calculator=cost_calculator,
             simulador=None,  # En proceso hijo no hay simulador principal
-            visual_event_queue=visual_event_queue  # NUEVO: Pasar cola
+            visual_event_queue=visual_event_queue,  # NUEVO: Pasar cola
+            replay_buffer=None  # No disponible en proceso hijo
         )
         
         # 7. Inicializar estado visual EN EL PROCESO HIJO (con cola)

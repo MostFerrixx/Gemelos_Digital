@@ -192,13 +192,13 @@ class GroundOperator(BaseOperator):
             tour = self.almacen.dispatcher.solicitar_asignacion(self)
 
             if tour is None:
-                # No hay trabajo disponible, esperar
-                yield self.env.timeout(1.0)
-
-                # Verificar si termino la simulacion
+                # No hay trabajo disponible, verificar si termino
                 if self.almacen.simulacion_ha_terminado():
                     print(f"[{self.id}] Simulacion finalizada, saliendo...")
                     break
+                
+                # Esperar un poco antes de reintentar
+                yield self.env.timeout(1.0)
                 continue
 
             # PASO 2: Procesar tour asignado
@@ -332,13 +332,13 @@ class Forklift(BaseOperator):
             tour = self.almacen.dispatcher.solicitar_asignacion(self)
 
             if tour is None:
-                # No hay trabajo disponible, esperar
-                yield self.env.timeout(1.0)
-
-                # Verificar si termino la simulacion
+                # No hay trabajo disponible, verificar si termino
                 if self.almacen.simulacion_ha_terminado():
                     print(f"[{self.id}] Simulacion finalizada, saliendo...")
                     break
+                
+                # Esperar un poco antes de reintentar
+                yield self.env.timeout(1.0)
                 continue
 
             # PASO 2: Procesar tour asignado

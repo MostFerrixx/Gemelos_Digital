@@ -75,6 +75,105 @@
                 "font_size": 12,
                 "text_color": "#FFFFFF"
             }
+        },
+        "scrolling_container": {
+            "normal": {
+                "shape": "rounded_rectangle",
+                "shape_corner_radius": 6,
+                "colours": {
+                    "normal_bg": "#1A1A1A",
+                    "normal_border": "#404040",
+                    "hovered_bg": "#2A2A2A",
+                    "hovered_border": "#505050"
+                },
+                "border_width": 1
+            }
+        }
+    },
+    "semantic_colors": {
+        "operator_states": {
+            "idle": {
+                "text_color": "#808080",
+                "bg_color": "#2C2C2C",
+                "border_color": "#404040"
+            },
+            "moving": {
+                "text_color": "#4CAF50",
+                "bg_color": "#1B5E20",
+                "border_color": "#2E7D32"
+            },
+            "working": {
+                "text_color": "#FF9800",
+                "bg_color": "#E65100",
+                "border_color": "#F57C00"
+            },
+            "discharging": {
+                "text_color": "#F44336",
+                "bg_color": "#B71C1C",
+                "border_color": "#D32F2F"
+            },
+            "loading": {
+                "text_color": "#2196F3",
+                "bg_color": "#0D47A1",
+                "border_color": "#1976D2"
+            },
+            "waiting": {
+                "text_color": "#9C27B0",
+                "bg_color": "#4A148C",
+                "border_color": "#7B1FA2"
+            },
+            "error": {
+                "text_color": "#FF0000",
+                "bg_color": "#B71C1C",
+                "border_color": "#D32F2F"
+            },
+            "unknown": {
+                "text_color": "#FFFFFF",
+                "bg_color": "#2C2C2C",
+                "border_color": "#404040"
+            }
+        },
+        "metrics_types": {
+            "time": {
+                "text_color": "#2196F3",
+                "bg_color": "#0D47A1",
+                "border_color": "#1976D2"
+            },
+            "ratio": {
+                "text_color": "#4CAF50",
+                "bg_color": "#1B5E20",
+                "border_color": "#2E7D32"
+            },
+            "count": {
+                "text_color": "#FF9800",
+                "bg_color": "#E65100",
+                "border_color": "#F57C00"
+            },
+            "percentage": {
+                "text_color": "#FF6600",
+                "bg_color": "#E65100",
+                "border_color": "#F57C00"
+            }
+        },
+        "headers": {
+            "level_1": {
+                "text_color": "#FFFFFF",
+                "bg_color": "#2C2C2C",
+                "border_color": "#FF6600",
+                "font_size": 24
+            },
+            "level_2": {
+                "text_color": "#E0E0E0",
+                "bg_color": "#3C3C3C",
+                "border_color": "#505050",
+                "font_size": 18
+            },
+            "level_3": {
+                "text_color": "#C0C0C0",
+                "bg_color": "#404040",
+                "border_color": "#606060",
+                "font_size": 14
+            }
         }
     }
 }

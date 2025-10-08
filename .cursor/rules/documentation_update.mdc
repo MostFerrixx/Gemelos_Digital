@@ -1,0 +1,151 @@
+---
+description: "Actualizar automáticamente archivos de documentación en cada sesión de chat"
+alwaysApply: true
+globs: "**/*.md"
+---
+
+# 🚨 REGLAS OBLIGATORIAS DE DOCUMENTACIÓN
+
+## AL INICIAR CADA SESIÓN DE CHAT (OBLIGATORIO):
+
+### PASO 1: LECTURA AUTOMÁTICA DE ARCHIVOS CLAVE
+**DEBES LEER OBLIGATORIAMENTE estos archivos en este orden exacto:**
+
+1. **`CURSOR_DOCUMENTATION_RULES.md`** - Reglas completas de documentación
+2. **`ACTIVE_SESSION_STATE.md`** - Contexto inmediato de la sesión activa
+3. **`HANDOFF.md`** - Estado completo del proyecto
+4. **`INSTRUCCIONES.md`** - Instrucciones técnicas del sistema
+
+### PASO 2: VERIFICACIÓN DEL ESTADO REAL
+**EJECUTAR estos comandos obligatoriamente:**
+```bash
+git status
+git log --oneline -3
+```
+
+### PASO 3: IDENTIFICACIÓN DE CONTEXTO
+- **IDENTIFICAR la tarea actual** en `ACTIVE_SESSION_STATE.md`
+- **VERIFICAR el estado** de las fases en progreso
+- **REVISAR problemas** pendientes documentados
+- **CONFIRMAR próxima acción** definida
+
+### PASO 4: RESUMEN DE ESTADO
+**PROPORCIONAR al usuario un resumen que incluya:**
+- ✅ **Estado actual del proyecto**
+- ✅ **Tarea en progreso** (si existe)
+- ✅ **Próxima acción definida** (si existe)
+- ✅ **Problemas pendientes** (si existen)
+- ✅ **Opciones disponibles** para continuar
+
+### PASO 5: LISTO PARA INSTRUCCIONES
+**DECIR al usuario:**
+"✅ **Contexto cargado completamente. Estado actual:** [RESUMEN]
+**¿Cuál es tu siguiente instrucción?** Puedo continuar con el plan existente o recibir nuevas instrucciones."
+
+## DURANTE LA SESIÓN:
+
+- ✅ **Actualizar inmediatamente** `ACTIVE_SESSION_STATE.md` cuando completes fases
+- ✅ **Documentar problemas** encontrados en `ACTIVE_SESSION_STATE.md`
+- ✅ **Actualizar próxima acción** en `ACTIVE_SESSION_STATE.md` cuando cambie el enfoque
+- ✅ **Actualizar `HANDOFF.md`** si completas una fase importante
+- ✅ **Actualizar `INSTRUCCIONES.md`** si cambias algo técnico
+- ✅ **VERIFICAR CARACTERES ASCII** - Asegúrate de que todo el código fuente use solo caracteres ASCII, y si ves en tus lecturas que algo tiene algo diferente a caracteres ASCII que lo cambies inmediatamente
+
+## AL FINALIZAR LA SESIÓN (OBLIGATORIO):
+
+### CHECKLIST OBLIGATORIO ANTES DE FINALIZAR:
+
+- [ ] `ACTIVE_SESSION_STATE.md` actualizado con estado real
+- [ ] Fases completadas marcadas como ✅
+- [ ] Próxima acción claramente definida
+- [ ] Problemas encontrados documentados
+- [ ] Tiempo estimado restante actualizado
+- [ ] `HANDOFF.md` actualizado (si aplica)
+- [ ] `INSTRUCCIONES.md` actualizado (si aplica)
+- [ ] Git status verificado
+- [ ] Archivos mencionados existen
+- [ ] Documentación es consistente
+- [ ] **CÓDIGO FUENTE VERIFICADO** - Solo caracteres ASCII en todo el código fuente
+
+### COMANDOS DE VALIDACIÓN OBLIGATORIOS:
+
+```bash
+# Verificar estado del proyecto
+git status
+git log --oneline -3
+
+# Verificar archivos de documentación
+ls -la ACTIVE_SESSION_STATE.md HANDOFF.md INSTRUCCIONES.md
+
+# Verificar consistencia
+grep -n "Estado:" ACTIVE_SESSION_STATE.md
+grep -n "Fecha:" ACTIVE_SESSION_STATE.md
+
+# Verificar caracteres ASCII en código fuente
+find src/ -name "*.py" -exec file {} \; | grep -v "ASCII"
+# Si encuentra archivos no-ASCII, corregir inmediatamente
+```
+
+## TEMPLATES PARA ACTUALIZACIÓN:
+
+### ACTUALIZACIÓN DE ACTIVE_SESSION_STATE.md:
+```markdown
+# 🚀 ESTADO DE SESIÓN ACTIVA - [NOMBRE_TAREA]
+
+**Fecha:** [FECHA_ACTUAL]
+**Sesión:** [NOMBRE_SESIÓN]
+**Estado:** [ESTADO_ACTUAL]
+
+## 📋 CONTEXTO INMEDIATO
+### TAREA ACTUAL: [DESCRIPCIÓN_CLARA]
+### PROBLEMA IDENTIFICADO: [LISTA_PROBLEMAS]
+### SOLUCIÓN DISEÑADA: [LISTA_SOLUCIONES]
+
+## 🛠️ PLAN DE IMPLEMENTACIÓN
+### FASE 1: [NOMBRE] ([TIEMPO]) - ✅ COMPLETADA / ⏳ EN PROGRESO / ⏳ PENDIENTE
+- [x] Tarea 1 (completada)
+- [ ] Tarea 2 (pendiente)
+
+### PRÓXIMO PASO: [ACCIÓN_INMEDIATA]
+**ESTADO:** ✅ [ESTADO_ACTUAL]
+**TIEMPO ESTIMADO RESTANTE:** [TIEMPO]
+```
+
+### ACTUALIZACIÓN DE HANDOFF.md:
+```markdown
+## What Has Been Done
+✅ **[NUEVA_FASE_COMPLETADA]:** [DESCRIPCIÓN]
+- [Detalle 1]
+- [Detalle 2]
+
+## What Needs to Be Done Next
+### IMMEDIATE TASK: [NUEVA_TAREA] ⏳
+**Próximo Paso:** [DESCRIPCIÓN_DETALLADA]
+```
+
+## 🔤 REGLA CRÍTICA: CARACTERES ASCII
+
+### OBLIGATORIO EN TODO CÓDIGO FUENTE:
+- ✅ **SOLO caracteres ASCII** en archivos `.py`, `.json`, `.md`, `.txt`
+- ✅ **NO usar caracteres especiales** como acentos, ñ, símbolos Unicode
+- ✅ **VERIFICAR inmediatamente** si encuentras caracteres no-ASCII
+- ✅ **CORREGIR inmediatamente** cualquier carácter no-ASCII encontrado
+
+### CARACTERES PROHIBIDOS:
+- ❌ Acentos: á, é, í, ó, ú, ñ
+- ❌ Símbolos especiales: ¿, ¡, «, », etc.
+- ❌ Cualquier carácter fuera del rango ASCII (0-127)
+
+### CARACTERES PERMITIDOS:
+- ✅ Letras básicas: a-z, A-Z
+- ✅ Números: 0-9
+- ✅ Símbolos básicos: .,;:!?()[]{}+-*/=<>@#$%^&|~`"'\
+- ✅ Espacios y saltos de línea
+
+## ⚠️ IMPORTANTE:
+
+**ESTAS REGLAS SON OBLIGATORIAS Y NO TIENEN EXCEPCIONES.**
+
+**SOLO después de completar el checklist obligatorio puedes finalizar la sesión.**
+
+**El objetivo es garantizar que cada nueva sesión pueda continuar exactamente donde quedó la anterior.**

@@ -36,7 +36,9 @@ from subsystems.visualization.state import (
     obtener_velocidad_simulacion
 )
 from subsystems.visualization.renderer import RendererOriginal, renderizar_diagnostico_layout
-from subsystems.visualization.dashboard import DashboardOriginal, DashboardGUI
+from subsystems.visualization.dashboard import DashboardOriginal, DashboardGUI, DashboardWorldClass
+from subsystems.visualization.dashboard_modern import ModernDashboard
+from subsystems.visualization.dashboard_world_class import DashboardWorldClass as DashboardWC
 
 # REFACTOR V11: Config utilities - Necesarios para cargar configuracion
 # ConfigurationManager replaces cargar_configuracion logic
@@ -50,12 +52,12 @@ class ReplayViewerEngine:
         # REFACTOR: ConfigurationManager integration
         try:
             self.config_manager = ConfigurationManager()
-            self.config_manager.validate_configuration()  # Validar configuración cargada
+            self.config_manager.validate_configuration()  # Validar configuracion cargada
             self.configuracion = self.config_manager.configuration
             print("[REPLAY-ENGINE] ConfigurationManager integrado exitosamente")
         except ConfigurationError as e:
             print(f"[REPLAY-ENGINE ERROR] Error en configuracion: {e}")
-            # Fallback: usar configuración por defecto
+            # Fallback: usar configuracion por defecto
             self.config_manager = None
             self.configuracion = get_default_config()
             print("[REPLAY-ENGINE] Fallback: Usando configuracion por defecto")
@@ -81,83 +83,64 @@ class ReplayViewerEngine:
         """Inicializa ventana de Pygame para visualizacion de replay"""
         # KEEP: Todo el metodo - Necesario para crear ventana
 
-        PANEL_WIDTH = 400
+        PANEL_WIDTH = 440
         # 1. Obtener la clave de resolucion seleccionada por el usuario
         resolution_key = self.configuracion.get('selected_resolution_key', "Pequena (800x800)")
 
-        # 2. Buscar el tamaño (ancho, alto) en nuestro diccionario
+        # 2. Buscar el tamano (ancho, alto) en nuestro diccionario
         self.window_size = SUPPORTED_RESOLUTIONS.get(resolution_key, (800, 800))
 
         print(f"[DISPLAY] Resolucion seleccionada por el usuario: '{resolution_key}' -> {self.window_size[0]}x{self.window_size[1]}")
 
-        # 3. Hacemos la ventana principal más ancha para acomodar el panel
+        # 3. Hacemos la ventana principal mas ancha para acomodar el panel
         main_window_width = self.window_size[0] + PANEL_WIDTH
         main_window_height = self.window_size[1]
         self.pantalla = pygame.display.set_mode((main_window_width, main_window_height), pygame.RESIZABLE)
         pygame.display.set_caption("Replay Viewer - Gemelo Digital")
 
-        # 4. La superficie virtual mantiene el tamaño lógico del mapa
+        # 4. La superficie virtual mantiene el tamano logico del mapa
         self.virtual_surface = pygame.Surface((LOGICAL_WIDTH, LOGICAL_HEIGHT))
         print(f"Ventana creada: {main_window_width}x{main_window_height}. Panel UI: {PANEL_WIDTH}px.")
 
         self.reloj = pygame.time.Clock()
         self.renderer = RendererOriginal(self.virtual_surface)
-        self.dashboard = DashboardOriginal()
         
         # PYGAME_GUI FASE 2.5: Inicializar UIManager y DashboardGUI refactorizada
         self._inicializar_pygame_gui()
+        
+        # NOTA: la creacion del ModernDashboard se realiza en _inicializar_pygame_gui().
+        # Aqui evitamos crear una segunda instancia para no duplicar elementos UI.
 
     def _inicializar_pygame_gui(self):
         """
-        Inicializa pygame_gui UIManager y DashboardGUI refactorizada.
+        Inicializa Dashboard World-Class con pygame nativo.
         
-        FASE 2.5: Integración de DashboardGUI Refactorizada
-        Crea el UIManager cargando el tema JSON y la instancia de DashboardGUI
-        con la nueva arquitectura de layout responsivo.
+        DASHBOARD WORLD-CLASS: Integracion del nuevo dashboard profesional
+        usando pygame nativo (sin pygame_gui) para maximo control y estabilidad.
         """
-        print("[PYGAME-GUI] Iniciando inicializacion de pygame_gui con DashboardGUI refactorizada...")
+        print("[DASHBOARD-WC] Iniciando Dashboard World-Class...")
         try:
-            # Crear UIManager con el tamaño de la ventana
-            window_width = self.window_size[0] + 400  # +400 para el panel del dashboard
-            window_height = self.window_size[1]
-            
-            print(f"[PYGAME-GUI] Creando UIManager con tamaño: {window_width}x{window_height}")
-            print(f"[PYGAME-GUI] Tema path: data/themes/dashboard_theme.json")
-            
-            self.ui_manager = pygame_gui.UIManager(
-                (window_width, window_height),
-                theme_path='data/themes/dashboard_theme.json'
+            # Crear Dashboard World-Class con posicion izquierda
+            self.dashboard = DashboardWC(
+                panel_width=440,
+                panel_position='left'
             )
+            print("[DASHBOARD-WC] Dashboard World-Class creado exitosamente")
+            print("[DASHBOARD-WC] Panel izquierdo activo (440px)")
             
-            print("[PYGAME-GUI] UIManager creado exitosamente")
-            
-            # Crear rectángulo para el dashboard (panel derecho)
-            # FASE 2.5: Usar coordenadas relativas para el dashboard
-            dashboard_rect = pygame.Rect(
-                0,                    # x: coordenada relativa (0)
-                0,                    # y: coordenada relativa (0)
-                400,                  # width: ancho del panel
-                window_height         # height: altura completa
-            )
-            
-            print(f"[PYGAME-GUI] Creando DashboardGUI refactorizada con rect: {dashboard_rect}")
-            
-            # FASE 2.5: Crear instancia de DashboardGUI refactorizada
-            # Esta versión usa DashboardLayoutManager y ResponsiveGrid
-            self.dashboard_gui = DashboardGUI(self.ui_manager, dashboard_rect)
-            
-            print("[PYGAME-GUI] DashboardGUI refactorizada inicializada exitosamente")
-            print(f"[PYGAME-GUI] Dashboard rect: {dashboard_rect}")
-            print("[PYGAME-GUI] Arquitectura de layout responsivo activa")
+            # Sincronizar referencia para compatibilidad
+            self.dashboard_gui = self.dashboard
+            self.ui_manager = None  # No se usa pygame_gui
             
         except Exception as e:
-            print(f"[PYGAME-GUI ERROR] Error inicializando pygame_gui: {e}")
-            print(f"[PYGAME-GUI ERROR] Tipo de error: {type(e).__name__}")
+            print(f"[DASHBOARD-WC ERROR] Error inicializando Dashboard World-Class: {e}")
+            print(f"[DASHBOARD-WC ERROR] Tipo de error: {type(e).__name__}")
             import traceback
-            print(f"[PYGAME-GUI ERROR] Traceback: {traceback.format_exc()}")
-            print("[PYGAME-GUI] Fallback: Continuando sin pygame_gui")
-            self.ui_manager = None
+            print(f"[DASHBOARD-WC ERROR] Traceback: {traceback.format_exc()}")
+            print("[DASHBOARD-WC] Fallback: Continuando sin dashboard")
+            self.dashboard = None
             self.dashboard_gui = None
+            self.ui_manager = None
 
     # REFACTOR: Method replaced by ConfigurationManager integration in __init__
     # Original method preserved below (commented out) for reference
@@ -165,7 +148,7 @@ class ReplayViewerEngine:
         """
         ORIGINAL METHOD - Now handled by ConfigurationManager in __init__
 
-        Carga la configuración desde config.json o usa defaults hardcodeados
+        Carga la configuracion desde config.json o usa defaults hardcodeados
 
         MIGRATION NOTE: This method has been replaced by ConfigurationManager
         integration in __init__(). Configuration is now loaded automatically
@@ -176,18 +159,18 @@ class ReplayViewerEngine:
         - core.config_manager.ConfigurationManager._sanitize_assignment_rules()
         """
         # COMMENTED OUT - Original implementation preserved for reference
-        # KEEP: Todo el método - Necesario para configurar el replay viewer
+        # KEEP: Todo el metodo - Necesario para configurar el replay viewer
         #
         # config_path = os.path.join(os.path.dirname(__file__), "config.json")
         #
         # try:
         #     # Intentar cargar config.json
         #     if os.path.exists(config_path):
-        #         print(f"[CONFIG] Cargando configuración desde: {config_path}")
+        #         print(f"[CONFIG] Cargando configuracion desde: {config_path}")
         #         with open(config_path, 'r', encoding='utf-8') as f:
         #             self.configuracion = json.load(f)
         #
-        #         # KEEP: Sanitización - Necesaria para compatibilidad
+        #         # KEEP: Sanitizacion - Necesaria para compatibilidad
         #         # Sanitizar assignment_rules: convertir claves str a int
         #         if 'assignment_rules' in self.configuracion and self.configuracion['assignment_rules']:
         #             sanitized_rules = {}
@@ -195,29 +178,29 @@ class ReplayViewerEngine:
         #                 sanitized_rules[agent_type] = {int(k): v for k, v in rules.items()}
         #             self.configuracion['assignment_rules'] = sanitized_rules
         #
-        #         print("[CONFIG] Configuración cargada exitosamente desde archivo JSON")
+        #         print("[CONFIG] Configuracion cargada exitosamente desde archivo JSON")
         #     else:
-        #         print("[CONFIG] config.json no encontrado, usando configuración por defecto")
+        #         print("[CONFIG] config.json no encontrado, usando configuracion por defecto")
         #         self.configuracion = get_default_config()
-        #         print("[CONFIG] Configuración por defecto cargada")
+        #         print("[CONFIG] Configuracion por defecto cargada")
         #
         #     # ELIMINATED: cost_calculator - No needed for replay visualization
-        #     # ELIMINATED: # Nota: cost_calculator se creará después de inicializar data_manager
+        #     # ELIMINATED: # Nota: cost_calculator se creara despues de inicializar data_manager
         #
-        #     # Mostrar resumen de configuración cargada
+        #     # Mostrar resumen de configuracion cargada
         #     mostrar_resumen_config(self.configuracion)
         #
         #     return True
         #
         # except json.JSONDecodeError as e:
         #     print(f"[CONFIG ERROR] Error al parsear config.json: {e}")
-        #     print("[CONFIG] Usando configuración por defecto como fallback")
+        #     print("[CONFIG] Usando configuracion por defecto como fallback")
         #     self.configuracion = get_default_config()
         #     return True
         #
         # except Exception as e:
-        #     print(f"[CONFIG ERROR] Error inesperado cargando configuración: {e}")
-        #     print("[CONFIG] Usando configuración por defecto como fallback")
+        #     print(f"[CONFIG ERROR] Error inesperado cargando configuracion: {e}")
+        #     print("[CONFIG] Usando configuracion por defecto como fallback")
         #     self.configuracion = get_default_config()
         #     return True
 
@@ -225,18 +208,18 @@ class ReplayViewerEngine:
         return True
 
     # ELIMINATED: def crear_simulacion(self) - No simulation creation needed for replay viewer
-    # Todo el método eliminado ya que el replay viewer no crea simulaciones
+    # Todo el metodo eliminado ya que el replay viewer no crea simulaciones
     def inicializar_layout_para_visualizacion(self):
         """Inicializa solo el layout manager para mostrar el mapa TMX en replay"""
         # KEEP: Solo la parte de layout - Necesaria para mostrar el mapa de fondo
 
         if not self.configuracion:
-            print("Error: No hay configuración válida")
+            print("Error: No hay configuracion valida")
             return False
 
-        print("[REPLAY-VIEWER] Inicializando layout TMX para visualización...")
+        print("[REPLAY-VIEWER] Inicializando layout TMX para visualizacion...")
 
-        # Inicializar pygame si no está inicializado
+        # Inicializar pygame si no esta inicializado
         if not pygame.get_init():
             pygame.init()
             pygame.display.set_mode((100, 100))  # Ventana temporal para TMX
@@ -249,7 +232,7 @@ class ReplayViewerEngine:
             self.layout_manager = LayoutManager(tmx_file)
         except Exception as e:
             print(f"[FATAL ERROR] No se pudo cargar archivo TMX: {e}")
-            print("[FATAL ERROR] El replay viewer requiere un archivo TMX válido para mostrar el mapa.")
+            print("[FATAL ERROR] El replay viewer requiere un archivo TMX valido para mostrar el mapa.")
             raise SystemExit(f"Error cargando TMX: {e}")
 
 
@@ -262,7 +245,7 @@ class ReplayViewerEngine:
     # ELIMINATED: def _proceso_actualizacion_metricas(self) - No simulation metrics needed
 
     def ejecutar_bucle_visualizacion_replay(self):
-        """Bucle principal para visualización de replay - versión simplificada"""
+        """Bucle principal para visualizacion de replay - version simplificada"""
         # KEEP: Core visualization loop - Necesario para mostrar replay
 
         from subsystems.visualization.renderer import renderizar_agentes, renderizar_dashboard
@@ -279,21 +262,19 @@ class ReplayViewerEngine:
                 if not self._manejar_evento(event):
                     self.corriendo = False
 
-            # 2. PYGAME_GUI FASE 2.5: Actualizar UI Manager y DashboardGUI refactorizada
+            # 2. DASHBOARD WORLD-CLASS: Actualizar dashboard (opcional)
             time_delta = self.reloj.tick(30) / 1000.0  # Convertir a segundos
-            if self.ui_manager:
-                self.ui_manager.update(time_delta)
             
-            # FASE 2.5: Actualizar DashboardGUI refactorizada con estado visual
-            if self.dashboard_gui:
-                # Obtener estado visual actualizado
-                from subsystems.visualization.state import estado_visual
-                self.dashboard_gui.update_data(estado_visual)
+            # Dashboard World-Class se actualiza en el render() directamente
+            # No necesita update_data() previo
 
             # 3. Renderizado - Core para mostrar replay
-            self.pantalla.fill((240, 240, 240))  # Fondo gris claro
+            # ORDEN CORRECTO: Primero llenar fondo, luego dashboard, luego layout
+            
+            # 3.1. Limpiar pantalla completa con fondo gris claro
+            self.pantalla.fill((240, 240, 240))
 
-            # 4. Dibujar el mundo de replay en la superficie virtual
+            # 3.2. Dibujar el mundo de replay en la superficie virtual
             self.virtual_surface.fill((25, 25, 25))
             if hasattr(self, 'layout_manager') and self.layout_manager:
                 self.renderer.renderizar_mapa_tmx(self.virtual_surface, self.layout_manager.tmx_data)
@@ -303,18 +284,16 @@ class ReplayViewerEngine:
             agentes_para_renderizar = list(estado_visual.get('operarios', {}).values())
             renderizar_agentes(self.virtual_surface, agentes_para_renderizar, self.layout_manager)
 
-            # 5. KEEP: Escalar la superficie virtual al área de simulación en la pantalla
+            # 3.3. LAYOUT: Escalar y dibujar el mundo desplazado a la derecha (ANTES del dashboard)
             scaled_surface = pygame.transform.smoothscale(self.virtual_surface, self.window_size)
-            self.pantalla.blit(scaled_surface, (0, 0))  # Dibujar el mundo a la izquierda
+            self.pantalla.blit(scaled_surface, (440, 0))
+            
+            # 3.4. DASHBOARD WORLD-CLASS: Renderizar dashboard en panel izquierdo (DESPUÉS del layout)
+            # Esto asegura que el dashboard se dibuje SOBRE el fondo y no sea tapado
+            if self.dashboard:
+                self.dashboard.render(self.pantalla, estado_visual, offset_x=0)
 
-            # 6. PYGAME_GUI FASE 2.5: Dibujar UI de pygame_gui con DashboardGUI refactorizada
-            if self.ui_manager:
-                self.ui_manager.draw_ui(self.pantalla)
-            else:
-                # Fallback: Dashboard original para replay
-                self._renderizar_dashboard_replay()
-
-            # 7. ELIMINATED: Verificación de finalización - No simulation to finish
+            # 7. ELIMINATED: Verificacion de finalizacion - No simulation to finish
 
             # 8. KEEP: Actualizar la pantalla
             pygame.display.flip()
@@ -323,36 +302,6 @@ class ReplayViewerEngine:
         print("Replay viewer terminado. Saliendo de Pygame.")
         pygame.quit()
 
-    def _renderizar_dashboard_replay(self):
-        """Renderiza dashboard simplificado para replay viewer"""
-        # KEEP: Simplified dashboard for replay
-        font = pygame.font.Font(None, 24)
-
-        # Panel derecho para información de replay
-        panel_x = self.window_size[0]
-        panel_width = 380
-
-        # Fondo del panel
-        pygame.draw.rect(self.pantalla, (50, 50, 50),
-                        (panel_x, 0, panel_width, self.window_size[1]))
-
-        # Información del replay
-        textos = [
-            "REPLAY VIEWER",
-            f"Tiempo: {self.playback_time:.1f}s",
-            f"Velocidad: {self.factor_aceleracion:.1f}x",
-            f"Buffer: {len(self.event_buffer)} eventos",
-            "",
-            "Controles:",
-            "+/- : Cambiar velocidad",
-            "SPACE : Pausa",
-            "ESC : Salir"
-        ]
-
-        for i, texto in enumerate(textos):
-            color = (255, 255, 255) if i == 0 else (200, 200, 200)
-            superficie_texto = font.render(texto, True, color)
-            self.pantalla.blit(superficie_texto, (panel_x + 10, 20 + i * 30))
 
 
     def _renderizar_replay_frame(self, operarios_visual, eventos_recibidos, eventos_procesados):
@@ -362,7 +311,7 @@ class ReplayViewerEngine:
         # Limpiar pantalla
         self.pantalla.fill((240, 240, 240))  # Fondo gris claro
 
-        # Renderizar mapa TMX si está disponible
+        # Renderizar mapa TMX si esta disponible
         if hasattr(self, 'layout_manager') and self.layout_manager:
             # Renderizar en superficie virtual primero
             self.virtual_surface.fill((25, 25, 25))
@@ -378,7 +327,7 @@ class ReplayViewerEngine:
             # Renderizado simple sin mapa
             self._renderizar_agentes_replay(self.pantalla, operarios_visual)
 
-        # HUD de información del motor de replay
+        # HUD de informacion del motor de replay
         self._renderizar_hud_replay(eventos_recibidos, eventos_procesados, len(operarios_visual))
 
         # Actualizar pantalla
@@ -393,15 +342,15 @@ class ReplayViewerEngine:
             y = data.get('y', 100)
             tipo = data.get('tipo', 'terrestre')
 
-            # Color según tipo
+            # Color segun tipo
             color = (0, 150, 255) if tipo == 'montacargas' else (255, 100, 0)  # Azul o naranja
 
-            # Dibujar agente como círculo
+            # Dibujar agente como circulo
             pygame.draw.circle(surface, color, (int(x), int(y)), 8)
 
             # Dibujar ID del agente
             font = pygame.font.Font(None, 16)
-            texto = font.render(agent_id[-1], True, (255, 255, 255))  # Solo último carácter
+            texto = font.render(agent_id[-1], True, (255, 255, 255))  # Solo ultimo caracter
             surface.blit(texto, (int(x) - 5, int(y) - 20))
 
     def _renderizar_hud_replay(self, eventos_recibidos, eventos_procesados, agentes_activos):
@@ -411,7 +360,7 @@ class ReplayViewerEngine:
         font = pygame.font.Font(None, 24)
         textos = [
             f"REPLAY VIEWER ENGINE",
-            f"Tiempo de reproducción: {self.playback_time:.1f}s",
+            f"Tiempo de reproduccion: {self.playback_time:.1f}s",
             f"Velocidad: {self.factor_aceleracion:.1f}x",
             f"Buffer: {len(self.event_buffer)} eventos",
             f"Recibidos: {eventos_recibidos} | Procesados: {eventos_procesados}",
@@ -451,7 +400,7 @@ class ReplayViewerEngine:
                     self.factor_aceleracion = factores[factores.index(self.factor_aceleracion) + 1]
                 else:
                     self.factor_aceleracion = factores[-1]
-                print(f"[REPLAY] Velocidad de reproducción: {self.factor_aceleracion:.1f}x")
+                print(f"[REPLAY] Velocidad de reproduccion: {self.factor_aceleracion:.1f}x")
 
             elif evento.key == pygame.K_MINUS or evento.key == pygame.K_KP_MINUS:  # Tecla - o -
                 # KEEP: Velocidad control - Core for replay playback speed
@@ -460,29 +409,29 @@ class ReplayViewerEngine:
                     self.factor_aceleracion = factores[factores.index(self.factor_aceleracion) - 1]
                 else:
                     self.factor_aceleracion = factores[0]
-                print(f"[REPLAY] Velocidad de reproducción: {self.factor_aceleracion:.1f}x")
+                print(f"[REPLAY] Velocidad de reproduccion: {self.factor_aceleracion:.1f}x")
 
-            elif evento.key == pygame.K_o:  # Tecla O para Dashboard de Órdenes
+            elif evento.key == pygame.K_o:  # Tecla O para Dashboard de Ordenes
                 print("[REPLAY-VIEWER] Tecla 'O' detectada.")
                 # KEEP: Dashboard toggle - Useful for replay analysis
                 self.toggle_order_dashboard()
 
-            # ELIMINATED: Funciones de diagnóstico - Not needed for replay viewer
+            # ELIMINATED: Funciones de diagnostico - Not needed for replay viewer
 
         return True
 
 
     def toggle_order_dashboard(self):
-        """Toggle del dashboard de órdenes (PyQt6)"""
+        """Toggle del dashboard de ordenes (PyQt6)"""
         # KEEP: Dashboard functionality - Useful for replay analysis
 
         if self.order_dashboard_process and self.order_dashboard_process.is_alive():
-            print("[DASHBOARD] Cerrando dashboard de órdenes...")
+            print("[DASHBOARD] Cerrando dashboard de ordenes...")
             self.order_dashboard_process.terminate()
             self.order_dashboard_process = None
             print("[DASHBOARD] Dashboard cerrado")
         else:
-            print("[DASHBOARD] Abriendo dashboard de órdenes...")
+            print("[DASHBOARD] Abriendo dashboard de ordenes...")
             # ELIMINATED: Complex simulation data passing - Simplified for replay
             self._iniciar_dashboard_ordenes_replay()
 
@@ -554,7 +503,7 @@ class ReplayViewerEngine:
         pygame.init()
         
         # Usar el metodo inicializar_pygame() que incluye pygame_gui
-        self.window_size = (960, 1000)  # Establecer tamaño antes de inicializar
+        self.window_size = (960, 1000)  # Establecer tamano antes de inicializar
         self.inicializar_pygame()
         
         # Variables para compatibilidad con codigo existente
@@ -603,7 +552,7 @@ class ReplayViewerEngine:
         virtual_surface = pygame.Surface((warehouse_width, warehouse_width))  # Superficie virtual para el mapa
         self.renderer = RendererOriginal(virtual_surface)
         self.virtual_surface = virtual_surface
-        # self.window_size ya está establecido en inicializar_pygame()
+        # self.window_size ya esta establecido en inicializar_pygame()
 
         # Inicializar estado visual basico
         inicializar_estado(None, None, configuracion, self.layout_manager)
@@ -627,7 +576,7 @@ class ReplayViewerEngine:
         agentes_iniciales = {}
         for evento in eventos[:10]:  # Solo mirar los primeros eventos
             if evento.get('type') == 'estado_agente':
-                agent_id = evento.get('agent_id')  # BUGFIX: agent_id está en nivel raíz
+                agent_id = evento.get('agent_id')  # BUGFIX: agent_id esta en nivel raiz
                 data = evento.get('data', {})
                 if agent_id and 'position' in data:  # BUGFIX: Buscar position como antes
                     agentes_iniciales[agent_id] = data
@@ -641,6 +590,7 @@ class ReplayViewerEngine:
 
         # Inicializar motor de playback
         playback_time = 0.0
+        self.playback_time = 0.0  # Mantener sincronizado con el estado para el dashboard
         replay_speed = 1.0
         velocidades_permitidas = [0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0]
         processed_event_indices = set()  # Trackear eventos ya procesados
@@ -685,9 +635,17 @@ class ReplayViewerEngine:
         while corriendo:
             time_delta = self.reloj.tick(30) / 1000.0
 
+            # PYGAME_GUI: Actualizar UIManager si está disponible
+            if self.ui_manager:
+                self.ui_manager.update(time_delta)
+
             # Manejar eventos de pygame
             for event in pygame.event.get():
-                # REFACTOR V8.0: Eventos para proceso principal (sin pygame_gui)
+                # PYGAME_GUI: Procesar eventos pygame_gui si está disponible
+                if self.ui_manager:
+                    self.ui_manager.process_events(event)
+                
+                # REFACTOR V8.0: Eventos para proceso principal
                 if event.type == pygame.QUIT:
                     corriendo = False
                 elif event.type == pygame.KEYDOWN:
@@ -765,7 +723,7 @@ class ReplayViewerEngine:
                     print(f"[BUGFIX] Replay pausado - replay_finalizado = {replay_finalizado}")
 
                 if evento.get('type') == 'estado_agente':
-                    agent_id = evento.get('agent_id')  # BUGFIX: agent_id está en nivel raíz
+                    agent_id = evento.get('agent_id')  # BUGFIX: agent_id esta en nivel raiz
                     event_data = evento.get('data', {})
                     event_timestamp = evento.get('timestamp', 0.0)
 
@@ -782,18 +740,18 @@ class ReplayViewerEngine:
                         # CRITICO: Usar .update() para fusionar datos sin perder claves existentes
                         estado_visual["operarios"][agent_id].update(event_data)
 
-                        # BUGFIX: Usar position como en la versión anterior y convertir a píxeles
+                        # BUGFIX: Usar position como en la version anterior y convertir a pixeles
                         if 'position' in event_data:
                             position = event_data['position']
                             estado_visual["operarios"][agent_id]['position'] = position
                             
-                            # Convertir coordenadas de grid a píxeles para renderizado
+                            # Convertir coordenadas de grid a pixeles para renderizado
                             try:
                                 pixel_x, pixel_y = self.layout_manager.grid_to_pixel(position[0], position[1])
                                 estado_visual["operarios"][agent_id]['x'] = pixel_x
                                 estado_visual["operarios"][agent_id]['y'] = pixel_y
                             except Exception as e:
-                                print(f"[DEBUG] Error convirtiendo posición {position} a píxeles: {e}")
+                                print(f"[DEBUG] Error convirtiendo posicion {position} a pixeles: {e}")
                                 # Fallback: usar coordenadas originales si hay error
                                 estado_visual["operarios"][agent_id]['x'] = event_data.get('x', 0)
                                 estado_visual["operarios"][agent_id]['y'] = event_data.get('y', 0)
@@ -836,22 +794,30 @@ class ReplayViewerEngine:
             # BUGFIX DASHBOARD METRICS: Update operator metrics after processing events
             if estado_visual.get("operarios"):
                 actualizar_metricas_tiempo(estado_visual["operarios"])
+            
+            # BUGFIX MODERN DASHBOARD: Calcular métricas que necesita ModernDashboard
+            self._calcular_metricas_modern_dashboard(estado_visual)
+            self._calcular_throughput_min(estado_visual)
 
             # REFACTOR ARQUITECTONICO: Avanzar tiempo DESPUES de procesar eventos
             # BUGFIX: Solo avanzar tiempo si el replay NO ha finalizado y NO esta pausado
             if not replay_finalizado and not replay_pausado:
                 delta_time = self.reloj.get_time() / 1000.0  # Convertir ms a segundos
                 playback_time += delta_time * replay_speed
+                # Sincronizar el tiempo expuesto para el dashboard
+                self.playback_time = playback_time
 
-            # Limpiar pantalla
+            # RENDERIZADO - ORDEN CORRECTO PARA NO TAPAR EL DASHBOARD
+            
+            # 1. Limpiar pantalla completa
             self.pantalla.fill((240, 240, 240))
             virtual_surface.fill((25, 25, 25))
 
-            # Renderizar mapa TMX
+            # 2. Renderizar mapa TMX en superficie virtual
             if hasattr(self.layout_manager, 'tmx_data') and self.layout_manager.tmx_data:
                 self.renderer.renderizar_mapa_tmx(virtual_surface, self.layout_manager.tmx_data)
 
-            # Renderizar agentes con posiciones actualizadas
+            # 3. Renderizar agentes con posiciones actualizadas
             from subsystems.visualization.renderer import renderizar_agentes
             if estado_visual.get("operarios"):
                 # CRITICO: Convertir diccionario a lista para renderizar_agentes
@@ -863,7 +829,7 @@ class ReplayViewerEngine:
 
                 renderizar_agentes(virtual_surface, operarios_a_renderizar, self.layout_manager)
 
-            # BUGFIX 2025-10-05: Escalar uniformemente para mantener proporcion 1:1
+            # 4. BUGFIX 2025-10-05: Escalar uniformemente para mantener proporcion 1:1
             # Calcula ratio uniforme usando el menor dimension disponible
             scale_ratio = min(warehouse_width / 960.0, self.window_size[1] / 960.0)
             scaled_width = int(960 * scale_ratio)
@@ -879,65 +845,25 @@ class ReplayViewerEngine:
             offset_x = (warehouse_width - scaled_width) // 2
             offset_y = (self.window_size[1] - scaled_height) // 2
 
-            # Llenar fondo del area de warehouse (para bordes si hay)
-            warehouse_rect = pygame.Rect(0, 0, warehouse_width, self.window_size[1])
+            # 5. Llenar fondo del area de warehouse (para bordes si hay)
+            warehouse_rect = pygame.Rect(440, 0, warehouse_width, self.window_size[1])
             pygame.draw.rect(self.pantalla, (40, 40, 40), warehouse_rect)
 
-            # Blit superficie escalada centrada
-            self.pantalla.blit(scaled_warehouse, (offset_x, offset_y))
+            # 6. Blit superficie escalada centrada con desplazamiento del panel izquierdo
+            self.pantalla.blit(scaled_warehouse, (offset_x + 440, offset_y))
 
-            # Renderizar Dashboard de Agentes
-            from subsystems.visualization.renderer import renderizar_dashboard
-
-            # Preparar metricas para el dashboard - DUAL COUNTERS
-            # BUGFIX PHASE 1: Count completed WorkOrders correctly
-            work_orders = estado_visual.get('work_orders', {})
-            workorders_completadas = sum(
-                1 for wo in work_orders.values()
-                if wo.get('cantidad_restante', wo.get('cantidad_total', 1)) == 0
-                or wo.get('status') in ['completed', 'staged', 'delivered']
-            )
-
-            # BUGFIX PHASE 2: Count tasks from picking_executions in WorkOrders
-            tareas_completadas = sum(
-                wo.get('picking_executions', 0)
-                for wo in work_orders.values()
-            )
-
-            # BUGFIX: Usar total fijo de WorkOrders si esta disponible
-            total_wos_a_usar = total_work_orders_fijo if total_work_orders_fijo is not None else len(work_orders)
-
-            # BUGFIX PHASE 4: Merge calculated metrics with operator metrics from estado_visual
-            metricas = {
-                'tiempo': playback_time,
-                'workorders_completadas': workorders_completadas,  # KPI principal
-                'tareas_completadas': tareas_completadas,  # Metrica granular
-                'total_wos': total_wos_a_usar,
-                # Add operator metrics from estado_visual
-                'operarios_idle': estado_visual["metricas"].get("operarios_idle", 0),
-                'operarios_working': estado_visual["metricas"].get("operarios_working", 0),
-                'operarios_traveling': estado_visual["metricas"].get("operarios_traveling", 0),
-                'utilizacion_promedio': estado_visual["metricas"].get("utilizacion_promedio", 0.0)
-            }
-
-            # Preparar operarios para el dashboard (convertir a formato esperado)
-            operarios_dashboard = []
-            for agent_id, agent_data in estado_visual.get('operarios', {}).items():
-                operario = agent_data.copy()
-                operario['id'] = agent_id
-                operarios_dashboard.append(operario)
-
-            # Renderizar dashboard en el lado derecho
-            renderizar_dashboard(self.pantalla, warehouse_width, metricas, operarios_dashboard)
+            # 7. DASHBOARD WORLD-CLASS: Renderizar DESPUÉS del layout para que se vea encima
+            if self.dashboard:
+                self.dashboard.render(self.pantalla, estado_visual, offset_x=0)
 
             # Mostrar informacion de replay en la parte superior del almacen
             font = pygame.font.Font(None, 20)
             info_text = font.render(f"REPLAY: Tiempo {playback_time:.2f}s | Velocidad: {replay_speed:.2f}x | Eventos {len(processed_event_indices)}/{len(eventos)}", True, (255, 255, 255))
-            self.pantalla.blit(info_text, (10, 10))
+            self.pantalla.blit(info_text, (450, 10))
 
             # Mostrar informacion de controles y dashboard
             controls_text = font.render("CONTROLES: +/- velocidad | SPACE pausa | O dashboard | ESC salir", True, (255, 255, 255))
-            self.pantalla.blit(controls_text, (10, 35))
+            self.pantalla.blit(controls_text, (450, 35))
 
             # REFACTOR V8.0: IPC communication con PyQt6 Dashboard
             if dashboard_process_started and ipc_manager and not replay_pausado:
@@ -960,6 +886,58 @@ class ReplayViewerEngine:
         pygame.quit()
         print("[REPLAY] Modo replay terminado")
         return 0
+
+    def _calcular_metricas_modern_dashboard(self, estado_visual):
+        """
+        Calcula las métricas que necesita el ModernDashboard.
+        
+        Args:
+            estado_visual: Dict con el estado actual de la simulación
+        """
+        # Inicializar métricas si no existen
+        if "metricas" not in estado_visual:
+            estado_visual["metricas"] = {}
+        
+        # Calcular métricas de WorkOrders
+        work_orders = estado_visual.get("work_orders", {})
+        total_wos = len(work_orders)
+        workorders_completadas = 0
+        tareas_completadas = 0
+        
+        for wo_id, wo_data in work_orders.items():
+            status = wo_data.get('status', 'unknown')
+            if status in ['completed', 'Completada', 'COMPLETED']:
+                workorders_completadas += 1
+            
+            # Contar tareas completadas (puede ser una estimación basada en el progreso)
+            # Por ahora, asumimos que cada WO completada tiene todas sus tareas completadas
+            if status in ['completed', 'Completada', 'COMPLETED']:
+                # Estimación: cada WO tiene aproximadamente 2-4 tareas
+                tareas_completadas += 3  # Estimación conservadora
+        
+        # Calcular tiempo de simulación
+        tiempo_simulacion = self.playback_time
+        
+        # Actualizar métricas
+        estado_visual["metricas"]["tiempo"] = tiempo_simulacion
+        estado_visual["metricas"]["workorders_completadas"] = workorders_completadas
+        estado_visual["metricas"]["total_wos"] = total_wos
+        estado_visual["metricas"]["tareas_completadas"] = tareas_completadas
+        
+        # Debug: mostrar métricas calculadas
+        if total_wos > 0:
+            print(f"[METRICAS] WO: {workorders_completadas}/{total_wos}, Tareas: {tareas_completadas}, Tiempo: {tiempo_simulacion:.1f}s")
+
+    def _calcular_throughput_min(self, estado_visual):
+        """Calcula throughput por minuto (WO completadas / minuto)."""
+        if "metricas" not in estado_visual:
+            estado_visual["metricas"] = {}
+        tiempo = self.playback_time
+        completadas = estado_visual["metricas"].get("workorders_completadas", 0)
+        if tiempo > 0:
+            estado_visual["metricas"]["throughput_min"] = (completadas / max(tiempo, 1e-6)) * 60.0
+        else:
+            estado_visual["metricas"]["throughput_min"] = 0.0
 
     def limpiar_recursos(self):
         """Limpia recursos al cerrar"""

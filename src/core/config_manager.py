@@ -19,7 +19,7 @@ class ConfigurationManager:
     """
     Manager centralizado para gestion de configuracion JSON
 
-    Características:
+    Caracteristicas:
     - Carga desde config.json con fallback automatico a defaults
     - Sanitizacion automatica de assignment_rules
     - Validacion de claves esenciales
