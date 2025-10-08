@@ -145,8 +145,18 @@ class DispatcherV11:
         """
         # Step 1: Check if work is available
         if not self.work_orders_pendientes:
-            print(f"[DISPATCHER] {self.env.now:.2f} - No hay WorkOrders pendientes para "
-                  f"{operator.type}_{operator.id}")
+            # BUGFIX: Solo log cada 10 segundos para evitar spam
+            if not hasattr(self, '_last_no_work_log'):
+                self._last_no_work_log = {}
+            
+            operator_key = f"{operator.type}_{operator.id}"
+            last_log_time = self._last_no_work_log.get(operator_key, 0)
+            
+            if self.env.now - last_log_time >= 10.0:
+                print(f"[DISPATCHER] {self.env.now:.2f} - No hay WorkOrders pendientes para "
+                      f"{operator.type}_{operator.id}")
+                self._last_no_work_log[operator_key] = self.env.now
+            
             return None
 
         print(f"[DISPATCHER] {self.env.now:.2f} - Operador {operator.type}_{operator.id} "
@@ -486,6 +496,29 @@ class DispatcherV11:
             # Update WorkOrder state
             wo.status = "completed"
             wo.tiempo_fin = self.env.now
+            
+            # BUGFIX FASE4: Emitir evento work_order_update para registrar completado
+            # Esto permite que el replay tenga datos completos de progreso
+            self.almacen.registrar_evento('work_order_update', {
+                'id': wo.id,
+                'order_id': wo.order_id,
+                'tour_id': getattr(wo, 'tour_id', None),
+                'sku_id': wo.sku_id,
+                'sku_name': wo.sku_name,
+                'cantidad_total': wo.cantidad_total,
+                'cantidad_restante': wo.cantidad_restante,
+                'volumen_restante': wo.volumen_restante,
+                'ubicacion': wo.ubicacion,
+                'staging_id': wo.staging_id,
+                'status': 'completed',
+                'assigned_agent_id': wo.assigned_agent_id,
+                'pick_sequence': wo.pick_sequence,
+                'work_group': wo.work_group,
+                'work_area': wo.work_area,
+                'picking_executions': getattr(wo, 'picking_executions', 0),
+                'tiempo_inicio': getattr(wo, 'tiempo_inicio', None),
+                'tiempo_fin': wo.tiempo_fin
+            })
 
         # Operator back to available
         if operator_id in self.operadores_activos:

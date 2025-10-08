@@ -41,6 +41,43 @@ class WorkOrder:
         self.tiempo_inicio = None
         self.tiempo_fin = None
 
+    @property
+    def sku_id(self) -> str:
+        """Get SKU ID from SKU object"""
+        return self.sku.id if self.sku else "N/A"
+    
+    @property
+    def sku_name(self) -> str:
+        """Get SKU name (same as ID for now)"""
+        return self.sku.id if self.sku else "N/A"
+    
+    @property
+    def cantidad_total(self) -> int:
+        """Alias for cantidad_inicial"""
+        return self.cantidad_inicial
+    
+    @property
+    def volumen_restante(self) -> int:
+        """Calculate remaining volume"""
+        return self.cantidad_restante * self.sku.volumen if self.sku else 0
+    
+    @property
+    def staging_id(self) -> int:
+        """Get staging ID (placeholder)"""
+        return 1  # Default staging
+    
+    @property
+    def work_group(self) -> str:
+        """Get work group (derived from work_area)"""
+        # Map work_area to work_group
+        if 'Ground' in self.work_area:
+            return 'WG_A'
+        elif 'Piso' in self.work_area:
+            return 'WG_B'
+        elif 'Rack' in self.work_area:
+            return 'WG_C'
+        return 'WG_A'  # Default
+
     def calcular_volumen_restante(self) -> int:
         """Calculate remaining volume for this work order"""
         return self.cantidad_restante * self.sku.volumen
@@ -81,11 +118,12 @@ class AlmacenMejorado:
     def __init__(self, env: simpy.Environment, configuracion: Dict[str, Any],
                  layout_manager=None, pathfinder=None, data_manager=None,
                  cost_calculator=None, route_calculator=None, simulador=None,
-                 visual_event_queue=None):
+                 visual_event_queue=None, replay_buffer=None):
         """
         Initialize warehouse with configuration and dependencies
 
         BUGFIX FASE 1: Agregado route_calculator para integracion con DispatcherV11
+        BUGFIX JSONL: Agregado replay_buffer para generacion de archivos .jsonl
 
         Args:
             env: SimPy environment
@@ -97,6 +135,7 @@ class AlmacenMejorado:
             route_calculator: RouteCalculator for tour optimization
             simulador: Reference to main simulator (optional)
             visual_event_queue: Multiprocessing queue for visual events (optional)
+            replay_buffer: ReplayBuffer instance for .jsonl generation (optional)
         """
         self.env = env
         self.configuracion = configuracion
@@ -107,6 +146,8 @@ class AlmacenMejorado:
         self.route_calculator = route_calculator
         self.simulador = simulador
         self.visual_event_queue = visual_event_queue
+        self.replay_buffer = replay_buffer
+        
 
         # Inventory and catalog
         self.catalogo_skus: Dict[str, SKU] = {}
@@ -124,7 +165,17 @@ class AlmacenMejorado:
         self.workorders_completadas_count = 0  # Main KPI counter
         self.tareas_completadas_count = 0      # Legacy picking tasks counter
 
-        # BUGFIX FASE 1: Reemplazar Dispatcher stub con DispatcherV11 real
+        # Event log for analytics
+        self.event_log: List[Dict[str, Any]] = []
+
+        # Agent configuration
+        self.num_operarios_total = configuracion.get('num_operarios_total', 3)
+
+        # Simulation state
+        self._simulation_finished = False
+
+        # BUGFIX JSONL: Crear dispatcher DESPUÉS de completar inicialización
+        # para evitar problemas de referencia con replay_buffer
         from .dispatcher import DispatcherV11
         self.dispatcher = DispatcherV11(
             env=env,
@@ -134,15 +185,6 @@ class AlmacenMejorado:
             data_manager=data_manager,
             configuracion=configuracion
         )
-
-        # Event log for analytics
-        self.event_log: List[Dict[str, Any]] = []
-
-        # Agent configuration
-        self.num_operarios_total = configuracion.get('num_operarios_total', 3)
-
-        # Simulation state
-        self._simulation_finished = False
 
         # BUGFIX CAPACITY VALIDATION: Extract operator capacities from configuration
         self.operator_capacities = {}  # {work_area: max_capacity}
@@ -345,17 +387,17 @@ class AlmacenMejorado:
         Returns:
             True if all work orders are completed and no agents are busy
         """
-        # Check if all work orders are completed
-        if not self.dispatcher.lista_maestra_work_orders:
-            # All work orders completed
-            if not self._simulation_finished:
-                self._simulation_finished = True
-                print(f"[ALMACEN] Simulacion finalizada en t={self.env.now:.2f}")
-                print(f"[ALMACEN] WorkOrders completadas: {self.workorders_completadas_count}")
-                print(f"[ALMACEN] Tareas completadas: {self.tareas_completadas_count}")
-            return True
-
-        return False
+        # BUGFIX: Delegar al dispatcher que tiene la logica correcta
+        # (compara completados vs total en lugar de verificar si lista esta vacia)
+        terminado = self.dispatcher.simulacion_ha_terminado()
+        
+        if terminado and not self._simulation_finished:
+            self._simulation_finished = True
+            print(f"[ALMACEN] Simulacion finalizada en t={self.env.now:.2f}")
+            print(f"[ALMACEN] WorkOrders completadas: {self.workorders_completadas_count}")
+            print(f"[ALMACEN] Tareas completadas: {self.tareas_completadas_count}")
+        
+        return terminado
 
     def incrementar_contador_workorders(self):
         """Increment WorkOrders completed counter"""
@@ -367,7 +409,10 @@ class AlmacenMejorado:
 
     def registrar_evento(self, tipo: str, datos: Dict[str, Any]):
         """
-        Register an event in the event log for analytics
+        Register an event in the event log for analytics and replay buffer
+
+        BUGFIX JSONL: Ahora tambien escribe eventos al replay_buffer para
+        generacion de archivos .jsonl
 
         Args:
             tipo: Event type (e.g., 'task_completed', 'agent_moved')
@@ -379,6 +424,16 @@ class AlmacenMejorado:
             **datos
         }
         self.event_log.append(evento)
+        
+        # BUGFIX JSONL: Tambien agregar al replay_buffer para generacion de .jsonl
+        if self.replay_buffer is not None:
+            # Convertir formato para replay (tipo -> type)
+            replay_evento = {
+                'type': tipo,
+                'timestamp': self.env.now,
+                **datos
+            }
+            self.replay_buffer.add_event(replay_evento)
 
     def __repr__(self):
         return (f"AlmacenMejorado(ordenes={self.total_ordenes}, "
