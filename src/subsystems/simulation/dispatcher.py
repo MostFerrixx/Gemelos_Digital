@@ -79,6 +79,9 @@ class DispatcherV11:
         # Statistics
         self.total_asignaciones = 0
         self.total_tours_creados = 0
+        
+        # FASE 2: Contador inicial de WorkOrders para metadata
+        self.work_orders_total_inicial = 0
 
         # Configuration parameters
         self.max_wos_por_tour = configuracion.get('max_wos_por_tour', 20)
@@ -102,6 +105,11 @@ class DispatcherV11:
             self.lista_maestra_work_orders.append(wo)
             self.work_orders_pendientes.append(wo)
             wo.status = "pending"
+
+        # FASE 2: Configurar contador inicial de WorkOrders para metadata
+        if not hasattr(self, 'work_orders_total_inicial') or self.work_orders_total_inicial == 0:
+            self.work_orders_total_inicial = len(self.lista_maestra_work_orders)
+            print(f"[DISPATCHER] Total WorkOrders iniciales configurado: {self.work_orders_total_inicial}")
 
         print(f"[DISPATCHER] {self.env.now:.2f} - Agregados {len(work_orders)} WorkOrders. "
               f"Total pendientes: {len(self.work_orders_pendientes)}")

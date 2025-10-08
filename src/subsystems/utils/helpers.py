@@ -17,12 +17,13 @@ from datetime import datetime
 # FUNCIONES DE EXPORTACION
 # =============================================================================
 
-def exportar_metricas(almacen):
+def exportar_metricas(almacen, archivo_json=None):
     """
     Exporta las metricas del almacen a un archivo JSON.
 
     Args:
         almacen: Instancia de AlmacenMejorado
+        archivo_json: Path del archivo JSON de salida (opcional)
 
     Returns:
         str: Path del archivo JSON generado, o None si fallo
@@ -30,12 +31,16 @@ def exportar_metricas(almacen):
     SKELETON: Implementacion minima - genera archivo vacio
     """
     try:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"metricas_{timestamp}.json"
+        # Usar archivo_json si se proporciona, sino generar nombre automático
+        if archivo_json:
+            filename = archivo_json
+        else:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"metricas_{timestamp}.json"
 
         # Datos minimos de exportacion
         data = {
-            "timestamp": timestamp,
+            "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
             "status": "SKELETON - Exportacion minima",
             "tareas_completadas": getattr(almacen, 'tareas_completadas_count', 0) if almacen else 0
         }

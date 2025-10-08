@@ -189,6 +189,17 @@ class GroundOperator(BaseOperator):
         while True:
             # PASO 1: Solicitar asignacion de tour
             self.status = "idle"
+            
+            # FASE 1: Capturar cambio de estado a idle
+            self.almacen.registrar_evento('estado_agente', {
+                'agent_id': self.id,
+                'tipo': self.type,
+                'position': self.current_position,
+                'status': self.status,
+                'current_task': None,
+                'cargo_volume': self.cargo_volume
+            })
+            
             tour = self.almacen.dispatcher.solicitar_asignacion(self)
 
             if tour is None:
@@ -215,48 +226,168 @@ class GroundOperator(BaseOperator):
 
             # PASO 3: Visitar cada ubicacion de picking
             visit_sequence = route_info['visit_sequence']
+            segment_paths = route_info['segment_paths']
             segment_distances = route_info['segment_distances']
 
             for idx, wo in enumerate(visit_sequence):
-                # Navegar a ubicacion de picking
+                # Navegar a ubicacion de picking usando pathfinding paso a paso
+                segment_path = segment_paths[idx] if idx < len(segment_paths) else []
                 segment_distance = segment_distances[idx] if idx < len(segment_distances) else 0
-                travel_time = segment_distance * TIME_PER_CELL * self.default_speed
 
-                if travel_time > 0:
+                if segment_path and len(segment_path) > 1:
                     self.status = "moving"
+                    
+                    # FASE 1: Capturar cambio de estado a moving (navegando)
+                    self.almacen.registrar_evento('estado_agente', {
+                        'agent_id': self.id,
+                        'tipo': self.type,
+                        'position': self.current_position,
+                        'status': self.status,
+                        'current_task': wo.id if wo else None,
+                        'cargo_volume': self.cargo_volume
+                    })
+                    
                     print(f"[{self.id}] t={self.env.now:.1f} Navegando a {wo.ubicacion} "
-                          f"(dist: {segment_distance:.1f})")
-                    yield self.env.timeout(travel_time)
+                          f"(path: {len(segment_path)} pasos)")
+                    
+                    # MOVIMIENTO PASO A PASO: Generar eventos intermedios
+                    for step_idx, step_position in enumerate(segment_path[1:], 1):  # Skip first (current position)
+                        # Actualizar posición paso a paso
+                        self.current_position = step_position
+                        
+                        # Registrar evento intermedio de movimiento
+                        self.almacen.registrar_evento('estado_agente', {
+                            'agent_id': self.id,
+                            'tipo': self.type,
+                            'position': self.current_position,
+                            'status': self.status,
+                            'current_task': wo.id if wo else None,
+                            'cargo_volume': self.cargo_volume
+                        })
+                        
+                        # Avanzar tiempo por celda
+                        yield self.env.timeout(TIME_PER_CELL * self.default_speed)
+                        
+                        print(f"[{self.id}] t={self.env.now:.1f} Paso {step_idx}/{len(segment_path)-1}: {step_position}")
+                else:
+                    # Fallback: movimiento directo si no hay path
+                    self.current_position = wo.ubicacion
+                    self.total_distance_traveled += segment_distance
 
-                # Actualizar posicion
-                self.current_position = wo.ubicacion
-                self.total_distance_traveled += segment_distance
+                # FASE 1: Capturar evento de posición para replay
+                self.almacen.registrar_evento('estado_agente', {
+                    'agent_id': self.id,
+                    'tipo': self.type,
+                    'position': self.current_position,
+                    'status': self.status,
+                    'current_task': wo.id if wo else None,
+                    'cargo_volume': self.cargo_volume
+                })
 
                 # Simular picking
                 self.status = "picking"
+                
+                # FASE 1: Capturar cambio de estado a picking
+                self.almacen.registrar_evento('estado_agente', {
+                    'agent_id': self.id,
+                    'tipo': self.type,
+                    'position': self.current_position,
+                    'status': self.status,
+                    'current_task': wo.id if wo else None,
+                    'cargo_volume': self.cargo_volume
+                })
+                
                 print(f"[{self.id}] t={self.env.now:.1f} Picking en {wo.ubicacion}")
                 yield self.env.timeout(self.discharge_time)
 
                 # Actualizar cargo
                 self.cargo_volume += wo.calcular_volumen_restante()
 
-            # PASO 4: Navegar a staging area para descarga
-            final_segment_distance = segment_distances[-1] if segment_distances else 0
-            travel_time = final_segment_distance * TIME_PER_CELL * self.default_speed
+            # PASO 4: Navegar a staging area para descarga usando pathfinding paso a paso
+            depot_location = self.almacen.data_manager.outbound_staging_locations.get(1, (0, 0))
 
-            if travel_time > 0:
-                self.status = "moving"
-                print(f"[{self.id}] t={self.env.now:.1f} Regresando a staging")
-                yield self.env.timeout(travel_time)
-
-            self.current_position = depot_location
-            self.total_distance_traveled += final_segment_distance
+            # Calcular ruta de regreso usando pathfinder
+            if hasattr(self.almacen, 'route_calculator') and self.almacen.route_calculator:
+                try:
+                    return_path = self.almacen.route_calculator.pathfinder.find_path(self.current_position, depot_location)
+                    if return_path and len(return_path) > 1:
+                        self.status = "moving"
+                        
+                        # FASE 1: Capturar cambio de estado a moving (regresando)
+                        self.almacen.registrar_evento('estado_agente', {
+                            'agent_id': self.id,
+                            'tipo': self.type,
+                            'position': self.current_position,
+                            'status': self.status,
+                            'current_task': None,
+                            'cargo_volume': self.cargo_volume
+                        })
+                        
+                        print(f"[{self.id}] t={self.env.now:.1f} Regresando a staging (path: {len(return_path)} pasos)")
+                        
+                        # MOVIMIENTO PASO A PASO: Generar eventos intermedios de regreso
+                        for step_idx, step_position in enumerate(return_path[1:], 1):
+                            self.current_position = step_position
+                            
+                            # Registrar evento intermedio de movimiento
+                            self.almacen.registrar_evento('estado_agente', {
+                                'agent_id': self.id,
+                                'tipo': self.type,
+                                'position': self.current_position,
+                                'status': self.status,
+                                'current_task': None,
+                                'cargo_volume': self.cargo_volume
+                            })
+                            
+                            # Avanzar tiempo por celda
+                            yield self.env.timeout(TIME_PER_CELL * self.default_speed)
+                            
+                            print(f"[{self.id}] t={self.env.now:.1f} Regreso paso {step_idx}/{len(return_path)-1}: {step_position}")
+                        
+                        self.total_distance_traveled += len(return_path) - 1
+                    else:
+                        # Fallback: movimiento directo si no hay path
+                        final_segment_distance = segment_distances[-1] if segment_distances else 0
+                        self.current_position = depot_location
+                        self.total_distance_traveled += final_segment_distance
+                except Exception as e:
+                    print(f"[{self.id}] Error calculando ruta de regreso: {e}")
+                    # Fallback: movimiento directo
+                    final_segment_distance = segment_distances[-1] if segment_distances else 0
+                    self.current_position = depot_location
+                    self.total_distance_traveled += final_segment_distance
+            else:
+                # Fallback: movimiento directo si no hay route_calculator
+                final_segment_distance = segment_distances[-1] if segment_distances else 0
+                self.current_position = depot_location
+                self.total_distance_traveled += final_segment_distance
 
             # PASO 5: Descargar
             self.status = "unloading"
+            
+            # FASE 1: Capturar cambio de estado a unloading
+            self.almacen.registrar_evento('estado_agente', {
+                'agent_id': self.id,
+                'tipo': self.type,
+                'position': self.current_position,
+                'status': self.status,
+                'current_task': None,
+                'cargo_volume': self.cargo_volume
+            })
+            
             print(f"[{self.id}] t={self.env.now:.1f} Descargando en staging")
             yield self.env.timeout(self.discharge_time)
             self.cargo_volume = 0
+            
+            # FASE 1: Capturar evento después de descarga
+            self.almacen.registrar_evento('estado_agente', {
+                'agent_id': self.id,
+                'tipo': self.type,
+                'position': self.current_position,
+                'status': 'idle',
+                'current_task': None,
+                'cargo_volume': self.cargo_volume
+            })
 
             # PASO 6: Notificar completado
             self.almacen.dispatcher.notificar_completado(self, work_orders)
@@ -329,6 +460,17 @@ class Forklift(BaseOperator):
         while True:
             # PASO 1: Solicitar asignacion de tour
             self.status = "idle"
+            
+            # FASE 1: Capturar cambio de estado a idle
+            self.almacen.registrar_evento('estado_agente', {
+                'agent_id': self.id,
+                'tipo': self.type,
+                'position': self.current_position,
+                'status': self.status,
+                'current_task': None,
+                'cargo_volume': self.cargo_volume
+            })
+            
             tour = self.almacen.dispatcher.solicitar_asignacion(self)
 
             if tour is None:
@@ -355,22 +497,53 @@ class Forklift(BaseOperator):
 
             # PASO 3: Visitar cada ubicacion de picking
             visit_sequence = route_info['visit_sequence']
+            segment_paths = route_info['segment_paths']
             segment_distances = route_info['segment_distances']
 
             for idx, wo in enumerate(visit_sequence):
-                # Navegar a ubicacion de picking
+                # Navegar a ubicacion de picking usando pathfinding paso a paso
+                segment_path = segment_paths[idx] if idx < len(segment_paths) else []
                 segment_distance = segment_distances[idx] if idx < len(segment_distances) else 0
-                travel_time = segment_distance * TIME_PER_CELL * self.default_speed
 
-                if travel_time > 0:
+                if segment_path and len(segment_path) > 1:
                     self.status = "moving"
+                    
+                    # FASE 1: Capturar cambio de estado a moving (navegando)
+                    self.almacen.registrar_evento('estado_agente', {
+                        'agent_id': self.id,
+                        'tipo': self.type,
+                        'position': self.current_position,
+                        'status': self.status,
+                        'current_task': wo.id if wo else None,
+                        'cargo_volume': self.cargo_volume
+                    })
+                    
                     print(f"[{self.id}] t={self.env.now:.1f} Navegando a {wo.ubicacion} "
-                          f"(dist: {segment_distance:.1f})")
-                    yield self.env.timeout(travel_time)
-
-                # Actualizar posicion
-                self.current_position = wo.ubicacion
-                self.total_distance_traveled += segment_distance
+                          f"(path: {len(segment_path)} pasos)")
+                    
+                    # MOVIMIENTO PASO A PASO: Generar eventos intermedios
+                    for step_idx, step_position in enumerate(segment_path[1:], 1):  # Skip first (current position)
+                        # Actualizar posición paso a paso
+                        self.current_position = step_position
+                        
+                        # Registrar evento intermedio de movimiento
+                        self.almacen.registrar_evento('estado_agente', {
+                            'agent_id': self.id,
+                            'tipo': self.type,
+                            'position': self.current_position,
+                            'status': self.status,
+                            'current_task': wo.id if wo else None,
+                            'cargo_volume': self.cargo_volume
+                        })
+                        
+                        # Avanzar tiempo por celda
+                        yield self.env.timeout(TIME_PER_CELL * self.default_speed)
+                        
+                        print(f"[{self.id}] t={self.env.now:.1f} Paso {step_idx}/{len(segment_path)-1}: {step_position}")
+                else:
+                    # Fallback: movimiento directo si no hay path
+                    self.current_position = wo.ubicacion
+                    self.total_distance_traveled += segment_distance
 
                 # FORKLIFT SPECIFIC: Elevar horquilla
                 self.status = "lifting"
@@ -391,23 +564,91 @@ class Forklift(BaseOperator):
                 # Actualizar cargo
                 self.cargo_volume += wo.calcular_volumen_restante()
 
-            # PASO 4: Navegar a staging area para descarga
-            final_segment_distance = segment_distances[-1] if segment_distances else 0
-            travel_time = final_segment_distance * TIME_PER_CELL * self.default_speed
+            # PASO 4: Navegar a staging area para descarga usando pathfinding paso a paso
+            depot_location = self.almacen.data_manager.outbound_staging_locations.get(1, (0, 0))
 
-            if travel_time > 0:
-                self.status = "moving"
-                print(f"[{self.id}] t={self.env.now:.1f} Regresando a staging")
-                yield self.env.timeout(travel_time)
-
-            self.current_position = depot_location
-            self.total_distance_traveled += final_segment_distance
+            # Calcular ruta de regreso usando pathfinder
+            if hasattr(self.almacen, 'route_calculator') and self.almacen.route_calculator:
+                try:
+                    return_path = self.almacen.route_calculator.pathfinder.find_path(self.current_position, depot_location)
+                    if return_path and len(return_path) > 1:
+                        self.status = "moving"
+                        
+                        # FASE 1: Capturar cambio de estado a moving (regresando)
+                        self.almacen.registrar_evento('estado_agente', {
+                            'agent_id': self.id,
+                            'tipo': self.type,
+                            'position': self.current_position,
+                            'status': self.status,
+                            'current_task': None,
+                            'cargo_volume': self.cargo_volume
+                        })
+                        
+                        print(f"[{self.id}] t={self.env.now:.1f} Regresando a staging (path: {len(return_path)} pasos)")
+                        
+                        # MOVIMIENTO PASO A PASO: Generar eventos intermedios de regreso
+                        for step_idx, step_position in enumerate(return_path[1:], 1):
+                            self.current_position = step_position
+                            
+                            # Registrar evento intermedio de movimiento
+                            self.almacen.registrar_evento('estado_agente', {
+                                'agent_id': self.id,
+                                'tipo': self.type,
+                                'position': self.current_position,
+                                'status': self.status,
+                                'current_task': None,
+                                'cargo_volume': self.cargo_volume
+                            })
+                            
+                            # Avanzar tiempo por celda
+                            yield self.env.timeout(TIME_PER_CELL * self.default_speed)
+                            
+                            print(f"[{self.id}] t={self.env.now:.1f} Regreso paso {step_idx}/{len(return_path)-1}: {step_position}")
+                        
+                        self.total_distance_traveled += len(return_path) - 1
+                    else:
+                        # Fallback: movimiento directo si no hay path
+                        final_segment_distance = segment_distances[-1] if segment_distances else 0
+                        self.current_position = depot_location
+                        self.total_distance_traveled += final_segment_distance
+                except Exception as e:
+                    print(f"[{self.id}] Error calculando ruta de regreso: {e}")
+                    # Fallback: movimiento directo
+                    final_segment_distance = segment_distances[-1] if segment_distances else 0
+                    self.current_position = depot_location
+                    self.total_distance_traveled += final_segment_distance
+            else:
+                # Fallback: movimiento directo si no hay route_calculator
+                final_segment_distance = segment_distances[-1] if segment_distances else 0
+                self.current_position = depot_location
+                self.total_distance_traveled += final_segment_distance
 
             # PASO 5: Descargar
             self.status = "unloading"
+            
+            # FASE 1: Capturar cambio de estado a unloading
+            self.almacen.registrar_evento('estado_agente', {
+                'agent_id': self.id,
+                'tipo': self.type,
+                'position': self.current_position,
+                'status': self.status,
+                'current_task': None,
+                'cargo_volume': self.cargo_volume
+            })
+            
             print(f"[{self.id}] t={self.env.now:.1f} Descargando en staging")
             yield self.env.timeout(self.discharge_time)
             self.cargo_volume = 0
+            
+            # FASE 1: Capturar evento después de descarga
+            self.almacen.registrar_evento('estado_agente', {
+                'agent_id': self.id,
+                'tipo': self.type,
+                'position': self.current_position,
+                'status': 'idle',
+                'current_task': None,
+                'cargo_volume': self.cargo_volume
+            })
 
             # PASO 6: Notificar completado
             self.almacen.dispatcher.notificar_completado(self, work_orders)

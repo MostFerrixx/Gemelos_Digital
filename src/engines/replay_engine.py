@@ -561,7 +561,7 @@ class ReplayViewerEngine:
         dashboard_wos_state = {}  # Estado persistente de WorkOrders para el dashboard
         print("[DASHBOARD-STATE] Motor de estado continuo inicializado")
 
-        # Configurar estado inicial con WorkOrders si estan disponibles
+        # FIX CRITICAL: Configurar estado inicial con WorkOrders y métricas base
         if initial_work_orders:
             for wo in initial_work_orders:
                 estado_visual["work_orders"][wo['id']] = wo.copy()
@@ -569,7 +569,19 @@ class ReplayViewerEngine:
                 dashboard_wos_state[wo['id']] = wo.copy()
             print(f"[REPLAY] {len(initial_work_orders)} WorkOrders cargadas en estado inicial")
             print(f"[DASHBOARD-STATE] {len(dashboard_wos_state)} WorkOrders pobladas en estado continuo")
-
+            
+            # FIX CRITICAL: Inicializar métricas base con total correcto
+            estado_visual["metricas"]["total_wos"] = len(initial_work_orders)
+            estado_visual["metricas"]["workorders_completadas"] = 0
+            estado_visual["metricas"]["tareas_completadas"] = 0
+            estado_visual["metricas"]["tiempo"] = 0.0
+            
+            # FIX CRITICAL: Usar total_work_orders_fijo si está disponible
+            if total_work_orders_fijo is not None:
+                estado_visual["metricas"]["total_wos"] = total_work_orders_fijo
+                print(f"[REPLAY] Usando total_work_orders_fijo: {total_work_orders_fijo}")
+            
+            print(f"[REPLAY] Métricas inicializadas: {estado_visual['metricas']['workorders_completadas']}/{estado_visual['metricas']['total_wos']} WorkOrders")
             print("=========================================\n")
 
         # Procesar primer evento para obtener posiciones iniciales de agentes
@@ -770,25 +782,41 @@ class ReplayViewerEngine:
                                     estado_visual['work_orders'][wo_id] = work_order.copy()
 
                 elif evento.get('type') == 'work_order_update':
-                    # Procesar actualizacion de Work Order
-                    work_order_data = evento.get('data', {})
-                    work_order_id = work_order_data.get('id')
+                    # FIX CRITICAL: Procesar actualizacion de Work Order con formato correcto
+                    # Los datos están directamente en el evento, no en evento['data']
+                    work_order_id = evento.get('id')
                     event_timestamp = evento.get('timestamp', 0.0)
+                    status = evento.get('status', 'unknown')
 
-                    real_time = time.time()
-                    status = work_order_data.get('status', 'unknown')
                     # BUGFIX: Manejar timestamp None
                     if event_timestamp is None:
                         event_timestamp = 0.0
 
                     if work_order_id:
-                        # Actualizar Work Order en estado visual
+                        # FIX CRITICAL: Actualizar Work Order en estado visual con formato consistente
                         if 'work_orders' not in estado_visual:
                             estado_visual['work_orders'] = {}
-                        estado_visual['work_orders'][work_order_id] = work_order_data.copy()
+                        
+                        # FIX CRITICAL: Asegurar que el formato sea consistente con initial_work_orders
+                        work_order_update = {
+                            'id': work_order_id,
+                            'status': status,
+                            'order_id': evento.get('order_id'),
+                            'tour_id': evento.get('tour_id'),
+                            'sku_id': evento.get('sku_id'),
+                            'cantidad_total': evento.get('cantidad_total'),
+                            'cantidad_restante': evento.get('cantidad_restante'),
+                            'ubicacion': evento.get('ubicacion'),
+                            'work_area': evento.get('work_area'),
+                            'assigned_agent_id': evento.get('assigned_agent_id'),
+                            'tiempo_inicio': evento.get('tiempo_inicio'),
+                            'tiempo_fin': evento.get('tiempo_fin')
+                        }
+                        
+                        estado_visual['work_orders'][work_order_id] = work_order_update
 
                         # FEATURE: Actualizar estado continuo del dashboard
-                        dashboard_wos_state[work_order_id] = work_order_data.copy()
+                        dashboard_wos_state[work_order_id] = work_order_update.copy()
                         print(f"[DASHBOARD-STATE] WO {work_order_id} actualizada: status={status}")
 
             # BUGFIX DASHBOARD METRICS: Update operator metrics after processing events
@@ -891,6 +919,8 @@ class ReplayViewerEngine:
         """
         Calcula las métricas que necesita el ModernDashboard.
         
+        FIX CRITICAL: Corregido para usar total correcto y contar completadas desde eventos.
+        
         Args:
             estado_visual: Dict con el estado actual de la simulación
         """
@@ -898,9 +928,11 @@ class ReplayViewerEngine:
         if "metricas" not in estado_visual:
             estado_visual["metricas"] = {}
         
-        # Calcular métricas de WorkOrders
+        # FIX CRITICAL: Usar total_wos desde métricas inicializadas (no desde work_orders)
+        total_wos = estado_visual["metricas"].get("total_wos", 0)
+        
+        # FIX CRITICAL: Contar WorkOrders completadas desde estado_visual['work_orders']
         work_orders = estado_visual.get("work_orders", {})
-        total_wos = len(work_orders)
         workorders_completadas = 0
         tareas_completadas = 0
         
@@ -908,11 +940,7 @@ class ReplayViewerEngine:
             status = wo_data.get('status', 'unknown')
             if status in ['completed', 'Completada', 'COMPLETED']:
                 workorders_completadas += 1
-            
-            # Contar tareas completadas (puede ser una estimación basada en el progreso)
-            # Por ahora, asumimos que cada WO completada tiene todas sus tareas completadas
-            if status in ['completed', 'Completada', 'COMPLETED']:
-                # Estimación: cada WO tiene aproximadamente 2-4 tareas
+                # Estimación: cada WO completada tiene aproximadamente 2-4 tareas
                 tareas_completadas += 3  # Estimación conservadora
         
         # Calcular tiempo de simulación
@@ -921,7 +949,7 @@ class ReplayViewerEngine:
         # Actualizar métricas
         estado_visual["metricas"]["tiempo"] = tiempo_simulacion
         estado_visual["metricas"]["workorders_completadas"] = workorders_completadas
-        estado_visual["metricas"]["total_wos"] = total_wos
+        estado_visual["metricas"]["total_wos"] = total_wos  # Mantener total correcto
         estado_visual["metricas"]["tareas_completadas"] = tareas_completadas
         
         # Debug: mostrar métricas calculadas

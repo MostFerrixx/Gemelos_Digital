@@ -115,7 +115,7 @@ class AnalyticsEngine:
         tiempo_total_horas = tiempo_total_sim / 3600  # CORREGIDO: Convertir segundos a horas
         
         # Total de tareas completadas - CORREGIDO: usar work_order_completed
-        work_order_completed_events = self.events_df[self.events_df['event_type'] == 'work_order_completed']
+        work_order_completed_events = self.events_df[self.events_df['tipo'] == 'work_order_completed']
         total_tareas_completadas = len(work_order_completed_events)
         
         # Productividad (Tareas/Hora)
@@ -163,26 +163,26 @@ class AnalyticsEngine:
         tiempo_total_simulacion = self.events_df['timestamp'].max() - self.events_df['timestamp'].min()
         
         # Obtener lista unica de agentes
-        agent_ids = self.events_df['agent_id'].unique()
+        agent_ids = self.events_df['assigned_agent_id'].unique()
         performance_data = []
         
         for agent_id in agent_ids:
             # Filtrar eventos por agente
-            agent_events = self.events_df[self.events_df['agent_id'] == agent_id]
+            agent_events = self.events_df[self.events_df['assigned_agent_id'] == agent_id]
             
             # NUEVA LOGICA: Contar work_orders completadas por agente
-            work_order_events = agent_events[agent_events['event_type'] == 'work_order_completed']
+            work_order_events = agent_events[agent_events['tipo'] == 'work_order_completed']
             tareas_completadas = len(work_order_events)
             
             # NUEVA LOGICA: Sumar duraciones de trip_completed para tiempo de viaje
-            trip_events = agent_events[agent_events['event_type'] == 'trip_completed']
+            trip_events = agent_events[agent_events['tipo'] == 'trip_completed']
             tiempo_viaje_total = 0
             for _, event in trip_events.iterrows():
                 if 'data' in event and event['data'] and 'duration' in event['data']:
                     tiempo_viaje_total += event['data']['duration']
             
             # NUEVA LOGICA: Sumar duraciones de operation_completed para tiempo de picking
-            operation_events = agent_events[agent_events['event_type'] == 'operation_completed']
+            operation_events = agent_events[agent_events['tipo'] == 'operation_completed']
             tiempo_picking_total = 0
             for _, event in operation_events.iterrows():
                 if 'data' in event and event['data'] and 'duration' in event['data']:
@@ -190,7 +190,7 @@ class AnalyticsEngine:
             
             # Tiempo de descarga (mantener logica existente para discharge_completed)
             tiempo_descarga_total = 0
-            discharge_completed_events = agent_events[agent_events['event_type'] == 'discharge_completed']
+            discharge_completed_events = agent_events[agent_events['tipo'] == 'discharge_completed']
             for _, event in discharge_completed_events.iterrows():
                 if 'data' in event and event['data'] and 'tiempo_total_descarga' in event['data']:
                     tiempo_descarga_total += event['data']['tiempo_total_descarga'] / 60  # Segundos a minutos
@@ -202,7 +202,7 @@ class AnalyticsEngine:
             tiempo_ocioso = max(0, tiempo_total_simulacion - tiempo_total_activo)
             
             # Utilizacion de capacidad (mantener logica existente)
-            discharge_events = agent_events[agent_events['event_type'] == 'discharge_started']
+            discharge_events = agent_events[agent_events['tipo'] == 'discharge_started']
             utilizacion_capacidad_promedio = 0
             if not discharge_events.empty:
                 capacidades = []
@@ -278,7 +278,7 @@ class AnalyticsEngine:
         print(f"[ANALYTICS-ENGINE] Creada grilla base con {len(heatmap_df)} coordenadas")
         
         # Calcular tiempo de transito (eventos agent_moved)
-        move_events = self.events_df[self.events_df['event_type'] == 'agent_moved']
+        move_events = self.events_df[self.events_df['tipo'] == 'agent_moved']
         transito_count = 0
         
         for _, event in move_events.iterrows():
@@ -300,7 +300,7 @@ class AnalyticsEngine:
         print(f"[ANALYTICS-ENGINE] Procesados {transito_count} eventos de transito")
         
         # Calcular tiempo de trabajo (eventos task_completed)
-        task_events = self.events_df[self.events_df['event_type'] == 'task_completed']
+        task_events = self.events_df[self.events_df['tipo'] == 'task_completed']
         trabajo_count = 0
         
         for _, event in task_events.iterrows():

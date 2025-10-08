@@ -428,11 +428,53 @@ class AlmacenMejorado:
         # BUGFIX JSONL: Tambien agregar al replay_buffer para generacion de .jsonl
         if self.replay_buffer is not None:
             # Convertir formato para replay (tipo -> type)
-            replay_evento = {
-                'type': tipo,
-                'timestamp': self.env.now,
-                **datos
-            }
+            if tipo == 'estado_agente':
+                # FIX REPLAY VIEWER: Usar estructura compatible con replay viewer
+                # Estructura: {type, timestamp, agent_id, data: {...}}
+                agent_id = datos.get('agent_id', 'unknown')
+                
+                # Calcular coordenadas pixel desde position (grid coordinates)
+                position = datos.get('position', [0, 0])
+                pixel_x, pixel_y = 0, 0
+                if self.layout_manager and position:
+                    try:
+                        pixel_x, pixel_y = self.layout_manager.grid_to_pixel(position[0], position[1])
+                    except Exception as e:
+                        print(f"[WARNING] Error calculating pixel coordinates from {position}: {e}")
+                        pixel_x, pixel_y = position[0] * 32, position[1] * 32  # Fallback
+                
+                replay_evento = {
+                    'type': tipo,
+                    'timestamp': self.env.now,
+                    'agent_id': agent_id,
+                    'data': {
+                        'x': pixel_x,  # CRITICAL: Coordenadas pixel para replay viewer
+                        'y': pixel_y,  # CRITICAL: Coordenadas pixel para replay viewer
+                        'tipo': datos.get('tipo', 'unknown'),
+                        'position': position,
+                        'status': datos.get('status', 'idle'),
+                        'current_task': datos.get('current_task'),
+                        'cargo_volume': datos.get('cargo_volume', 0),
+                        # Campos adicionales para compatibilidad
+                        'accion': f"Estado: {datos.get('status', 'idle')}",
+                        'tareas_completadas': 0,
+                        'direccion_x': 0,
+                        'direccion_y': 0,
+                        'type': datos.get('tipo', 'unknown'),
+                        'tour_tasks_completed': 0,
+                        'tour_total_tasks': 0,
+                        'current_item': 'N/A',
+                        'carga': datos.get('cargo_volume', 0),
+                        'capacidad': 150 if datos.get('tipo') == 'GroundOperator' else 1000
+                    }
+                }
+            else:
+                # Para otros tipos de eventos, mantener estructura original
+                replay_evento = {
+                    'type': tipo,
+                    'timestamp': self.env.now,
+                    **datos
+                }
             self.replay_buffer.add_event(replay_evento)
 
     def __repr__(self):

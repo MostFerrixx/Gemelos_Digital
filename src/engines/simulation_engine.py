@@ -1392,7 +1392,7 @@ class SimulationEngine:
             try:
                 if hasattr(self, 'replay_buffer') and self.replay_buffer and len(self.replay_buffer) > 0:
                     os.makedirs(self.session_output_dir, exist_ok=True)
-                    output_file = os.path.join(self.session_output_dir, f"replay_{self.session_timestamp}.jsonl")
+                    output_file = os.path.join(self.session_output_dir, f"replay_events_{self.session_timestamp}.jsonl")
                     print(f"[REPLAY] Generating replay file: {output_file}")
                     initial_snapshot = getattr(self.almacen.dispatcher, 'initial_work_orders_snapshot', []) if hasattr(self, 'almacen') and self.almacen else []
                     volcar_replay_a_archivo(self.replay_buffer, output_file, self.configuracion, self.almacen, initial_snapshot)
