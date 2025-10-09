@@ -757,11 +757,16 @@ class ReplayViewerEngine:
                             position = event_data['position']
                             estado_visual["operarios"][agent_id]['position'] = position
                             
+                            # NUEVO: Mapear tipo Forklift a montacargas para renderizado
+                            if event_data.get('tipo') == 'Forklift':
+                                event_data['tipo'] = 'montacargas'
+                            
                             # Convertir coordenadas de grid a pixeles para renderizado
                             try:
                                 pixel_x, pixel_y = self.layout_manager.grid_to_pixel(position[0], position[1])
                                 estado_visual["operarios"][agent_id]['x'] = pixel_x
                                 estado_visual["operarios"][agent_id]['y'] = pixel_y
+                                estado_visual["operarios"][agent_id]['tipo'] = event_data['tipo']  # NUEVO
                             except Exception as e:
                                 print(f"[DEBUG] Error convirtiendo posicion {position} a pixeles: {e}")
                                 # Fallback: usar coordenadas originales si hay error

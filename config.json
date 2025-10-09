@@ -1,5 +1,5 @@
 {
-    "total_ordenes": 300,
+    "total_ordenes": 30,
     "distribucion_tipos": {
         "pequeno": {
             "porcentaje": 60,
@@ -15,7 +15,7 @@
         }
     },
     "capacidad_carro": 150,
-    "dispatch_strategy": "Optimizacion Global",
+    "dispatch_strategy": "Ejecucion de Plan (Filtro por Prioridad)",
     "tour_type": "Tour Mixto (Multi-Destino)",
     "layout_file": "layouts/WH1.tmx",
     "sequence_file": "layouts/Warehouse_Logic.xlsx",
@@ -31,13 +31,13 @@
         "Forklift": {}
     },
     "outbound_staging_distribution": {
-        "1": 100,
-        "2": 0,
-        "3": 0,
-        "4": 0,
-        "5": 0,
-        "6": 0,
-        "7": 0
+        "1": 15,
+        "2": 14,
+        "3": 14,
+        "4": 14,
+        "5": 14,
+        "6": 14,
+        "7": 15
     },
     "agent_types": [
         {
@@ -45,8 +45,7 @@
             "capacity": 150,
             "discharge_time": 5,
             "work_area_priorities": {
-                "Area_Ground": 1,
-                "Area_Piso_L1": 2
+                "Area_Ground": 1
             }
         },
         {
@@ -54,16 +53,25 @@
             "capacity": 150,
             "discharge_time": 5,
             "work_area_priorities": {
-                "Area_Ground": 1,
-                "Area_Piso_L1": 2
+                "Area_Ground": 1
             }
         },
         {
             "type": "Forklift",
-            "capacity": 1000,
+            "capacity": 300,
             "discharge_time": 5,
             "work_area_priorities": {
-                "Area_Rack": 1
+                "Area_High": 1,
+                "Area_Special": 2
+            }
+        },
+        {
+            "type": "Forklift",
+            "capacity": 300,
+            "discharge_time": 5,
+            "work_area_priorities": {
+                "Area_High": 1,
+                "Area_Special": 2
             }
         }
     ],

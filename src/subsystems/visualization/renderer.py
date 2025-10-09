@@ -574,7 +574,7 @@ def _determinar_color_agente(tipo: str, status: str) -> Tuple[int, int, int]:
         return COLOR_AGENTE_TRABAJANDO
 
     # Prioridad 3: Color segun tipo (para traveling u otros)
-    if tipo == 'montacargas':
+    if tipo == 'montacargas' or tipo == 'Forklift':  # NUEVO: Soporte para Forklift
         return COLOR_AGENTE_MONTACARGAS
     else:
         return COLOR_AGENTE_TERRESTRE

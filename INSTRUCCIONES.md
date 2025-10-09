@@ -29,6 +29,11 @@ python test_quick_jsonl.py
 python configurator.py
 ```
 
+**Flujo de trabajo recomendado:**
+1. **Save:** Guardar configuración actual en slots
+2. **Use:** Aplicar configuración de slots a config.json
+3. **Ejecutar:** `python entry_points/run_live_simulation.py --headless`
+
 **NOTA:** El configurador incluye sistema de slots completo con funcionalidades avanzadas, iconos vectoriales profesionales y tema oscuro moderno.
 
 ### Ver Replay de Simulación con Dashboard World-Class:
@@ -48,9 +53,10 @@ El sistema de slots permite gestionar múltiples configuraciones con metadatos c
 ### Funcionalidades Implementadas:
 - ✅ **Save:** Guarda configuraciones con metadatos completos
 - ✅ **Load:** Carga configuraciones existentes
+- ✅ **Use:** Aplica configuración de slots a config.json
 - ✅ **Manage:** Gestiona configuraciones (eliminar, listar)
 - ✅ **Default:** Carga configuración marcada como default
-- ✅ **Iconos Vectoriales:** 7 iconos profesionales generados con Pillow
+- ✅ **Iconos Vectoriales:** 8 iconos profesionales generados con Pillow
 - ✅ **Tema Oscuro:** Sistema completo de alternancia claro/oscuro
 - ✅ **Paleta de Colores:** Profesional tipo VS Code/Discord
 - ✅ **Botón de Alternancia:** 🌙/☀️ para cambiar tema dinámicamente
@@ -369,7 +375,9 @@ export PYGAME_DEBUG=1
 
 - `ACTIVE_SESSION_STATE.md` - Estado actual de la sesión
 - `HANDOFF.md` - Overview completo del proyecto
+- `PLAN_IMPLEMENTACION_ESTRATEGIAS_DESPACHO.md` - **NUEVO PLAN DE TRABAJO** para implementar estrategias correctas
 - `PLAN_SISTEMA_SLOTS_CONFIGURACION.md` - Plan detallado completo
+- `PLAN_SOLUCION_FORKLIFTS_RENDERIZADO.md` - Plan de solución para problema de forklifts
 
 **Documentación archivada:**
 - `archived/` - Documentación completada (debugging, Dashboard, etc.)
@@ -382,8 +390,9 @@ export PYGAME_DEBUG=1
 1. Leer `ACTIVE_SESSION_STATE.md`
 2. Leer `HANDOFF.md`
 3. Leer `PLAN_SISTEMA_SLOTS_CONFIGURACION.md` (si aplica)
-4. Ejecutar `git status`
-5. Ejecutar `git log --oneline -3`
+4. Leer `PLAN_SOLUCION_FORKLIFTS_RENDERIZADO.md` (si aplica)
+5. Ejecutar `git status`
+6. Ejecutar `git log --oneline -3`
 
 ### DURANTE LA SESIÓN:
 - Sistema completamente funcional
@@ -402,10 +411,10 @@ export PYGAME_DEBUG=1
 ## 📞 SOPORTE
 
 **Para nueva sesión:**
-1. Leer documentación en orden: ACTIVE_SESSION_STATE → HANDOFF → PLAN_SISTEMA_SLOTS
+1. Leer documentación en orden: ACTIVE_SESSION_STATE → HANDOFF → PLAN_IMPLEMENTACION_ESTRATEGIAS_DESPACHO
 2. Ejecutar `python test_quick_jsonl.py` para verificar funcionamiento
 3. Usar `python entry_points/run_replay_viewer.py` para visualizar simulaciones
-4. Sistema listo para desarrollo de nuevas funcionalidades
+4. Sistema listo para implementar estrategias de despacho correctas
 
 **Archivos críticos para uso:**
 - `test_quick_jsonl.py` - Test rápido
@@ -440,6 +449,20 @@ export PYGAME_DEBUG=1
 - [x] Tema oscuro moderno con alternancia dinámica
 - [x] Sistema 100% funcional y listo para uso
 
+### ✅ Renderizado de Forklifts completado cuando:
+- [x] Forklifts aparecen en el layout durante replay
+- [x] Forklifts tienen color azul correcto (COLOR_AGENTE_MONTACARGAS)
+- [x] Mapeo de tipos implementado en replay_engine.py
+- [x] Soporte adicional implementado en renderer.py
+- [x] Sistema completamente funcional
+
+### ✅ WorkOrders para Forklifts completado cuando:
+- [x] Forklifts reciben WorkOrders para Area_High y Area_Special
+- [x] Distribución equilibrada entre todas las áreas de trabajo
+- [x] Mezcla aleatoria de puntos de picking implementada
+- [x] Forklifts trabajan activamente en todas las áreas
+- [x] Sistema completamente funcional
+
 ---
 
 ## Notes
@@ -448,6 +471,8 @@ export PYGAME_DEBUG=1
 - Dashboard World-Class completamente implementado con todas las 8 fases
 - Sistema de Slots de Configuración 100% funcional
 - Modernización UI completada con iconos vectoriales y tema oscuro
+- Renderizado de Forklifts completamente funcional
+- WorkOrders para Forklifts implementados (distribución equilibrada entre áreas)
 - Todos los bugs críticos **RESUELTOS EXITOSAMENTE**
 - Sistema listo para producción completa
 - Funcionalidad de replay completamente operativa

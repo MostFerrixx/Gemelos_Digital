@@ -83,14 +83,16 @@ class ModernIconGenerator:
         
         return ImageTk.PhotoImage(img)
     
-    def create_exit_icon(self):
-        """Crea icono de salir moderno"""
+    # Método create_exit_icon removido - usar solo la cruz superior derecha
+    
+    def create_use_icon(self):
+        """Crea icono de usar/aplicar moderno"""
         img = Image.new('RGBA', (self.icon_size, self.icon_size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         
-        # X moderna
-        draw.line([(3, 3), (13, 13)], fill=self.colors['danger'], width=2)
-        draw.line([(13, 3), (3, 13)], fill=self.colors['danger'], width=2)
+        # Flecha hacia la derecha con círculo
+        draw.ellipse([(2, 2), (14, 14)], fill=self.colors['success'], outline=None)
+        draw.polygon([(8, 5), (11, 8), (8, 11)], fill='white')
         
         return ImageTk.PhotoImage(img)
     
@@ -136,7 +138,7 @@ class VentanaConfiguracion:
             'load': self.icon_generator.create_load_icon(),
             'manage': self.icon_generator.create_manage_icon(),
             'default': self.icon_generator.create_default_icon(),
-            'exit': self.icon_generator.create_exit_icon(),
+            'use': self.icon_generator.create_use_icon(),
             'delete': self.icon_generator.create_delete_icon(),
             'refresh': self.icon_generator.create_refresh_icon()
         }
@@ -461,7 +463,7 @@ class VentanaConfiguracion:
         # Configurar fondo principal
         self.parent.configure(bg=dark_colors['bg_primary'])
         
-        # Aplicar estilos oscuros a todos los widgets
+        # Aplicar estilos oscuros a todos los widgets ttk
         style.configure('TFrame', background=dark_colors['bg_primary'])
         style.configure('TLabel', background=dark_colors['bg_primary'], foreground=dark_colors['text_primary'])
         style.configure('TLabelFrame', background=dark_colors['bg_primary'], foreground=dark_colors['text_primary'])
@@ -471,6 +473,10 @@ class VentanaConfiguracion:
         style.configure('TCombobox', fieldbackground=dark_colors['bg_secondary'], foreground=dark_colors['text_primary'])
         style.configure('TNotebook', background=dark_colors['bg_primary'])
         style.configure('TNotebook.Tab', background=dark_colors['bg_secondary'], foreground=dark_colors['text_primary'])
+        style.configure('TScrollbar', background=dark_colors['bg_secondary'], troughcolor=dark_colors['bg_primary'])
+        
+        # Aplicar tema oscuro a widgets tk nativos que no heredan de ttk
+        self._apply_dark_theme_to_tk_widgets(dark_colors)
         
         # Actualizar el botón de tema
         for widget in self.parent.winfo_children():
@@ -478,16 +484,195 @@ class VentanaConfiguracion:
                 widget.configure(text='☀️')
                 break
     
+    def _apply_dark_theme_to_tk_widgets(self, dark_colors):
+        """Aplica tema oscuro a widgets tk nativos que no heredan de ttk"""
+        try:
+            # Configurar colores para widgets tk nativos
+            self.parent.option_add('*Entry*background', dark_colors['bg_secondary'])
+            self.parent.option_add('*Entry*foreground', dark_colors['text_primary'])
+            self.parent.option_add('*Entry*insertBackground', dark_colors['text_primary'])
+            self.parent.option_add('*Entry*selectBackground', dark_colors['accent'])
+            self.parent.option_add('*Entry*selectForeground', dark_colors['text_primary'])
+            
+            self.parent.option_add('*Text*background', dark_colors['bg_secondary'])
+            self.parent.option_add('*Text*foreground', dark_colors['text_primary'])
+            self.parent.option_add('*Text*insertBackground', dark_colors['text_primary'])
+            self.parent.option_add('*Text*selectBackground', dark_colors['accent'])
+            self.parent.option_add('*Text*selectForeground', dark_colors['text_primary'])
+            
+            self.parent.option_add('*Canvas*background', dark_colors['bg_secondary'])
+            self.parent.option_add('*Canvas*foreground', dark_colors['text_primary'])
+            
+            self.parent.option_add('*Listbox*background', dark_colors['bg_secondary'])
+            self.parent.option_add('*Listbox*foreground', dark_colors['text_primary'])
+            self.parent.option_add('*Listbox*selectBackground', dark_colors['accent'])
+            self.parent.option_add('*Listbox*selectForeground', dark_colors['text_primary'])
+            
+            self.parent.option_add('*Scrollbar*background', dark_colors['bg_secondary'])
+            self.parent.option_add('*Scrollbar*troughcolor', dark_colors['bg_primary'])
+            self.parent.option_add('*Scrollbar*activebackground', dark_colors['bg_tertiary'])
+            
+            # Aplicar a widgets existentes recursivamente
+            self._apply_dark_theme_recursive(self.parent, dark_colors)
+            
+        except Exception as e:
+            print(f"[VENTANA_CONFIGURACION] Error aplicando tema oscuro a widgets tk: {e}")
+    
+    def _apply_dark_theme_recursive(self, widget, dark_colors):
+        """Aplica tema oscuro recursivamente a todos los widgets hijos"""
+        try:
+            # Solo aplicar a widgets tk nativos específicos, NO a widgets ttk
+            widget_class = widget.__class__.__name__
+            
+            # Verificar si es un widget tk nativo (no ttk)
+            if widget_class.startswith('Tk') or widget_class in ['Entry', 'Text', 'Canvas', 'Listbox', 'Scrollbar', 'Toplevel', 'Label', 'Button']:
+                if isinstance(widget, tk.Entry):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        insertbackground=dark_colors['text_primary'],
+                        selectbackground=dark_colors['accent'],
+                        selectforeground=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Text):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        insertbackground=dark_colors['text_primary'],
+                        selectbackground=dark_colors['accent'],
+                        selectforeground=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Canvas):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Listbox):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        selectbackground=dark_colors['accent'],
+                        selectforeground=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Scrollbar):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        troughcolor=dark_colors['bg_primary'],
+                        activebackground=dark_colors['bg_tertiary']
+                    )
+                elif isinstance(widget, tk.Toplevel):
+                    widget.configure(bg=dark_colors['bg_primary'])
+                elif isinstance(widget, tk.Label):
+                    widget.configure(
+                        bg=dark_colors['bg_primary'],
+                        fg=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Button):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        activebackground=dark_colors['accent'],
+                        activeforeground=dark_colors['text_primary']
+                    )
+            
+            # Recursivamente aplicar a widgets hijos
+            for child in widget.winfo_children():
+                self._apply_dark_theme_recursive(child, dark_colors)
+                
+        except Exception as e:
+            # Silenciar errores de widgets que no soportan configuración
+            pass
+    
     def _apply_light_theme(self):
         """Aplica el tema claro a todos los widgets"""
         # Reaplicar el tema claro original
         self._aplicar_tema_moderno()
+        
+        # Restaurar colores claros para widgets tk nativos
+        self._restore_light_theme_to_tk_widgets()
         
         # Actualizar el botón de tema
         for widget in self.parent.winfo_children():
             if isinstance(widget, ttk.Button) and widget.cget('text') in ['🌙', '☀️']:
                 widget.configure(text='🌙')
                 break
+    
+    def _restore_light_theme_to_tk_widgets(self):
+        """Restaura tema claro a widgets tk nativos"""
+        try:
+            # Restaurar colores claros por defecto
+            self.parent.option_clear()
+            
+            # Aplicar tema claro recursivamente
+            self._apply_light_theme_recursive(self.parent)
+            
+        except Exception as e:
+            print(f"[VENTANA_CONFIGURACION] Error restaurando tema claro: {e}")
+    
+    def _apply_light_theme_recursive(self, widget):
+        """Aplica tema claro recursivamente a todos los widgets hijos"""
+        try:
+            # Solo aplicar a widgets tk nativos específicos, NO a widgets ttk
+            widget_class = widget.__class__.__name__
+            
+            # Verificar si es un widget tk nativo (no ttk)
+            if widget_class.startswith('Tk') or widget_class in ['Entry', 'Text', 'Canvas', 'Listbox', 'Scrollbar', 'Toplevel', 'Label', 'Button']:
+                if isinstance(widget, tk.Entry):
+                    widget.configure(
+                        bg='white',
+                        fg='black',
+                        insertbackground='black',
+                        selectbackground='#0078d4',
+                        selectforeground='white'
+                    )
+                elif isinstance(widget, tk.Text):
+                    widget.configure(
+                        bg='white',
+                        fg='black',
+                        insertbackground='black',
+                        selectbackground='#0078d4',
+                        selectforeground='white'
+                    )
+                elif isinstance(widget, tk.Canvas):
+                    widget.configure(
+                        bg='white',
+                        fg='black'
+                    )
+                elif isinstance(widget, tk.Listbox):
+                    widget.configure(
+                        bg='white',
+                        fg='black',
+                        selectbackground='#0078d4',
+                        selectforeground='white'
+                    )
+                elif isinstance(widget, tk.Scrollbar):
+                    widget.configure(
+                        bg='#f0f0f0',
+                        troughcolor='#e0e0e0',
+                        activebackground='#d0d0d0'
+                    )
+                elif isinstance(widget, tk.Toplevel):
+                    widget.configure(bg='#f0f0f0')
+                elif isinstance(widget, tk.Label):
+                    widget.configure(
+                        bg='#f0f0f0',
+                        fg='black'
+                    )
+                elif isinstance(widget, tk.Button):
+                    widget.configure(
+                        bg='#f0f0f0',
+                        fg='black',
+                        activebackground='#e0e0e0',
+                        activeforeground='black'
+                    )
+            
+            # Recursivamente aplicar a widgets hijos
+            for child in widget.winfo_children():
+                self._apply_light_theme_recursive(child)
+                
+        except Exception as e:
+            # Silenciar errores de widgets que no soportan configuración
+            pass
 
     def _crear_widgets_carga(self):
         """Crea widgets de la pestana Carga de Trabajo"""
@@ -953,9 +1138,14 @@ class VentanaConfiguracion:
         manage_btn.pack(side=tk.LEFT, padx=(0, 8))
         
         default_btn = ttk.Button(slots_frame, text="Default", image=self.icons['default'], 
-                                compound=tk.LEFT, width=12,
-                                command=self.valores_por_defecto_new)
+                               compound=tk.LEFT, width=12,
+                               command=self.valores_por_defecto_new)
         default_btn.pack(side=tk.LEFT, padx=(0, 8))
+        
+        use_btn = ttk.Button(slots_frame, text="Use", image=self.icons['use'], 
+                            compound=tk.LEFT, width=12,
+                            command=self._use_configuration_callback)
+        use_btn.pack(side=tk.LEFT, padx=(0, 8))
 
         # Frame para botones de control
         control_frame = ttk.Frame(button_frame)
@@ -966,11 +1156,7 @@ class VentanaConfiguracion:
                               command=self._toggle_theme)
         theme_btn.pack(side=tk.RIGHT, padx=(5, 0))
         
-        # Botón Salir con icono vectorial moderno
-        exit_btn = ttk.Button(control_frame, text="Salir", image=self.icons['exit'], 
-                             compound=tk.LEFT, width=12,
-                             command=self._salir_callback)
-        exit_btn.pack(side=tk.RIGHT, padx=(10, 0))
+        # Botón Salir removido - usar solo la cruz superior derecha
         
         print("[VENTANA_CONFIGURACION] Botones del sistema de slots con diseño mejorado agregados")
 
@@ -999,6 +1185,14 @@ class VentanaConfiguracion:
         print("[VENTANA_CONFIGURACION] Callback _eliminar_configuracion_callback llamado")
         if hasattr(self, '_eliminar_configuracion_callback_real'):
             self._eliminar_configuracion_callback_real()
+        else:
+            print("[VENTANA_CONFIGURACION] Callback real no conectado")
+    
+    def _use_configuration_callback(self):
+        """Placeholder para callback de Use - se conecta en ConfiguradorSimulador"""
+        print("[VENTANA_CONFIGURACION] Callback _use_configuration_callback llamado")
+        if hasattr(self, '_use_configuration_callback_real'):
+            self._use_configuration_callback_real()
         else:
             print("[VENTANA_CONFIGURACION] Callback real no conectado")
 
@@ -1536,9 +1730,7 @@ class VentanaConfiguracion:
         """Placeholder para probar"""
         print("[VENTANA] Probar callback")
 
-    def _salir_callback(self):
-        """Placeholder para salir"""
-        self.parent.quit()
+    # Callback _salir_callback removido - usar solo la cruz superior derecha
 
 
 class ConfiguradorSimulador:
@@ -1570,7 +1762,7 @@ class ConfiguradorSimulador:
         # Conectar callbacks INMEDIATAMENTE después de crear la ventana
         self.ventana_config._guardar_callback = self.guardar_configuracion
         self.ventana_config._cargar_callback = self.cargar_configuracion_manual
-        self.ventana_config._salir_callback = self.salir
+        # Callback _salir_callback removido - usar solo la cruz superior derecha
         
         # ========================================================================
         # NUEVOS CALLBACKS PARA SISTEMA DE SLOTS
@@ -1578,6 +1770,7 @@ class ConfiguradorSimulador:
         self.ventana_config._guardar_como_callback_real = self._guardar_como_callback
         self.ventana_config._cargar_desde_callback_real = self._cargar_desde_callback
         self.ventana_config._eliminar_configuracion_callback_real = self._eliminar_configuracion_callback
+        self.ventana_config._use_configuration_callback_real = self._use_configuration_callback
         
         # Conectar referencia al configurador para acceso a config_manager
         self.ventana_config._configurador = self
@@ -1919,14 +2112,7 @@ class ConfiguradorSimulador:
             )
             print(f"[CONFIGURATOR ERROR] Error cargando defaults: {e}")
 
-    def salir(self):
-        """Cierra el configurador"""
-        if messagebox.askyesno(
-            "Confirmar Salida",
-            "Estas seguro de que deseas salir del configurador?"
-        ):
-            print("[CONFIGURATOR] Cerrando configurador")
-            self.root.destroy()
+    # Método salir removido - usar solo la cruz superior derecha
 
     def _validar_configuracion_actual(self) -> bool:
         """Valida la configuracion actual de la UI"""
@@ -2081,11 +2267,60 @@ class ConfiguradorSimulador:
             print(f"[CONFIGURATOR ERROR] Error en eliminar configuracion: {e}")
             messagebox.showerror("Error", f"No se pudo abrir el gestor de configuraciones: {e}")
 
+    def _use_configuration_callback(self):
+        """Callback para 'Use' - Selecciona configuración de slots y la aplica a config.json"""
+        try:
+            print("[CONFIGURATOR] *** BOTON USE CONFIGURACION PRESIONADO ***")
+            
+            # Obtener iconos desde VentanaConfiguracion
+            icons = getattr(self.ventana_config, '_icons', {})
+            
+            # Abrir dialogo de selección (similar a Load pero para aplicar)
+            dialog = ConfigurationDialog(
+                parent=self.root,
+                config_manager=self.config_manager,
+                config_data=None,
+                mode="use"
+            )
+            
+            # Esperar resultado
+            self.root.wait_window(dialog)
+            
+            if dialog.result:
+                # Aplicar la configuración seleccionada a config.json
+                config_data = dialog.result
+                config_name = config_data['metadata']['name']
+                
+                # Guardar configuración en config.json
+                self._guardar_configuracion_directa(config_data['configuration'])
+                
+                print(f"[CONFIGURATOR] Configuracion '{config_name}' aplicada a config.json")
+                messagebox.showinfo("Exito", f"Configuracion '{config_name}' aplicada exitosamente a config.json")
+            
+        except Exception as e:
+            print(f"[CONFIGURATOR ERROR] Error en use configuracion: {e}")
+            messagebox.showerror("Error", f"No se pudo aplicar la configuracion: {e}")
+
+    def _guardar_configuracion_directa(self, config_data):
+        """Guarda configuración directamente en config.json"""
+        try:
+            config_path = "config.json"
+            
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config_data, f, indent=4, ensure_ascii=False)
+            
+            print(f"[CONFIGURATOR] Configuracion guardada en: {config_path}")
+            
+        except Exception as e:
+            print(f"[CONFIGURATOR ERROR] Error guardando configuracion directa: {e}")
+            raise
+
     def ejecutar(self):
         """Ejecuta el configurador"""
         print("[CONFIGURATOR] Iniciando configurador independiente...")
-        print("[CONFIGURATOR] Use 'Guardar Configuracion' para crear config.json")
-        print("[CONFIGURATOR] Use 'Guardar Como...' para sistema de slots")
+        print("[CONFIGURATOR] Use 'Use' para aplicar configuracion de slots a config.json")
+        print("[CONFIGURATOR] Use 'Save' para guardar en sistema de slots")
+        print("[CONFIGURATOR] Use 'Load' para cargar desde sistema de slots")
 
         # Callbacks ya conectados en __init__
         self.root.mainloop()
@@ -2599,6 +2834,9 @@ class ConfigurationSaveModeDialog(tk.Toplevel):
         # Crear UI
         self._create_ui()
         
+        # Aplicar tema oscuro si está activo
+        self._apply_dialog_theme()
+        
         # Centrar ventana en pantalla
         self._center_window()
         
@@ -2702,6 +2940,72 @@ class ConfigurationSaveModeDialog(tk.Toplevel):
         """Maneja click en boton Cancelar"""
         print("[CONFIGURATION_SAVE_MODE_DIALOG] Operacion cancelada")
         self.destroy()
+    
+    def _apply_dialog_theme(self):
+        """Aplica tema oscuro al diálogo si está activo en la ventana principal"""
+        try:
+            # Verificar si el tema oscuro está activo en la ventana principal
+            if hasattr(self.parent, 'dark_mode') and self.parent.dark_mode:
+                dark_colors = {
+                    'bg_primary': '#1e1e1e',
+                    'bg_secondary': '#2d2d30',
+                    'text_primary': '#cccccc',
+                    'accent': '#007acc'
+                }
+                
+                # Aplicar tema oscuro al diálogo
+                self.configure(bg=dark_colors['bg_primary'])
+                
+                # Aplicar recursivamente a todos los widgets
+                self._apply_dark_theme_recursive(self, dark_colors)
+                
+        except Exception as e:
+            print(f"[CONFIGURATION_SAVE_MODE_DIALOG] Error aplicando tema: {e}")
+    
+    def _apply_dark_theme_recursive(self, widget, dark_colors):
+        """Aplica tema oscuro recursivamente a widgets del diálogo"""
+        try:
+            # Solo aplicar a widgets tk nativos específicos, NO a widgets ttk
+            widget_class = widget.__class__.__name__
+            
+            # Verificar si es un widget tk nativo (no ttk)
+            if widget_class.startswith('Tk') or widget_class in ['Entry', 'Text', 'Canvas', 'Listbox', 'Scrollbar', 'Toplevel', 'Label', 'Button']:
+                if isinstance(widget, tk.Entry):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        insertbackground=dark_colors['text_primary'],
+                        selectbackground=dark_colors['accent'],
+                        selectforeground=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Text):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        insertbackground=dark_colors['text_primary'],
+                        selectbackground=dark_colors['accent'],
+                        selectforeground=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Label):
+                    widget.configure(
+                        bg=dark_colors['bg_primary'],
+                        fg=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Button):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        activebackground=dark_colors['accent'],
+                        activeforeground=dark_colors['text_primary']
+                    )
+            
+            # Recursivamente aplicar a widgets hijos
+            for child in widget.winfo_children():
+                self._apply_dark_theme_recursive(child, dark_colors)
+                
+        except Exception as e:
+            # Silenciar errores de widgets que no soportan configuración
+            pass
 
 
 class ConfigurationDialog(tk.Toplevel):
@@ -2730,6 +3034,7 @@ class ConfigurationDialog(tk.Toplevel):
         self._setup_window()
         self._create_widgets()
         self._center_window()
+        self._apply_dialog_theme()
         
         # Hacer modal
         self.transient(parent)
@@ -3164,6 +3469,72 @@ class ConfigurationDialog(tk.Toplevel):
         x = (self.winfo_screenwidth() // 2) - (width // 2)
         y = (self.winfo_screenheight() // 2) - (height // 2)
         self.geometry(f"{width}x{height}+{x}+{y}")
+    
+    def _apply_dialog_theme(self):
+        """Aplica tema oscuro al diálogo si está activo en la ventana principal"""
+        try:
+            # Verificar si el tema oscuro está activo en la ventana principal
+            if hasattr(self.parent, 'dark_mode') and self.parent.dark_mode:
+                dark_colors = {
+                    'bg_primary': '#1e1e1e',
+                    'bg_secondary': '#2d2d30',
+                    'text_primary': '#cccccc',
+                    'accent': '#007acc'
+                }
+                
+                # Aplicar tema oscuro al diálogo
+                self.configure(bg=dark_colors['bg_primary'])
+                
+                # Aplicar recursivamente a todos los widgets
+                self._apply_dark_theme_recursive(self, dark_colors)
+                
+        except Exception as e:
+            print(f"[CONFIGURATION_DIALOG] Error aplicando tema: {e}")
+    
+    def _apply_dark_theme_recursive(self, widget, dark_colors):
+        """Aplica tema oscuro recursivamente a widgets del diálogo"""
+        try:
+            # Solo aplicar a widgets tk nativos específicos, NO a widgets ttk
+            widget_class = widget.__class__.__name__
+            
+            # Verificar si es un widget tk nativo (no ttk)
+            if widget_class.startswith('Tk') or widget_class in ['Entry', 'Text', 'Canvas', 'Listbox', 'Scrollbar', 'Toplevel', 'Label', 'Button']:
+                if isinstance(widget, tk.Entry):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        insertbackground=dark_colors['text_primary'],
+                        selectbackground=dark_colors['accent'],
+                        selectforeground=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Text):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        insertbackground=dark_colors['text_primary'],
+                        selectbackground=dark_colors['accent'],
+                        selectforeground=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Label):
+                    widget.configure(
+                        bg=dark_colors['bg_primary'],
+                        fg=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Button):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        activebackground=dark_colors['accent'],
+                        activeforeground=dark_colors['text_primary']
+                    )
+            
+            # Recursivamente aplicar a widgets hijos
+            for child in widget.winfo_children():
+                self._apply_dark_theme_recursive(child, dark_colors)
+                
+        except Exception as e:
+            # Silenciar errores de widgets que no soportan configuración
+            pass
 
 
 class ConfigurationOverwriteDialog(tk.Toplevel):
@@ -3182,6 +3553,7 @@ class ConfigurationOverwriteDialog(tk.Toplevel):
         self._setup_window()
         self._create_widgets()
         self._center_window()
+        self._apply_dialog_theme()
         
         self.transient(parent)
         self.grab_set()
@@ -3370,6 +3742,72 @@ class ConfigurationOverwriteDialog(tk.Toplevel):
         x = (self.winfo_screenwidth() // 2) - (width // 2)
         y = (self.winfo_screenheight() // 2) - (height // 2)
         self.geometry(f"{width}x{height}+{x}+{y}")
+    
+    def _apply_dialog_theme(self):
+        """Aplica tema oscuro al diálogo si está activo en la ventana principal"""
+        try:
+            # Verificar si el tema oscuro está activo en la ventana principal
+            if hasattr(self.parent, 'dark_mode') and self.parent.dark_mode:
+                dark_colors = {
+                    'bg_primary': '#1e1e1e',
+                    'bg_secondary': '#2d2d30',
+                    'text_primary': '#cccccc',
+                    'accent': '#007acc'
+                }
+                
+                # Aplicar tema oscuro al diálogo
+                self.configure(bg=dark_colors['bg_primary'])
+                
+                # Aplicar recursivamente a todos los widgets
+                self._apply_dark_theme_recursive(self, dark_colors)
+                
+        except Exception as e:
+            print(f"[CONFIGURATION_OVERWRITE_DIALOG] Error aplicando tema: {e}")
+    
+    def _apply_dark_theme_recursive(self, widget, dark_colors):
+        """Aplica tema oscuro recursivamente a widgets del diálogo"""
+        try:
+            # Solo aplicar a widgets tk nativos específicos, NO a widgets ttk
+            widget_class = widget.__class__.__name__
+            
+            # Verificar si es un widget tk nativo (no ttk)
+            if widget_class.startswith('Tk') or widget_class in ['Entry', 'Text', 'Canvas', 'Listbox', 'Scrollbar', 'Toplevel', 'Label', 'Button']:
+                if isinstance(widget, tk.Entry):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        insertbackground=dark_colors['text_primary'],
+                        selectbackground=dark_colors['accent'],
+                        selectforeground=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Text):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        insertbackground=dark_colors['text_primary'],
+                        selectbackground=dark_colors['accent'],
+                        selectforeground=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Label):
+                    widget.configure(
+                        bg=dark_colors['bg_primary'],
+                        fg=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Button):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        activebackground=dark_colors['accent'],
+                        activeforeground=dark_colors['text_primary']
+                    )
+            
+            # Recursivamente aplicar a widgets hijos
+            for child in widget.winfo_children():
+                self._apply_dark_theme_recursive(child, dark_colors)
+                
+        except Exception as e:
+            # Silenciar errores de widgets que no soportan configuración
+            pass
 
 class ConfigurationManagerDialog(tk.Toplevel):
     """
@@ -3394,6 +3832,7 @@ class ConfigurationManagerDialog(tk.Toplevel):
         self._setup_window()
         self._create_widgets()
         self._center_window()
+        self._apply_dialog_theme()
         
         # Hacer modal
         self.transient(parent)
@@ -3591,6 +4030,72 @@ class ConfigurationManagerDialog(tk.Toplevel):
         x = (self.winfo_screenwidth() // 2) - (width // 2)
         y = (self.winfo_screenheight() // 2) - (height // 2)
         self.geometry(f"{width}x{height}+{x}+{y}")
+    
+    def _apply_dialog_theme(self):
+        """Aplica tema oscuro al diálogo si está activo en la ventana principal"""
+        try:
+            # Verificar si el tema oscuro está activo en la ventana principal
+            if hasattr(self.parent, 'dark_mode') and self.parent.dark_mode:
+                dark_colors = {
+                    'bg_primary': '#1e1e1e',
+                    'bg_secondary': '#2d2d30',
+                    'text_primary': '#cccccc',
+                    'accent': '#007acc'
+                }
+                
+                # Aplicar tema oscuro al diálogo
+                self.configure(bg=dark_colors['bg_primary'])
+                
+                # Aplicar recursivamente a todos los widgets
+                self._apply_dark_theme_recursive(self, dark_colors)
+                
+        except Exception as e:
+            print(f"[CONFIGURATION_MANAGER_DIALOG] Error aplicando tema: {e}")
+    
+    def _apply_dark_theme_recursive(self, widget, dark_colors):
+        """Aplica tema oscuro recursivamente a widgets del diálogo"""
+        try:
+            # Solo aplicar a widgets tk nativos específicos, NO a widgets ttk
+            widget_class = widget.__class__.__name__
+            
+            # Verificar si es un widget tk nativo (no ttk)
+            if widget_class.startswith('Tk') or widget_class in ['Entry', 'Text', 'Canvas', 'Listbox', 'Scrollbar', 'Toplevel', 'Label', 'Button']:
+                if isinstance(widget, tk.Entry):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        insertbackground=dark_colors['text_primary'],
+                        selectbackground=dark_colors['accent'],
+                        selectforeground=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Text):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        insertbackground=dark_colors['text_primary'],
+                        selectbackground=dark_colors['accent'],
+                        selectforeground=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Label):
+                    widget.configure(
+                        bg=dark_colors['bg_primary'],
+                        fg=dark_colors['text_primary']
+                    )
+                elif isinstance(widget, tk.Button):
+                    widget.configure(
+                        bg=dark_colors['bg_secondary'],
+                        fg=dark_colors['text_primary'],
+                        activebackground=dark_colors['accent'],
+                        activeforeground=dark_colors['text_primary']
+                    )
+            
+            # Recursivamente aplicar a widgets hijos
+            for child in widget.winfo_children():
+                self._apply_dark_theme_recursive(child, dark_colors)
+                
+        except Exception as e:
+            # Silenciar errores de widgets que no soportan configuración
+            pass
 
 
 # Importar datetime para timestamps

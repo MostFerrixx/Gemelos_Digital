@@ -283,10 +283,15 @@ class AlmacenMejorado:
         if not self.data_manager or not self.data_manager.puntos_de_picking_ordenados:
             print("[ALMACEN WARNING] No hay puntos de picking disponibles - usando ubicaciones dummy")
             picking_points = [(10, 10), (15, 15), (20, 20)]
-            work_areas = ["Area_Ground", "Area_Rack", "Area_Piso_L1"]
+            work_areas = ["Area_Ground", "Area_High", "Area_Special"]
         else:
-            picking_points = [pp['ubicacion_grilla'] for pp in self.data_manager.puntos_de_picking_ordenados]
-            work_areas = [pp.get('work_area', 'Area_Ground') for pp in self.data_manager.puntos_de_picking_ordenados]
+            # Mix picking points randomly to ensure fair distribution across areas
+            import random
+            mixed_points = self.data_manager.puntos_de_picking_ordenados.copy()
+            random.shuffle(mixed_points)
+            
+            picking_points = [pp['ubicacion_grilla'] for pp in mixed_points]
+            work_areas = [pp.get('WorkArea', 'Area_Ground') for pp in mixed_points]
 
         # Generate work orders (collect all first, then add in batch)
         wo_counter = 0
@@ -320,7 +325,7 @@ class AlmacenMejorado:
             for wo_num in range(num_wos):
                 wo_counter += 1
 
-                # Select picking location
+                # Select picking location - ORIGINAL METHOD RESTORED
                 pick_idx = wo_counter % len(picking_points)
                 ubicacion = picking_points[pick_idx]
                 work_area = work_areas[pick_idx] if pick_idx < len(work_areas) else "Area_Ground"
