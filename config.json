@@ -1,40 +1,73 @@
 {
-  "total_ordenes": 3,
-  "num_operarios_total": 2,
-  "num_traspaletas": 0,
-  "num_montacargas": 0,
-  "distribucion_tipos": {
-    "pequeno": {
-      "porcentaje": 100,
-      "volumen": 5
+    "total_ordenes": 300,
+    "distribucion_tipos": {
+        "pequeno": {
+            "porcentaje": 60,
+            "volumen": 5
+        },
+        "mediano": {
+            "porcentaje": 30,
+            "volumen": 25
+        },
+        "grande": {
+            "porcentaje": 10,
+            "volumen": 80
+        }
     },
-    "mediano": {
-      "porcentaje": 0,
-      "volumen": 25
+    "capacidad_carro": 150,
+    "dispatch_strategy": "Optimizacion Global",
+    "tour_type": "Tour Mixto (Multi-Destino)",
+    "layout_file": "layouts/WH1.tmx",
+    "sequence_file": "layouts/Warehouse_Logic.xlsx",
+    "map_scale": 1.3,
+    "selected_resolution_key": "Pequena (800x800)",
+    "num_operarios_terrestres": 2,
+    "num_montacargas": 1,
+    "num_operarios_total": 3,
+    "capacidad_montacargas": 1000,
+    "tiempo_descarga_por_tarea": 5,
+    "assignment_rules": {
+        "GroundOperator": {},
+        "Forklift": {}
     },
-    "grande": {
-      "porcentaje": 0,
-      "volumen": 80
-    }
-  },
-  "layout_file": "data/layouts/WH1.tmx",
-  "sequence_file": "data/layouts/Warehouse_Logic.xlsx",
-  "agent_types": [
-    {
-      "type": "GroundOperator",
-      "count": 2,
-      "capacity": 150,
-      "discharge_time": 5,
-      "work_area_priorities": {
-        "Area_Ground": 1,
-        "Area_Piso_L1": 2,
-        "Area_Special": 3
-      }
-    }
-  ],
-  "assignment_rules": {
-    "strategy": "Optimizacion Global",
-    "max_wos_per_tour": 20,
-    "proximity_radius": 100
-  }
+    "outbound_staging_distribution": {
+        "1": 100,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0
+    },
+    "agent_types": [
+        {
+            "type": "GroundOperator",
+            "capacity": 150,
+            "discharge_time": 5,
+            "work_area_priorities": {
+                "Area_Ground": 1,
+                "Area_Piso_L1": 2
+            }
+        },
+        {
+            "type": "GroundOperator",
+            "capacity": 150,
+            "discharge_time": 5,
+            "work_area_priorities": {
+                "Area_Ground": 1,
+                "Area_Piso_L1": 2
+            }
+        },
+        {
+            "type": "Forklift",
+            "capacity": 1000,
+            "discharge_time": 5,
+            "work_area_priorities": {
+                "Area_Rack": 1
+            }
+        }
+    ],
+    "num_operarios": 3,
+    "tareas_zona_a": 0,
+    "tareas_zona_b": 0
 }

@@ -9,10 +9,10 @@
 
 ### AL INICIAR CADA SESIÓN (OBLIGATORIO):
 1. **LECTURA AUTOMÁTICA** de archivos clave en orden:
-   - CURSOR_DOCUMENTATION_RULES.md
-   - ACTIVE_SESSION_STATE.md  
+   - ACTIVE_SESSION_STATE.md
    - HANDOFF.md
    - INSTRUCCIONES.md
+   - PLAN_SISTEMA_SLOTS_CONFIGURACION.md (si aplica)
 
 2. **VERIFICACIÓN** del estado real: git status && git log --oneline -3
 
@@ -39,7 +39,7 @@
 - ACTIVE_SESSION_STATE.md - Contexto inmediato
 - HANDOFF.md - Estado del proyecto
 - INSTRUCCIONES.md - Instrucciones técnicas
-- CURSOR_DOCUMENTATION_RULES.md - Reglas completas
+- PLAN_SISTEMA_SLOTS_CONFIGURACION.md - Plan actual pendiente
 
 ## OBJETIVO:
 Garantizar que cada nueva sesión pueda continuar exactamente donde quedó la anterior, sin pérdida de contexto.
