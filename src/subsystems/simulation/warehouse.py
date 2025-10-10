@@ -302,7 +302,7 @@ class AlmacenMejorado:
 
     def _generar_flujo_ordenes(self):
         """Generate work orders flow based on configuration"""
-        print(f"[ALMACEN] Generando {self.total_ordenes} ordenes de trabajo...")
+        # print(f"[ALMACEN] Generando {self.total_ordenes} ordenes de trabajo...")
 
         # Get picking points from data manager
         if not self.data_manager or not self.data_manager.puntos_de_picking_ordenados:
@@ -387,7 +387,7 @@ class AlmacenMejorado:
         if all_work_orders:
             self.dispatcher.agregar_work_orders(all_work_orders)
 
-        print(f"[ALMACEN] Generadas {len(self.dispatcher.lista_maestra_work_orders)} WorkOrders")
+        # print(f"[ALMACEN] Generadas {len(self.dispatcher.lista_maestra_work_orders)} WorkOrders")
         print(f"[ALMACEN] Distribucion por tipo: {self.distribucion_tipos}")
 
         # BUGFIX CAPACITY VALIDATION: Report statistics

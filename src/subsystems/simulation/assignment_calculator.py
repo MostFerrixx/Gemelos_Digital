@@ -150,8 +150,8 @@ class AssignmentCostCalculator:
         distance = self._calculate_distance(start_pos, work_order.ubicacion)
         distance_cost = distance * self.DISTANCE_WEIGHT
         
-        # DEBUG: Log position used for calculation
-        print(f"[COST-CALC DEBUG] {operator.id} -> {work_order.id}: desde {start_pos} a {work_order.ubicacion}, distancia={distance}")
+        # DEBUG: Log position used for calculation (DISABLED FOR PERFORMANCE)
+        # print(f"[COST-CALC DEBUG] {operator.id} -> {work_order.id}: desde {start_pos} a {work_order.ubicacion}, distancia={distance}")
 
         # Component 4: Total Cost
         total_cost = priority_penalty + distance_cost
@@ -170,10 +170,10 @@ class AssignmentCostCalculator:
             'target_position': work_order.ubicacion,
         }
 
-        # Log calculation (format matches production logs)
-        print(f"[COST-CALC] {operator.type}_{operator.id} -> {work_area}: "
-              f"priority={priority_score}, penalty={int(priority_penalty)}, "
-              f"distance={int(distance)}, total={int(total_cost)}")
+        # Log calculation (format matches production logs) (DISABLED FOR PERFORMANCE)
+        # print(f"[COST-CALC] {operator.type}_{operator.id} -> {work_area}: "
+        #       f"priority={priority_score}, penalty={int(priority_penalty)}, "
+        #       f"distance={int(distance)}, total={int(total_cost)}")
 
         return CostResult(
             total_cost=total_cost,

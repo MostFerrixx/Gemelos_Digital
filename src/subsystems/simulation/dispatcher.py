@@ -87,9 +87,9 @@ class DispatcherV11:
         self.max_wos_por_tour = configuracion.get('max_wos_por_tour', 20)
         self.radio_cercania = configuracion.get('radio_cercania', 100)  # Grid cells
 
-        print(f"[DISPATCHER] Inicializado con estrategia: '{self.estrategia}'")
-        print(f"[DISPATCHER] Max WOs por tour: {self.max_wos_por_tour}, "
-              f"Radio cercania: {self.radio_cercania}")
+        # print(f"[DISPATCHER] Inicializado con estrategia: '{self.estrategia}'")
+        # print(f"[DISPATCHER] Max WOs por tour: {self.max_wos_por_tour}, "
+        #       f"Radio cercania: {self.radio_cercania}")
 
     def agregar_work_orders(self, work_orders: List[Any]) -> None:
         """
@@ -109,10 +109,10 @@ class DispatcherV11:
         # FASE 2: Configurar contador inicial de WorkOrders para metadata
         if not hasattr(self, 'work_orders_total_inicial') or self.work_orders_total_inicial == 0:
             self.work_orders_total_inicial = len(self.lista_maestra_work_orders)
-            print(f"[DISPATCHER] Total WorkOrders iniciales configurado: {self.work_orders_total_inicial}")
+            # print(f"[DISPATCHER] Total WorkOrders iniciales configurado: {self.work_orders_total_inicial}")
 
-        print(f"[DISPATCHER] {self.env.now:.2f} - Agregados {len(work_orders)} WorkOrders. "
-              f"Total pendientes: {len(self.work_orders_pendientes)}")
+        # print(f"[DISPATCHER] {self.env.now:.2f} - Agregados {len(work_orders)} WorkOrders. "
+        #       f"Total pendientes: {len(self.work_orders_pendientes)}")
 
     def registrar_operador_disponible(self, operator: Any) -> None:
         """
@@ -123,8 +123,8 @@ class DispatcherV11:
         """
         if operator not in self.operadores_disponibles:
             self.operadores_disponibles.append(operator)
-            print(f"[DISPATCHER] {self.env.now:.2f} - Operador {operator.type}_{operator.id} "
-                  f"registrado como disponible (pos: {operator.current_position})")
+        # print(f"[DISPATCHER] {self.env.now:.2f} - Operador {operator.type}_{operator.id} "
+        #       f"registrado como disponible (pos: {operator.current_position})")
 
     def solicitar_asignacion(self, operator: Any) -> Optional[Dict[str, Any]]:
         """
@@ -196,7 +196,7 @@ class DispatcherV11:
             
             return None
 
-        print(f"[DISPATCHER] Estrategia '{self.estrategia}' selecciono {len(candidatos)} candidatos")
+        # print(f"[DISPATCHER] Estrategia '{self.estrategia}' selecciono {len(candidatos)} candidatos")
 
         # Step 3: Select best batch based on strategy
         if self.estrategia == "Optimizacion Global":

@@ -32,6 +32,9 @@ from subsystems.config.settings import *
 from subsystems.config.colors import *
 from subsystems.simulation.warehouse import AlmacenMejorado
 from subsystems.simulation.operators import crear_operarios
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from analytics_engine import AnalyticsEngine
 from subsystems.simulation.layout_manager import LayoutManager
 from subsystems.simulation.assignment_calculator import AssignmentCostCalculator
@@ -324,7 +327,9 @@ class SimulationEngine:
             pathfinder=self.pathfinder,          # OBLIGATORIO
             data_manager=self.data_manager,      # NUEVO V2.6
             cost_calculator=self.cost_calculator, # NUEVO V2.6
-            simulador=self  # REFACTOR: Pasar referencia del simulador
+            route_calculator=self.route_calculator, # BUGFIX: Agregar route_calculator faltante
+            simulador=self,  # REFACTOR: Pasar referencia del simulador
+            replay_buffer=self.replay_buffer  # BUGFIX: Agregar replay_buffer para generacion de .jsonl
         )
         
         inicializar_estado(self.almacen, self.env, self.configuracion, layout_manager=self.layout_manager)
@@ -1470,6 +1475,10 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
         # 5. Crear calculador de costos
         cost_calculator = AssignmentCostCalculator(data_manager)
         
+        # 5.5. Crear replay_buffer para generacion de .jsonl
+        from simulation_buffer import ReplayBuffer
+        replay_buffer = ReplayBuffer()
+        
         # 6. REFACTOR: Crear AlmacenMejorado con cola de eventos
         print("[PROCESO-SIMPY] Creando AlmacenMejorado con cola de eventos...")
         almacen = AlmacenMejorado(
@@ -1479,8 +1488,10 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
             pathfinder=pathfinder,
             data_manager=data_manager,
             cost_calculator=cost_calculator,
+            route_calculator=route_calculator,  # BUGFIX: Agregar route_calculator faltante
             simulador=None,  # En proceso hijo no hay simulador principal
-            visual_event_queue=visual_event_queue  # NUEVO: Pasar cola
+            visual_event_queue=visual_event_queue,  # NUEVO: Pasar cola
+            replay_buffer=replay_buffer  # BUGFIX: Agregar replay_buffer para .jsonl
         )
         
         # 7. Inicializar estado visual EN EL PROCESO HIJO (con cola)
