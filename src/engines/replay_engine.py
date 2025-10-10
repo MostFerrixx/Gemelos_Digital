@@ -36,11 +36,11 @@ from subsystems.visualization.state import (
     disminuir_velocidad,
     obtener_velocidad_simulacion
 )
-from subsystems.visualization.renderer import RendererOriginal, renderizar_diagnostico_layout
+from subsystems.visualization.renderer import RendererOriginal, renderizar_diagnostico_layout, renderizar_agentes
 from subsystems.visualization.dashboard import DashboardOriginal, DashboardGUI, DashboardWorldClass
 from subsystems.visualization.dashboard_modern import ModernDashboard
 from subsystems.visualization.dashboard_world_class import DashboardWorldClass as DashboardWC
-from subsystems.visualization.replay_scrubber import REPLAY_SEEK_EVENT
+from subsystems.visualization.replay_scrubber import REPLAY_SEEK_EVENT, ReplayScrubber
 
 # REFACTOR V11: Config utilities - Necesarios para cargar configuracion
 # ConfigurationManager replaces cargar_configuracion logic
@@ -75,12 +75,14 @@ class ReplayViewerEngine:
         self.layout_manager = None
         self.window_size = (0, 0)
         self.virtual_surface = None
+        self.replay_scrubber = None  # ReplayScrubber para navegacion temporal
 
         # KEEP: Replay visualization motor - Core para mostrar replay
         self.event_buffer = []           # Buffer de eventos para replay
         self.playback_time = 0.0         # Reloj de reproduccion interno
         self.factor_aceleracion = 1.0    # Factor de velocidad de reproduccion
         self.dashboard_wos_state = {}
+        self.processed_event_indices = set()  # Indices de eventos procesados
 
     def inicializar_pygame(self):
         """Inicializa ventana de Pygame para visualizacion de replay"""
@@ -145,6 +147,53 @@ class ReplayViewerEngine:
             self.dashboard_gui = None
             self.ui_manager = None
 
+    def _inicializar_replay_scrubber(self):
+        """
+        Inicializa el ReplayScrubber para navegacion temporal.
+        """
+        print("[REPLAY-SCRUBBER] Iniciando ReplayScrubber...")
+        try:
+            # Obtener dimensiones de la ventana
+            screen_width, screen_height = self.pantalla.get_size()
+            
+            # Configurar posicion del scrubber (parte inferior de la ventana)
+            scrubber_width = screen_width - 40  # Margen de 20px a cada lado
+            scrubber_height = 30
+            scrubber_x = 20
+            scrubber_y = screen_height - scrubber_height - 20  # 20px desde abajo
+            
+            # Configurar fuente y colores
+            font = pygame.font.Font(None, 24)
+            colors = {
+                'surface_0': (45, 45, 45),      # Fondo oscuro
+                'border_primary': (70, 70, 70), # Borde
+                'accent_blue': (100, 150, 255), # Progreso
+                'accent_purple': (150, 100, 255), # Thumb
+                'text_primary': (255, 255, 255), # Texto principal
+                'text_secondary': (200, 200, 200) # Texto secundario
+            }
+            
+            # Crear instancia del ReplayScrubber
+            self.replay_scrubber = ReplayScrubber(
+                x=scrubber_x,
+                y=scrubber_y,
+                width=scrubber_width,
+                height=scrubber_height,
+                font=font,
+                colors=colors
+            )
+            
+            print("[REPLAY-SCRUBBER] ReplayScrubber inicializado exitosamente")
+            print(f"[REPLAY-SCRUBBER] Posicion: ({scrubber_x}, {scrubber_y}), Tamaño: {scrubber_width}x{scrubber_height}")
+            
+        except Exception as e:
+            print(f"[REPLAY-SCRUBBER ERROR] Error inicializando ReplayScrubber: {e}")
+            print(f"[REPLAY-SCRUBBER ERROR] Tipo de error: {type(e).__name__}")
+            import traceback
+            print(f"[REPLAY-SCRUBBER ERROR] Traceback: {traceback.format_exc()}")
+            print("[REPLAY-SCRUBBER] Fallback: Continuando sin ReplayScrubber")
+            self.replay_scrubber = None
+
     def run(self, jsonl_file_path):
         """Metodo principal - Ejecuta el motor de replay completo desde archivo .jsonl"""
         print(f"[REPLAY] Cargando archivo: {jsonl_file_path}")
@@ -191,6 +240,9 @@ class ReplayViewerEngine:
         tmx_file = os.path.join(project_root, "layouts", "WH1.tmx")
         self.layout_manager = LayoutManager(tmx_file)
         virtual_surface = pygame.Surface((warehouse_width, warehouse_width))
+        
+        # Inicializar ReplayScrubber - DESHABILITADO (redundante con dashboard)
+        # self._inicializar_replay_scrubber()
         self.renderer = RendererOriginal(virtual_surface)
         self.virtual_surface = virtual_surface
         inicializar_estado(None, None, configuracion, self.layout_manager)
@@ -257,6 +309,7 @@ class ReplayViewerEngine:
 
             for event in pygame.event.get():
                 if self.dashboard: self.dashboard.handle_mouse_event(event)
+                # if self.replay_scrubber: self.replay_scrubber.handle_event(event)  # DESHABILITADO
                 if event.type == REPLAY_SEEK_EVENT:
                     playback_time = self.seek_to_time(event.target_time)
                     replay_finalizado = (playback_time >= self.max_time)
@@ -306,6 +359,11 @@ class ReplayViewerEngine:
             if self.dashboard:
                 estado_visual['metricas']['max_time'] = self.max_time
                 self.dashboard.render(self.pantalla, estado_visual, offset_x=0)
+
+            # Renderizar ReplayScrubber - DESHABILITADO (redundante con dashboard)
+            # if self.replay_scrubber:
+            #     self.replay_scrubber.update(playback_time, self.max_time)
+            #     self.replay_scrubber.draw(self.pantalla)
 
             font = pygame.font.Font(None, 20)
             info_text = font.render(f"REPLAY: Tiempo {self.playback_time:.2f}s | Velocidad: {replay_speed:.2f}x | Eventos {len(self.processed_event_indices)}/{len(self.eventos)}", True, (255, 255, 255))

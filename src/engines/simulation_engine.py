@@ -398,8 +398,8 @@ class SimulationEngine:
     
     def ejecutar_bucle_principal(self):
         """Bucle principal completo con simulacion y renderizado de agentes."""
-        from visualization.original_renderer import renderizar_agentes, renderizar_dashboard
-        from visualization.state import estado_visual, obtener_velocidad_simulacion
+        from subsystems.visualization.renderer import renderizar_agentes, renderizar_dashboard
+        from subsystems.visualization.state import estado_visual, obtener_velocidad_simulacion
         
         self.corriendo = True
         while self.corriendo:
@@ -472,12 +472,12 @@ class SimulationEngine:
             self.virtual_surface.fill((25, 25, 25))
             if hasattr(self, 'layout_manager') and self.layout_manager:
                 self.renderer.renderizar_mapa_tmx(self.virtual_surface, self.layout_manager.tmx_data)
-                from visualization.original_renderer import renderizar_tareas_pendientes
+                from subsystems.visualization.renderer import renderizar_tareas_pendientes
                 # Obtener lista de tareas pendientes del dispatcher
                 tareas_pendientes = self.almacen.dispatcher.lista_maestra_work_orders if (self.almacen and self.almacen.dispatcher) else []
                 renderizar_tareas_pendientes(self.virtual_surface, tareas_pendientes, self.layout_manager)
             # Obtener lista de agentes para renderizar desde estado visual
-            from visualization.state import estado_visual
+            from subsystems.visualization.state import estado_visual
             agentes_para_renderizar = list(estado_visual.get('operarios', {}).values())
             renderizar_agentes(self.virtual_surface, agentes_para_renderizar, self.layout_manager)
 
@@ -565,8 +565,8 @@ class SimulationEngine:
         print("[CONSUMIDOR-PLAYBACK] Iniciando bucle con motor de playback_time sincronizado...")
         import queue
         import time
-        from visualization.original_renderer import renderizar_agentes, renderizar_dashboard, renderizar_tareas_pendientes
-        from visualization.state import estado_visual
+        from subsystems.visualization.renderer import renderizar_agentes, renderizar_dashboard, renderizar_tareas_pendientes
+        from subsystems.visualization.state import estado_visual
         
         # Estado de visualizacion
         simulacion_activa = True
@@ -711,7 +711,7 @@ class SimulationEngine:
                     tareas_pendientes = self.almacen.dispatcher.lista_maestra_work_orders if (self.almacen and self.almacen.dispatcher) else []
                     renderizar_tareas_pendientes(self.virtual_surface, tareas_pendientes, self.layout_manager)
                 # Obtener lista de agentes para renderizar desde estado visual
-                from visualization.state import estado_visual
+                from subsystems.visualization.state import estado_visual
                 agentes_para_renderizar = list(estado_visual.get('operarios', {}).values())
                 renderizar_agentes(self.virtual_surface, agentes_para_renderizar, self.layout_manager)
 
@@ -871,7 +871,7 @@ class SimulationEngine:
     # ELIMINATED: def _renderizar_hud_replay_mejorado() - Enhanced replay HUD method removed
     def _ELIMINATED_renderizar_hud_replay_mejorado(self, eventos_recibidos, agentes_activos):
         """Renderiza el HUD del motor de replay mejorado"""
-        from visualization.state import estado_visual
+        from subsystems.visualization.state import estado_visual
         
         font = pygame.font.Font(None, 20)
         y_offset = self.window_size[1] - 120  # Esquina inferior izquierda
@@ -891,7 +891,7 @@ class SimulationEngine:
     # ELIMINATED: def _renderizar_hud_playback_motor() - Playback motor HUD method removed
     def _ELIMINATED_renderizar_hud_playback_motor(self, eventos_recibidos, eventos_procesados, buffer_size):
         """Renderiza el HUD del motor de playback sincronizado"""
-        from visualization.state import estado_visual
+        from subsystems.visualization.state import estado_visual
         
         font = pygame.font.Font(None, 18)
         y_offset = self.window_size[1] - 140  # Esquina inferior izquierda
@@ -1140,7 +1140,7 @@ class SimulationEngine:
         """
         if self.dashboard_data_queue:
             try:
-                from visualization.state import estado_visual
+                from subsystems.visualization.state import estado_visual
                 
                 # Obtener WorkOrders desde estado_visual (datos del replay)
                 work_orders = estado_visual.get('work_orders', {})
@@ -1181,7 +1181,7 @@ class SimulationEngine:
             self.dashboard_data_queue):
             
             try:
-                from visualization.state import estado_visual
+                from subsystems.visualization.state import estado_visual
                 
                 # Obtener WorkOrders actuales desde estado_visual
                 work_orders = estado_visual.get('work_orders', {})
@@ -1218,7 +1218,7 @@ class SimulationEngine:
     
     def _inicializar_operarios_en_estado_visual(self, agentes):
         """Inicializa estado visual basandose en agentes reales creados"""
-        from visualization.state import estado_visual
+        from subsystems.visualization.state import estado_visual
         
         if not agentes:
             print("[VISUAL-STATE] No hay agentes para inicializar en estado visual")
@@ -1426,13 +1426,13 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
     
     import pygame
     import simpy
-    from simulation.warehouse import AlmacenMejorado
-    from simulation.operators_workorder import crear_operarios
-    from simulation.layout_manager import LayoutManager
-    from simulation.assignment_calculator import AssignmentCostCalculator
-    from simulation.data_manager import DataManager
-    from simulation.pathfinder import Pathfinder
-    from simulation.route_calculator import RouteCalculator
+    from subsystems.simulation.warehouse import AlmacenMejorado
+    from subsystems.simulation.operators import crear_operarios
+    from subsystems.simulation.layout_manager import LayoutManager
+    from subsystems.simulation.assignment_calculator import AssignmentCostCalculator
+    from subsystems.simulation.data_manager import DataManager
+    from subsystems.simulation.pathfinder import Pathfinder
+    from subsystems.simulation.route_calculator import RouteCalculator
     
     try:
         print("[PROCESO-SIMPY] Iniciando proceso de simulacion separado...")
@@ -1484,7 +1484,7 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
         )
         
         # 7. Inicializar estado visual EN EL PROCESO HIJO (con cola)
-        from visualization.state import inicializar_estado_con_cola
+        from subsystems.visualization.state import inicializar_estado_con_cola
         inicializar_estado_con_cola(almacen, env, configuracion, 
                                    layout_manager, visual_event_queue)
         
