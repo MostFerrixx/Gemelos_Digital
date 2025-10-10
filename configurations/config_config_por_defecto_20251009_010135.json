@@ -3,8 +3,8 @@
         "id": "config_config_por_defecto_20251009_010135",
         "name": "Config Por Defecto",
         "description": "Configuración por defecto del sistema",
-        "created_at": "2025-10-09T03:51:39.410787",
-        "modified_at": "2025-10-09T03:51:39.410812",
+        "created_at": "2025-10-09T17:27:21.168322",
+        "modified_at": "2025-10-09T17:27:21.168333",
         "version": "1.0",
         "tags": [
             "default",
@@ -30,7 +30,7 @@
             }
         },
         "capacidad_carro": 150,
-        "dispatch_strategy": "Ejecucion de Plan (Filtro por Prioridad)",
+        "dispatch_strategy": "Optimizacion Global",
         "tour_type": "Tour Mixto (Multi-Destino)",
         "layout_file": "layouts/WH1.tmx",
         "sequence_file": "layouts/Warehouse_Logic.xlsx",

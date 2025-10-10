@@ -123,6 +123,25 @@ class BaseOperator:
         """Update agent status"""
         self.status = new_status
 
+    def _get_current_work_area(self) -> Optional[str]:
+        """
+        Obtiene el work_area de la WorkOrder actual si existe.
+        
+        Returns:
+            str: Work area de la WO actual o None si no hay WO activa
+        """
+        if not self.current_task:
+            return None
+            
+        # Buscar la WorkOrder en el dispatcher
+        if hasattr(self.almacen, 'dispatcher') and self.almacen.dispatcher:
+            operator_id = f"{self.type}_{self.id}"
+            current_wo = self.almacen.dispatcher.work_orders_en_progreso.get(operator_id)
+            if current_wo and hasattr(current_wo, 'work_area'):
+                return current_wo.work_area
+        
+        return None
+
     def __repr__(self):
         return f"{self.type}({self.id}, cargo={self.cargo_volume}/{self.capacity}, status={self.status})"
 
@@ -244,6 +263,7 @@ class GroundOperator(BaseOperator):
                         'position': self.current_position,
                         'status': self.status,
                         'current_task': wo.id if wo else None,
+                        'current_work_area': wo.work_area if wo else None,
                         'cargo_volume': self.cargo_volume
                     })
                     
@@ -262,6 +282,7 @@ class GroundOperator(BaseOperator):
                             'position': self.current_position,
                             'status': self.status,
                             'current_task': wo.id if wo else None,
+                            'current_work_area': wo.work_area if wo else None,
                             'cargo_volume': self.cargo_volume
                         })
                         
@@ -281,6 +302,7 @@ class GroundOperator(BaseOperator):
                     'position': self.current_position,
                     'status': self.status,
                     'current_task': wo.id if wo else None,
+                    'current_work_area': wo.work_area if wo else None,
                     'cargo_volume': self.cargo_volume
                 })
 
@@ -294,6 +316,7 @@ class GroundOperator(BaseOperator):
                     'position': self.current_position,
                     'status': self.status,
                     'current_task': wo.id if wo else None,
+                    'current_work_area': wo.work_area if wo else None,
                     'cargo_volume': self.cargo_volume
                 })
                 
@@ -515,6 +538,7 @@ class Forklift(BaseOperator):
                         'position': self.current_position,
                         'status': self.status,
                         'current_task': wo.id if wo else None,
+                        'current_work_area': wo.work_area if wo else None,
                         'cargo_volume': self.cargo_volume
                     })
                     
@@ -533,6 +557,7 @@ class Forklift(BaseOperator):
                             'position': self.current_position,
                             'status': self.status,
                             'current_task': wo.id if wo else None,
+                            'current_work_area': wo.work_area if wo else None,
                             'cargo_volume': self.cargo_volume
                         })
                         
@@ -703,7 +728,7 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
                 configuracion=configuracion,
                 capacity=150,  # Default capacity
                 discharge_time=5,
-                work_area_priorities={"Area_Ground": 1, "Area_Piso_L1": 2},
+                work_area_priorities={"Area_Ground": 1, "Area_High": 2, "Area_Special": 3},  # FIX: Use available areas
                 pathfinder=pathfinder,
                 layout_manager=layout_manager,
                 simulador=simulador
@@ -722,7 +747,7 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
                 configuracion=configuracion,
                 capacity=1000,  # Default capacity
                 discharge_time=5,
-                work_area_priorities={"Area_Rack": 1},
+                work_area_priorities={"Area_High": 1, "Area_Special": 2},  # FIX: Use available areas
                 pathfinder=pathfinder,
                 layout_manager=layout_manager,
                 simulador=simulador

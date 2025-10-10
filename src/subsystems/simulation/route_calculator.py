@@ -37,7 +37,8 @@ class RouteCalculator:
     def calculate_route(self,
                        start_position: Tuple[int, int],
                        work_orders: List[Any],
-                       return_to_start: bool = True) -> Optional[Dict[str, Any]]:
+                       return_to_start: bool = True,
+                       preserve_first: bool = False) -> Optional[Dict[str, Any]]:
         """
         Calculate optimal route visiting all work order locations
 
@@ -95,7 +96,7 @@ class RouteCalculator:
             # Continue anyway - validation already logged warnings
 
         # Order work orders by pick_sequence (default strategy)
-        ordered_work_orders = self.order_work_orders_by_sequence(work_orders)
+        ordered_work_orders = self.order_work_orders_by_sequence(work_orders, preserve_first)
 
         # Calculate route segments
         segment_paths = []
@@ -178,12 +179,13 @@ class RouteCalculator:
 
         return result
 
-    def order_work_orders_by_sequence(self, work_orders: List[Any]) -> List[Any]:
+    def order_work_orders_by_sequence(self, work_orders: List[Any], preserve_first: bool = False) -> List[Any]:
         """
         Order work orders by their pick_sequence attribute
 
         Args:
             work_orders: List of WorkOrder objects
+            preserve_first: If True, keep the first WorkOrder at the beginning
 
         Returns:
             Sorted list of WorkOrders by pick_sequence (ascending)
@@ -192,11 +194,19 @@ class RouteCalculator:
             - pick_sequence comes from Warehouse_Logic.xlsx
             - This represents the optimal picking order determined by warehouse design
             - Lower sequence = pick first
+            - If preserve_first=True, the first WorkOrder stays first regardless of pick_sequence
         """
-        # Sort by pick_sequence attribute
-        ordered = sorted(work_orders, key=lambda wo: wo.pick_sequence)
-
-        print(f"[ROUTE-CALCULATOR] Ordenados {len(ordered)} WorkOrders por pick_sequence")
+        if not work_orders:
+            return work_orders
+            
+        if preserve_first:
+            # Don't reorder at all - keep the order provided by dispatcher
+            ordered = work_orders
+            print(f"[ROUTE-CALCULATOR] Ordenados {len(ordered)} WorkOrders por proximidad (sin reordenar)")
+        else:
+            # Sort by pick_sequence attribute
+            ordered = sorted(work_orders, key=lambda wo: wo.pick_sequence)
+            print(f"[ROUTE-CALCULATOR] Ordenados {len(ordered)} WorkOrders por pick_sequence")
 
         return ordered
 

@@ -135,10 +135,13 @@ class AssignmentCostCalculator:
             priority_penalty = 0.0
 
         # Component 3: Distance Cost
-        # Use operator's current position or default to posicion_grilla
+        # Use operator's current position or default to current_position
         start_pos = current_position
         if start_pos is None:
-            if hasattr(operator, 'posicion_grilla'):
+            # Use operator's current_position if available
+            if hasattr(operator, 'current_position') and operator.current_position is not None:
+                start_pos = operator.current_position
+            elif hasattr(operator, 'posicion_grilla'):
                 start_pos = operator.posicion_grilla
             else:
                 # Fallback: use (0, 0) if no position available
@@ -146,6 +149,9 @@ class AssignmentCostCalculator:
 
         distance = self._calculate_distance(start_pos, work_order.ubicacion)
         distance_cost = distance * self.DISTANCE_WEIGHT
+        
+        # DEBUG: Log position used for calculation
+        print(f"[COST-CALC DEBUG] {operator.id} -> {work_order.id}: desde {start_pos} a {work_order.ubicacion}, distancia={distance}")
 
         # Component 4: Total Cost
         total_cost = priority_penalty + distance_cost

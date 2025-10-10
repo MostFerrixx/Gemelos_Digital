@@ -19,7 +19,8 @@ def get_default_config() -> dict:
 
         # Configuracion de estrategias
         'strategy': 'Zoning and Snake',
-        'dispatch_strategy': 'Ejecucion de Plan (Filtro por Prioridad)',
+        'dispatch_strategy': 'Optimizacion Global',
+        'tour_type': 'Tour Mixto (Multi-Destino)',
 
         # Configuracion de layout
         'layout_file': 'layouts/WH1.tmx',

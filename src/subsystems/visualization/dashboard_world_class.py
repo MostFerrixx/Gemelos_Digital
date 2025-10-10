@@ -641,7 +641,9 @@ class DashboardWorldClass:
                 'estado': operator_data.get('status', 'idle'),
                 'carga_actual': operator_data.get('carga', 0),
                 'capacidad_max': operator_data.get('capacidad', 100),
-                'ubicacion': f"({operator_data.get('x', 0)}, {operator_data.get('y', 0)})"
+                'ubicacion': f"({operator_data.get('x', 0)}, {operator_data.get('y', 0)})",
+                'current_task': operator_data.get('current_task', None),  # WorkOrder actual
+                'current_work_area': operator_data.get('current_work_area', None)  # Work Area actual
             }
             operarios_list.append(operario)
         
@@ -686,6 +688,8 @@ class DashboardWorldClass:
         carga_actual = operario.get('carga_actual', 0)
         capacidad_max = operario.get('capacidad_max', 100)
         ubicacion = operario.get('ubicacion', 'Unknown')
+        current_task = operario.get('current_task', None)  # WorkOrder actual
+        current_work_area = operario.get('current_work_area', None)  # Work Area actual
         
         # Calcular porcentaje de carga
         carga_porcentaje = (carga_actual / capacidad_max * 100) if capacidad_max > 0 else 0
@@ -703,6 +707,19 @@ class DashboardWorldClass:
         # 3. ID del operario
         id_text = self.fonts['operator_id'].render(operator_id, True, self.colors['text_primary'])
         surface.blit(id_text, (x + 35, y + 6))
+        
+        # 3.5. WorkOrder actual y Work Area (si existe)
+        if current_task:
+            # Formato: "WO: WO-XXXX (Area_Ground)"
+            if current_work_area:
+                wo_text = f"WO: {current_task} ({current_work_area})"
+            else:
+                wo_text = f"WO: {current_task}"
+            
+            wo_surface = self.fonts['operator_detail'].render(wo_text, True, self.colors['accent_green'])
+            # Posicionar en la parte superior derecha del cuadro
+            wo_x = x + operator_rect.width - wo_surface.get_width() - 8
+            surface.blit(wo_surface, (wo_x, y + 6))
         
         # 4. Estado del operario
         estado_text = self._get_operator_status_text(estado)

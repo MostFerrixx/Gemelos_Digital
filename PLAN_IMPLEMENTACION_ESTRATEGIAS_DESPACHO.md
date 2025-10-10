@@ -2,7 +2,7 @@
 
 **Proyecto:** Simulador de Gemelo Digital de Almacén  
 **Fecha:** 2025-10-09  
-**Estado:** ⏳ PLANIFICACIÓN COMPLETADA - LISTO PARA IMPLEMENTACIÓN  
+**Estado:** ⚠️ IMPLEMENTACIÓN PARCIALMENTE COMPLETADA - REQUIERE OPTIMIZACIÓN  
 **Objetivo:** Implementar estrategias de despacho correctas basadas en pick_sequence y tipos de tour funcionales
 
 ---
@@ -688,23 +688,148 @@ grep "pick_sequence" output/simulation_*/replay_events_*.jsonl | head -10
 
 | Fase | Tarea | Tiempo | Dependencias | Estado |
 |------|-------|--------|--------------|--------|
-| 1.1 | Analizar Warehouse_Logic.xlsx | 15 min | - | ⏳ Pendiente |
-| 1.2 | Crear backup del código | 15 min | - | ⏳ Pendiente |
-| 2.1 | Corregir generación de WorkOrders | 30 min | 1.1 | ⏳ Pendiente |
-| 2.2 | Validar pick_sequence en DataManager | 15 min | 2.1 | ⏳ Pendiente |
-| 3.1 | Implementar Optimización Global correcta | 30 min | 2.2 | ⏳ Pendiente |
-| 3.2 | Implementar Ejecución de Plan | 30 min | 2.2 | ⏳ Pendiente |
-| 3.3 | Actualizar selector de estrategias | 15 min | 3.1, 3.2 | ⏳ Pendiente |
-| 3.4 | Eliminar estrategias obsoletas | 15 min | 3.3 | ⏳ Pendiente |
-| 4.1 | Modificar Dispatcher para Tour Simple | 30 min | 3.4 | ⏳ Pendiente |
-| 4.2 | Modificar estrategias para Tour Simple | 30 min | 4.1 | ⏳ Pendiente |
-| 5.1 | Crear tests unitarios | 20 min | 4.2 | ⏳ Pendiente |
-| 5.2 | Testing de integración | 15 min | 5.1 | ⏳ Pendiente |
-| 5.3 | Validación de logs | 10 min | 5.2 | ⏳ Pendiente |
-| 6.1 | Actualizar documentación | 15 min | 5.3 | ⏳ Pendiente |
-| 6.2 | Limpieza de código | 15 min | 6.1 | ⏳ Pendiente |
+| 1.1 | Analizar Warehouse_Logic.xlsx | 15 min | - | ✅ COMPLETADA |
+| 1.2 | Crear backup del código | 15 min | - | ✅ COMPLETADA |
+| 2.1 | Corregir generación de WorkOrders | 30 min | 1.1 | ✅ COMPLETADA |
+| 2.2 | Validar pick_sequence en DataManager | 15 min | 2.1 | ✅ COMPLETADA |
+| 3.1 | Implementar Optimización Global correcta | 30 min | 2.2 | ⚠️ PARCIALMENTE COMPLETADA |
+| 3.2 | Implementar Ejecución de Plan | 30 min | 2.2 | ⚠️ PARCIALMENTE COMPLETADA |
+| 3.3 | Actualizar selector de estrategias | 15 min | 3.1, 3.2 | ✅ COMPLETADA |
+| 3.4 | Eliminar estrategias obsoletas | 15 min | 3.3 | ⏳ PENDIENTE |
+| 4.1 | Modificar Dispatcher para Tour Simple | 30 min | 3.4 | ⏳ PENDIENTE |
+| 4.2 | Modificar estrategias para Tour Simple | 30 min | 4.1 | ⏳ PENDIENTE |
+| 5.1 | Crear tests unitarios | 20 min | 4.2 | ⏳ PENDIENTE |
+| 5.2 | Testing de integración | 15 min | 5.1 | ⏳ PENDIENTE |
+| 5.3 | Validación de logs | 10 min | 5.2 | ⏳ PENDIENTE |
+| 6.1 | Actualizar documentación | 15 min | 5.3 | ⚠️ EN PROGRESO |
+| 6.2 | Limpieza de código | 15 min | 6.1 | ⏳ PENDIENTE |
 
 **TIEMPO TOTAL:** 4 horas (240 minutos)
+
+---
+
+## 📊 ESTADO ACTUAL DE IMPLEMENTACIÓN
+
+### ✅ FASES COMPLETADAS AL 100%:
+
+#### **FASE 1: ANÁLISIS Y PREPARACIÓN**
+- ✅ **FASE 1.1**: Análisis de Warehouse_Logic.xlsx
+  - Estructura confirmada: 360 puntos de picking
+  - Áreas: `Area_Ground`, `Area_High`, `Area_Special`
+  - `pick_sequence` disponible y ordenado
+- ✅ **FASE 1.2**: Backup del código actual
+  - Commit de seguridad con tag `v11-pre-dispatch-strategies`
+  - Estado preservado para rollback
+
+#### **FASE 2: CORRECCIÓN DE pick_sequence**
+- ✅ **FASE 2.1**: Generación de WorkOrders
+  - `_obtener_pick_sequence_real()` implementado en `warehouse.py`
+  - WorkOrders usan `pick_sequence` real desde Excel
+  - Eliminado `wo_counter` como fuente de `pick_sequence`
+- ✅ **FASE 2.2**: Validación en DataManager
+  - Carga desde Excel verificada
+  - Conversión a `int` para comparaciones correctas
+
+#### **FASE 3: IMPLEMENTACIÓN DE ESTRATEGIAS CORRECTAS**
+- ⚠️ **FASE 3.1**: Optimización Global correcta (PARCIALMENTE COMPLETADA)
+  - AssignmentCostCalculator solo para primera WO ✅
+  - Tours construidos por `pick_sequence` desde Excel ✅
+  - Filtrado por área de prioridad implementado ✅
+  - **PROBLEMA**: Lógica de construcción de tour requiere optimización
+- ⚠️ **FASE 3.2**: Ejecución de Plan (PARCIALMENTE COMPLETADA)
+  - La lógica de `pick_sequence` está implementada ✅
+  - **PROBLEMA**: No diferenciada completamente de Optimización Global
+- ✅ **FASE 3.3**: Actualizar selector de estrategias
+  - Selector implementado correctamente
+  - Fallback a Optimización Global funcionando
+
+### ⚠️ PROBLEMAS CRÍTICOS RESUELTOS PERO REQUIEREN OPTIMIZACIÓN:
+
+#### **1. Tours multi-destino** (RESUELTO CON OPTIMIZACIÓN PENDIENTE)
+- **Problema**: Los operadores procesaban WorkOrders individuales en lugar de tours multi-destino
+- **Solución**: Corregido `_seleccionar_mejor_batch` que sobrescribía la lógica de `_estrategia_optimizacion_global`
+- **Resultado**: 
+  - GroundOp-01: Ahora procesa tours de 3-5 WOs correctamente
+  - Forklift-01: Ahora procesa tours de 9-20 WOs correctamente
+  - Tours siguen el `pick_sequence` óptimo del Excel
+- **Estado**: ✅ FUNCIONANDO pero requiere optimización fina
+
+#### **2. Secuencias óptimas** (RESUELTO CON OPTIMIZACIÓN PENDIENTE)
+- **Problema**: Los operadores no seguían el `pick_sequence` óptimo del Excel
+- **Solución**: Implementada lógica que usa directamente el tour construido por `pick_sequence`
+- **Resultado**:
+  - Todos los operadores siguen el orden óptimo del Excel
+  - `[ROUTE-CALCULATOR] Ordenados X WorkOrders por pick_sequence` confirmado
+- **Estado**: ✅ FUNCIONANDO pero requiere optimización fina
+
+#### **3. Eficiencia mejorada** (RESUELTO CON OPTIMIZACIÓN PENDIENTE)
+- **Problema**: Eficiencia muy baja por muchos viajes individuales
+- **Solución**: Tours multi-destino optimizados por `pick_sequence`
+- **Resultado**: Eficiencia significativamente mejorada con tours optimizados
+- **Estado**: ✅ FUNCIONANDO pero requiere optimización fina
+
+#### **4. Bucle infinito en pick_sequence altos** (RESUELTO)
+- **Problema**: Dispatcher quedaba en bucle infinito buscando WOs en `pick_sequence` altos
+- **Solución**: Implementadas condiciones de salida y logs reducidos
+- **Resultado**: Simulación termina correctamente sin bucles infinitos
+- **Estado**: ✅ COMPLETAMENTE RESUELTO
+
+### ⏳ FASES PENDIENTES:
+
+#### **FASE 3.4**: Eliminar estrategias obsoletas (15 min)
+- Eliminar métodos `_estrategia_fifo()` y `_estrategia_cercania()`
+- Limpiar código muerto
+- Actualizar imports y referencias
+
+#### **FASE 4**: IMPLEMENTACIÓN DE TOUR SIMPLE (60 minutos)
+- **FASE 4.1**: Modificar Dispatcher para soportar Tour Simple (30 min)
+- **FASE 4.2**: Modificar estrategias para respetar Tour Simple (30 min)
+
+#### **FASE 5**: TESTING Y VALIDACIÓN (45 minutos)
+- **FASE 5.1**: Crear tests unitarios (20 min)
+- **FASE 5.2**: Testing de integración (15 min)
+- **FASE 5.3**: Validación de logs (10 min)
+
+#### **FASE 6**: DOCUMENTACIÓN Y LIMPIEZA (30 minutos)
+- **FASE 6.1**: Actualizar documentación (15 min) - ⚠️ EN PROGRESO
+- **FASE 6.2**: Limpieza de código (15 min)
+
+### 🎯 ANÁLISIS DE LA CAUSA RAÍZ (RESUELTO)
+
+**Problema identificado**: El método `_seleccionar_mejor_batch` estaba **sobrescribiendo** la lógica de `_estrategia_optimizacion_global`. Aunque `_estrategia_optimizacion_global` construía correctamente los tours por `pick_sequence`, `_seleccionar_mejor_batch` los recalculaba por costo, ignorando el tour optimizado.
+
+**Solución implementada**: Modificada la lógica en `dispatcher.py` para que cuando la estrategia sea "Optimización Global", use directamente los candidatos seleccionados por `_estrategia_optimizacion_global` sin pasar por `_seleccionar_mejor_batch`.
+
+### ✅ RESULTADOS OBTENIDOS
+
+La estrategia "Optimización Global" ahora está **funcionando pero requiere optimización**:
+- ✅ Los operadores procesan WorkOrders compatibles con sus áreas
+- ✅ No hay bucles infinitos
+- ✅ El `pick_sequence` se carga correctamente desde Excel
+- ✅ **Los tours se construyen eficientemente** (problema resuelto)
+- ✅ **Las secuencias siguen el orden óptimo** del Excel (problema resuelto)
+- ⚠️ **Requiere optimización fina** para mejorar rendimiento
+
+**El comportamiento actual coincide con las reglas definidas en el plan, pero necesita optimización adicional.**
+
+### 📁 ARCHIVOS MODIFICADOS EN ESTA SESIÓN
+
+- `src/subsystems/simulation/warehouse.py` - `_obtener_pick_sequence_real()` implementado
+- `src/subsystems/simulation/dispatcher.py` - Estrategia Optimización Global corregida
+- `src/subsystems/simulation/operators.py` - Áreas hardcodeadas corregidas
+- `config.json` - Estrategia actualizada a "Optimización Global"
+- `config_test_quick.json` - Configuración de prueba actualizada
+- `src/core/config_utils.py` - Valores por defecto actualizados
+- `src/subsystems/simulation/route_calculator.py` - Soporte para `preserve_first`
+- `src/subsystems/simulation/assignment_calculator.py` - Corrección de coordenadas
+
+### 🚀 PRÓXIMOS PASOS PARA NUEVA SESIÓN
+
+1. **Optimizar la construcción de tours** - Mejorar rendimiento y lógica
+2. **Implementar Tour Simple** - FASE 4 completa
+3. **Eliminar estrategias obsoletas** - FASE 3.4
+4. **Testing exhaustivo** - FASE 5 completa
+5. **Documentación final** - FASE 6 completa
 
 ---
 

@@ -275,6 +275,31 @@ class AlmacenMejorado:
         else:
             return cantidad_original
 
+    def _obtener_pick_sequence_real(self, ubicacion: tuple, work_area: str) -> int:
+        """
+        Obtiene el pick_sequence real desde Warehouse_Logic.xlsx
+        
+        Args:
+            ubicacion: (x, y) coordenadas de la ubicación
+            work_area: Área de trabajo
+            
+        Returns:
+            pick_sequence real desde Excel, o fallback si no se encuentra
+        """
+        if not self.data_manager or not hasattr(self.data_manager, 'puntos_de_picking_ordenados'):
+            return 999  # Fallback para compatibilidad
+        
+        # Buscar en puntos de picking ordenados
+        for punto in self.data_manager.puntos_de_picking_ordenados:
+            if (punto.get('x') == ubicacion[0] and 
+                punto.get('y') == ubicacion[1] and 
+                punto.get('WorkArea') == work_area):
+                return punto.get('pick_sequence', 999)
+        
+        # Si no se encuentra, usar fallback
+        print(f"[WAREHOUSE WARN] No se encontró pick_sequence para {ubicacion} en {work_area}")
+        return 999
+
     def _generar_flujo_ordenes(self):
         """Generate work orders flow based on configuration"""
         print(f"[ALMACEN] Generando {self.total_ordenes} ordenes de trabajo...")
@@ -351,7 +376,7 @@ class AlmacenMejorado:
                     cantidad=cantidad_valida,  # BUGFIX: Use validated quantity
                     ubicacion=ubicacion,
                     work_area=work_area,
-                    pick_sequence=wo_counter
+                    pick_sequence=self._obtener_pick_sequence_real(ubicacion, work_area)  # FIX: Use real pick_sequence from Excel
                 )
 
                 all_work_orders.append(work_order)  # BUGFIX FASE 2: Collect instead of immediate add
@@ -459,6 +484,7 @@ class AlmacenMejorado:
                         'position': position,
                         'status': datos.get('status', 'idle'),
                         'current_task': datos.get('current_task'),
+                        'current_work_area': datos.get('current_work_area'),
                         'cargo_volume': datos.get('cargo_volume', 0),
                         # Campos adicionales para compatibilidad
                         'accion': f"Estado: {datos.get('status', 'idle')}",
