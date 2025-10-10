@@ -32,6 +32,8 @@ import json
 import os
 from typing import Dict, List, Any, Optional, Tuple
 
+from .replay_scrubber import ReplayScrubber, REPLAY_SEEK_EVENT
+
 
 class DashboardWorldClass:
     """
@@ -84,9 +86,13 @@ class DashboardWorldClass:
             'ticker': 50,
             'metrics': 240,
             'progress': 40,
+            'scrubber': 60,  # NUEVO: Espacio para el Replay Scrubber
             'operators': 0,  # Dinamico
             'footer': 120
         }
+
+        # Inicializar el Replay Scrubber
+        self.replay_scrubber = None # Se creara en render() para tener la altura correcta
         
         # OPTIMIZACION FASE 7: Cache de superficies para mejor rendimiento
         self._cached_surfaces = {}
@@ -238,6 +244,9 @@ class DashboardWorldClass:
         # 5. PROGRESS BAR (Barra de progreso)
         y = self._render_progress_bar(surface, panel_x, y, estado_visual)
         
+        # NUEVO: Replay Scrubber
+        y = self._render_replay_scrubber(surface, panel_x, y, estado_visual)
+
         # 6. OPERATORS LIST (Lista scrollable)
         operators_height = surface.get_height() - y - self.section_heights['footer']
         y = self._render_operators_list(surface, panel_x, y, operators_height, estado_visual)
@@ -585,6 +594,50 @@ class DashboardWorldClass:
         
         return y + self.section_heights['progress']
     
+    def _render_replay_scrubber(self, surface: pygame.Surface, x: int, y: int,
+                               estado_visual: Dict[str, Any]) -> int:
+        """
+        Renderiza el componente ReplayScrubber.
+
+        Args:
+            surface: Superficie pygame donde dibujar
+            x: Posicion X del panel
+            y: Posicion Y inicial
+            estado_visual: Datos actuales
+
+        Returns:
+            Nueva posicion Y
+        """
+        scrubber_height = self.section_heights['scrubber']
+
+        # Inicializar el scrubber si aun no existe
+        if self.replay_scrubber is None:
+            scrubber_y = y + 15
+            self.replay_scrubber = ReplayScrubber(
+                x=x + 15,
+                y=scrubber_y,
+                width=self.panel_width - 30,
+                height=10,
+                font=self.fonts['ticker_label'],
+                colors=self.colors
+            )
+
+        # Extraer tiempos del estado_visual
+        metricas = estado_visual.get('metricas', {})
+        current_time = metricas.get('tiempo', 0.0)
+
+        # NOTA: 'max_time' no esta aun en las metricas. Se anadira en el motor.
+        # Por ahora, usamos un valor temporal o lo extraemos del evento final si es posible.
+        # Asumiremos que el ultimo evento en la lista de eventos del motor tiene el tiempo maximo.
+        # Temporalmente, podemos usar un valor fijo si no esta disponible.
+        max_time = metricas.get('max_time', 3600.0) # Placeholder de 1 hora
+
+        # Actualizar y dibujar el scrubber
+        self.replay_scrubber.update(current_time, max_time)
+        self.replay_scrubber.draw(surface)
+
+        return y + scrubber_height
+
     def _render_operators_list(self, surface: pygame.Surface, x: int, y: int,
                                height: int, estado_visual: Dict[str, Any]) -> int:
         """
@@ -1186,6 +1239,10 @@ class DashboardWorldClass:
         else:
             panel_x = pygame.display.get_surface().get_width() - self.panel_width + offset_x
         
+        # Propagar evento al scrubber si existe
+        if self.replay_scrubber:
+            self.replay_scrubber.handle_event(event)
+
         # Manejar scroll de la lista de operarios
         if event.type == pygame.MOUSEWHEEL:
             mouse_x, mouse_y = pygame.mouse.get_pos()

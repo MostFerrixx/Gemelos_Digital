@@ -5,7 +5,7 @@ Test script for dashboard graceful shutdown during cleanup.
 
 import sys
 import time
-from simulation_engine import SimulationEngine
+from engines.simulation_engine import SimulationEngine
 
 def test_graceful_cleanup():
     """Test DashboardCommunicator graceful shutdown during cleanup."""

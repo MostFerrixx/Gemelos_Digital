@@ -5,7 +5,7 @@ Test script to validate DashboardCommunicator integration.
 
 import sys
 import time
-from simulation_engine import SimulationEngine
+from engines.simulation_engine import SimulationEngine
 
 def test_dashboard_integration():
     """Test DashboardCommunicator integration systematically."""

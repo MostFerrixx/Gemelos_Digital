@@ -2,7 +2,7 @@
 # Proyecto V11 Migration - Arquitectura Profesional
 
 # Core dependencies
-pygame>=2.1.4
+pygame-ce>=2.5.0
 simpy>=4.0.1
 pytmx>=3.31
 numpy>=1.21.0

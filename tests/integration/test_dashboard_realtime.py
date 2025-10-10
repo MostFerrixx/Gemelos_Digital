@@ -5,7 +5,7 @@ Test script for real-time dashboard updates during live simulation.
 
 import sys
 import time
-from simulation_engine import SimulationEngine
+from engines.simulation_engine import SimulationEngine
 
 def test_realtime_updates():
     """Test DashboardCommunicator real-time updates with full simulation."""

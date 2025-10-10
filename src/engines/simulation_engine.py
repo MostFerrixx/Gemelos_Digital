@@ -27,54 +27,37 @@ import logging
 
 
 
-# REFACTOR V11: Importaciones actualizadas a arquitectura subsystems/
+# Importaciones de modulos propios
 from subsystems.config.settings import *
 from subsystems.config.colors import *
 from subsystems.simulation.warehouse import AlmacenMejorado
 from subsystems.simulation.operators import crear_operarios
-from engines.analytics_engine import AnalyticsEngine
+from analytics_engine import AnalyticsEngine
 from subsystems.simulation.layout_manager import LayoutManager
 from subsystems.simulation.assignment_calculator import AssignmentCostCalculator
 from subsystems.simulation.data_manager import DataManager
+
 from subsystems.simulation.pathfinder import Pathfinder
 from subsystems.simulation.route_calculator import RouteCalculator
-
-# REFACTOR V11: Visualization subsystem imports
-from subsystems.visualization.state import (
-    inicializar_estado,
-    actualizar_metricas_tiempo,
-    toggle_pausa,
-    toggle_dashboard,
-    estado_visual,
-    limpiar_estado,
-    aumentar_velocidad,
-    disminuir_velocidad,
-    obtener_velocidad_simulacion
-)
+from subsystems.visualization.state import inicializar_estado, actualizar_metricas_tiempo, toggle_pausa, toggle_dashboard, estado_visual, limpiar_estado, aumentar_velocidad, disminuir_velocidad, obtener_velocidad_simulacion
 from subsystems.visualization.renderer import RendererOriginal, renderizar_diagnostico_layout
 from subsystems.visualization.dashboard import DashboardOriginal
-
-# REFACTOR V11: Utils subsystem imports
 from subsystems.utils.helpers import exportar_metricas, mostrar_metricas_consola
-
-# REFACTOR V11: Replay system components for .jsonl generation
-from shared.buffer import ReplayBuffer
+from subsystems.config.settings import SUPPORTED_RESOLUTIONS, LOGICAL_WIDTH, LOGICAL_HEIGHT
+# from dynamic_pathfinding_integration import get_dynamic_pathfinding_wrapper  # Eliminado en limpieza
+# RESTORED: Replay system components for .jsonl generation
+from simulation_buffer import ReplayBuffer
 from core.replay_utils import agregar_evento_replay, volcar_replay_a_archivo
-
-# REFACTOR V11: ConfigurationManager replaces cargar_configuracion logic
+# REFACTOR: ConfigurationManager replaces cargar_configuracion logic
 from core.config_manager import ConfigurationManager, ConfigurationError
 from core.config_utils import get_default_config, mostrar_resumen_config
-
-# REFACTOR V11: AnalyticsExporter extraction - Import analytics exporter
+# REFACTOR: AnalyticsExporter extraction - Import analytics exporter
 from analytics.exporter import AnalyticsExporter as AnalyticsExporterV1
-
-# REFACTOR V11 PHASE 2: Enhanced AnalyticsExporter with SimulationContext
+# REFACTOR PHASE 2: Enhanced AnalyticsExporter with SimulationContext
 from analytics import AnalyticsExporter, SimulationContext, ExportResult
-
-# REFACTOR V11 PHASE 3: DashboardCommunicator integration - Import communication components
+# REFACTOR PHASE 3: DashboardCommunicator integration - Import communication components
 from communication import DashboardCommunicator, create_simulation_data_provider, DashboardConfig
-
-# REFACTOR V11: DiagnosticTools extraction - Import diagnostics function
+# REFACTOR: DiagnosticTools extraction - Import diagnostics function
 def _import_diagnostic_tools():
     """Import diagnostic tools with fallback mechanism"""
     try:
@@ -83,7 +66,7 @@ def _import_diagnostic_tools():
         current_dir = os.path.dirname(os.path.abspath(__file__))
         if current_dir not in sys.path:
             sys.path.insert(0, current_dir)
-        from shared.diagnostic_tools import diagnosticar_route_calculator as diag_func
+        from utils.diagnostic_tools import diagnosticar_route_calculator as diag_func
         return diag_func
     except ImportError:
         # Fallback: define inline diagnostic function
@@ -292,9 +275,9 @@ class SimulationEngine:
                 pygame.init()
                 pygame.display.set_mode((100, 100))  # Ventana temporal para TMX
         
-        # 1. Inicializar LayoutManager con archivo TMX de configuracion (OBLIGATORIO)
-        # BUGFIX V11: Usar ruta de config directamente (LayoutManager resuelve rutas relativas)
-        tmx_file = self.configuracion.get('layout_file', 'data/layouts/WH1.tmx')
+        # 1. Inicializar LayoutManager con archivo TMX por defecto (OBLIGATORIO)
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+        tmx_file = os.path.join(project_root, "layouts", "WH1.tmx")
         print(f"[TMX] Cargando layout: {tmx_file}")
 
         try:
@@ -341,9 +324,7 @@ class SimulationEngine:
             pathfinder=self.pathfinder,          # OBLIGATORIO
             data_manager=self.data_manager,      # NUEVO V2.6
             cost_calculator=self.cost_calculator, # NUEVO V2.6
-            route_calculator=self.route_calculator, # BUGFIX FASE 1: Para DispatcherV11
-            simulador=self,  # REFACTOR: Pasar referencia del simulador
-            replay_buffer=self.replay_buffer  # BUGFIX JSONL: Pasar replay_buffer
+            simulador=self  # REFACTOR: Pasar referencia del simulador
         )
         
         inicializar_estado(self.almacen, self.env, self.configuracion, layout_manager=self.layout_manager)
@@ -417,8 +398,8 @@ class SimulationEngine:
     
     def ejecutar_bucle_principal(self):
         """Bucle principal completo con simulacion y renderizado de agentes."""
-        from subsystems.visualization.renderer import renderizar_agentes, renderizar_dashboard
-        from subsystems.visualization.state import estado_visual, obtener_velocidad_simulacion
+        from visualization.original_renderer import renderizar_agentes, renderizar_dashboard
+        from visualization.state import estado_visual, obtener_velocidad_simulacion
         
         self.corriendo = True
         while self.corriendo:
@@ -491,12 +472,12 @@ class SimulationEngine:
             self.virtual_surface.fill((25, 25, 25))
             if hasattr(self, 'layout_manager') and self.layout_manager:
                 self.renderer.renderizar_mapa_tmx(self.virtual_surface, self.layout_manager.tmx_data)
-                from subsystems.visualization.renderer import renderizar_tareas_pendientes
+                from visualization.original_renderer import renderizar_tareas_pendientes
                 # Obtener lista de tareas pendientes del dispatcher
                 tareas_pendientes = self.almacen.dispatcher.lista_maestra_work_orders if (self.almacen and self.almacen.dispatcher) else []
                 renderizar_tareas_pendientes(self.virtual_surface, tareas_pendientes, self.layout_manager)
             # Obtener lista de agentes para renderizar desde estado visual
-            from subsystems.visualization.state import estado_visual
+            from visualization.state import estado_visual
             agentes_para_renderizar = list(estado_visual.get('operarios', {}).values())
             renderizar_agentes(self.virtual_surface, agentes_para_renderizar, self.layout_manager)
 
@@ -584,8 +565,8 @@ class SimulationEngine:
         print("[CONSUMIDOR-PLAYBACK] Iniciando bucle con motor de playback_time sincronizado...")
         import queue
         import time
-        from subsystems.visualization.renderer import renderizar_agentes, renderizar_dashboard, renderizar_tareas_pendientes
-        from subsystems.visualization.state import estado_visual
+        from visualization.original_renderer import renderizar_agentes, renderizar_dashboard, renderizar_tareas_pendientes
+        from visualization.state import estado_visual
         
         # Estado de visualizacion
         simulacion_activa = True
@@ -640,10 +621,6 @@ class SimulationEngine:
                         
                         # Agregar evento al buffer ordenado por timestamp
                         self.event_buffer.append(mensaje)
-                        
-                        # BUGFIX JSONL: Tambien copiar al replay_buffer para .jsonl
-                        if self.replay_buffer:
-                            self.replay_buffer.add_event(mensaje)
                         
                     except queue.Empty:
                         break
@@ -734,7 +711,7 @@ class SimulationEngine:
                     tareas_pendientes = self.almacen.dispatcher.lista_maestra_work_orders if (self.almacen and self.almacen.dispatcher) else []
                     renderizar_tareas_pendientes(self.virtual_surface, tareas_pendientes, self.layout_manager)
                 # Obtener lista de agentes para renderizar desde estado visual
-                from subsystems.visualization.state import estado_visual
+                from visualization.state import estado_visual
                 agentes_para_renderizar = list(estado_visual.get('operarios', {}).values())
                 renderizar_agentes(self.virtual_surface, agentes_para_renderizar, self.layout_manager)
 
@@ -894,7 +871,7 @@ class SimulationEngine:
     # ELIMINATED: def _renderizar_hud_replay_mejorado() - Enhanced replay HUD method removed
     def _ELIMINATED_renderizar_hud_replay_mejorado(self, eventos_recibidos, agentes_activos):
         """Renderiza el HUD del motor de replay mejorado"""
-        from subsystems.visualization.state import estado_visual
+        from visualization.state import estado_visual
         
         font = pygame.font.Font(None, 20)
         y_offset = self.window_size[1] - 120  # Esquina inferior izquierda
@@ -914,7 +891,7 @@ class SimulationEngine:
     # ELIMINATED: def _renderizar_hud_playback_motor() - Playback motor HUD method removed
     def _ELIMINATED_renderizar_hud_playback_motor(self, eventos_recibidos, eventos_procesados, buffer_size):
         """Renderiza el HUD del motor de playback sincronizado"""
-        from subsystems.visualization.state import estado_visual
+        from visualization.state import estado_visual
         
         font = pygame.font.Font(None, 18)
         y_offset = self.window_size[1] - 140  # Esquina inferior izquierda
@@ -1163,7 +1140,7 @@ class SimulationEngine:
         """
         if self.dashboard_data_queue:
             try:
-                from subsystems.visualization.state import estado_visual
+                from visualization.state import estado_visual
                 
                 # Obtener WorkOrders desde estado_visual (datos del replay)
                 work_orders = estado_visual.get('work_orders', {})
@@ -1204,7 +1181,7 @@ class SimulationEngine:
             self.dashboard_data_queue):
             
             try:
-                from subsystems.visualization.state import estado_visual
+                from visualization.state import estado_visual
                 
                 # Obtener WorkOrders actuales desde estado_visual
                 work_orders = estado_visual.get('work_orders', {})
@@ -1241,7 +1218,7 @@ class SimulationEngine:
     
     def _inicializar_operarios_en_estado_visual(self, agentes):
         """Inicializa estado visual basandose en agentes reales creados"""
-        from subsystems.visualization.state import estado_visual
+        from visualization.state import estado_visual
         
         if not agentes:
             print("[VISUAL-STATE] No hay agentes para inicializar en estado visual")
@@ -1380,6 +1357,15 @@ class SimulationEngine:
                 # 5. Ejecutar bucle de visualizacion principal
                 self.ejecutar_bucle_principal()
 
+            # UNIFIED: Use session timestamp and directory for replay file
+            # RESTORED: Generate replay file after simulation completion
+            if self.replay_buffer and len(self.replay_buffer) > 0:
+                os.makedirs(self.session_output_dir, exist_ok=True)
+                output_file = os.path.join(self.session_output_dir, f"replay_{self.session_timestamp}.jsonl")
+                print(f"[REPLAY] Generating replay file: {output_file}")
+                initial_snapshot = getattr(self.almacen.dispatcher, 'initial_work_orders_snapshot', []) if hasattr(self, 'almacen') and self.almacen else []
+                volcar_replay_a_archivo(self.replay_buffer, output_file, self.configuracion, self.almacen, initial_snapshot)
+
         except KeyboardInterrupt:
             print("\nInterrupcion del usuario. Saliendo...")
         except Exception as e:
@@ -1387,24 +1373,6 @@ class SimulationEngine:
             import traceback
             traceback.print_exc()
         finally:
-            # BUGFIX JSONL: Generar archivo .jsonl en finally para garantizar generacion
-            # UNIFIED: Use session timestamp and directory for replay file
-            try:
-                if hasattr(self, 'replay_buffer') and self.replay_buffer and len(self.replay_buffer) > 0:
-                    os.makedirs(self.session_output_dir, exist_ok=True)
-                    output_file = os.path.join(self.session_output_dir, f"replay_events_{self.session_timestamp}.jsonl")
-                    print(f"[REPLAY] Generating replay file: {output_file}")
-                    initial_snapshot = getattr(self.almacen.dispatcher, 'initial_work_orders_snapshot', []) if hasattr(self, 'almacen') and self.almacen else []
-                    volcar_replay_a_archivo(self.replay_buffer, output_file, self.configuracion, self.almacen, initial_snapshot)
-                    print(f"[REPLAY] Replay file generated successfully: {len(self.replay_buffer)} events")
-                else:
-                    print(f"[REPLAY WARNING] No replay data to save (buffer empty or missing)")
-            except Exception as e:
-                print(f"[REPLAY ERROR] Failed to generate replay file: {e}")
-                import traceback
-                traceback.print_exc()
-            
-            # Limpiar recursos
             self.limpiar_recursos()
 
     def limpiar_recursos(self):
@@ -1458,13 +1426,13 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
     
     import pygame
     import simpy
-    from subsystems.simulation.warehouse import AlmacenMejorado
-    from subsystems.simulation.operators import crear_operarios
-    from subsystems.simulation.layout_manager import LayoutManager
-    from subsystems.simulation.assignment_calculator import AssignmentCostCalculator
-    from subsystems.simulation.data_manager import DataManager
-    from subsystems.simulation.pathfinder import Pathfinder
-    from subsystems.simulation.route_calculator import RouteCalculator
+    from simulation.warehouse import AlmacenMejorado
+    from simulation.operators_workorder import crear_operarios
+    from simulation.layout_manager import LayoutManager
+    from simulation.assignment_calculator import AssignmentCostCalculator
+    from simulation.data_manager import DataManager
+    from simulation.pathfinder import Pathfinder
+    from simulation.route_calculator import RouteCalculator
     
     try:
         print("[PROCESO-SIMPY] Iniciando proceso de simulacion separado...")
@@ -1504,9 +1472,6 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
         
         # 6. REFACTOR: Crear AlmacenMejorado con cola de eventos
         print("[PROCESO-SIMPY] Creando AlmacenMejorado con cola de eventos...")
-        # NOTA JSONL: En proceso productor NO se pasa replay_buffer porque es un proceso
-        # separado. Los eventos se envian via visual_event_queue y se copian al
-        # replay_buffer en el proceso consumidor (ver ejecutar_bucle_principal)
         almacen = AlmacenMejorado(
             env,
             configuracion,
@@ -1515,12 +1480,11 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
             data_manager=data_manager,
             cost_calculator=cost_calculator,
             simulador=None,  # En proceso hijo no hay simulador principal
-            visual_event_queue=visual_event_queue,  # NUEVO: Pasar cola
-            replay_buffer=None  # No disponible en proceso hijo
+            visual_event_queue=visual_event_queue  # NUEVO: Pasar cola
         )
         
         # 7. Inicializar estado visual EN EL PROCESO HIJO (con cola)
-        from subsystems.visualization.state import inicializar_estado_con_cola
+        from visualization.state import inicializar_estado_con_cola
         inicializar_estado_con_cola(almacen, env, configuracion, 
                                    layout_manager, visual_event_queue)
         
