@@ -339,7 +339,8 @@ class DashboardCommunicator:
     def _get_dashboard_target_function(self):
         """Get dashboard target function with deferred import and validation"""
         try:
-            from src.visualization.work_order_dashboard import launch_dashboard_process
+            # The root of the package is 'src', so we import relative to that.
+            from visualization.work_order_dashboard import launch_dashboard_process
 
             if not callable(launch_dashboard_process):
                 raise ImportError("launch_dashboard_process is not callable")
