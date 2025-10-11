@@ -201,6 +201,9 @@ class WorkOrderDashboard(QMainWindow):
 
         # Buffer for high-frequency delta updates
         self._delta_buffer = []
+        
+        # Flag to ignore delta/TIME_UPDATE during temporal sync
+        self._temporal_sync_in_progress = False
 
         # Main widget and layout
         central_widget = QWidget()
@@ -290,6 +293,11 @@ class WorkOrderDashboard(QMainWindow):
                 self.time_slider.setRange(0, max_time)
                 print(f"Dashboard: Slider range set to {max_time}")
         elif msg_type == "TIME_UPDATE":
+            # Skip TIME_UPDATE during temporal sync to prevent state reversion
+            if self._temporal_sync_in_progress:
+                print(f"[DEBUG-Dashboard] Ignoring TIME_UPDATE during temporal sync")
+                return
+                
             # Update time slider position without triggering seek
             timestamp = message.get('timestamp', 0.0)
             self.time_slider.blockSignals(True)  # Prevent recursive calls
@@ -303,6 +311,9 @@ class WorkOrderDashboard(QMainWindow):
             target_time = metadata.get('target_time', 0.0)
             
             print(f"[DEBUG-Dashboard] Temporal sync received: {len(data)} WorkOrders at time {target_time:.2f}s")
+            
+            # Set flag to ignore delta/TIME_UPDATE during temporal sync
+            self._temporal_sync_in_progress = True
             
             # Data should already be converted to dictionaries by DashboardCommunicator
             converted_data = data
@@ -327,8 +338,22 @@ class WorkOrderDashboard(QMainWindow):
                     'work_orders_count': len(converted_data)
                 }
             }
-            self.send_message(confirmation_msg)
+            if self.queue_to_sim:
+                print(f"[DEBUG-Dashboard] Sending temporal_sync_complete message: {confirmation_msg}")
+                self.queue_to_sim.put(confirmation_msg)
+                print(f"[DEBUG-Dashboard] Temporal sync complete message sent successfully")
+            else:
+                print(f"[DEBUG-Dashboard] queue_to_sim is None, cannot send temporal_sync_complete message")
+            
+            # Reset flag after sending confirmation
+            self._temporal_sync_in_progress = False
+            print(f"[DEBUG-Dashboard] Temporal sync flag reset to False")
         elif msg_type == "delta":
+            # Skip delta updates during temporal sync to prevent state reversion
+            if self._temporal_sync_in_progress:
+                print(f"[DEBUG-Dashboard] Ignoring delta update during temporal sync")
+                return
+                
             # For delta updates, add to buffer to be processed by the timer
             updates = message.get("data", [])
             if updates:
@@ -355,6 +380,9 @@ class WorkOrderDashboard(QMainWindow):
         # The slider value might need scaling depending on the simulation's total time
         # For now, we'll send the raw value.
         timestamp = float(value)
+        print(f"[DEBUG-Dashboard] seek_simulation_time called with value: {value}, timestamp: {timestamp}")
+        print(f"[DEBUG-Dashboard] queue_to_sim status: {self.queue_to_sim is not None}")
+        print(f"[DEBUG-Dashboard] queue_to_sim type: {type(self.queue_to_sim)}")
         self.time_label.setText(f"Time: {timestamp:.2f}s")
 
         if self.queue_to_sim:
@@ -363,7 +391,11 @@ class WorkOrderDashboard(QMainWindow):
                 'timestamp': timestamp
             }
             print(f"[DEBUG-Dashboard] Sending SEEK_TIME message: {message}")
-            self.queue_to_sim.put(message)
+            try:
+                self.queue_to_sim.put(message)
+                print(f"[DEBUG-Dashboard] SEEK_TIME message sent successfully")
+            except Exception as e:
+                print(f"[DEBUG-Dashboard] Error sending SEEK_TIME message: {e}")
         else:
             print(f"[DEBUG-Dashboard] queue_to_sim is None, cannot send SEEK_TIME message")
 

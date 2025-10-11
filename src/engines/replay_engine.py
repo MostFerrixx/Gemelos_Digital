@@ -57,6 +57,10 @@ class ReplayDataProvider(DataProviderInterface):
     def __init__(self, engine):
         self._engine = engine
 
+    def replay_engine_ref(self):
+        """HOLISTIC: Return reference to replay engine for authoritative state access."""
+        return self._engine
+
     def get_all_work_orders(self):
         # Convert dictionaries to WorkOrderSnapshot objects
         from communication.ipc_protocols import WorkOrderSnapshot
@@ -143,6 +147,10 @@ class ReplayViewerEngine:
         self.processed_event_indices = set()  # Indices de eventos procesados
         self.replay_finalizado = False
         self.temporal_sync_in_progress = False
+        
+        # HOLISTIC SOLUTION: Authoritative state computed from events
+        self.authoritative_wo_state = {}  # Single source of truth for Work Orders
+        self.temporal_mode_active = False  # Flag to indicate temporal navigation mode
 
     def inicializar_pygame(self):
         """Inicializa ventana de Pygame para visualizacion de replay"""
@@ -409,9 +417,10 @@ class ReplayViewerEngine:
                         # temporal_sync is already triggered by seek_to_time()
                         print(f"[REPLAY_ENGINE] Seek to {target_time:.2f}s complete.")
                     elif msg_type == 'temporal_sync_complete':
-                        # Dashboard has confirmed temporal sync is complete
+                        # HOLISTIC: Dashboard has confirmed temporal sync is complete
+                        # Keep temporal_mode_active = True to prevent conflicting updates
                         self.temporal_sync_in_progress = False
-                        print(f"[REPLAY_ENGINE] Temporal sync confirmed complete at {msg.get('metadata', {}).get('target_time', 0.0):.2f}s")
+                        print(f"[HOLISTIC] Temporal sync confirmed. Temporal mode remains active to prevent conflicting updates at {msg.get('metadata', {}).get('target_time', 0.0):.2f}s")
 
             if not replay_pausado and not replay_finalizado:
                 playback_time += time_delta * replay_speed
@@ -430,8 +439,8 @@ class ReplayViewerEngine:
                     self.dashboard_wos_state.update(dashboard_wos_state)
                     print(f"[DEBUG-ReplayEngine] Synced dashboard_wos_state: {len(self.dashboard_wos_state)} WorkOrders")
                     
-                    # CRITICAL FIX: Update dashboard with new data (skip if temporal sync in progress)
-                    if self.dashboard_communicator.is_dashboard_active and not self.temporal_sync_in_progress:
+                    # HOLISTIC: Update dashboard only if not in temporal mode
+                    if self.dashboard_communicator.is_dashboard_active and not self.temporal_mode_active:
                         self.dashboard_communicator.update_dashboard_state()
                     
                     if self.eventos[eventos_a_procesar[-1][0]].get('event_type') == 'SIMULATION_END':
@@ -502,56 +511,78 @@ class ReplayViewerEngine:
                         dashboard_wos_state[wo_id] = update_data.copy()
                         print(f"[DEBUG-ReplayEngine] WorkOrder updated: {wo_id} -> {update_data.get('status', 'unknown')}")
 
-    def seek_to_time(self, target_time):
-        """Salta a un punto especifico en el tiempo del replay usando keyframes."""
-        from subsystems.visualization.state import estado_visual
-        print(f"[REPLAY] Buscando el tiempo {target_time:.2f}s con keyframes...")
-
-        # 1. Encontrar el keyframe mas cercano anterior al tiempo objetivo
-        best_keyframe_time = 0.0
-        for kt in sorted(self.keyframes.keys()):
-            if kt <= target_time:
-                best_keyframe_time = kt
-            else:
-                break
-
-        print(f"[REPLAY] Usando keyframe de t={best_keyframe_time:.2f}s")
-
-        # 2. Cargar el estado desde el keyframe
-        estado_visual.clear()
-        estado_visual.update(deepcopy(self.keyframes[best_keyframe_time]))
-
-        # 3. Resetear indices de eventos procesados y playback time
-        self.processed_event_indices.clear()
-        self.playback_time = target_time
-
-        # 4. Reconstruir los indices procesados hasta el keyframe y encontrar eventos a procesar
-        events_to_process = []
+    def compute_authoritative_state_at_time(self, target_time):
+        """
+        HOLISTIC SOLUTION: Compute authoritative Work Order state at specific time
+        by replaying all events from beginning up to target_time.
+        This becomes the single source of truth.
+        """
+        print(f"[HOLISTIC] Computing authoritative state at {target_time:.2f}s...")
+        
+        # HOLISTIC FIX: Start with ALL Work Orders in pending state
+        authoritative_state = {}
+        
+        # Get all Work Order IDs from events to initialize them as pending
+        all_wo_ids = set()
+        for event in self.eventos:
+            if event.get('type') == 'work_order_update':
+                wo_id = event.get('id')
+                if wo_id:
+                    all_wo_ids.add(wo_id)
+        
+        # Initialize all Work Orders as pending
+        for wo_id in all_wo_ids:
+            authoritative_state[wo_id] = {
+                'id': wo_id,
+                'status': 'pending',
+                'timestamp': 0.0,
+                'order_id': '',
+                'tour_id': '',
+                'sku_id': '',
+                'ubicacion': '',
+                'work_area': '',
+                'cantidad_restante': 0,
+                'volumen_restante': 0,
+                'assigned_agent_id': None
+            }
+        
+        print(f"[HOLISTIC] Initialized {len(authoritative_state)} Work Orders as pending")
+        
+        # Process all events from beginning up to target_time
         for i, event in enumerate(self.eventos):
             event_timestamp = event.get('timestamp') or 0.0
-            if event_timestamp < best_keyframe_time:
-                self.processed_event_indices.add(i)
-            elif best_keyframe_time <= event_timestamp <= target_time:
-                events_to_process.append((i, event))
+            if event_timestamp <= target_time:
+                if event.get('type') == 'work_order_update':
+                    wo_id = event.get('id')
+                    if wo_id and wo_id in authoritative_state:
+                        # HOLISTIC FIX: Update authoritative state with this event
+                        # Only update if this event is more recent than current state
+                        current_event_time = authoritative_state[wo_id].get('timestamp', 0.0)
+                        if event_timestamp >= current_event_time:
+                            authoritative_state[wo_id].update(event)
+                            print(f"[HOLISTIC] WO {wo_id} -> {event.get('status', 'unknown')} at {event_timestamp:.2f}s")
+        
+        print(f"[HOLISTIC] Authoritative state computed: {len(authoritative_state)} Work Orders")
+        return authoritative_state
 
-        # 5. Procesar el lote de eventos entre el keyframe y el target
-        # Reconstruir el estado del dashboard desde el estado visual del keyframe
-        self.dashboard_wos_state.clear()
-        if "work_orders" in estado_visual:
-            for wo_id, wo_data in estado_visual["work_orders"].items():
-                self.dashboard_wos_state[wo_id] = deepcopy(wo_data)
+    def seek_to_time(self, target_time):
+        """HOLISTIC SOLUTION: Seek to time using authoritative state computation."""
+        from subsystems.visualization.state import estado_visual
+        print(f"[HOLISTIC] Seeking to time {target_time:.2f}s using authoritative state...")
 
-        if events_to_process:
-            self._process_event_batch(events_to_process, estado_visual, self.dashboard_wos_state)
-
-        # CRITICAL FIX: Force temporal sync of dashboard after time change
+        # HOLISTIC: Compute authoritative state at target time
+        self.authoritative_wo_state = self.compute_authoritative_state_at_time(target_time)
+        
+        # HOLISTIC: Set temporal mode to block conflicting updates
+        self.temporal_mode_active = True
+        self.playback_time = target_time
+        
+        # HOLISTIC: Update dashboard with authoritative state
         if self.dashboard_communicator.is_dashboard_active:
-            print(f"[REPLAY] Forcing temporal sync after seek to {target_time:.2f}s")
-            self.temporal_sync_in_progress = True
+            print(f"[HOLISTIC] Sending authoritative state to dashboard at {target_time:.2f}s")
             self.dashboard_communicator.force_temporal_sync()
-            # Flag will be reset when dashboard sends temporal_sync_complete confirmation
-
-        print(f"[REPLAY] Busqueda completada. {len(self.processed_event_indices)} eventos procesados en total.")
+        
+        print(f"[HOLISTIC] Seek complete. Authoritative state: {len(self.authoritative_wo_state)} Work Orders")
         return target_time
 
     def _sync_dashboard_time(self, current_time):

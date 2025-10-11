@@ -283,10 +283,10 @@ class DashboardCommunicator:
 
     def force_temporal_sync(self) -> bool:
         """
-        Force a complete temporal synchronization of WorkOrder states.
+        HOLISTIC SOLUTION: Force temporal sync using authoritative state from replay engine.
         
-        This method is called when the replay scrubber changes time positions,
-        ensuring the dashboard reflects the correct state at the selected time.
+        This method now uses the authoritative Work Order state computed by the replay engine
+        instead of relying on the data provider's current state.
         
         Returns:
             bool: True if temporal sync sent successfully
@@ -296,42 +296,44 @@ class DashboardCommunicator:
             return False
 
         try:
-            # Get current WorkOrder data (should reflect the new temporal state)
-            current_work_orders = self._get_work_orders_safely()
-            if not current_work_orders:
-                self._log("No WorkOrder data available for temporal sync")
+            # HOLISTIC: Get authoritative state from replay engine
+            replay_engine = self.data_provider.replay_engine_ref()
+            if not replay_engine:
+                self._log("Replay engine not available for temporal sync")
+                return False
+                
+            authoritative_state = replay_engine.authoritative_wo_state
+            if not authoritative_state:
+                self._log("No authoritative state available for temporal sync")
                 return False
 
-            # Get metadata including current time
-            metadata = self._get_metadata_safely()
-            
-            # Convert WorkOrderSnapshot objects to dictionaries for IPC
+            # HOLISTIC: Convert authoritative state to dashboard format
             converted_data = []
-            for wo_snapshot in current_work_orders:
+            for wo_id, wo_data in authoritative_state.items():
                 wo_dict = {
-                    'id': wo_snapshot.id,
-                    'order_id': wo_snapshot.order_id,
-                    'tour_id': wo_snapshot.tour_id,
-                    'sku_id': wo_snapshot.sku_id,
-                    'status': wo_snapshot.status,
-                    'ubicacion': wo_snapshot.ubicacion,
-                    'work_area': wo_snapshot.work_area,
-                    'cantidad_restante': wo_snapshot.cantidad_restante,
-                    'volumen_restante': wo_snapshot.volumen_restante,
-                    'assigned_agent_id': wo_snapshot.assigned_agent_id,
-                    'timestamp': wo_snapshot.timestamp
+                    'id': wo_data.get('id', wo_id),
+                    'order_id': wo_data.get('order_id', ''),
+                    'tour_id': wo_data.get('tour_id', ''),
+                    'sku_id': wo_data.get('sku_id', ''),
+                    'status': wo_data.get('status', 'pending'),
+                    'ubicacion': wo_data.get('ubicacion', ''),
+                    'work_area': wo_data.get('work_area', ''),
+                    'cantidad_restante': wo_data.get('cantidad_restante', 0),
+                    'volumen_restante': wo_data.get('volumen_restante', 0),
+                    'assigned_agent_id': wo_data.get('assigned_agent_id', ''),
+                    'timestamp': wo_data.get('timestamp', 0.0)
                 }
                 converted_data.append(wo_dict)
             
-            # Send temporal sync message with current time
-            current_time = metadata.get('current_time', 0.0)
+            # HOLISTIC: Send temporal sync message with authoritative state
+            current_time = replay_engine.playback_time
             message_dict = {
                 'type': 'temporal_sync',
                 'timestamp': time.time(),
                 'data': converted_data,
                 'metadata': {
                     'target_time': current_time,
-                    'sync_type': 'temporal',
+                    'sync_type': 'authoritative',
                     'total_work_orders': len(converted_data)
                 }
             }
@@ -340,16 +342,16 @@ class DashboardCommunicator:
             success = self._send_message_with_retry(message_dict, max_retries=2)
             
             if success:
-                self._log(f"Temporal sync completed: {len(current_work_orders)} WorkOrders synchronized")
+                self._log(f"HOLISTIC: Authoritative temporal sync completed: {len(converted_data)} WorkOrders synchronized")
                 # Reset delta cache since we've sent a full state
                 self._last_state_cache.clear()
             else:
-                self._log("Failed to send temporal sync")
+                self._log("Failed to send authoritative temporal sync")
 
             return success
 
         except Exception as e:
-            self._log(f"Error in temporal sync: {e}")
+            self._log(f"Error in authoritative temporal sync: {e}")
             self._stats['errors_count'] += 1
             return False
 
