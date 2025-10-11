@@ -418,9 +418,10 @@ class ReplayViewerEngine:
                         print(f"[REPLAY_ENGINE] Seek to {target_time:.2f}s complete.")
                     elif msg_type == 'temporal_sync_complete':
                         # HOLISTIC: Dashboard has confirmed temporal sync is complete
-                        # Keep temporal_mode_active = True to prevent conflicting updates
+                        # REPLAY-SCRUBBER FIX: Deactivate temporal mode to allow normal replay to continue
+                        self.temporal_mode_active = False
                         self.temporal_sync_in_progress = False
-                        print(f"[HOLISTIC] Temporal sync confirmed. Temporal mode remains active to prevent conflicting updates at {msg.get('metadata', {}).get('target_time', 0.0):.2f}s")
+                        print(f"[REPLAY-SCRUBBER] Temporal sync confirmed. Temporal mode deactivated to allow normal replay continuation at {msg.get('metadata', {}).get('target_time', 0.0):.2f}s")
 
             if not replay_pausado and not replay_finalizado:
                 playback_time += time_delta * replay_speed
@@ -565,6 +566,70 @@ class ReplayViewerEngine:
         print(f"[HOLISTIC] Authoritative state computed: {len(authoritative_state)} Work Orders")
         return authoritative_state
 
+    def compute_authoritative_operator_state_at_time(self, target_time):
+        """
+        REPLAY-SCRUBBER FIX: Compute authoritative operator state at specific time
+        by replaying all estado_agente events from beginning up to target_time.
+        This ensures operators move correctly when seeking backwards in time.
+        """
+        print(f"[REPLAY-SCRUBBER] Computing authoritative operator state at {target_time:.2f}s...")
+        
+        # Start with empty operator state
+        authoritative_operator_state = {}
+        
+        # Get all operator IDs from events to initialize them
+        all_operator_ids = set()
+        for event in self.eventos:
+            if event.get('type') == 'estado_agente':
+                agent_id = event.get('agent_id')
+                if agent_id:
+                    all_operator_ids.add(agent_id)
+        
+        # Initialize all operators with default state
+        for agent_id in all_operator_ids:
+            authoritative_operator_state[agent_id] = {
+                'id': agent_id,
+                'x': 100,  # Default position
+                'y': 100,
+                'tipo': 'terrestre',
+                'accion': 'Iniciando',
+                'status': 'idle',
+                'tareas_completadas': 0,
+                'direccion_x': 0,
+                'direccion_y': 0,
+                'timestamp': 0.0
+            }
+        
+        print(f"[REPLAY-SCRUBBER] Initialized {len(authoritative_operator_state)} operators")
+        
+        # Process all estado_agente events from beginning up to target_time
+        for i, event in enumerate(self.eventos):
+            event_timestamp = event.get('timestamp') or 0.0
+            if event_timestamp <= target_time:
+                if event.get('type') == 'estado_agente':
+                    agent_id = event.get('agent_id')
+                    event_data = event.get('data', {})
+                    if agent_id and agent_id in authoritative_operator_state:
+                        # Update authoritative operator state with this event
+                        # Only update if this event is more recent than current state
+                        current_event_time = authoritative_operator_state[agent_id].get('timestamp', 0.0)
+                        if event_timestamp >= current_event_time:
+                            authoritative_operator_state[agent_id].update(event_data)
+                            authoritative_operator_state[agent_id]['timestamp'] = event_timestamp
+                            
+                            # Convert position to pixels if needed
+                            if 'position' in event_data:
+                                pos = event_data['position']
+                                if isinstance(pos, (list, tuple)) and len(pos) >= 2:
+                                    px, py = self.layout_manager.grid_to_pixel(pos[0], pos[1])
+                                    authoritative_operator_state[agent_id]['x'] = px
+                                    authoritative_operator_state[agent_id]['y'] = py
+                            
+                            print(f"[REPLAY-SCRUBBER] Operator {agent_id} -> {event_data.get('status', 'unknown')} at {event_timestamp:.2f}s")
+        
+        print(f"[REPLAY-SCRUBBER] Authoritative operator state computed: {len(authoritative_operator_state)} operators")
+        return authoritative_operator_state
+
     def seek_to_time(self, target_time):
         """HOLISTIC SOLUTION: Seek to time using authoritative state computation."""
         from subsystems.visualization.state import estado_visual
@@ -572,6 +637,28 @@ class ReplayViewerEngine:
 
         # HOLISTIC: Compute authoritative state at target time
         self.authoritative_wo_state = self.compute_authoritative_state_at_time(target_time)
+        
+        # REPLAY-SCRUBBER FIX: Compute authoritative operator state at target time
+        self.authoritative_operator_state = self.compute_authoritative_operator_state_at_time(target_time)
+        
+        # REPLAY-SCRUBBER FIX: Update estado_visual with authoritative operator state
+        estado_visual["operarios"] = self.authoritative_operator_state.copy()
+        print(f"[REPLAY-SCRUBBER] Updated estado_visual with {len(self.authoritative_operator_state)} operators")
+        
+        # PROGRESS-BAR SYNC FIX: Update estado_visual with authoritative Work Orders state
+        estado_visual["work_orders"] = self.authoritative_wo_state.copy()
+        print(f"[PROGRESS-BAR SYNC] Updated estado_visual work_orders with {len(self.authoritative_wo_state)} Work Orders")
+        
+        # PROGRESS-BAR SYNC FIX: Update estado_visual metrics time to sync progress bar with scrubber
+        if "metricas" not in estado_visual:
+            estado_visual["metricas"] = {}
+        estado_visual["metricas"]["tiempo"] = target_time
+        print(f"[PROGRESS-BAR SYNC] Updated estado_visual metricas tiempo to {target_time:.2f}s")
+        
+        # REPLAY-SCRUBBER FIX: Reset processed_event_indices to allow reprocessing from target_time
+        # This is crucial for operators to continue moving after seeking backwards
+        self.processed_event_indices.clear()
+        print(f"[REPLAY-SCRUBBER] Cleared processed_event_indices to allow reprocessing from {target_time:.2f}s")
         
         # HOLISTIC: Set temporal mode to block conflicting updates
         self.temporal_mode_active = True
@@ -582,7 +669,7 @@ class ReplayViewerEngine:
             print(f"[HOLISTIC] Sending authoritative state to dashboard at {target_time:.2f}s")
             self.dashboard_communicator.force_temporal_sync()
         
-        print(f"[HOLISTIC] Seek complete. Authoritative state: {len(self.authoritative_wo_state)} Work Orders")
+        print(f"[HOLISTIC] Seek complete. Authoritative state: {len(self.authoritative_wo_state)} Work Orders, {len(self.authoritative_operator_state)} Operators")
         return target_time
 
     def _sync_dashboard_time(self, current_time):

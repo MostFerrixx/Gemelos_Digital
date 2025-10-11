@@ -2,7 +2,7 @@
 
 **Project:** Simulador de Gemelo Digital de Almacén  
 **Branch:** `main`  
-**Status:** ✅ Sistema completamente funcional - Solución Holística Dashboard implementada  
+**Status:** ✅ Sistema completamente funcional - Replay-Scrubber corregido, operarios móviles, barra de progreso sincronizada  
 **Last Updated:** 2025-01-11
 
 ---
@@ -21,9 +21,10 @@ Sistema de simulación de almacén completamente funcional con **Dashboard World
 - ✅ Modernización UI con iconos vectoriales y tema oscuro
 - ✅ Renderizado de Forklifts completamente funcional
 - ✅ WorkOrders para Forklifts implementados (distribución equilibrada entre áreas)
-- ✅ **Replay Scrubber implementado con navegación temporal funcional**
+- ✅ **Replay Scrubber completamente corregido - Operarios móviles tras retroceder**
 - ✅ **Dashboard PyQt6 en Tiempo Real completamente funcional**
 - ✅ **Solución Holística implementada - Estado autoritativo con navegación temporal**
+- ✅ **Sincronización Barra de Progreso - Barra sincronizada con replay-scrubber**
 - ✅ **Integración a main completada - Sistema completamente funcional**
 - ✅ **Push al repositorio remoto completado - Sistema sincronizado**
 
@@ -339,6 +340,23 @@ pip install -r requirements.txt
 - [x] Navegación temporal completamente funcional
 - [x] Sin discrepancias entre Work Orders `in_progress` y operarios trabajando
 - [x] Dashboard rápido sin actualizaciones por lotes conflictivas
+- [x] Sistema completamente funcional
+
+### ✅ Replay-Scrubber Corregido completado cuando:
+- [x] Operarios continúan moviéndose tras retroceder en la simulación
+- [x] Estado autoritativo de operarios implementado (`compute_authoritative_operator_state_at_time`)
+- [x] `estado_visual["operarios"]` se actualiza con estado histórico
+- [x] `processed_event_indices.clear()` permite reprocesamiento desde `target_time`
+- [x] `temporal_mode_active = False` después de sincronización confirmada
+- [x] Operarios móviles tras retroceder confirmado en logs
+- [x] Sistema completamente funcional
+
+### ✅ Sincronización Barra de Progreso completado cuando:
+- [x] Barra de progreso sincronizada con replay-scrubber durante `seek_to_time()`
+- [x] `estado_visual["work_orders"]` se actualiza con estado autoritativo histórico
+- [x] `estado_visual["metricas"]["tiempo"]` se sincroniza con tiempo del scrubber
+- [x] `_calcular_metricas_modern_dashboard()` cuenta Work Orders completadas desde estado histórico
+- [x] Progreso histórico correcto mostrado en dashboard
 - [x] Sistema completamente funcional
 
 ---
