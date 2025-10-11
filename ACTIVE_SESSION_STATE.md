@@ -1,12 +1,40 @@
-# 🚀 ESTADO DE SESIÓN ACTIVA - SOLUCIÓN HOLÍSTICA DASHBOARD IMPLEMENTADA
+# 🚀 ESTADO DE SESIÓN ACTIVA - AUDITORÍA ARQUITECTURA DASHBOARD PYQT6
 
 **Fecha:** 2025-01-11  
-**Estado:** ✅ REPLAY-SCRUBBER COMPLETAMENTE CORREGIDO - Operarios móviles tras retroceder, barra de progreso sincronizada, sistema 100% funcional  
-**Próxima acción:** Sistema listo para nuevas funcionalidades o optimizaciones adicionales  
+**Estado:** ✅ AUDITORÍA COMPLETADA - Análisis exhaustivo y contrapropuesta arquitectónica para dashboard PyQt6  
+**Próxima acción:** Revisión de auditoría y decisión sobre implementación de arquitectura Event Sourcing propuesta  
 
 ---
 
 ## 📋 CONTEXTO INMEDIATO
+
+### 🎯 NUEVA TAREA: AUDITORÍA ARQUITECTURA DASHBOARD PYQT6
+
+**Problema identificado por el cliente:**
+1. **Alta Latencia:** Actualizaciones de WorkOrders tardan en reflejarse en UI
+2. **Scrubber Inconsistente:** Saltar en el tiempo resulta en estado incorrecto
+3. **Hipótesis:** Envío de objetos pesados vía Queue
+
+**Auditoría completada:**
+- ✅ **Análisis exhaustivo** de arquitectura actual (DashboardCommunicator, WorkOrderDashboard, ReplayEngine)
+- ✅ **Identificación de causa raíz:** Competencia de fuentes de verdad, no tamaño de mensajes
+- ✅ **Validación de hipótesis:** Cliente tiene razón sobre eventos ligeros, pero implementación actual ya usa delta updates
+- ✅ **Contrapropuesta arquitectónica:** Event Sourcing híbrido con 15+ tipos de eventos granulares
+- ✅ **Plan de implementación:** 6 fases, 32 horas (~4 días)
+
+**Documento generado:**
+- `AUDITORIA_ARQUITECTURA_DASHBOARD_PYQT6.md` - Análisis completo de 700+ líneas
+
+**Hallazgos clave:**
+1. Sistema actual **YA USA** delta updates y batching
+2. Problema real: **temporal_mode_active flag** tiene race conditions
+3. Solución: **STATE_RESET + STATE_SNAPSHOT** atómicos
+4. Arquitectura propuesta: **Event Sourcing completo** con eventos tipados
+
+**Próximos pasos:**
+1. Cliente revisa documento de auditoría
+2. Decisión sobre implementación de arquitectura Event Sourcing
+3. Si aprobado: Iniciar Fase 1 (Catálogo de Eventos)
 
 ### ✅ ESTADO ACTUAL DEL PROYECTO:
 - **Dashboard World-Class:** Completado al 100% (Fases 1-8)
@@ -378,6 +406,22 @@ La estrategia "Optimización Global" ahora está **funcionando pero requiere opt
 3. **`INSTRUCCIONES.md`** - Instrucciones técnicas del sistema
 4. **`PLAN_SISTEMA_SLOTS_CONFIGURACION.md`** - Plan detallado completo (completado)
 
+### 🆕 ARCHIVOS CREADOS EN ESTA SESIÓN
+
+**NUEVO:**
+- **`AUDITORIA_ARQUITECTURA_DASHBOARD_PYQT6.md`** - Auditoría completa de 700+ líneas con análisis exhaustivo
+
+**CONTIENE:**
+1. Resumen ejecutivo de problemas
+2. Arquitectura actual (análisis detallado)
+3. Causa raíz identificada (competencia de fuentes de verdad)
+4. Contrapropuesta arquitectónica (Event Sourcing híbrido)
+5. Diseño detallado de la solución (15+ tipos de eventos)
+6. Código de ejemplo para ReplayEngine y Dashboard
+7. Plan de implementación (6 fases, 32 horas)
+8. Métricas de éxito y riesgos
+9. Recomendaciones finales
+
 ### 🔧 ARCHIVOS MODIFICADOS EN ESTA SESIÓN
 5. **`src/subsystems/simulation/warehouse.py`** - `_obtener_pick_sequence_real()` implementado
 6. **`src/subsystems/simulation/dispatcher.py`** - Estrategia Optimización Global corregida
@@ -459,12 +503,18 @@ tasklist | findstr python
 
 ### 🚀 PRÓXIMOS PASOS PARA NUEVA SESIÓN
 
+**PRIORIDAD ALTA: Arquitectura Dashboard PyQt6**
+1. **Revisar auditoría completa** - Leer `AUDITORIA_ARQUITECTURA_DASHBOARD_PYQT6.md`
+2. **Decidir sobre Event Sourcing** - Aprobar o rechazar arquitectura propuesta
+3. **Si aprobado:** Iniciar Fase 1 - Catálogo de Eventos (4 horas)
+4. **Si rechazado:** Discutir alternativas o fixes parciales
+
+**PRIORIDAD MEDIA: Optimizaciones Pendientes**
 1. **Optimizar la construcción de tours** - Mejorar rendimiento y lógica
 2. **Implementar Tour Simple** - FASE 4 completa
 3. **Eliminar estrategias obsoletas** - FASE 3.4
 4. **Testing exhaustivo** - FASE 5 completa
 5. **Documentación final** - FASE 6 completa
-6. **Nuevas funcionalidades del dashboard** - Recibir nuevas instrucciones para mejoras adicionales
 
 ### ✅ PROBLEMAS CRÍTICOS RESUELTOS:
 1. **`_seleccionar_mejor_batch` ya no sobrescribe la lógica de `_estrategia_optimizacion_global`**
@@ -476,6 +526,8 @@ tasklist | findstr python
 
 ---
 
-**Estado:** ✅ Replay-Scrubber completamente corregido, operarios móviles tras retroceder, barra de progreso sincronizada, sistema 100% funcional
+**Estado:** ✅ Auditoría de arquitectura Dashboard PyQt6 completada - Análisis exhaustivo y contrapropuesta arquitectónica Event Sourcing disponible
 
-**NOTA:** Sistema completamente funcional - Replay-scrubber con navegación temporal perfecta
+**NOTA:** Documento `AUDITORIA_ARQUITECTURA_DASHBOARD_PYQT6.md` contiene análisis completo de 700+ líneas con plan de implementación detallado
+
+**DECISIÓN PENDIENTE:** Cliente debe revisar auditoría y aprobar/rechazar arquitectura Event Sourcing propuesta
