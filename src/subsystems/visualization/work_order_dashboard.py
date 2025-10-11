@@ -27,7 +27,7 @@ from PyQt6.QtCore import (
     pyqtSignal,
     QTimer,
 )
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QColor
 
 # Define the columns based on the reference image and requirements.
 # Using a list of tuples: (Header Name, Internal Key)
@@ -52,6 +52,14 @@ COLUMN_HEADERS = [
     ("PROGRESS", "progress"),
 ]
 
+# Define status colors for visual differentiation
+STATUS_COLORS = {
+    'pending': QColor(255, 193, 7),      # Amber/Yellow
+    'assigned': QColor(0, 123, 255),      # Blue
+    'in_progress': QColor(255, 87, 34),   # Orange
+    'completed': QColor(40, 167, 69),     # Green
+}
+
 class WorkOrderTableModel(QAbstractTableModel):
     """
     Data model for the WorkOrders table.
@@ -75,6 +83,13 @@ class WorkOrderTableModel(QAbstractTableModel):
             row_data = self._data[index.row()]
             column_key = COLUMN_HEADERS[index.column()][1]
             return row_data.get(column_key, "")
+        
+        elif role == Qt.ItemDataRole.BackgroundRole:
+            # Color-code rows based on status
+            row_data = self._data[index.row()]
+            status = row_data.get('status', 'pending')
+            if status in STATUS_COLORS:
+                return STATUS_COLORS[status]
 
         return None
 
@@ -235,12 +250,14 @@ class WorkOrderDashboard(QMainWindow):
         Routes messages to the correct handler or buffers them.
         """
         msg_type = message.get("type")
+        print(f"[DEBUG-Dashboard] handle_message: type={msg_type}")
 
         if msg_type in ("full_state", "FULL_STATE_SNAPSHOT"):
             # For full updates, clear buffer and apply immediately
             self._delta_buffer.clear()
             data = message.get("data", [])
             metadata = message.get("metadata", {})
+            print(f"[DEBUG-Dashboard] Full state: {len(data)} WorkOrders")
 
             self.model.setData(data)
             self.table_view.resizeColumnsToContents()
@@ -250,6 +267,31 @@ class WorkOrderDashboard(QMainWindow):
                 max_time = int(metadata['max_time'])
                 self.time_slider.setRange(0, max_time)
                 print(f"Dashboard: Slider range set to {max_time}")
+        elif msg_type == "TIME_UPDATE":
+            # Update time slider position without triggering seek
+            timestamp = message.get('timestamp', 0.0)
+            self.time_slider.blockSignals(True)  # Prevent recursive calls
+            self.time_slider.setValue(int(timestamp))
+            self.time_slider.blockSignals(False)
+            self.time_label.setText(f"Time: {timestamp:.2f}s")
+        elif msg_type == "temporal_sync":
+            # Handle temporal synchronization from replay scrubber
+            data = message.get("data", [])
+            metadata = message.get("metadata", {})
+            target_time = metadata.get('target_time', 0.0)
+            
+            print(f"[DEBUG-Dashboard] Temporal sync received: {len(data)} WorkOrders at time {target_time:.2f}s")
+            
+            # Clear buffer and apply temporal state immediately
+            self._delta_buffer.clear()
+            self.model.setData(data)
+            self.table_view.resizeColumnsToContents()
+            
+            # Update time display
+            self.time_slider.blockSignals(True)
+            self.time_slider.setValue(int(target_time))
+            self.time_slider.blockSignals(False)
+            self.time_label.setText(f"Time: {target_time:.2f}s")
         elif msg_type == "delta":
             # For delta updates, add to buffer to be processed by the timer
             updates = message.get("data", [])
@@ -290,7 +332,7 @@ class WorkOrderDashboard(QMainWindow):
         """
         Handle the window close event to clean up the listener thread.
         """
-        if hasattr(self, 'thread') and self.thread.isRunning():
+        if hasattr(self, 'thread') and isinstance(self.thread, QThread) and self.thread.isRunning():
             # Send a sentinel value to stop the listener loop
             if self.queue_from_sim:
                 self.queue_from_sim.put(None)

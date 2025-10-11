@@ -58,8 +58,35 @@ class ReplayDataProvider(DataProviderInterface):
         self._engine = engine
 
     def get_all_work_orders(self):
-        # The dashboard expects a list of dictionaries.
-        return list(self._engine.dashboard_wos_state.values())
+        # Convert dictionaries to WorkOrderSnapshot objects
+        from communication.ipc_protocols import WorkOrderSnapshot
+        
+        work_orders = []
+        for wo_dict in self._engine.dashboard_wos_state.values():
+            try:
+                # Convert dictionary to WorkOrderSnapshot
+                wo_snapshot = WorkOrderSnapshot(
+                    id=wo_dict.get('id', ''),
+                    order_id=wo_dict.get('order_id', ''),
+                    tour_id=wo_dict.get('tour_id', ''),
+                    sku_id=wo_dict.get('sku_id', ''),
+                    status=wo_dict.get('status', 'pending'),
+                    ubicacion=str(wo_dict.get('ubicacion', [])),
+                    work_area=wo_dict.get('work_area', ''),
+                    cantidad_restante=wo_dict.get('cantidad_restante', 0),
+                    volumen_restante=wo_dict.get('volumen_restante', 0.0),
+                    assigned_agent_id=wo_dict.get('assigned_agent_id'),
+                    timestamp=wo_dict.get('timestamp', 0.0)
+                )
+                work_orders.append(wo_snapshot)
+            except Exception as e:
+                print(f"[ERROR-ReplayDataProvider] Failed to convert WO {wo_dict.get('id', 'unknown')}: {e}")
+                continue
+        
+        print(f"[DEBUG-ReplayDataProvider] get_all_work_orders: {len(work_orders)} WorkOrderSnapshots")
+        if work_orders:
+            print(f"[DEBUG-ReplayDataProvider] First WO: {work_orders[0]}")
+        return work_orders
 
     def has_valid_almacen(self):
         return True
@@ -68,7 +95,10 @@ class ReplayDataProvider(DataProviderInterface):
         return self._engine.replay_finalizado
 
     def get_simulation_metadata(self):
-        return {'max_time': self._engine.max_time}
+        return {
+            'max_time': self._engine.max_time,
+            'current_time': self._engine.playback_time
+        }
 
 
 class ReplayViewerEngine:
@@ -283,6 +313,10 @@ class ReplayViewerEngine:
             estado_visual["metricas"]["total_wos"] = len(initial_work_orders)
             if total_work_orders_fijo is not None:
                 estado_visual["metricas"]["total_wos"] = total_work_orders_fijo
+        
+        # CRITICAL FIX: Initialize self.dashboard_wos_state with initial data
+        self.dashboard_wos_state = dashboard_wos_state.copy()
+        print(f"[DEBUG-ReplayEngine] Initialized dashboard_wos_state with {len(self.dashboard_wos_state)} WorkOrders")
 
         agentes_iniciales = {}
         for evento in self.eventos[:50]:
@@ -374,12 +408,24 @@ class ReplayViewerEngine:
             if not replay_pausado and not replay_finalizado:
                 playback_time += time_delta * replay_speed
                 self.playback_time = playback_time
+                
+                # Sync dashboard time slider with current playback time
+                if self.dashboard_communicator.is_dashboard_active:
+                    self._sync_dashboard_time(playback_time)
                 eventos_a_procesar = []
                 for i, evento in enumerate(self.eventos):
                     if i not in self.processed_event_indices and (evento.get('timestamp') or 0.0) <= playback_time:
                         eventos_a_procesar.append((i, evento))
                 if eventos_a_procesar:
                     self._process_event_batch(eventos_a_procesar, estado_visual, dashboard_wos_state)
+                    # CRITICAL FIX: Sync dashboard_wos_state with processed data
+                    self.dashboard_wos_state.update(dashboard_wos_state)
+                    print(f"[DEBUG-ReplayEngine] Synced dashboard_wos_state: {len(self.dashboard_wos_state)} WorkOrders")
+                    
+                    # CRITICAL FIX: Update dashboard with new data
+                    if self.dashboard_communicator.is_dashboard_active:
+                        self.dashboard_communicator.update_dashboard_state()
+                    
                     if self.eventos[eventos_a_procesar[-1][0]].get('event_type') == 'SIMULATION_END':
                         replay_finalizado = True
 
@@ -446,6 +492,7 @@ class ReplayViewerEngine:
                     estado_visual['work_orders'][wo_id] = update_data
                     if dashboard_wos_state is not None:
                         dashboard_wos_state[wo_id] = update_data.copy()
+                        print(f"[DEBUG-ReplayEngine] WorkOrder updated: {wo_id} -> {update_data.get('status', 'unknown')}")
 
     def seek_to_time(self, target_time):
         """Salta a un punto especifico en el tiempo del replay usando keyframes."""
@@ -489,8 +536,28 @@ class ReplayViewerEngine:
         if events_to_process:
             self._process_event_batch(events_to_process, estado_visual, self.dashboard_wos_state)
 
+        # CRITICAL FIX: Force temporal sync of dashboard after time change
+        if self.dashboard_communicator.is_dashboard_active:
+            print(f"[REPLAY] Forcing temporal sync after seek to {target_time:.2f}s")
+            self.dashboard_communicator.force_temporal_sync()
+
         print(f"[REPLAY] Busqueda completada. {len(self.processed_event_indices)} eventos procesados en total.")
         return target_time
+
+    def _sync_dashboard_time(self, current_time):
+        """
+        Sync dashboard time slider with current playback time.
+        """
+        try:
+            # Send time update message to dashboard
+            message = {
+                'type': 'TIME_UPDATE',
+                'timestamp': current_time,
+                'max_time': self.max_time
+            }
+            self.dashboard_communicator._send_message_with_retry(message, max_retries=1)
+        except Exception as e:
+            print(f"[DEBUG-ReplayEngine] Failed to sync dashboard time: {e}")
 
     def _calcular_metricas_modern_dashboard(self, estado_visual):
         """

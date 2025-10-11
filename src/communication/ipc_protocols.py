@@ -25,6 +25,7 @@ class MessageType(Enum):
     COMMAND = "command"
     STATUS = "status"
     ERROR = "error"
+    TEMPORAL_SYNC = "temporal_sync"
 
 
 @dataclass(frozen=True)
@@ -117,6 +118,19 @@ class DashboardMessage:
             type=MessageType.STATUS,
             data=status_str,
             metadata=kwargs
+        )
+
+    @classmethod
+    def temporal_sync(cls, work_orders: List[WorkOrderSnapshot], target_time: float) -> 'DashboardMessage':
+        """Create temporal synchronization message for replay scrubber"""
+        return cls(
+            type=MessageType.TEMPORAL_SYNC,
+            data=work_orders,
+            metadata={
+                'target_time': target_time,
+                'sync_type': 'temporal',
+                'total_work_orders': len(work_orders)
+            }
         )
 
 

@@ -224,6 +224,7 @@ class DashboardCommunicator:
         try:
             # Get current WorkOrder data
             current_work_orders = self._get_work_orders_safely()
+            print(f"[DEBUG-DashboardCommunicator] update_dashboard_state: {len(current_work_orders) if current_work_orders else 0} WorkOrders")
             if not current_work_orders:
                 self._log("No WorkOrder data available for update")
                 return False
@@ -278,6 +279,60 @@ class DashboardCommunicator:
 
         except Exception as e:
             self._log(f"Error sending simulation ended: {e}")
+            return False
+
+    def force_temporal_sync(self) -> bool:
+        """
+        Force a complete temporal synchronization of WorkOrder states.
+        
+        This method is called when the replay scrubber changes time positions,
+        ensuring the dashboard reflects the correct state at the selected time.
+        
+        Returns:
+            bool: True if temporal sync sent successfully
+        """
+        if not self.is_dashboard_active:
+            self._log("Dashboard not active - skipping temporal sync")
+            return False
+
+        try:
+            # Get current WorkOrder data (should reflect the new temporal state)
+            current_work_orders = self._get_work_orders_safely()
+            if not current_work_orders:
+                self._log("No WorkOrder data available for temporal sync")
+                return False
+
+            # Get metadata including current time
+            metadata = self._get_metadata_safely()
+            
+            # Send temporal sync message with current time
+            current_time = metadata.get('current_time', 0.0)
+            message_dict = {
+                'type': 'temporal_sync',
+                'timestamp': time.time(),
+                'data': current_work_orders,
+                'metadata': {
+                    'target_time': current_time,
+                    'sync_type': 'temporal',
+                    'total_work_orders': len(current_work_orders)
+                }
+            }
+            
+            # Send via lifecycle manager with timeout handling
+            success = self._send_message_with_retry(message_dict, max_retries=2)
+            
+            if success:
+                self._log(f"Temporal sync completed: {len(current_work_orders)} WorkOrders synchronized")
+                # Reset delta cache since we've sent a full state
+                self._last_state_cache.clear()
+            else:
+                self._log("Failed to send temporal sync")
+
+            return success
+
+        except Exception as e:
+            self._log(f"Error in temporal sync: {e}")
+            self._stats['errors_count'] += 1
             return False
 
     # PRIVATE IMPLEMENTATION METHODS
@@ -338,24 +393,64 @@ class DashboardCommunicator:
 
     def _get_dashboard_target_function(self):
         """Get dashboard target function with deferred import and validation"""
+        import sys
+        import os
+        
+        # Add current directory and src directory to Python path if not already there
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(current_dir))
+        src_dir = os.path.join(project_root, 'src')
+        
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        if src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
+            
         try:
-            # The root of the package is 'src', so we import relative to that.
-            from visualization.work_order_dashboard import launch_dashboard_process
+            # Try multiple import strategies
+            launch_dashboard_process = None
+            
+            # Strategy 1: Import from subsystems.visualization (correct location)
+            try:
+                from subsystems.visualization.work_order_dashboard import launch_dashboard_process
+                self._log("Dashboard target function imported successfully (strategy 1)")
+            except ImportError:
+                # Strategy 2: Direct import from src
+                try:
+                    from src.visualization.work_order_dashboard import launch_dashboard_process
+                    self._log("Dashboard target function imported successfully (strategy 2)")
+                except ImportError:
+                    # Strategy 3: Import from visualization module
+                    try:
+                        from visualization.work_order_dashboard import launch_dashboard_process
+                        self._log("Dashboard target function imported successfully (strategy 3)")
+                    except ImportError:
+                        raise ImportError("All import strategies failed")
 
             if not callable(launch_dashboard_process):
                 raise ImportError("launch_dashboard_process is not callable")
 
-            self._log("Dashboard target function imported successfully")
             return launch_dashboard_process
 
         except ImportError as e:
             error_msg = f"Failed to import dashboard module: {e}"
             self._log(error_msg)
-            try:
-                import src.visualization.work_order_dashboard
-                self._log("Found 'work_order_dashboard' but failed to import 'launch_dashboard_process'.")
-            except ImportError:
-                self._log("Could not find 'src.visualization.work_order_dashboard' module.")
+            self._log(f"Python path: {sys.path[:3]}...")  # Show first 3 paths
+            self._log(f"Current working directory: {os.getcwd()}")
+            self._log(f"Project root: {project_root}")
+            self._log(f"SRC directory: {src_dir}")
+            
+            # Try to find the file manually
+            dashboard_file_subsystems = os.path.join(src_dir, 'subsystems', 'visualization', 'work_order_dashboard.py')
+            dashboard_file_src = os.path.join(src_dir, 'visualization', 'work_order_dashboard.py')
+            
+            if os.path.exists(dashboard_file_subsystems):
+                self._log(f"Dashboard file exists at: {dashboard_file_subsystems}")
+            elif os.path.exists(dashboard_file_src):
+                self._log(f"Dashboard file exists at: {dashboard_file_src}")
+            else:
+                self._log(f"Dashboard file NOT found at: {dashboard_file_subsystems}")
+                self._log(f"Dashboard file NOT found at: {dashboard_file_src}")
 
             raise ProcessStartupError(error_msg) from e
 
