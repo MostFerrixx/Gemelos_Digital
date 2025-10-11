@@ -282,9 +282,32 @@ class WorkOrderDashboard(QMainWindow):
             
             print(f"[DEBUG-Dashboard] Temporal sync received: {len(data)} WorkOrders at time {target_time:.2f}s")
             
+            # Convert WorkOrderSnapshot objects to dictionaries for the model
+            converted_data = []
+            for wo_snapshot in data:
+                if hasattr(wo_snapshot, '__dict__'):
+                    # Convert WorkOrderSnapshot to dictionary
+                    wo_dict = {
+                        'id': wo_snapshot.id,
+                        'order_id': wo_snapshot.order_id,
+                        'tour_id': wo_snapshot.tour_id,
+                        'sku_id': wo_snapshot.sku_id,
+                        'status': wo_snapshot.status,
+                        'ubicacion': wo_snapshot.ubicacion,
+                        'work_area': wo_snapshot.work_area,
+                        'cantidad_restante': wo_snapshot.cantidad_restante,
+                        'volumen_restante': wo_snapshot.volumen_restante,
+                        'assigned_agent_id': wo_snapshot.assigned_agent_id,
+                        'timestamp': wo_snapshot.timestamp
+                    }
+                    converted_data.append(wo_dict)
+                else:
+                    # Already a dictionary
+                    converted_data.append(wo_snapshot)
+            
             # Clear buffer and apply temporal state immediately
             self._delta_buffer.clear()
-            self.model.setData(data)
+            self.model.setData(converted_data)
             self.table_view.resizeColumnsToContents()
             
             # Update time display
