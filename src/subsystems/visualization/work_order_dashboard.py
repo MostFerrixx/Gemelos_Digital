@@ -119,6 +119,22 @@ class WorkOrderTableModel(QAbstractTableModel):
 
         # Process updates for existing items first
         for wo_update in updates:
+            # Convert WorkOrderSnapshot to dictionary if needed
+            if hasattr(wo_update, '__dict__'):
+                wo_update = {
+                    'id': wo_update.id,
+                    'order_id': wo_update.order_id,
+                    'tour_id': wo_update.tour_id,
+                    'sku_id': wo_update.sku_id,
+                    'status': wo_update.status,
+                    'ubicacion': wo_update.ubicacion,
+                    'work_area': wo_update.work_area,
+                    'cantidad_restante': wo_update.cantidad_restante,
+                    'volumen_restante': wo_update.volumen_restante,
+                    'assigned_agent_id': wo_update.assigned_agent_id,
+                    'timestamp': wo_update.timestamp
+                }
+            
             wo_id = wo_update.get('id')
             if not wo_id:
                 continue
@@ -283,28 +299,8 @@ class WorkOrderDashboard(QMainWindow):
             
             print(f"[DEBUG-Dashboard] Temporal sync received: {len(data)} WorkOrders at time {target_time:.2f}s")
             
-            # Convert WorkOrderSnapshot objects to dictionaries for the model
-            converted_data = []
-            for wo_snapshot in data:
-                if hasattr(wo_snapshot, '__dict__'):
-                    # Convert WorkOrderSnapshot to dictionary
-                    wo_dict = {
-                        'id': wo_snapshot.id,
-                        'order_id': wo_snapshot.order_id,
-                        'tour_id': wo_snapshot.tour_id,
-                        'sku_id': wo_snapshot.sku_id,
-                        'status': wo_snapshot.status,
-                        'ubicacion': wo_snapshot.ubicacion,
-                        'work_area': wo_snapshot.work_area,
-                        'cantidad_restante': wo_snapshot.cantidad_restante,
-                        'volumen_restante': wo_snapshot.volumen_restante,
-                        'assigned_agent_id': wo_snapshot.assigned_agent_id,
-                        'timestamp': wo_snapshot.timestamp
-                    }
-                    converted_data.append(wo_dict)
-                else:
-                    # Already a dictionary
-                    converted_data.append(wo_snapshot)
+            # Data should already be converted to dictionaries by DashboardCommunicator
+            converted_data = data
             
             # Clear buffer and apply temporal state immediately
             self._delta_buffer.clear()

@@ -305,16 +305,34 @@ class DashboardCommunicator:
             # Get metadata including current time
             metadata = self._get_metadata_safely()
             
+            # Convert WorkOrderSnapshot objects to dictionaries for IPC
+            converted_data = []
+            for wo_snapshot in current_work_orders:
+                wo_dict = {
+                    'id': wo_snapshot.id,
+                    'order_id': wo_snapshot.order_id,
+                    'tour_id': wo_snapshot.tour_id,
+                    'sku_id': wo_snapshot.sku_id,
+                    'status': wo_snapshot.status,
+                    'ubicacion': wo_snapshot.ubicacion,
+                    'work_area': wo_snapshot.work_area,
+                    'cantidad_restante': wo_snapshot.cantidad_restante,
+                    'volumen_restante': wo_snapshot.volumen_restante,
+                    'assigned_agent_id': wo_snapshot.assigned_agent_id,
+                    'timestamp': wo_snapshot.timestamp
+                }
+                converted_data.append(wo_dict)
+            
             # Send temporal sync message with current time
             current_time = metadata.get('current_time', 0.0)
             message_dict = {
                 'type': 'temporal_sync',
                 'timestamp': time.time(),
-                'data': current_work_orders,
+                'data': converted_data,
                 'metadata': {
                     'target_time': current_time,
                     'sync_type': 'temporal',
-                    'total_work_orders': len(current_work_orders)
+                    'total_work_orders': len(converted_data)
                 }
             }
             
