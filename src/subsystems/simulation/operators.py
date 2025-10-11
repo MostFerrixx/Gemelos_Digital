@@ -572,12 +572,36 @@ class Forklift(BaseOperator):
 
                 # FORKLIFT SPECIFIC: Elevar horquilla
                 self.status = "lifting"
+                
+                # FASE 1: Capturar cambio de estado a lifting
+                self.almacen.registrar_evento('estado_agente', {
+                    'agent_id': self.id,
+                    'tipo': self.type,
+                    'position': self.current_position,
+                    'status': self.status,
+                    'current_task': wo.id if wo else None,
+                    'current_work_area': wo.work_area if wo else None,
+                    'cargo_volume': self.cargo_volume
+                })
+                
                 print(f"[{self.id}] t={self.env.now:.1f} Elevando horquilla")
                 yield self.env.timeout(LIFT_TIME)
                 self.set_lift_height(1)  # Altura elevada
 
                 # Simular picking
                 self.status = "picking"
+                
+                # FASE 1: Capturar cambio de estado a picking
+                self.almacen.registrar_evento('estado_agente', {
+                    'agent_id': self.id,
+                    'tipo': self.type,
+                    'position': self.current_position,
+                    'status': self.status,
+                    'current_task': wo.id if wo else None,
+                    'current_work_area': wo.work_area if wo else None,
+                    'cargo_volume': self.cargo_volume
+                })
+                
                 print(f"[{self.id}] t={self.env.now:.1f} Picking en {wo.ubicacion}")
                 yield self.env.timeout(self.discharge_time)
 

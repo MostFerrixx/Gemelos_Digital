@@ -7,6 +7,7 @@ Built with PyQt6 for performance and native look-and-feel.
 """
 
 import sys
+import time
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -315,6 +316,17 @@ class WorkOrderDashboard(QMainWindow):
             self.time_slider.setValue(int(target_time))
             self.time_slider.blockSignals(False)
             self.time_label.setText(f"Time: {target_time:.2f}s")
+            
+            # Send confirmation back to replay engine that temporal sync is complete
+            confirmation_msg = {
+                'type': 'temporal_sync_complete',
+                'timestamp': time.time(),
+                'metadata': {
+                    'target_time': target_time,
+                    'work_orders_count': len(converted_data)
+                }
+            }
+            self.send_message(confirmation_msg)
         elif msg_type == "delta":
             # For delta updates, add to buffer to be processed by the timer
             updates = message.get("data", [])

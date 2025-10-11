@@ -142,6 +142,7 @@ class ReplayViewerEngine:
         self.dashboard_wos_state = {}
         self.processed_event_indices = set()  # Indices de eventos procesados
         self.replay_finalizado = False
+        self.temporal_sync_in_progress = False
 
     def inicializar_pygame(self):
         """Inicializa ventana de Pygame para visualizacion de replay"""
@@ -404,6 +405,10 @@ class ReplayViewerEngine:
                         playback_time = self.seek_to_time(target_time)
                         self.dashboard_communicator.update_dashboard_state(force_full_sync=True)
                         print(f"[REPLAY_ENGINE] Seek to {target_time:.2f}s complete.")
+                    elif msg_type == 'temporal_sync_complete':
+                        # Dashboard has confirmed temporal sync is complete
+                        self.temporal_sync_in_progress = False
+                        print(f"[REPLAY_ENGINE] Temporal sync confirmed complete at {msg.get('metadata', {}).get('target_time', 0.0):.2f}s")
 
             if not replay_pausado and not replay_finalizado:
                 playback_time += time_delta * replay_speed
@@ -422,8 +427,8 @@ class ReplayViewerEngine:
                     self.dashboard_wos_state.update(dashboard_wos_state)
                     print(f"[DEBUG-ReplayEngine] Synced dashboard_wos_state: {len(self.dashboard_wos_state)} WorkOrders")
                     
-                    # CRITICAL FIX: Update dashboard with new data
-                    if self.dashboard_communicator.is_dashboard_active:
+                    # CRITICAL FIX: Update dashboard with new data (skip if temporal sync in progress)
+                    if self.dashboard_communicator.is_dashboard_active and not self.temporal_sync_in_progress:
                         self.dashboard_communicator.update_dashboard_state()
                     
                     if self.eventos[eventos_a_procesar[-1][0]].get('event_type') == 'SIMULATION_END':
@@ -539,7 +544,9 @@ class ReplayViewerEngine:
         # CRITICAL FIX: Force temporal sync of dashboard after time change
         if self.dashboard_communicator.is_dashboard_active:
             print(f"[REPLAY] Forcing temporal sync after seek to {target_time:.2f}s")
+            self.temporal_sync_in_progress = True
             self.dashboard_communicator.force_temporal_sync()
+            # Flag will be reset when dashboard sends temporal_sync_complete confirmation
 
         print(f"[REPLAY] Busqueda completada. {len(self.processed_event_indices)} eventos procesados en total.")
         return target_time

@@ -684,6 +684,28 @@ class DispatcherV11:
             wo.status = "assigned"
             wo.assigned_agent_id = operator_id
             wo.tiempo_inicio = self.env.now
+            
+            # Emit work_order_update event for assigned status
+            self.almacen.registrar_evento('work_order_update', {
+                'id': wo.id,
+                'order_id': wo.order_id,
+                'tour_id': getattr(wo, 'tour_id', None),
+                'sku_id': wo.sku_id,
+                'sku_name': getattr(wo, 'sku_name', wo.sku_id),
+                'cantidad_total': wo.cantidad_inicial,
+                'cantidad_restante': wo.cantidad_restante,
+                'volumen_restante': wo.volumen_restante,
+                'ubicacion': wo.ubicacion,
+                'staging_id': getattr(wo, 'staging_id', 1),
+                'status': wo.status,
+                'assigned_agent_id': wo.assigned_agent_id,
+                'pick_sequence': getattr(wo, 'pick_sequence', 0),
+                'work_group': getattr(wo, 'work_group', 'WG_A'),
+                'work_area': wo.work_area,
+                'picking_executions': getattr(wo, 'picking_executions', 0),
+                'tiempo_inicio': wo.tiempo_inicio,
+                'tiempo_fin': getattr(wo, 'tiempo_fin', None)
+            })
 
         # Update operator tracking
         if operator in self.operadores_disponibles:
@@ -708,6 +730,28 @@ class DispatcherV11:
         # Move to in_progress
         work_order.status = "in_progress"
         self.work_orders_en_progreso[operator_id] = work_order
+
+        # Emit work_order_update event for in_progress status
+        self.almacen.registrar_evento('work_order_update', {
+            'id': work_order.id,
+            'order_id': work_order.order_id,
+            'tour_id': getattr(work_order, 'tour_id', None),
+            'sku_id': work_order.sku_id,
+            'sku_name': getattr(work_order, 'sku_name', work_order.sku_id),
+            'cantidad_total': work_order.cantidad_inicial,
+            'cantidad_restante': work_order.cantidad_restante,
+            'volumen_restante': work_order.volumen_restante,
+            'ubicacion': work_order.ubicacion,
+            'staging_id': getattr(work_order, 'staging_id', 1),
+            'status': work_order.status,
+            'assigned_agent_id': work_order.assigned_agent_id,
+            'pick_sequence': getattr(work_order, 'pick_sequence', 0),
+            'work_group': getattr(work_order, 'work_group', 'WG_A'),
+            'work_area': work_order.work_area,
+            'picking_executions': getattr(work_order, 'picking_executions', 0),
+            'tiempo_inicio': work_order.tiempo_inicio,
+            'tiempo_fin': getattr(work_order, 'tiempo_fin', None)
+        })
 
         print(f"[DISPATCHER] {self.env.now:.2f} - {operator_id} inicio WO {work_order.id}")
 
