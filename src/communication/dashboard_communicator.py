@@ -205,11 +205,14 @@ class DashboardCommunicator:
             self._stats['errors_count'] += 1
             return False
 
-    def update_dashboard_state(self) -> bool:
+    def update_dashboard_state(self, force_full_sync: bool = False) -> bool:
         """
         Update dashboard with current WorkOrder state using delta optimization.
 
         Migrated from: simulation_engine.py:1316 (_actualizar_dashboard_ordenes)
+
+        Args:
+            force_full_sync: If True, sends a full state sync instead of a delta.
 
         Returns:
             bool: True if update sent successfully
@@ -225,9 +228,10 @@ class DashboardCommunicator:
                 self._log("No WorkOrder data available for update")
                 return False
 
-            # Send initial sync if not completed
-            if not self._initial_sync_completed:
-                return self._send_full_state_sync(current_work_orders)
+            # Send initial sync if not completed or a full sync is forced
+            if not self._initial_sync_completed or force_full_sync:
+                metadata = self._get_metadata_safely()
+                return self._send_full_state_sync(current_work_orders, metadata=metadata)
 
             # Calculate and send delta updates
             return self._send_delta_updates(current_work_orders)
@@ -236,6 +240,15 @@ class DashboardCommunicator:
             self._log(f"Error updating dashboard state: {e}")
             self._stats['errors_count'] += 1
             return False
+
+    def get_pending_message(self) -> Optional[Dict[str, Any]]:
+        """
+        Check for and retrieve a pending message from the dashboard.
+        This is non-blocking.
+        """
+        if not self.is_dashboard_active:
+            return None
+        return self.lifecycle_manager.get_message()
 
     def send_simulation_ended(self) -> bool:
         """
@@ -350,6 +363,14 @@ class DashboardCommunicator:
             self._log(error_msg)
             raise ProcessStartupError(error_msg) from e
 
+    def _get_metadata_safely(self) -> Dict[str, Any]:
+        """Get simulation metadata from data provider with error handling"""
+        try:
+            return self.data_provider.get_simulation_metadata()
+        except Exception as e:
+            self._log(f"Error getting metadata from provider: {e}")
+            return {}
+
     def _get_work_orders_safely(self) -> Optional[List[WorkOrderSnapshot]]:
         """Get WorkOrders from data provider with error handling"""
         try:
@@ -358,7 +379,7 @@ class DashboardCommunicator:
             self._log(f"Error getting WorkOrders from provider: {e}")
             return None
 
-    def _send_full_state_sync(self, work_orders: List[WorkOrderSnapshot]) -> bool:
+    def _send_full_state_sync(self, work_orders: List[WorkOrderSnapshot], metadata: Optional[Dict] = None) -> bool:
         """
         Send complete WorkOrder state to dashboard.
 
@@ -367,6 +388,7 @@ class DashboardCommunicator:
 
         Args:
             work_orders: Complete list of WorkOrders
+            metadata: Optional dictionary for extra data like max_time
 
         Returns:
             bool: True if sync sent successfully
@@ -395,7 +417,8 @@ class DashboardCommunicator:
             message_dict = {
                 'type': 'full_state',
                 'timestamp': time.time(),
-                'data': full_state_data
+                'data': full_state_data,
+                'metadata': metadata or {}
             }
 
             # Send via lifecycle manager with timeout handling

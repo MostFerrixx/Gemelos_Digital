@@ -158,6 +158,13 @@ class DataProviderInterface(ABC):
         """
         pass
 
+    def get_simulation_metadata(self) -> Dict[str, Any]:
+        """
+        Get metadata about the simulation (e.g., max_time).
+        Default implementation returns an empty dict.
+        """
+        return {}
+
 
 class DashboardProtocolValidator:
     """

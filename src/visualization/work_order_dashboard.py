@@ -239,8 +239,17 @@ class WorkOrderDashboard(QMainWindow):
         if msg_type in ("full_state", "FULL_STATE_SNAPSHOT"):
             # For full updates, clear buffer and apply immediately
             self._delta_buffer.clear()
-            self.model.setData(message.get("data", []))
+            data = message.get("data", [])
+            metadata = message.get("metadata", {})
+
+            self.model.setData(data)
             self.table_view.resizeColumnsToContents()
+
+            # Update slider range if max_time is provided
+            if 'max_time' in metadata:
+                max_time = int(metadata['max_time'])
+                self.time_slider.setRange(0, max_time)
+                print(f"Dashboard: Slider range set to {max_time}")
         elif msg_type == "delta":
             # For delta updates, add to buffer to be processed by the timer
             updates = message.get("data", [])

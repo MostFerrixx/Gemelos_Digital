@@ -47,6 +47,30 @@ from subsystems.visualization.replay_scrubber import REPLAY_SEEK_EVENT, ReplaySc
 from core.config_manager import ConfigurationManager, ConfigurationError
 from core.config_utils import get_default_config, mostrar_resumen_config
 
+# V12: Dashboard Communicator
+from communication.dashboard_communicator import DashboardCommunicator
+from communication.ipc_protocols import DataProviderInterface
+
+
+class ReplayDataProvider(DataProviderInterface):
+    """Provides replay data to the DashboardCommunicator."""
+    def __init__(self, engine):
+        self._engine = engine
+
+    def get_all_work_orders(self):
+        # The dashboard expects a list of dictionaries.
+        return list(self._engine.dashboard_wos_state.values())
+
+    def has_valid_almacen(self):
+        return True
+
+    def is_simulation_finished(self):
+        return self._engine.replay_finalizado
+
+    def get_simulation_metadata(self):
+        return {'max_time': self._engine.max_time}
+
+
 class ReplayViewerEngine:
     """Motor puro para visualizacion de archivos .jsonl de replay existentes"""
 
@@ -77,12 +101,17 @@ class ReplayViewerEngine:
         self.virtual_surface = None
         self.replay_scrubber = None  # ReplayScrubber para navegacion temporal
 
+        # V12: Dashboard Communicator
+        self.data_provider = ReplayDataProvider(self)
+        self.dashboard_communicator = DashboardCommunicator(self.data_provider)
+
         # KEEP: Replay visualization motor - Core para mostrar replay
         self.event_buffer = []           # Buffer de eventos para replay
         self.playback_time = 0.0         # Reloj de reproduccion interno
         self.factor_aceleracion = 1.0    # Factor de velocidad de reproduccion
         self.dashboard_wos_state = {}
         self.processed_event_indices = set()  # Indices de eventos procesados
+        self.replay_finalizado = False
 
     def inicializar_pygame(self):
         """Inicializa ventana de Pygame para visualizacion de replay"""
@@ -325,7 +354,23 @@ class ReplayViewerEngine:
                         if current_index > 0: replay_speed = velocidades_permitidas[current_index - 1]
                     elif event.key == pygame.K_SPACE:
                         replay_pausado = not replay_pausado
+                    elif event.key == pygame.K_o:
+                        self.dashboard_communicator.toggle_dashboard()
+                        if self.dashboard_communicator.is_dashboard_active:
+                            self.dashboard_communicator.update_dashboard_state()
             
+            # V12: Check for messages from the dashboard
+            if self.dashboard_communicator.is_dashboard_active:
+                msg = self.dashboard_communicator.get_pending_message()
+                if msg and isinstance(msg, dict):
+                    msg_type = msg.get('type')
+                    if msg_type == 'SEEK_TIME':
+                        replay_pausado = True
+                        target_time = msg.get('timestamp', 0.0)
+                        playback_time = self.seek_to_time(target_time)
+                        self.dashboard_communicator.update_dashboard_state(force_full_sync=True)
+                        print(f"[REPLAY_ENGINE] Seek to {target_time:.2f}s complete.")
+
             if not replay_pausado and not replay_finalizado:
                 playback_time += time_delta * replay_speed
                 self.playback_time = playback_time
@@ -492,9 +537,9 @@ class ReplayViewerEngine:
 
     def limpiar_recursos(self):
         """Limpia recursos al cerrar"""
-        if self.order_dashboard_process and self.order_dashboard_process.is_alive():
+        if self.dashboard_communicator and self.dashboard_communicator.is_dashboard_active:
             print("[CLEANUP] Cerrando dashboard...")
-            self.order_dashboard_process.terminate()
+            self.dashboard_communicator.shutdown_dashboard()
 
         pygame.quit()
         print("[CLEANUP] Recursos limpiados exitosamente")
