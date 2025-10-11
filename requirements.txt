@@ -7,6 +7,7 @@ simpy>=4.0.1
 pytmx>=3.31
 numpy>=1.21.0
 openpyxl>=3.0.9
+pandas>=2.0.0
 
 # UI Framework - FASE 1: pygame_gui Integration
 pygame_gui>=0.6.0

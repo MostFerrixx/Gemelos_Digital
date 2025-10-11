@@ -326,10 +326,8 @@ class DashboardCommunicator:
     def _get_dashboard_target_function(self):
         """Get dashboard target function with deferred import and validation"""
         try:
-            # Phase 2: Complete implementation with validation
-            from git.visualization.order_dashboard import launch_dashboard_process
+            from src.visualization.work_order_dashboard import launch_dashboard_process
 
-            # Validate that the function is callable
             if not callable(launch_dashboard_process):
                 raise ImportError("launch_dashboard_process is not callable")
 
@@ -337,23 +335,13 @@ class DashboardCommunicator:
             return launch_dashboard_process
 
         except ImportError as e:
-            # Enhanced error reporting for missing dashboard module
             error_msg = f"Failed to import dashboard module: {e}"
             self._log(error_msg)
-
-            # Check if git.visualization package exists
             try:
-                import git.visualization
-                self._log("git.visualization package found")
-
-                # Check if order_dashboard module exists
-                try:
-                    import git.visualization.order_dashboard
-                    self._log("order_dashboard module found but launch_dashboard_process missing")
-                except ImportError:
-                    self._log("order_dashboard module not found")
+                import src.visualization.work_order_dashboard
+                self._log("Found 'work_order_dashboard' but failed to import 'launch_dashboard_process'.")
             except ImportError:
-                self._log("git.visualization package not found")
+                self._log("Could not find 'src.visualization.work_order_dashboard' module.")
 
             raise ProcessStartupError(error_msg) from e
 
