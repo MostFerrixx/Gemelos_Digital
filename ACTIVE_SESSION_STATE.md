@@ -427,3 +427,5 @@ tasklist | findstr python
 ---
 
 **Estado:** ✅ Solución Holística Dashboard implementada, navegación temporal completamente funcional y sistema estable
+
+**NOTA:** Versión Beta - Dashboard funcional con problemas conocidos pendientes en barra de tiempo
