@@ -372,13 +372,17 @@ class WorkOrderDashboard(QMainWindow):
         event.accept()
 
 
-def launch_dashboard_process(queue_from_sim, queue_to_sim):
+def launch_dashboard_process(data_queue, command_queue):
     """
     Entry point for the dashboard process.
     Initializes and runs the PyQt6 application.
+    
+    Args:
+        data_queue: Queue for receiving data from simulation (queue_from_sim)
+        command_queue: Queue for sending commands to simulation (queue_to_sim)
     """
     app = QApplication(sys.argv)
-    dashboard = WorkOrderDashboard(queue_from_sim, queue_to_sim)
+    dashboard = WorkOrderDashboard(data_queue, command_queue)
     dashboard.show()
     sys.exit(app.exec())
 

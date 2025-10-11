@@ -403,7 +403,7 @@ class ReplayViewerEngine:
                         replay_pausado = True
                         target_time = msg.get('timestamp', 0.0)
                         playback_time = self.seek_to_time(target_time)
-                        self.dashboard_communicator.update_dashboard_state(force_full_sync=True)
+                        # temporal_sync is already triggered by seek_to_time()
                         print(f"[REPLAY_ENGINE] Seek to {target_time:.2f}s complete.")
                     elif msg_type == 'temporal_sync_complete':
                         # Dashboard has confirmed temporal sync is complete
