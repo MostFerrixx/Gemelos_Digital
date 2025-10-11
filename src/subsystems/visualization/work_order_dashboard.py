@@ -76,18 +76,36 @@ class WorkOrderTableModel(QAbstractTableModel):
     def columnCount(self, parent=QModelIndex()):
         return len(COLUMN_HEADERS)
 
+    def _convert_to_dict(self, data):
+        """Convert WorkOrderSnapshot to dictionary if needed."""
+        if hasattr(data, '__dict__'):
+            return {
+                'id': data.id,
+                'order_id': data.order_id,
+                'tour_id': data.tour_id,
+                'sku_id': data.sku_id,
+                'status': data.status,
+                'ubicacion': data.ubicacion,
+                'work_area': data.work_area,
+                'cantidad_restante': data.cantidad_restante,
+                'volumen_restante': data.volumen_restante,
+                'assigned_agent_id': data.assigned_agent_id,
+                'timestamp': data.timestamp
+            }
+        return data
+
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid():
             return None
 
         if role == Qt.ItemDataRole.DisplayRole:
-            row_data = self._data[index.row()]
+            row_data = self._convert_to_dict(self._data[index.row()])
             column_key = COLUMN_HEADERS[index.column()][1]
             return row_data.get(column_key, "")
         
         elif role == Qt.ItemDataRole.BackgroundRole:
             # Color-code rows based on status
-            row_data = self._data[index.row()]
+            row_data = self._convert_to_dict(self._data[index.row()])
             status = row_data.get('status', 'pending')
             if status in STATUS_COLORS:
                 return STATUS_COLORS[status]
@@ -113,27 +131,14 @@ class WorkOrderTableModel(QAbstractTableModel):
         Update or add new data from a list of updates. This method is optimized
         for batch updates.
         """
-        id_to_row_map = {wo['id']: i for i, wo in enumerate(self._data)}
+        id_to_row_map = {self._convert_to_dict(wo)['id']: i for i, wo in enumerate(self._data)}
 
         new_rows_data = []
 
         # Process updates for existing items first
         for wo_update in updates:
             # Convert WorkOrderSnapshot to dictionary if needed
-            if hasattr(wo_update, '__dict__'):
-                wo_update = {
-                    'id': wo_update.id,
-                    'order_id': wo_update.order_id,
-                    'tour_id': wo_update.tour_id,
-                    'sku_id': wo_update.sku_id,
-                    'status': wo_update.status,
-                    'ubicacion': wo_update.ubicacion,
-                    'work_area': wo_update.work_area,
-                    'cantidad_restante': wo_update.cantidad_restante,
-                    'volumen_restante': wo_update.volumen_restante,
-                    'assigned_agent_id': wo_update.assigned_agent_id,
-                    'timestamp': wo_update.timestamp
-                }
+            wo_update = self._convert_to_dict(wo_update)
             
             wo_id = wo_update.get('id')
             if not wo_id:
@@ -357,7 +362,10 @@ class WorkOrderDashboard(QMainWindow):
                 'type': 'SEEK_TIME',
                 'timestamp': timestamp
             }
+            print(f"[DEBUG-Dashboard] Sending SEEK_TIME message: {message}")
             self.queue_to_sim.put(message)
+        else:
+            print(f"[DEBUG-Dashboard] queue_to_sim is None, cannot send SEEK_TIME message")
 
     def closeEvent(self, event):
         """

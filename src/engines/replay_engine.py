@@ -397,8 +397,11 @@ class ReplayViewerEngine:
             # V12: Check for messages from the dashboard
             if self.dashboard_communicator.is_dashboard_active:
                 msg = self.dashboard_communicator.get_pending_message()
+                if msg:
+                    print(f"[DEBUG-ReplayEngine] Received message: {msg}")
                 if msg and isinstance(msg, dict):
                     msg_type = msg.get('type')
+                    print(f"[DEBUG-ReplayEngine] Message type: {msg_type}")
                     if msg_type == 'SEEK_TIME':
                         replay_pausado = True
                         target_time = msg.get('timestamp', 0.0)
