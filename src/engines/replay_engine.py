@@ -366,9 +366,11 @@ class ReplayViewerEngine:
                     elif event.key == pygame.K_SPACE:
                         replay_pausado = not replay_pausado
                     elif event.key == pygame.K_o:
+                        was_active = self.dashboard_communicator.is_dashboard_active
                         self.dashboard_communicator.toggle_dashboard()
-                        if self.dashboard_communicator.is_dashboard_active:
-                            self.dashboard_communicator.update_dashboard_state()
+                        if self.dashboard_communicator.is_dashboard_active and not was_active:
+                            # Dashboard was just started, send initial STATE_SNAPSHOT
+                            self._send_initial_state_snapshot()
             
             # V12: Check for messages from the dashboard
             if self.dashboard_communicator.is_dashboard_active:
@@ -454,14 +456,15 @@ class ReplayViewerEngine:
         # In this branch, we always use the event sourcing model.
         for event_index, evento in eventos_a_procesar:
             self.processed_event_indices.add(event_index)
-            self._convert_and_emit_raw_event(evento)
+            self._convert_and_emit_raw_event(evento, estado_visual)
 
-    def _convert_and_emit_raw_event(self, evento: dict):
+    def _convert_and_emit_raw_event(self, evento: dict, estado_visual):
         """Convierte un evento JSON crudo en uno o más eventos tipados y los emite."""
         event_type = evento.get('type')
         if event_type == 'work_order_update':
             self._convert_and_emit_wo_update_event(evento)
-        # Aquí se podrían manejar otros tipos de eventos como 'estado_agente'
+        elif event_type == 'estado_agente':
+            self._convert_and_emit_agent_event(evento, estado_visual)
 
     def _convert_and_emit_wo_update_event(self, evento: dict):
         """Maneja la conversión de un evento 'work_order_update'."""
@@ -497,13 +500,63 @@ class ReplayViewerEngine:
 
         self._wo_state_cache_for_delta[wo_id] = evento
 
+    def _convert_and_emit_agent_event(self, evento: dict, estado_visual):
+        """Maneja la conversión de un evento 'estado_agente'."""
+        agent_id = evento.get('agent_id')
+        if not agent_id:
+            return
+        
+        # CRITICAL FIX: Update estado_visual with agent position data
+        agent_data = evento.get('data', {})
+        if agent_data and 'position' in agent_data:
+            # Update the visual state with agent position
+            if 'operarios' not in estado_visual:
+                estado_visual['operarios'] = {}
+            estado_visual['operarios'][agent_id] = agent_data.copy()
+            print(f"[DEBUG-AGENT] Updated position for {agent_id}: {agent_data.get('position', 'N/A')}")
+        else:
+            print(f"[DEBUG-AGENT] Processed agent event for {agent_id} (no position data)")
+        
+        # TODO: Implementar eventos específicos de operadores cuando estén disponibles
+        # Por ahora, los eventos de agentes se procesan para la visualización local
+        # pero no se envían al dashboard ya que no hay eventos tipados para operadores
+
     def _calculate_progress(self, evento: dict) -> float:
         return 0.0  # Lógica de cálculo de progreso pendiente
 
     def _emit_event(self, event: BaseEvent):
         """Serializa y envía un evento al dashboard."""
         if self.dashboard_communicator:
-            self.dashboard_communicator.send_event(event)
+            print(f"[DEBUG-EVENT] Emitting event: {event.type.value}")
+            success = self.dashboard_communicator.send_event(event)
+            print(f"[DEBUG-EVENT] Event sent successfully: {success}")
+        else:
+            print(f"[DEBUG-EVENT] No dashboard communicator available")
+
+    def _send_initial_state_snapshot(self):
+        """Envía el STATE_SNAPSHOT inicial al dashboard cuando se inicia."""
+        print("[DEBUG-EVENT] Sending initial STATE_SNAPSHOT to dashboard")
+        
+        # Convertir dashboard_wos_state a lista para el snapshot
+        work_orders_list = []
+        for wo_id, wo_data in self.dashboard_wos_state.items():
+            work_orders_list.append(wo_data)
+        
+        # Crear el snapshot inicial
+        initial_snapshot = StateSnapshotEvent(
+            timestamp=self.playback_time,
+            work_orders=work_orders_list,
+            operators=[],  # Por ahora vacío, se puede expandir después
+            metrics={
+                'total_work_orders': len(work_orders_list),
+                'completed_work_orders': 0,
+                'current_time': self.playback_time
+            }
+        )
+        
+        # Enviar el snapshot
+        self._emit_event(initial_snapshot)
+        print(f"[DEBUG-EVENT] Initial STATE_SNAPSHOT sent with {len(work_orders_list)} WorkOrders")
 
 
     def seek_to_time(self, target_time):
