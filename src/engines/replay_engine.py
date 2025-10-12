@@ -8,7 +8,20 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'git'))
 
+# --- FEATURE FLAG FOR EVENT SOURCING ARCHITECTURE ---
+USE_EVENT_SOURCING = os.getenv('USE_EVENT_SOURCING', 'false').lower() == 'true'
+# ----------------------------------------------------
+
 import pygame
+from communication.ipc_protocols import (
+    EventType,
+    BaseEvent,
+    StateResetEvent,
+    StateSnapshotEvent,
+    WorkOrderStatusChangedEvent,
+    WorkOrderAssignedEvent,
+    WorkOrderProgressUpdatedEvent,
+)
 import pygame_gui
 import json
 import time
@@ -47,6 +60,10 @@ from subsystems.visualization.replay_scrubber import REPLAY_SEEK_EVENT, ReplaySc
 from core.config_manager import ConfigurationManager, ConfigurationError
 from core.config_utils import get_default_config, mostrar_resumen_config
 
+# V12: Dashboard Communicator
+from communication.dashboard_communicator import DashboardCommunicator
+
+
 class ReplayViewerEngine:
     """Motor puro para visualizacion de archivos .jsonl de replay existentes"""
 
@@ -77,12 +94,31 @@ class ReplayViewerEngine:
         self.virtual_surface = None
         self.replay_scrubber = None  # ReplayScrubber para navegacion temporal
 
+        # V12: Dashboard Communicator & Event Sourcing Initialization
+        # In this branch, we always use the event sourcing model.
+        self.dashboard_communicator = DashboardCommunicator()
+
         # KEEP: Replay visualization motor - Core para mostrar replay
         self.event_buffer = []           # Buffer de eventos para replay
         self.playback_time = 0.0         # Reloj de reproduccion interno
         self.factor_aceleracion = 1.0    # Factor de velocidad de reproduccion
         self.dashboard_wos_state = {}
         self.processed_event_indices = set()  # Indices de eventos procesados
+        self.replay_finalizado = False
+        self.temporal_sync_in_progress = False
+
+        # HOLISTIC SOLUTION: Authoritative state computed from events
+        self.authoritative_wo_state = {}  # Single source of truth for Work Orders
+        self.temporal_mode_active = False  # Flag to indicate temporal navigation mode
+
+        # For event sourcing model
+        self.event_stream = []
+        self._wo_state_cache_for_delta = {}
+
+        if USE_EVENT_SOURCING:
+            print("[ARCH] Event Sourcing model is ENABLED.")
+        else:
+            print("[ARCH] Event Sourcing model is DISABLED. Using legacy state management.")
 
     def inicializar_pygame(self):
         """Inicializa ventana de Pygame para visualizacion de replay"""
@@ -255,6 +291,10 @@ class ReplayViewerEngine:
             if total_work_orders_fijo is not None:
                 estado_visual["metricas"]["total_wos"] = total_work_orders_fijo
 
+        # CRITICAL FIX: Initialize self.dashboard_wos_state with initial data
+        self.dashboard_wos_state = dashboard_wos_state.copy()
+        print(f"[DEBUG-ReplayEngine] Initialized dashboard_wos_state with {len(self.dashboard_wos_state)} WorkOrders")
+
         agentes_iniciales = {}
         for evento in self.eventos[:50]:
             if evento.get('type') == 'estado_agente':
@@ -325,16 +365,49 @@ class ReplayViewerEngine:
                         if current_index > 0: replay_speed = velocidades_permitidas[current_index - 1]
                     elif event.key == pygame.K_SPACE:
                         replay_pausado = not replay_pausado
+                    elif event.key == pygame.K_o:
+                        self.dashboard_communicator.toggle_dashboard()
+                        if self.dashboard_communicator.is_dashboard_active:
+                            self.dashboard_communicator.update_dashboard_state()
             
+            # V12: Check for messages from the dashboard
+            if self.dashboard_communicator.is_dashboard_active:
+                msg = self.dashboard_communicator.get_pending_message()
+                if msg:
+                    print(f"[DEBUG-ReplayEngine] Received message: {msg}")
+                if msg and isinstance(msg, dict):
+                    msg_type = msg.get('type')
+                    print(f"[DEBUG-ReplayEngine] Message type: {msg_type}")
+                    if msg_type == 'SEEK_TIME':
+                        replay_pausado = True
+                        target_time = msg.get('timestamp', 0.0)
+                        playback_time = self.seek_to_time(target_time)
+                        print(f"[REPLAY_ENGINE] Seek command received. Emitting RESET/SNAPSHOT events for t={target_time:.2f}s.")
+                    elif msg_type == 'SEEK_COMPLETE':
+                        replay_pausado = False
+                        print(f"[REPLAY_ENGINE] SEEK_COMPLETE received. Resuming playback.")
+
             if not replay_pausado and not replay_finalizado:
                 playback_time += time_delta * replay_speed
                 self.playback_time = playback_time
+
+                # Sync dashboard time slider with current playback time
+                if self.dashboard_communicator.is_dashboard_active:
+                    self._sync_dashboard_time(playback_time)
                 eventos_a_procesar = []
                 for i, evento in enumerate(self.eventos):
                     if i not in self.processed_event_indices and (evento.get('timestamp') or 0.0) <= playback_time:
                         eventos_a_procesar.append((i, evento))
                 if eventos_a_procesar:
                     self._process_event_batch(eventos_a_procesar, estado_visual, dashboard_wos_state)
+                    # CRITICAL FIX: Sync dashboard_wos_state with processed data
+                    self.dashboard_wos_state.update(dashboard_wos_state)
+                    print(f"[DEBUG-ReplayEngine] Synced dashboard_wos_state: {len(self.dashboard_wos_state)} WorkOrders")
+
+                    # HOLISTIC: Update dashboard only if not in temporal mode
+                    if self.dashboard_communicator.is_dashboard_active and not self.temporal_mode_active:
+                        self.dashboard_communicator.update_dashboard_state()
+
                     if self.eventos[eventos_a_procesar[-1][0]].get('event_type') == 'SIMULATION_END':
                         replay_finalizado = True
 
@@ -376,76 +449,142 @@ class ReplayViewerEngine:
         return 0
 
     def _process_event_batch(self, eventos_a_procesar, estado_visual, dashboard_wos_state):
-        """Procesa un lote de eventos para actualizar el estado visual."""
+        """
+        Procesa un lote de eventos para actualizar el estado visual."""
+        # In this branch, we always use the event sourcing model.
         for event_index, evento in eventos_a_procesar:
             self.processed_event_indices.add(event_index)
-            event_type = evento.get('type')
+            self._convert_and_emit_raw_event(evento)
 
-            if event_type == 'estado_agente':
-                agent_id = evento.get('agent_id')
-                event_data = evento.get('data', {})
-                if agent_id and event_data:
-                    if agent_id not in estado_visual["operarios"]: estado_visual["operarios"][agent_id] = {}
-                    estado_visual["operarios"][agent_id].update(event_data)
-                    if 'position' in event_data:
-                        pos = event_data['position']
-                        px, py = self.layout_manager.grid_to_pixel(pos[0], pos[1])
-                        estado_visual["operarios"][agent_id]['x'] = px
-                        estado_visual["operarios"][agent_id]['y'] = py
+    def _convert_and_emit_raw_event(self, evento: dict):
+        """Convierte un evento JSON crudo en uno o más eventos tipados y los emite."""
+        event_type = evento.get('type')
+        if event_type == 'work_order_update':
+            self._convert_and_emit_wo_update_event(evento)
+        # Aquí se podrían manejar otros tipos de eventos como 'estado_agente'
 
-            elif event_type == 'work_order_update':
-                wo_id = evento.get('id')
-                if wo_id:
-                    if 'work_orders' not in estado_visual: estado_visual['work_orders'] = {}
-                    update_data = evento.copy()
-                    estado_visual['work_orders'][wo_id] = update_data
-                    if dashboard_wos_state is not None:
-                        dashboard_wos_state[wo_id] = update_data.copy()
+    def _convert_and_emit_wo_update_event(self, evento: dict):
+        """Maneja la conversión de un evento 'work_order_update'."""
+        wo_id = evento.get('id')
+        if not wo_id: return
+
+        timestamp = evento.get('timestamp')
+        new_status = evento.get('status')
+        new_agent = evento.get('assigned_agent_id')
+        cantidad = evento.get('cantidad_restante', 0)
+        volumen = evento.get('volumen_restante', 0.0)
+
+        old_state = self._wo_state_cache_for_delta.get(wo_id, {})
+        old_status = old_state.get('status')
+
+        if new_status and old_status != new_status:
+            self._emit_event(WorkOrderStatusChangedEvent(
+                timestamp=timestamp, wo_id=wo_id, old_status=old_status or "unknown",
+                new_status=new_status, agent_id=new_agent
+            ))
+
+        if new_agent and old_state.get('assigned_agent_id') != new_agent:
+            self._emit_event(WorkOrderAssignedEvent(
+                timestamp=timestamp, wo_id=wo_id, agent_id=new_agent,
+                timestamp_assigned=timestamp
+            ))
+
+        if old_state.get('cantidad_restante') != cantidad or old_state.get('volumen_restante') != volumen:
+            self._emit_event(WorkOrderProgressUpdatedEvent(
+                timestamp=timestamp, wo_id=wo_id, cantidad_restante=cantidad,
+                volumen_restante=volumen, progress_percentage=self._calculate_progress(evento)
+            ))
+
+        self._wo_state_cache_for_delta[wo_id] = evento
+
+    def _calculate_progress(self, evento: dict) -> float:
+        return 0.0  # Lógica de cálculo de progreso pendiente
+
+    def _emit_event(self, event: BaseEvent):
+        """Serializa y envía un evento al dashboard."""
+        if self.dashboard_communicator:
+            self.dashboard_communicator.send_event(event)
+
 
     def seek_to_time(self, target_time):
-        """Salta a un punto especifico en el tiempo del replay usando keyframes."""
-        from subsystems.visualization.state import estado_visual
-        print(f"[REPLAY] Buscando el tiempo {target_time:.2f}s con keyframes...")
+        """
+        Emite eventos para reconstruir el estado en el dashboard a un tiempo específico.
+        """
+        print(f"[EVENT-ENGINE] Seeking to {target_time:.2f}s")
 
-        # 1. Encontrar el keyframe mas cercano anterior al tiempo objetivo
-        best_keyframe_time = 0.0
-        for kt in sorted(self.keyframes.keys()):
-            if kt <= target_time:
-                best_keyframe_time = kt
-            else:
-                break
+        # 1. Emitir STATE_RESET para limpiar el dashboard
+        self._emit_event(StateResetEvent(timestamp=target_time, reason="seek", target_time=target_time))
 
-        print(f"[REPLAY] Usando keyframe de t={best_keyframe_time:.2f}s")
+        # 2. Encontrar todos los eventos hasta el tiempo objetivo
+        # En una implementación completa, esto podría usar un event store optimizado.
+        # Aquí, simplemente filtramos la lista en memoria.
+        events_to_replay = [e for e in self.eventos if (e.get('timestamp') or 0.0) <= target_time]
 
-        # 2. Cargar el estado desde el keyframe
-        estado_visual.clear()
-        estado_visual.update(deepcopy(self.keyframes[best_keyframe_time]))
+        # 3. Calcular el snapshot a partir de los eventos
+        state_snapshot = self._compute_snapshot_from_events(events_to_replay)
 
-        # 3. Resetear indices de eventos procesados y playback time
-        self.processed_event_indices.clear()
+        # 4. Emitir STATE_SNAPSHOT con el estado reconstruido
+        self._emit_event(StateSnapshotEvent(
+            timestamp=target_time,
+            work_orders=state_snapshot['work_orders'],
+            operators=state_snapshot['operators'],
+            metrics=state_snapshot['metrics']
+        ))
+
+        # 5. Actualizar el estado interno del ReplayEngine
         self.playback_time = target_time
+        # Simulamos el reprocesamiento para el UI local de Pygame
+        self.processed_event_indices = {i for i, e in enumerate(self.eventos) if (e.get('timestamp') or 0.0) <= target_time}
 
-        # 4. Reconstruir los indices procesados hasta el keyframe y encontrar eventos a procesar
-        events_to_process = []
-        for i, event in enumerate(self.eventos):
-            event_timestamp = event.get('timestamp') or 0.0
-            if event_timestamp < best_keyframe_time:
-                self.processed_event_indices.add(i)
-            elif best_keyframe_time <= event_timestamp <= target_time:
-                events_to_process.append((i, event))
-
-        # 5. Procesar el lote de eventos entre el keyframe y el target
-        # Reconstruir el estado del dashboard desde el estado visual del keyframe
-        self.dashboard_wos_state.clear()
-        if "work_orders" in estado_visual:
-            for wo_id, wo_data in estado_visual["work_orders"].items():
-                self.dashboard_wos_state[wo_id] = deepcopy(wo_data)
-
-        if events_to_process:
-            self._process_event_batch(events_to_process, estado_visual, self.dashboard_wos_state)
-
-        print(f"[REPLAY] Busqueda completada. {len(self.processed_event_indices)} eventos procesados en total.")
+        print(f"[EVENT-ENGINE] Seek complete: {len(events_to_replay)} events processed for snapshot.")
         return target_time
+
+    def _compute_snapshot_from_events(self, events: list) -> dict:
+        """
+        Reconstruye y devuelve un snapshot del estado del mundo a partir de una secuencia de eventos.
+        """
+        state = {
+            'work_orders': {},
+            'operators': {},
+            'metrics': {}
+        }
+        # Este método es una simulación de cómo el dashboard reconstruiría el estado.
+        # Procesa los eventos crudos para generar un estado final.
+        for event in events:
+            event_type = event.get('type')
+            if event_type == 'work_order_update':
+                wo_id = event.get('id')
+                if wo_id:
+                    if wo_id not in state['work_orders']:
+                        state['work_orders'][wo_id] = {}
+                    state['work_orders'][wo_id].update(event)
+            elif event_type == 'estado_agente':
+                agent_id = event.get('agent_id')
+                if agent_id:
+                    if agent_id not in state['operators']:
+                        state['operators'][agent_id] = {}
+                    state['operators'][agent_id].update(event.get('data', {}))
+
+        # Convertir a listas de diccionarios para el snapshot
+        state['work_orders'] = list(state['work_orders'].values())
+        state['operators'] = list(state['operators'].values())
+
+        return state
+
+    def _sync_dashboard_time(self, current_time):
+        """
+        Sync dashboard time slider with current playback time.
+        """
+        try:
+            # Send time update message to dashboard
+            message = {
+                'type': 'TIME_UPDATE',
+                'timestamp': current_time,
+                'max_time': self.max_time
+            }
+            self.dashboard_communicator._send_message_with_retry(message, max_retries=1)
+        except Exception as e:
+            print(f"[DEBUG-ReplayEngine] Failed to sync dashboard time: {e}")
 
     def _calcular_metricas_modern_dashboard(self, estado_visual):
         """
@@ -492,9 +631,9 @@ class ReplayViewerEngine:
 
     def limpiar_recursos(self):
         """Limpia recursos al cerrar"""
-        if self.order_dashboard_process and self.order_dashboard_process.is_alive():
+        if self.dashboard_communicator and self.dashboard_communicator.is_dashboard_active:
             print("[CLEANUP] Cerrando dashboard...")
-            self.order_dashboard_process.terminate()
+            self.dashboard_communicator.shutdown_dashboard()
 
         pygame.quit()
         print("[CLEANUP] Recursos limpiados exitosamente")

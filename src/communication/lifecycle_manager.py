@@ -19,7 +19,7 @@ from contextlib import contextmanager
 from typing import Optional, Any, Callable, Dict
 from dataclasses import dataclass, field
 
-from .ipc_protocols import ProtocolConstants
+# from .ipc_protocols import ProtocolConstants
 
 
 @dataclass
@@ -36,8 +36,8 @@ class DashboardConfig:
     sigkill_timeout: float = 1.0
 
     # Queue settings
-    queue_timeout: float = ProtocolConstants.DEFAULT_QUEUE_TIMEOUT
-    max_queue_size: int = ProtocolConstants.MAX_QUEUE_SIZE
+    queue_timeout: float = 1.0
+    max_queue_size: int = 1000
 
     # Process monitoring
     health_check_enabled: bool = True
@@ -87,6 +87,7 @@ class ProcessLifecycleManager:
         self.config = config or DashboardConfig()
         self.process: Optional[multiprocessing.Process] = None
         self.data_queue: Optional[multiprocessing.Queue] = None
+        self.command_queue: Optional[multiprocessing.Queue] = None
 
         # State tracking
         self._startup_completed = False
@@ -235,13 +236,28 @@ class ProcessLifecycleManager:
 
     # Private implementation methods
 
+    def get_message(self) -> Optional[Any]:
+        """
+        Get a message from the command queue (non-blocking).
+
+        Returns:
+            Optional[Any]: The message if available, else None.
+        """
+        if not self.command_queue or self.command_queue.empty():
+            return None
+        try:
+            return self.command_queue.get_nowait()
+        except queue.Empty:
+            return None
+
     def _start_process_internal(self, target_function: Callable, args: tuple) -> bool:
         """Internal process startup implementation"""
-        # 1. Create communication queue
+        # 1. Create communication queues
         self.data_queue = multiprocessing.Queue(maxsize=self.config.max_queue_size)
+        self.command_queue = multiprocessing.Queue(maxsize=self.config.max_queue_size)
 
-        # 2. Create process with queue as first argument
-        process_args = (self.data_queue,) + args
+        # 2. Create process with queues as first arguments
+        process_args = (self.data_queue, self.command_queue) + args
         self.process = multiprocessing.Process(
             target=target_function,
             args=process_args
@@ -308,7 +324,7 @@ class ProcessLifecycleManager:
 
         # 2. Send graceful shutdown command
         if self.data_queue:
-            self.send_message(ProtocolConstants.EXIT_COMMAND)
+            self.send_message("__EXIT_COMMAND__")
 
         # 3. Wait for graceful exit
         try:

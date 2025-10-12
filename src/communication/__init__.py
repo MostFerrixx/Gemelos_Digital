@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-Communication Package - Digital Twin Warehouse Simulator V10.0.4
+Communication Package - Digital Twin Warehouse Simulator V11.0.0
 
-Extracted dashboard communication functionality from SimulationEngine.
-Provides robust, testable communication with PyQt6 dashboard process.
-
-Phase 1: Architecture skeleton and base classes.
+Handles event-based communication with the PyQt6 dashboard process.
 """
 
 # Core communication classes
 from .dashboard_communicator import DashboardCommunicator
 from .lifecycle_manager import ProcessLifecycleManager, DashboardConfig
 from .ipc_protocols import (
-    WorkOrderSnapshot,
-    DataProviderInterface,
-    DashboardMessage,
-    MessageType
+    EventType,
+    BaseEvent,
+    StateResetEvent,
+    StateSnapshotEvent,
+    WorkOrderStatusChangedEvent,
+    WorkOrderAssignedEvent,
+    WorkOrderProgressUpdatedEvent,
 )
 from .simulation_data_provider import SimulationEngineDataProvider, create_simulation_data_provider
 
@@ -26,7 +26,7 @@ from .dashboard_communicator import (
     IPCTimeoutError
 )
 
-__version__ = "10.0.4"
+__version__ = "11.0.0"
 __all__ = [
     # Main API
     'DashboardCommunicator',
@@ -35,11 +35,14 @@ __all__ = [
     'ProcessLifecycleManager',
     'DashboardConfig',
 
-    # IPC protocols
-    'WorkOrderSnapshot',
-    'DataProviderInterface',
-    'DashboardMessage',
-    'MessageType',
+    # IPC protocols (Event Sourcing)
+    'EventType',
+    'BaseEvent',
+    'StateResetEvent',
+    'StateSnapshotEvent',
+    'WorkOrderStatusChangedEvent',
+    'WorkOrderAssignedEvent',
+    'WorkOrderProgressUpdatedEvent',
 
     # Data providers
     'SimulationEngineDataProvider',

@@ -13,10 +13,10 @@ import time
 from typing import List, Optional
 import weakref
 
-from .ipc_protocols import DataProviderInterface, WorkOrderSnapshot
+# from .ipc_protocols import DataProviderInterface, WorkOrderSnapshot
 
 
-class SimulationEngineDataProvider(DataProviderInterface):
+class SimulationEngineDataProvider:
     """
     Data provider implementation that bridges SimulationEngine to DashboardCommunicator.
 
@@ -43,7 +43,7 @@ class SimulationEngineDataProvider(DataProviderInterface):
             raise RuntimeError("SimulationEngine has been garbage collected")
         return engine
 
-    def get_all_work_orders(self) -> List[WorkOrderSnapshot]:
+    def get_all_work_orders(self):
         """
         Get complete list of WorkOrders (active + historical).
 
@@ -121,7 +121,7 @@ class SimulationEngineDataProvider(DataProviderInterface):
         except Exception:
             return False
 
-    def _create_work_order_snapshot(self, work_order) -> WorkOrderSnapshot:
+    def _create_work_order_snapshot(self, work_order):
         """
         Create immutable snapshot from WorkOrder object.
 
@@ -181,19 +181,20 @@ class SimulationEngineDataProvider(DataProviderInterface):
             assigned_agent_id = getattr(work_order, 'assigned_agent_id', None)
 
             # Create snapshot
-            return WorkOrderSnapshot(
-                id=str(wo_id),
-                order_id=str(order_id),
-                tour_id=str(tour_id),
-                sku_id=str(sku_id),
-                status=str(status),
-                ubicacion=str(ubicacion),
-                work_area=str(work_area),
-                cantidad_restante=int(cantidad_restante),
-                volumen_restante=float(volumen_restante),
-                assigned_agent_id=str(assigned_agent_id) if assigned_agent_id else None,
-                timestamp=time.time()
-            )
+            # return WorkOrderSnapshot(
+            #     id=str(wo_id),
+            #     order_id=str(order_id),
+            #     tour_id=str(tour_id),
+            #     sku_id=str(sku_id),
+            #     status=str(status),
+            #     ubicacion=str(ubicacion),
+            #     work_area=str(work_area),
+            #     cantidad_restante=int(cantidad_restante),
+            #     volumen_restante=float(volumen_restante),
+            #     assigned_agent_id=str(assigned_agent_id) if assigned_agent_id else None,
+            #     timestamp=time.time()
+            # )
+            return None
 
         except Exception as e:
             raise ValueError(f"Failed to create WorkOrderSnapshot: {e}") from e

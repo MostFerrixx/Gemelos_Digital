@@ -468,9 +468,18 @@ def renderizar_dashboard(pantalla: pygame.Surface,
 
     # Reconstruir estado_visual desde parametros legacy
     # (para compatibilidad con codigo que llama con firma antigua)
+    # Handle both dict and string operarios_list
+    operarios_dict = {}
+    for i, op in enumerate(operarios_list):
+        if isinstance(op, dict):
+            operarios_dict[op.get('id', f'op_{i}')] = op
+        else:
+            # If op is a string, create a simple dict structure
+            operarios_dict[f'op_{i}'] = {'id': f'op_{i}', 'name': str(op)}
+
     estado_visual = {
         'metricas': metricas_dict,
-        'operarios': {op.get('id', f'op_{i}'): op for i, op in enumerate(operarios_list)}
+        'operarios': operarios_dict
     }
 
     # Delegar renderizado a clase DashboardOriginal

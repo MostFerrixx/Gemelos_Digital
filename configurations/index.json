@@ -1,6 +1,6 @@
 {
     "version": "1.0",
-    "last_updated": "2025-10-09T17:27:21.170094",
+    "last_updated": "2025-10-10T20:39:31.943863",
     "configurations": [
         {
             "id": "config_config_producción_20251009_010135",
@@ -21,8 +21,8 @@
             "id": "config_config_por_defecto_20251009_010135",
             "name": "Config Por Defecto",
             "description": "Configuración por defecto del sistema",
-            "created_at": "2025-10-09T17:27:21.168322",
-            "modified_at": "2025-10-09T17:27:21.168333",
+            "created_at": "2025-10-10T20:39:31.941234",
+            "modified_at": "2025-10-10T20:39:31.941266",
             "version": "1.0",
             "tags": [
                 "default",

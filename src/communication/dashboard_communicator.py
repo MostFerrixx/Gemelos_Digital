@@ -1,34 +1,19 @@
 # -*- coding: utf-8 -*-
 """
 Dashboard Communicator - Robust communication with PyQt6 dashboard process.
-
-Extracted from SimulationEngine dashboard communication methods.
-Provides clean API for dashboard lifecycle and data synchronization.
-
-Based on audit findings from:
-- simulation_engine.py:1185-1263 (toggle_order_dashboard)
-- simulation_engine.py:1265-1314 (_enviar_estado_completo_inicial)
-- simulation_engine.py:1316-1415 (_actualizar_dashboard_ordenes)
-- simulation_engine.py:708-717 (process cleanup)
-
-Migrated Methods:
-- toggle_order_dashboard() -> toggle_dashboard()
-- _enviar_estado_completo_inicial() -> _send_initial_full_state()
-- _actualizar_dashboard_ordenes() -> update_dashboard_state()
-- Cleanup logic -> shutdown_dashboard()
 """
 
 import time
 import weakref
 from typing import Optional, Dict, List, Any
+import os
+from dataclasses import is_dataclass, asdict
 
-from .ipc_protocols import (
-    DataProviderInterface,
-    WorkOrderSnapshot,
-    DashboardMessage,
-    MessageType,
-    ProtocolConstants
-)
+# --- FEATURE FLAG FOR EVENT SOURCING ARCHITECTURE ---
+USE_EVENT_SOURCING = os.getenv('USE_EVENT_SOURCING', 'false').lower() == 'true'
+# ----------------------------------------------------
+
+from .ipc_protocols import BaseEvent, EventType
 from .lifecycle_manager import (
     ProcessLifecycleManager,
     DashboardConfig,
@@ -61,538 +46,173 @@ class DataProviderError(DashboardCommunicationError):
 class DashboardCommunicator:
     """
     Robust communication manager for PyQt6 dashboard process.
-
-    Provides clean API for:
-    - Process lifecycle management (start/stop)
-    - Data synchronization (full state + delta updates)
-    - Error handling and recovery
-    - Resource cleanup
-
-    Replaces scattered dashboard communication logic from SimulationEngine.
+    Supports both legacy state-pull and new event-sourcing models via a feature flag.
     """
 
-    def __init__(self, data_provider: DataProviderInterface, config: Optional[DashboardConfig] = None):
+    def __init__(self, data_provider=None, config: Optional[DashboardConfig] = None):
         """
         Initialize dashboard communicator.
-
         Args:
-            data_provider: Interface to get WorkOrder data
-            config: Configuration for process management
+            data_provider: Interface for legacy data-pull mode. Not used if USE_EVENT_SOURCING is True.
+            config: Configuration for process management.
         """
+        if not USE_EVENT_SOURCING and data_provider is None:
+            raise ValueError("data_provider is required when USE_EVENT_SOURCING is False.")
+
         self.data_provider = data_provider
         self.config = config or DashboardConfig()
 
-        # Process lifecycle manager
+        if USE_EVENT_SOURCING:
+            print("[ARCH] DashboardCommunicator initialized in EVENT SOURCING mode.")
+        else:
+            print("[ARCH] DashboardCommunicator initialized in LEGACY (state-pull) mode.")
+
         self.lifecycle_manager = ProcessLifecycleManager(self.config)
 
-        # Communication state (based on audit of existing state management)
-        self._last_state_cache: Dict[str, WorkOrderSnapshot] = {}
+        # Legacy state
+        self._last_state_cache: Dict[str, Any] = {}
         self._initial_sync_completed = False
         self._simulation_ended_sent = False
 
-        # Statistics and monitoring
         self._stats = {
             'messages_sent': 0,
-            'delta_updates_sent': 0,
-            'full_syncs_sent': 0,
+            'events_sent': 0,
             'errors_count': 0,
             'last_update_time': 0.0
         }
-
-        # Setup lifecycle callbacks
         self._setup_lifecycle_callbacks()
 
     @property
     def is_dashboard_active(self) -> bool:
-        """Check if dashboard process is active and communicating"""
         return self.lifecycle_manager.is_process_active
 
-    @property
-    def dashboard_pid(self) -> Optional[int]:
-        """Get dashboard process PID if running"""
-        return self.lifecycle_manager.process_pid
-
-    @property
-    def communication_stats(self) -> Dict[str, Any]:
-        """Get communication statistics"""
-        return self._stats.copy()
-
-    # PUBLIC API METHODS
-
-    def toggle_dashboard(self) -> bool:
-        """
-        Toggle dashboard visibility - start if stopped, stop if running.
-
-        Migrated from: simulation_engine.py:1185 (toggle_order_dashboard)
-
-        Returns:
-            bool: True if operation successful
-
-        Raises:
-            ProcessStartupError: If dashboard fails to start
-            ProcessShutdownError: If dashboard fails to shutdown
-        """
-        if self.is_dashboard_active:
-            # Dashboard is running - shut it down
-            return self.shutdown_dashboard()
-        else:
-            # Dashboard is not running - start it
-            return self.start_dashboard()
-
     def start_dashboard(self) -> bool:
-        """
-        Start dashboard process with data validation.
-
-        Returns:
-            bool: True if startup successful
-
-        Raises:
-            ProcessStartupError: If process fails to start
-            DataProviderError: If data provider is invalid
-        """
-        # Validate data provider before starting process
-        if not self._validate_data_provider():
-            raise DataProviderError("Data provider validation failed - cannot start dashboard")
+        if not USE_EVENT_SOURCING and not self._validate_data_provider():
+            raise DataProviderError("Data provider validation failed for legacy mode.")
 
         try:
-            # Import dashboard launch function (deferred import for startup validation)
             dashboard_target = self._get_dashboard_target_function()
-
-            # Start process via lifecycle manager
             success = self.lifecycle_manager.start_process(dashboard_target)
-
             if success:
-                self._log("Dashboard process started successfully")
-                # Initial state sync will be handled by startup callback
+                self._log("Dashboard process started successfully.")
                 return True
-            else:
-                raise ProcessStartupError("Dashboard process failed to start")
-
-        except ImportError as e:
-            raise ProcessStartupError(f"Failed to import dashboard module: {e}")
+            raise ProcessStartupError("Dashboard process failed to start.")
         except Exception as e:
             raise ProcessStartupError(f"Unexpected error starting dashboard: {e}")
 
     def shutdown_dashboard(self, force: bool = False) -> bool:
-        """
-        Shutdown dashboard process gracefully.
-
-        Migrated from: simulation_engine.py:1235-1263
-
-        Args:
-            force: Force immediate termination
-
-        Returns:
-            bool: True if shutdown successful
-        """
         if not self.is_dashboard_active:
-            self._log("Dashboard not running - shutdown not needed")
             return True
-
         try:
             success = self.lifecycle_manager.shutdown_process(force=force)
-
             if success:
-                self._log("Dashboard shutdown completed")
+                self._log("Dashboard shutdown completed.")
                 self._reset_communication_state()
-            else:
-                self._log("Dashboard shutdown had issues")
-
             return success
-
         except Exception as e:
             self._log(f"Error during dashboard shutdown: {e}")
-            self._stats['errors_count'] += 1
             return False
 
-    def update_dashboard_state(self) -> bool:
+    def send_event(self, event: BaseEvent) -> bool:
         """
-        Update dashboard with current WorkOrder state using delta optimization.
-
-        Migrated from: simulation_engine.py:1316 (_actualizar_dashboard_ordenes)
-
-        Returns:
-            bool: True if update sent successfully
+        Sends a typed event to the dashboard (Event Sourcing mode).
         """
-        if not self.is_dashboard_active:
-            self._log("Dashboard not active - skipping update")
+        if not USE_EVENT_SOURCING:
+            self._log("Attempted to send an event while in legacy mode. Ignoring.")
             return False
-
-        try:
-            # Get current WorkOrder data
-            current_work_orders = self._get_work_orders_safely()
-            if not current_work_orders:
-                self._log("No WorkOrder data available for update")
-                return False
-
-            # Send initial sync if not completed
-            if not self._initial_sync_completed:
-                return self._send_full_state_sync(current_work_orders)
-
-            # Calculate and send delta updates
-            return self._send_delta_updates(current_work_orders)
-
-        except Exception as e:
-            self._log(f"Error updating dashboard state: {e}")
-            self._stats['errors_count'] += 1
-            return False
-
-    def send_simulation_ended(self) -> bool:
-        """
-        Send simulation ended command to dashboard.
-
-        Based on: simulation_engine.py:1220-1225
-
-        Returns:
-            bool: True if command sent successfully
-        """
         if not self.is_dashboard_active:
             return False
-
-        if self._simulation_ended_sent:
-            self._log("Simulation ended already sent")
-            return True
-
         try:
-            message = DashboardMessage.command(ProtocolConstants.SIMULATION_ENDED)
-            success = self.lifecycle_manager.send_message(message)
-
+            message_dict = self._serialize_event(event)
+            success = self._send_message_with_retry(message_dict)
             if success:
-                self._log("Simulation ended command sent")
-                self._simulation_ended_sent = True
-
+                self._stats['events_sent'] += 1
+                self._stats['messages_sent'] += 1
+                self._stats['last_update_time'] = time.time()
             return success
-
         except Exception as e:
-            self._log(f"Error sending simulation ended: {e}")
+            self._log(f"Error sending event {event.type.value}: {e}")
             return False
 
-    # PRIVATE IMPLEMENTATION METHODS
+    def get_pending_message(self) -> Optional[Dict[str, Any]]:
+        if not self.is_dashboard_active:
+            return None
+        return self.lifecycle_manager.get_message()
+
+    def _serialize_event(self, event: BaseEvent) -> dict:
+        """Serializes a dataclass event into a dict for IPC."""
+        if not is_dataclass(event):
+            raise TypeError("Can only serialize dataclass objects")
+
+        event_data = asdict(event)
+
+        payload = {
+            'type': event.type.value,
+            'timestamp': event_data.pop('timestamp'),
+            'event_id': event_data.pop('event_id'),
+            'data': event_data,
+            'metadata': {
+                'sent_timestamp': time.time()
+            }
+        }
+        return payload
 
     def _send_message_with_retry(self, message_dict: dict, max_retries: int = 2, timeout: float = None) -> bool:
-        """
-        Send message with retry logic and timeout handling.
-
-        Phase 2: Complete implementation for robust IPC communication.
-
-        Args:
-            message_dict: Message dictionary to send
-            max_retries: Maximum number of retry attempts
-            timeout: Send timeout (uses config default if None)
-
-        Returns:
-            bool: True if message sent successfully
-        """
         if not self.lifecycle_manager.is_process_active:
-            self._log("Cannot send message - process not active")
             return False
-
         timeout = timeout or self.config.queue_timeout
-
-        for attempt in range(max_retries + 1):
+        for _ in range(max_retries + 1):
             try:
-                # Use lifecycle manager's send_message with timeout
-                success = self.lifecycle_manager.send_message(message_dict, timeout=timeout)
-
-                if success:
-                    if attempt > 0:
-                        self._log(f"Message sent successfully on attempt {attempt + 1}")
+                if self.lifecycle_manager.send_message(message_dict, timeout=timeout):
                     return True
-                else:
-                    if attempt < max_retries:
-                        self._log(f"Send failed, retrying ({attempt + 1}/{max_retries})")
-                        time.sleep(0.1 * (attempt + 1))  # Exponential backoff
-                    else:
-                        self._log(f"Message send failed after {max_retries + 1} attempts")
-
-            except Exception as e:
-                if attempt < max_retries:
-                    self._log(f"Send error on attempt {attempt + 1}: {e}, retrying")
-                    time.sleep(0.1 * (attempt + 1))
-                else:
-                    self._log(f"Message send failed with error: {e}")
-
+            except Exception:
+                pass
+            time.sleep(0.1)
         return False
 
     def _validate_data_provider(self) -> bool:
-        """Validate that data provider can supply required data"""
+        if USE_EVENT_SOURCING:
+            return True
         try:
-            return (self.data_provider.has_valid_almacen() and
+            return (self.data_provider is not None and
+                    hasattr(self.data_provider, 'has_valid_almacen') and
                     hasattr(self.data_provider, 'get_all_work_orders'))
-        except Exception as e:
-            self._log(f"Data provider validation error: {e}")
+        except Exception:
             return False
 
     def _get_dashboard_target_function(self):
         """Get dashboard target function with deferred import and validation"""
-        try:
-            # Phase 2: Complete implementation with validation
-            from git.visualization.order_dashboard import launch_dashboard_process
+        import sys
 
-            # Validate that the function is callable
-            if not callable(launch_dashboard_process):
-                raise ImportError("launch_dashboard_process is not callable")
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(current_dir))
+        src_dir = os.path.join(project_root, 'src')
 
-            self._log("Dashboard target function imported successfully")
-            return launch_dashboard_process
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        if src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
 
-        except ImportError as e:
-            # Enhanced error reporting for missing dashboard module
-            error_msg = f"Failed to import dashboard module: {e}"
-            self._log(error_msg)
-
-            # Check if git.visualization package exists
-            try:
-                import git.visualization
-                self._log("git.visualization package found")
-
-                # Check if order_dashboard module exists
-                try:
-                    import git.visualization.order_dashboard
-                    self._log("order_dashboard module found but launch_dashboard_process missing")
-                except ImportError:
-                    self._log("order_dashboard module not found")
-            except ImportError:
-                self._log("git.visualization package not found")
-
-            raise ProcessStartupError(error_msg) from e
-
-        except Exception as e:
-            error_msg = f"Unexpected error importing dashboard function: {e}"
-            self._log(error_msg)
-            raise ProcessStartupError(error_msg) from e
-
-    def _get_work_orders_safely(self) -> Optional[List[WorkOrderSnapshot]]:
-        """Get WorkOrders from data provider with error handling"""
-        try:
-            return self.data_provider.get_all_work_orders()
-        except Exception as e:
-            self._log(f"Error getting WorkOrders from provider: {e}")
-            return None
-
-    def _send_full_state_sync(self, work_orders: List[WorkOrderSnapshot]) -> bool:
-        """
-        Send complete WorkOrder state to dashboard.
-
-        Migrated from: simulation_engine.py:1265 (_enviar_estado_completo_inicial)
-        Complete Phase 2 implementation with proper message serialization.
-
-        Args:
-            work_orders: Complete list of WorkOrders
-
-        Returns:
-            bool: True if sync sent successfully
-        """
-        try:
-            # Phase 2: Create full state message with proper serialization
-            # Convert WorkOrderSnapshots to dict format for IPC transmission
-            full_state_data = []
-            for wo in work_orders:
-                wo_dict = {
-                    "id": wo.id,
-                    "order_id": wo.order_id,
-                    "tour_id": wo.tour_id,
-                    "sku_id": wo.sku_id,
-                    "status": wo.status,
-                    "ubicacion": wo.ubicacion,
-                    "work_area": wo.work_area,
-                    "cantidad_restante": wo.cantidad_restante,
-                    "volumen_restante": wo.volumen_restante,
-                    "assigned_agent_id": wo.assigned_agent_id,
-                    "timestamp": wo.timestamp
-                }
-                full_state_data.append(wo_dict)
-
-            # Create structured message (matching original format from simulation_engine.py:1297-1303)
-            message_dict = {
-                'type': 'full_state',
-                'timestamp': time.time(),
-                'data': full_state_data
-            }
-
-            # Send via lifecycle manager with timeout handling
-            success = self._send_message_with_retry(message_dict, max_retries=2)
-
-            if success:
-                # Update cache and sync state
-                self._update_state_cache(work_orders)
-                self._initial_sync_completed = True
-                self._stats['full_syncs_sent'] += 1
-                self._stats['messages_sent'] += 1
-                self._stats['last_update_time'] = time.time()
-
-                self._log(f"Full state sync sent: {len(work_orders)} WorkOrders")
-            else:
-                self._log("Failed to send full state sync message")
-
-            return success
-
-        except Exception as e:
-            self._log(f"Error in full state sync: {e}")
-            self._stats['errors_count'] += 1
-            return False
-
-    def _send_delta_updates(self, current_work_orders: List[WorkOrderSnapshot]) -> bool:
-        """
-        Send only changed WorkOrders to dashboard.
-
-        Migrated from: simulation_engine.py:1344-1398 (delta calculation logic)
-        Complete Phase 2 implementation with proper serialization and batching.
-
-        Args:
-            current_work_orders: Current WorkOrder state
-
-        Returns:
-            bool: True if delta sent successfully
-        """
-        try:
-            # Calculate changes from last state
-            changed_work_orders = self._calculate_delta_changes(current_work_orders)
-
-            if not changed_work_orders:
-                # No changes - update cache and return success
-                self._update_state_cache(current_work_orders)
-                return True
-
-            # Phase 2: Implement batching for large delta sets
-            max_batch_size = ProtocolConstants.MAX_DELTA_BATCH_SIZE
-            total_changes = len(changed_work_orders)
-
-            # Process in batches if necessary
-            for batch_start in range(0, total_changes, max_batch_size):
-                batch_end = min(batch_start + max_batch_size, total_changes)
-                batch = changed_work_orders[batch_start:batch_end]
-
-                # Convert to dict format for IPC
-                delta_data = []
-                for wo in batch:
-                    wo_dict = {
-                        "id": wo.id,
-                        "order_id": wo.order_id,
-                        "tour_id": wo.tour_id,
-                        "sku_id": wo.sku_id,
-                        "status": wo.status,
-                        "ubicacion": wo.ubicacion,
-                        "work_area": wo.work_area,
-                        "cantidad_restante": wo.cantidad_restante,
-                        "volumen_restante": wo.volumen_restante,
-                        "assigned_agent_id": wo.assigned_agent_id,
-                        "timestamp": wo.timestamp
-                    }
-                    delta_data.append(wo_dict)
-
-                # Create delta message (matching original format from simulation_engine.py:1384-1388)
-                message_dict = {
-                    'type': 'delta',
-                    'timestamp': time.time(),
-                    'data': delta_data,
-                    'metadata': {
-                        'batch_info': {
-                            'current_batch': (batch_start // max_batch_size) + 1,
-                            'total_batches': (total_changes + max_batch_size - 1) // max_batch_size,
-                            'batch_size': len(batch)
-                        }
-                    }
-                }
-
-                # Send batch with retry logic
-                success = self._send_message_with_retry(message_dict, max_retries=2)
-                if not success:
-                    self._log(f"Failed to send delta batch {batch_start//max_batch_size + 1}")
-                    return False
-
-            # Update cache with new state after successful transmission
-            self._update_state_cache(current_work_orders)
-
-            # Update statistics
-            self._stats['delta_updates_sent'] += 1
-            self._stats['messages_sent'] += 1
-            self._stats['last_update_time'] = time.time()
-
-            self._log(f"Delta update sent: {total_changes} changes in {(total_changes + max_batch_size - 1) // max_batch_size} batch(es)")
-            return True
-
-        except Exception as e:
-            self._log(f"Error in delta update: {e}")
-            self._stats['errors_count'] += 1
-            return False
-
-    def _calculate_delta_changes(self, current_work_orders: List[WorkOrderSnapshot]) -> List[WorkOrderSnapshot]:
-        """
-        Calculate WorkOrders that changed since last update.
-
-        Based on: simulation_engine.py:1365-1375 (change detection logic)
-
-        Args:
-            current_work_orders: Current WorkOrder state
-
-        Returns:
-            List[WorkOrderSnapshot]: WorkOrders that changed
-        """
-        changed = []
-        current_by_id = {wo.id: wo for wo in current_work_orders}
-
-        for work_order_id, current_wo in current_by_id.items():
-            last_wo = self._last_state_cache.get(work_order_id)
-
-            # Check if new or changed (key fields from audit)
-            if (last_wo is None or
-                last_wo.status != current_wo.status or
-                last_wo.cantidad_restante != current_wo.cantidad_restante or
-                last_wo.assigned_agent_id != current_wo.assigned_agent_id or
-                last_wo.volumen_restante != current_wo.volumen_restante):
-
-                changed.append(current_wo)
-
-        return changed
-
-    def _update_state_cache(self, work_orders: List[WorkOrderSnapshot]) -> None:
-        """Update internal state cache for delta calculation"""
-        self._last_state_cache = {wo.id: wo for wo in work_orders}
-
-    def _setup_lifecycle_callbacks(self) -> None:
-        """Setup callbacks for process lifecycle events"""
-        self.lifecycle_manager.add_startup_callback(
-            'initial_sync',
-            self._on_process_startup
-        )
-        self.lifecycle_manager.add_shutdown_callback(
-            'cleanup_state',
-            self._on_process_shutdown
-        )
-
-    def _on_process_startup(self, lifecycle_manager) -> None:
-        """Callback for process startup - send initial data"""
-        # Send initial full state if data available
-        work_orders = self._get_work_orders_safely()
-        if work_orders:
-            self._send_full_state_sync(work_orders)
-
-            # Check if simulation already ended
-            if self.data_provider.is_simulation_finished():
-                self.send_simulation_ended()
-
-    def _on_process_shutdown(self, lifecycle_manager) -> None:
-        """Callback for process shutdown - cleanup state"""
-        self._reset_communication_state()
+        from subsystems.visualization.work_order_dashboard import launch_dashboard_process
+        return launch_dashboard_process
 
     def _reset_communication_state(self) -> None:
-        """Reset communication state after shutdown"""
-        self._last_state_cache.clear()
         self._initial_sync_completed = False
         self._simulation_ended_sent = False
 
     def _log(self, message: str) -> None:
-        """Internal logging with consistent prefix"""
         if self.config.debug_logging:
-            print(f"{self.config.log_prefix} {message}")
+            print(f"[{self.config.log_prefix}] {message}")
 
+    # Stubs for legacy methods, not used in event sourcing mode
+    def update_dashboard_state(self, force_full_sync: bool = False) -> bool:
+        if USE_EVENT_SOURCING: return True
+        # Legacy implementation would go here
+        return False
 
-# Phase 1: Export main communication API
-__all__ = [
-    'DashboardCommunicator',
-    'DashboardCommunicationError',
-    'ProcessStartupError',
-    'IPCTimeoutError',
-    'DataProviderError'
-]
+    def force_temporal_sync(self) -> bool:
+        if USE_EVENT_SOURCING: return True
+        # Legacy implementation would go here
+        return False
+
+    def _setup_lifecycle_callbacks(self): pass

@@ -202,7 +202,7 @@ class RouteCalculator:
         if preserve_first:
             # Don't reorder at all - keep the order provided by dispatcher
             ordered = work_orders
-            print(f"[ROUTE-CALCULATOR] Ordenados {len(ordered)} WorkOrders por proximidad (sin reordenar)")
+            print(f"[ROUTE-CALCULATOR] Ordenados {len(ordered)} WorkOrders por orden del dispatcher (sin reordenar)")
         else:
             # Sort by pick_sequence attribute
             ordered = sorted(work_orders, key=lambda wo: wo.pick_sequence)
