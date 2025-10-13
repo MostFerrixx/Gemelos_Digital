@@ -371,6 +371,10 @@ class ReplayViewerEngine:
                         # Let's clean this up.
                         if not self.dashboard_communicator.is_dashboard_active:
                             self.dashboard_communicator.start_dashboard()
+                            # Send initial STATE_SNAPSHOT when dashboard opens mid-replay
+                            if USE_EVENT_SOURCING:
+                                import time
+                                time.sleep(0.5)  # Give dashboard time to initialize
                             self._send_initial_state_snapshot()
                         else:
                             self.dashboard_communicator.shutdown_dashboard()
@@ -622,13 +626,22 @@ class ReplayViewerEngine:
         Sync dashboard time slider with current playback time.
         """
         try:
-            # Send time update message to dashboard
-            message = {
-                'type': 'TIME_UPDATE',
-                'timestamp': current_time,
-                'max_time': self.max_time
-            }
-            self.dashboard_communicator._send_message_with_retry(message, max_retries=1)
+            if USE_EVENT_SOURCING:
+                # Event Sourcing mode: Send TIME_TICK event
+                from communication.ipc_protocols import TimeTickEvent
+                self._emit_event(TimeTickEvent(
+                    timestamp=current_time,
+                    elapsed_time=current_time,
+                    total_duration=self.max_time
+                ))
+            else:
+                # Legacy mode: Send TIME_UPDATE message
+                message = {
+                    'type': 'TIME_UPDATE',
+                    'timestamp': current_time,
+                    'max_time': self.max_time
+                }
+                self.dashboard_communicator._send_message_with_retry(message, max_retries=1)
         except Exception as e:
             print(f"[DEBUG-ReplayEngine] Failed to sync dashboard time: {e}")
 

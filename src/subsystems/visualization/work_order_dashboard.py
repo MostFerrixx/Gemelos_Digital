@@ -7,6 +7,7 @@ Built with PyQt6 for performance and native look-and-feel.
 """
 
 import sys
+import os
 import time
 from PyQt6.QtWidgets import (
     QApplication,
