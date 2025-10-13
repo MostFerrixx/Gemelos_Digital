@@ -150,3 +150,17 @@ class WorkOrderProgressUpdatedEvent(BaseEvent):
 
     def __post_init__(self):
         object.__setattr__(self, 'type', EventType.WO_PROGRESS_UPDATED)
+
+
+@dataclass(frozen=True)
+class TimeTickEvent(BaseEvent):
+    """
+    Periodic time update event for dashboard synchronization.
+    """
+    elapsed_time: float
+    total_duration: float
+    version: str = "v1"
+    event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+    def __post_init__(self):
+        object.__setattr__(self, 'type', EventType.TIME_TICK)
