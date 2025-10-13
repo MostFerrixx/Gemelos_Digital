@@ -505,6 +505,22 @@ class ReplayViewerEngine:
                 # Update internal state
                 self.dashboard_wos_state[wo_id] = evento.copy()
 
+            # ===== Agent Events =====
+            elif event_type == 'estado_agente':
+                agent_id = evento.get('agent_id')
+                data = evento.get('data', {})
+                
+                if agent_id and 'position' in data:
+                    # Update visual state for Pygame rendering
+                    if agent_id not in estado_visual["operarios"]:
+                        estado_visual["operarios"][agent_id] = {}
+                    
+                    estado_visual["operarios"][agent_id].update(data)
+                    
+                    # Debug log
+                    position = data.get('position', [0, 0])
+                    print(f"[DEBUG-AGENT] Updated position for {agent_id}: {position}")
+
     def _emit_event(self, event: BaseEvent):
         """Serializa y envía un evento al dashboard."""
         if self.dashboard_communicator:
