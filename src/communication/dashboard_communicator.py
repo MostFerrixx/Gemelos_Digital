@@ -10,7 +10,8 @@ import os
 from dataclasses import is_dataclass, asdict
 
 # --- FEATURE FLAG FOR EVENT SOURCING ARCHITECTURE ---
-USE_EVENT_SOURCING = os.getenv('USE_EVENT_SOURCING', 'false').lower() == 'true'
+# REPLAY-VIEWER-FIX: Forcing Event Sourcing to True as this is the only supported mode for replay.
+USE_EVENT_SOURCING = True
 # ----------------------------------------------------
 
 from .ipc_protocols import BaseEvent, EventType
@@ -113,9 +114,10 @@ class DashboardCommunicator:
             self._log(f"Error during dashboard shutdown: {e}")
             return False
 
-    def send_event(self, event: BaseEvent) -> bool:
+    def send_event(self, event: BaseEvent, block: bool = True) -> bool:
         """
         Sends a typed event to the dashboard (Event Sourcing mode).
+        If block is True, it will wait for the dashboard to acknowledge the event.
         """
         if not USE_EVENT_SOURCING:
             self._log("Attempted to send an event while in legacy mode. Ignoring.")
@@ -124,11 +126,24 @@ class DashboardCommunicator:
             return False
         try:
             message_dict = self._serialize_event(event)
+
+            # Clear acknowledgment before sending
+            if block:
+                self.lifecycle_manager.clear_ack()
+
             success = self._send_message_with_retry(message_dict)
+            
             if success:
                 self._stats['events_sent'] += 1
                 self._stats['messages_sent'] += 1
                 self._stats['last_update_time'] = time.time()
+
+                # Wait for dashboard to acknowledge processing
+                if block:
+                    if not self.lifecycle_manager.wait_for_ack(timeout=5.0):
+                        self._log("Dashboard acknowledgment timeout!")
+                        self._stats['errors_count'] += 1
+                        return False
             return success
         except Exception as e:
             self._log(f"Error sending event {event.type.value}: {e}")

@@ -192,18 +192,20 @@ class WorkOrderDashboard(QMainWindow):
     The main dashboard window.
     Contains the table view and handles UI setup.
     """
-    def __init__(self, queue_from_sim=None, queue_to_sim=None):
+    def __init__(self, queue_from_sim=None, queue_to_sim=None, ack_event=None):
         super().__init__()
         self.setWindowTitle("Digital Twin Warehouse - Dashboard v1.0")
         self.setGeometry(100, 100, 1600, 800)
 
-        # Store communication queues
+        # Store communication queues and sync event
         self.queue_from_sim = queue_from_sim
         self.queue_to_sim = queue_to_sim
+        self.ack_event = ack_event
 
         # ===== NUEVO: Event Sourcing State Management =====
         # Local state rebuilt from events (Event Sourcing pattern)
         self._local_wo_state: Dict[str, Dict[str, Any]] = {}
+        self._wo_id_to_row_map: Dict[str, int] = {}
         self._local_operator_state: Dict[str, Dict[str, Any]] = {}
         self._local_metrics: Dict[str, Any] = {}
 
@@ -211,8 +213,8 @@ class WorkOrderDashboard(QMainWindow):
         self._is_rebuilding_state: bool = False
         self._last_snapshot_time: float = 0.0
 
-        # Feature flag check
-        self._use_event_sourcing = os.getenv('USE_EVENT_SOURCING', 'false').lower() == 'true'
+        # REPLAY-VIEWER-FIX: Forcing Event Sourcing to True as this is the only supported mode for replay.
+        self._use_event_sourcing = True
 
         if self._use_event_sourcing:
             print("[DASHBOARD] Initialized in EVENT SOURCING mode")
@@ -291,10 +293,13 @@ class WorkOrderDashboard(QMainWindow):
         # ===== Event Sourcing Mode =====
         if self._use_event_sourcing:
             self._handle_event_sourcing_message(message_type, message)
-            return
-
         # ===== Legacy Mode =====
-        self._handle_legacy_message(message_type, message)
+        else:
+            self._handle_legacy_message(message_type, message)
+
+        # Signal acknowledgment after processing is complete
+        if self.ack_event:
+            self.ack_event.set()
 
     def _handle_legacy_message(self, message_type: str, message: Dict[str, Any]):
         """Handle messages in legacy mode (existing behavior)."""
@@ -409,6 +414,9 @@ class WorkOrderDashboard(QMainWindow):
         self.model._data = list(self._local_wo_state.values())
         self.model.endResetModel()
 
+        # Rebuild the ID-to-row map for fast lookups
+        self._rebuild_wo_id_map()
+
         # Update time slider if exists
         if hasattr(self, 'time_slider') and self.time_slider:
             self.time_slider.setValue(int(timestamp))
@@ -432,25 +440,6 @@ class WorkOrderDashboard(QMainWindow):
                 'timestamp': timestamp
             })
             print(f"[DASHBOARD] SEEK_COMPLETE confirmation sent")
-        data = message.get('data', {})
-        work_orders = data.get('work_orders', [])
-
-        for wo in work_orders:
-            self._local_wo_state[wo['id']] = wo
-
-        self.model.setData(list(self._local_wo_state.values()))
-        self.table_view.resizeColumnsToContents()
-        self._is_rebuilding_state = False
-        print(f"[DASHBOARD] State rebuilt with {len(work_orders)} work orders.")
-
-        # Send SEEK_COMPLETE confirmation back to the engine
-        if self.queue_to_sim:
-            confirmation_msg = {
-                'type': 'SEEK_COMPLETE',
-                'timestamp': time.time(),
-            }
-            self.queue_to_sim.put(confirmation_msg)
-            print(f"[DASHBOARD] SEEK_COMPLETE confirmation sent.")
 
     def _handle_wo_status_changed(self, message: Dict[str, Any]):
         """
@@ -465,18 +454,17 @@ class WorkOrderDashboard(QMainWindow):
         old_status = data.get('old_status')
         new_status = data.get('new_status')
 
-        if wo_id and wo_id in self._local_wo_state:
-            # Update local state
-            self._local_wo_state[wo_id]['status'] = new_status
+        row = self._find_row_by_wo_id(wo_id)
+        if row >= 0:
+            # BUGFIX: Update the model's actual data source, not just the local cache.
+            self.model._data[row]['status'] = new_status
+            if wo_id in self._local_wo_state:
+                self._local_wo_state[wo_id]['status'] = new_status
 
-            # Find row in table
-            row = self._find_row_by_wo_id(wo_id)
-            if row >= 0:
-                # Emit dataChanged signal for status column only
-                status_column = self._get_column_index('status')
-                if status_column >= 0:
-                    index = self.model.index(row, status_column)
-                    self.model.dataChanged.emit(index, index)
+            # Emit dataChanged signal for the entire row to ensure UI update
+            left_index = self.model.index(row, 0)
+            right_index = self.model.index(row, self.model.columnCount() - 1)
+            self.model.dataChanged.emit(left_index, right_index)
 
             print(f"[DASHBOARD] WO {wo_id} status: {old_status} -> {new_status}")
 
@@ -492,18 +480,19 @@ class WorkOrderDashboard(QMainWindow):
         agent_id = data.get('agent_id')
         timestamp_assigned = data.get('timestamp_assigned', 0.0)
 
-        if wo_id and wo_id in self._local_wo_state:
-            # Update local state
-            self._local_wo_state[wo_id]['assigned_agent_id'] = agent_id
-            self._local_wo_state[wo_id]['timestamp_assigned'] = timestamp_assigned
+        row = self._find_row_by_wo_id(wo_id)
+        if row >= 0:
+            # BUGFIX: Update the model's actual data source.
+            self.model._data[row]['assigned_agent_id'] = agent_id
+            self.model._data[row]['timestamp_assigned'] = timestamp_assigned
+            if wo_id in self._local_wo_state:
+                self._local_wo_state[wo_id]['assigned_agent_id'] = agent_id
+                self._local_wo_state[wo_id]['timestamp_assigned'] = timestamp_assigned
 
-            # Update UI cell
-            row = self._find_row_by_wo_id(wo_id)
-            if row >= 0:
-                agent_column = self._get_column_index('assigned_agent_id')
-                if agent_column >= 0:
-                    index = self.model.index(row, agent_column)
-                    self.model.dataChanged.emit(index, index)
+            # Update UI by emitting dataChanged for the entire row
+            left_index = self.model.index(row, 0)
+            right_index = self.model.index(row, self.model.columnCount() - 1)
+            self.model.dataChanged.emit(left_index, right_index)
 
             print(f"[DASHBOARD] WO {wo_id} assigned to {agent_id}")
 
@@ -516,22 +505,22 @@ class WorkOrderDashboard(QMainWindow):
 
         data = message.get('data', {})
         wo_id = data.get('wo_id')
-        cantidad_restante = data.get('cantidad_restante')
-        volumen_restante = data.get('volumen_restante')
-        progress_percentage = data.get('progress_percentage', 0.0)
 
-        if wo_id and wo_id in self._local_wo_state:
-            # Update local state
-            self._local_wo_state[wo_id]['cantidad_restante'] = cantidad_restante
-            self._local_wo_state[wo_id]['volumen_restante'] = volumen_restante
-            self._local_wo_state[wo_id]['progress'] = progress_percentage
+        row = self._find_row_by_wo_id(wo_id)
+        if row >= 0:
+            # BUGFIX: Update the model's actual data source.
+            self.model._data[row]['cantidad_restante'] = data.get('cantidad_restante')
+            self.model._data[row]['volumen_restante'] = data.get('volumen_restante')
+            self.model._data[row]['progress'] = data.get('progress_percentage', 0.0)
+            if wo_id in self._local_wo_state:
+                self._local_wo_state[wo_id]['cantidad_restante'] = data.get('cantidad_restante')
+                self._local_wo_state[wo_id]['volumen_restante'] = data.get('volumen_restante')
+                self._local_wo_state[wo_id]['progress'] = data.get('progress_percentage', 0.0)
 
             # Update UI (emit signal for entire row for simplicity)
-            row = self._find_row_by_wo_id(wo_id)
-            if row >= 0:
-                left_index = self.model.index(row, 0)
-                right_index = self.model.index(row, self.model.columnCount() - 1)
-                self.model.dataChanged.emit(left_index, right_index)
+            left_index = self.model.index(row, 0)
+            right_index = self.model.index(row, self.model.columnCount() - 1)
+            self.model.dataChanged.emit(left_index, right_index)
 
     def _handle_wo_completed(self, message: Dict[str, Any]):
         """
@@ -544,19 +533,23 @@ class WorkOrderDashboard(QMainWindow):
         wo_id = data.get('wo_id')
         completion_time = data.get('completion_time', 0.0)
 
-        if wo_id and wo_id in self._local_wo_state:
-            # Update local state
-            self._local_wo_state[wo_id]['status'] = 'completed'
-            self._local_wo_state[wo_id]['completion_time'] = completion_time
-            self._local_wo_state[wo_id]['cantidad_restante'] = 0
-            self._local_wo_state[wo_id]['volumen_restante'] = 0.0
+        row = self._find_row_by_wo_id(wo_id)
+        if row >= 0:
+            # BUGFIX: Update the model's actual data source.
+            self.model._data[row]['status'] = 'completed'
+            self.model._data[row]['completion_time'] = completion_time
+            self.model._data[row]['cantidad_restante'] = 0
+            self.model._data[row]['volumen_restante'] = 0.0
+            if wo_id in self._local_wo_state:
+                self._local_wo_state[wo_id]['status'] = 'completed'
+                self._local_wo_state[wo_id]['completion_time'] = completion_time
+                self._local_wo_state[wo_id]['cantidad_restante'] = 0
+                self._local_wo_state[wo_id]['volumen_restante'] = 0.0
 
             # Update UI
-            row = self._find_row_by_wo_id(wo_id)
-            if row >= 0:
-                left_index = self.model.index(row, 0)
-                right_index = self.model.index(row, self.model.columnCount() - 1)
-                self.model.dataChanged.emit(left_index, right_index)
+            left_index = self.model.index(row, 0)
+            right_index = self.model.index(row, self.model.columnCount() - 1)
+            self.model.dataChanged.emit(left_index, right_index)
 
             print(f"[DASHBOARD] WO {wo_id} COMPLETED at t={completion_time:.2f}s")
 
@@ -570,13 +563,18 @@ class WorkOrderDashboard(QMainWindow):
 
     def _find_row_by_wo_id(self, wo_id: str) -> int:
         """
-        Find row index in table by WorkOrder ID.
+        Find row index in table by WorkOrder ID using a cache.
         Returns -1 if not found.
         """
-        for row, wo_data in enumerate(self.model._data):
-            if wo_data.get('id') == wo_id:
-                return row
-        return -1
+        return self._wo_id_to_row_map.get(wo_id, -1)
+
+    def _rebuild_wo_id_map(self):
+        """Rebuilds the dictionary mapping WorkOrder IDs to their row index."""
+        print("[DASHBOARD-DEBUG] Rebuilding WO ID to row map...")
+        self._wo_id_to_row_map = {
+            wo.get('id'): i for i, wo in enumerate(self.model._data)
+        }
+        print(f"[DASHBOARD-DEBUG] Map rebuilt with {len(self._wo_id_to_row_map)} entries.")
 
     def _get_column_index(self, column_name: str) -> int:
         """
@@ -596,7 +594,10 @@ class WorkOrderDashboard(QMainWindow):
         timestamp = message.get('timestamp', 0.0)
 
         if hasattr(self, 'time_slider') and self.time_slider:
+            # Block signals to prevent triggering seek_simulation_time
+            self.time_slider.blockSignals(True)
             self.time_slider.setValue(int(timestamp))
+            self.time_slider.blockSignals(False)
 
     def _handle_time_seek(self, message: Dict[str, Any]):
         """Handle time seek command (user interaction)."""
@@ -627,6 +628,11 @@ class WorkOrderDashboard(QMainWindow):
         """
         Sends a SEEK_TIME message to the simulation engine.
         """
+        # Prevent seeks during state rebuilding to avoid infinite loops
+        if self._is_rebuilding_state:
+            print(f"[DEBUG-Dashboard] Ignoring seek during state rebuild: {value}")
+            return
+            
         # The slider value might need scaling depending on the simulation's total time
         # For now, we'll send the raw value.
         timestamp = float(value)
@@ -662,7 +668,7 @@ class WorkOrderDashboard(QMainWindow):
         event.accept()
 
 
-def launch_dashboard_process(data_queue, command_queue):
+def launch_dashboard_process(data_queue, command_queue, ack_event):
     """
     Entry point for the dashboard process.
     Initializes and runs the PyQt6 application.
@@ -670,9 +676,10 @@ def launch_dashboard_process(data_queue, command_queue):
     Args:
         data_queue: Queue for receiving data from simulation (queue_from_sim)
         command_queue: Queue for sending commands to simulation (queue_to_sim)
+        ack_event: Event to signal acknowledgment of message processing.
     """
     app = QApplication(sys.argv)
-    dashboard = WorkOrderDashboard(data_queue, command_queue)
+    dashboard = WorkOrderDashboard(data_queue, command_queue, ack_event)
     dashboard.show()
     sys.exit(app.exec())
 

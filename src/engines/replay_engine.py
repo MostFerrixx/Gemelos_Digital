@@ -9,7 +9,8 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'git'))
 
 # --- FEATURE FLAG FOR EVENT SOURCING ARCHITECTURE ---
-USE_EVENT_SOURCING = os.getenv('USE_EVENT_SOURCING', 'false').lower() == 'true'
+# REPLAY-VIEWER-FIX: Forcing Event Sourcing to True as this is the only supported mode for replay.
+USE_EVENT_SOURCING = True
 # ----------------------------------------------------
 
 import pygame
@@ -106,6 +107,14 @@ class ReplayViewerEngine:
         self.processed_event_indices = set()  # Indices de eventos procesados
         self.replay_finalizado = False
         self.temporal_sync_in_progress = False
+
+        # NEW: Event processing queue to smooth out updates
+        self.last_event_idx_enqueued = -1
+        self.event_processing_queue = []
+
+        # NEW: Event processing queue to smooth out updates
+        self.last_event_idx_enqueued = -1
+        self.event_processing_queue = []
 
         # HOLISTIC SOLUTION: Authoritative state computed from events
         self.authoritative_wo_state = {}  # Single source of truth for Work Orders
@@ -305,34 +314,58 @@ class ReplayViewerEngine:
         for agent_id, data in agentes_iniciales.items():
             estado_visual["operarios"][agent_id] = data.copy()
 
+        # --- NEW FIX: Sync initial agent tasks with the dashboard ---
+        print("[SYNC] Sincronizando estado inicial de tareas de agentes con el dashboard...")
+        initial_sync_timestamp = 0.1 # Use a small non-zero timestamp for the event
+        for agent_id, agent_data in estado_visual["operarios"].items():
+            initial_task_id = agent_data.get('current_task')
+            if initial_task_id and initial_task_id in self.dashboard_wos_state:
+                wo_state = self.dashboard_wos_state[initial_task_id]
+                if wo_state.get('status') == 'pending':
+                    print(f"[SYNC] Agente inicial {agent_id} tiene tarea {initial_task_id}. Actualizando estado a 'in_progress'.")
+                    self._emit_event(WorkOrderStatusChangedEvent(
+                        timestamp=initial_sync_timestamp,
+                        wo_id=initial_task_id,
+                        old_status=wo_state.get('status'),
+                        new_status='in_progress',
+                        agent_id=agent_id
+                    ))
+                    # Also update our internal state to prevent duplicate events
+                    self.dashboard_wos_state[initial_task_id]['status'] = 'in_progress'
+        # --- END NEW FIX ---
+
+
         self.initial_estado_visual = deepcopy(estado_visual)
         print("[REPLAY] Estado visual inicial guardado.")
 
         # --- FEATURE: Keyframe Caching ---
-        self.keyframes = {0.0: deepcopy(self.initial_estado_visual)}
-        KEYFRAME_INTERVAL = 30.0  # Segundos
-        next_keyframe_time = KEYFRAME_INTERVAL
-
-        temp_estado_visual_for_keyframes = deepcopy(self.initial_estado_visual)
-        temp_processed_indices = set()
-
-        for i, evento in enumerate(self.eventos):
-            event_timestamp = evento.get('timestamp') or 0.0
-            if event_timestamp >= next_keyframe_time:
-                print(f"[REPLAY] Creando keyframe en {next_keyframe_time:.2f}s")
-                # Procesar eventos hasta este punto para generar el estado del keyframe
-                events_for_keyframe = []
-                for j, sub_evento in enumerate(self.eventos):
-                    if j not in temp_processed_indices and (sub_evento.get('timestamp') or 0.0) < next_keyframe_time:
-                         events_for_keyframe.append((j, sub_evento))
-
-                self._process_event_batch(events_for_keyframe)
-                for index, _ in events_for_keyframe:
-                    temp_processed_indices.add(index)
-
-                self.keyframes[next_keyframe_time] = deepcopy(temp_estado_visual_for_keyframes)
-                next_keyframe_time += KEYFRAME_INTERVAL
-        print(f"[REPLAY] {len(self.keyframes)} keyframes creados.")
+        # DISABLED: This feature is architecturally flawed and causes state corruption before playback begins.
+        # It processes events in 30-second batches, which was the source of the 30-second periodic updates.
+        # Disabling it ensures a clean state for the main playback loop.
+        # self.keyframes = {0.0: deepcopy(self.initial_estado_visual)}
+        # KEYFRAME_INTERVAL = 30.0  # Segundos
+        # next_keyframe_time = KEYFRAME_INTERVAL
+        #
+        # temp_estado_visual_for_keyframes = deepcopy(self.initial_estado_visual)
+        # temp_processed_indices = set()
+        #
+        # for i, evento in enumerate(self.eventos):
+        #     event_timestamp = evento.get('timestamp') or 0.0
+        #     if event_timestamp >= next_keyframe_time:
+        #         print(f"[REPLAY] Creando keyframe en {next_keyframe_time:.2f}s")
+        #         # Procesar eventos hasta este punto para generar el estado del keyframe
+        #         events_for_keyframe = []
+        #         for j, sub_evento in enumerate(self.eventos):
+        #             if j not in temp_processed_indices and (sub_evento.get('timestamp') or 0.0) < next_keyframe_time:
+        #                  events_for_keyframe.append((j, sub_evento))
+        #
+        #         self._process_event_batch(events_for_keyframe, silent=True)
+        #         for index, _ in events_for_keyframe:
+        #             temp_processed_indices.add(index)
+        #
+        #         self.keyframes[next_keyframe_time] = deepcopy(temp_estado_visual_for_keyframes)
+        #         next_keyframe_time += KEYFRAME_INTERVAL
+        # print(f"[REPLAY] {len(self.keyframes)} keyframes creados.")
         # --- Fin Keyframe Caching ---
 
         playback_time = 0.0
@@ -398,14 +431,27 @@ class ReplayViewerEngine:
                 if self.dashboard_communicator.is_dashboard_active:
                     self._sync_dashboard_time(playback_time)
 
-                eventos_a_procesar = []
-                for i, evento in enumerate(self.eventos):
-                    if i not in self.processed_event_indices and (evento.get('timestamp') or 0.0) <= playback_time:
-                        eventos_a_procesar.append((i, evento))
+                # Enqueue new events based on playback_time
+                for i in range(self.last_event_idx_enqueued + 1, len(self.eventos)):
+                    evento = self.eventos[i]
+                    if (evento.get('timestamp') or 0.0) <= playback_time:
+                        self.event_processing_queue.append((i, evento))
+                        self.last_event_idx_enqueued = i
+                    else:
+                        break  # Events are sorted by time
 
-                if eventos_a_procesar:
-                    self._process_event_batch(eventos_a_procesar)
-                    if self.eventos[eventos_a_procesar[-1][0]].get('event_type') == 'SIMULATION_END':
+                # Process a manageable chunk of events per frame
+                EVENTS_PER_FRAME_CHUNK = 100
+                chunk_to_process = self.event_processing_queue[:EVENTS_PER_FRAME_CHUNK]
+                self.event_processing_queue = self.event_processing_queue[EVENTS_PER_FRAME_CHUNK:]
+
+                if chunk_to_process:
+                    print(f"[DEBUG] Processing chunk of {len(chunk_to_process)} events. Queue size: {len(self.event_processing_queue)}")
+                    self._process_event_batch(chunk_to_process)
+                    
+                    # Check if the simulation ended in this chunk
+                    last_event_in_chunk_index = chunk_to_process[-1][0]
+                    if self.eventos[last_event_in_chunk_index].get('event_type') == 'SIMULATION_END':
                         replay_finalizado = True
 
             if self.playback_time >= self.max_time:
@@ -445,7 +491,7 @@ class ReplayViewerEngine:
         print("[REPLAY] Modo replay terminado")
         return 0
 
-    def _process_event_batch(self, eventos_a_procesar):
+    def _process_event_batch(self, eventos_a_procesar, silent=False):
         """
         Process batch of events and emit granular typed events.
         """
@@ -467,24 +513,42 @@ class ReplayViewerEngine:
                 new_status = evento.get('status')
                 old_status = prev_wo.get('status')
                 if old_status != new_status:
-                    self._emit_event(WorkOrderStatusChangedEvent(
-                        timestamp=timestamp,
-                        wo_id=wo_id,
-                        old_status=old_status or 'unknown',
-                        new_status=new_status,
-                        agent_id=evento.get('assigned_agent_id')
-                    ))
+                    if not silent:
+                        self._emit_event(WorkOrderStatusChangedEvent(
+                            timestamp=timestamp,
+                            wo_id=wo_id,
+                            old_status=old_status or 'unknown',
+                            new_status=new_status,
+                            agent_id=evento.get('assigned_agent_id')
+                        ))
 
                 # Detect assignment change
                 new_agent = evento.get('assigned_agent_id')
                 old_agent = prev_wo.get('assigned_agent_id')
+
+                if new_agent != old_agent:
+                    # Un-assign from old agent if they exist
+                    if old_agent and old_agent in estado_visual["operarios"]:
+                        if estado_visual["operarios"][old_agent].get('current_task') == wo_id:
+                            estado_visual["operarios"][old_agent]['current_task'] = None
+                            estado_visual["operarios"][old_agent]['current_work_area'] = None # Also clear work area
+
+                    # Assign to new agent
+                    if new_agent and new_agent in estado_visual["operarios"]:
+                        estado_visual["operarios"][new_agent]['current_task'] = wo_id
+                        # Also add the work area
+                        work_area = evento.get('work_area')
+                        if work_area:
+                            estado_visual["operarios"][new_agent]['current_work_area'] = work_area
+
                 if new_agent and new_agent != old_agent:
-                    self._emit_event(WorkOrderAssignedEvent(
-                        timestamp=timestamp,
-                        wo_id=wo_id,
-                        agent_id=new_agent,
-                        timestamp_assigned=timestamp
-                    ))
+                    if not silent:
+                        self._emit_event(WorkOrderAssignedEvent(
+                            timestamp=timestamp,
+                            wo_id=wo_id,
+                            agent_id=new_agent,
+                            timestamp_assigned=timestamp
+                        ))
 
                 # Detect progress change
                 new_cantidad = evento.get('cantidad_restante', 0)
@@ -498,13 +562,14 @@ class ReplayViewerEngine:
                     if total_cantidad > 0:
                         progress = ((total_cantidad - new_cantidad) / total_cantidad) * 100.0
 
-                    self._emit_event(WorkOrderProgressUpdatedEvent(
-                        timestamp=timestamp,
-                        wo_id=wo_id,
-                        cantidad_restante=new_cantidad,
-                        volumen_restante=new_volumen,
-                        progress_percentage=progress
-                    ))
+                    if not silent:
+                        self._emit_event(WorkOrderProgressUpdatedEvent(
+                            timestamp=timestamp,
+                            wo_id=wo_id,
+                            cantidad_restante=new_cantidad,
+                            volumen_restante=new_volumen,
+                            progress_percentage=progress
+                        ))
 
                 # Update internal state
                 self.dashboard_wos_state[wo_id] = evento.copy()
@@ -514,21 +579,46 @@ class ReplayViewerEngine:
                 agent_id = evento.get('agent_id')
                 data = evento.get('data', {})
                 
-                if agent_id and 'position' in data:
-                    # Update visual state for Pygame rendering
+                if agent_id:
+                    # Get previous state for comparison
+                    prev_agent_state = estado_visual["operarios"].get(agent_id, {})
+
+                    # Update visual state for Pygame rendering FIRST
                     if agent_id not in estado_visual["operarios"]:
                         estado_visual["operarios"][agent_id] = {}
-                    
                     estado_visual["operarios"][agent_id].update(data)
-                    
-                    # Debug log
-                    position = data.get('position', [0, 0])
-                    print(f"[DEBUG-AGENT] Updated position for {agent_id}: {position}")
 
-    def _emit_event(self, event: BaseEvent):
+                    # --- NEW LOGIC: Sync dashboard from agent state ---
+                    new_task_id = data.get('current_task')
+                    old_task_id = prev_agent_state.get('current_task')
+
+                    if new_task_id != old_task_id:
+                        # Agent started a new task
+                        if new_task_id and new_task_id in self.dashboard_wos_state:
+                            wo_state = self.dashboard_wos_state[new_task_id]
+                            # If the WO was 'pending' or 'assigned', it's now 'in_progress'.
+                            if wo_state.get('status') in ['pending', 'assigned']:
+                                if not silent:
+                                    self._emit_event(WorkOrderStatusChangedEvent(
+                                        timestamp=timestamp,
+                                        wo_id=new_task_id,
+                                        old_status=wo_state.get('status'),
+                                        new_status='in_progress',
+                                        agent_id=agent_id
+                                    ))
+                                # Also update our internal state to prevent duplicate events
+                                self.dashboard_wos_state[new_task_id]['status'] = 'in_progress'
+                    # --- END NEW LOGIC ---
+
+                    # Original debug log for position
+                    if 'position' in data:
+                        position = data.get('position', [0, 0])
+                        # print(f"[DEBUG-AGENT] Updated position for {agent_id}: {position}")
+
+    def _emit_event(self, event: BaseEvent, block: bool = True):
         """Serializa y envía un evento al dashboard."""
         if self.dashboard_communicator:
-            self.dashboard_communicator.send_event(event)
+            self.dashboard_communicator.send_event(event, block=block)
 
     def _send_initial_state_snapshot(self):
         """Envía el STATE_SNAPSHOT inicial al dashboard cuando se inicia."""
@@ -571,7 +661,7 @@ class ReplayViewerEngine:
         events_to_replay = [e for e in self.eventos if (e.get('timestamp') or 0.0) <= target_time]
 
         # 3. Calcular el snapshot a partir de los eventos
-        state_snapshot = self._compute_snapshot_from_events(events_to_replay)
+        state_snapshot = self._compute_snapshot_from_events(events_to_replay, target_time)
 
         # 4. Emitir STATE_SNAPSHOT con el estado reconstruido
         self._emit_event(StateSnapshotEvent(
@@ -586,28 +676,74 @@ class ReplayViewerEngine:
         # Simulamos el reprocesamiento para el UI local de Pygame
         self.processed_event_indices = {i for i, e in enumerate(self.eventos) if (e.get('timestamp') or 0.0) <= target_time}
 
+        # BUGFIX: Reset the engine's internal state cache to match the snapshot.
+        # This ensures that when playback resumes, change detection in _process_event_batch
+        # compares against the correct historical state.
+        self.dashboard_wos_state = {wo['id']: wo for wo in state_snapshot['work_orders']}
+
+        # NEW: Reset event processing queue after a seek
+        self.event_processing_queue = []
+        if self.processed_event_indices:
+            self.last_event_idx_enqueued = max(self.processed_event_indices)
+        else:
+            self.last_event_idx_enqueued = -1
+
+        # NEW: Reset event processing queue after a seek
+        self.event_processing_queue = []
+        if self.processed_event_indices:
+            self.last_event_idx_enqueued = max(self.processed_event_indices)
+        else:
+            self.last_event_idx_enqueued = -1
+
+        # Update the global estado_visual for the Pygame UI
+        global estado_visual
+        estado_visual['work_orders'] = {wo['id']: wo for wo in state_snapshot['work_orders']}
+        estado_visual['operarios'] = {op['id']: op for op in state_snapshot['operators']}
+        estado_visual['metricas'] = state_snapshot['metrics']
+
         print(f"[EVENT-ENGINE] Seek complete: {len(events_to_replay)} events processed for snapshot.")
         return target_time
 
-    def _compute_snapshot_from_events(self, events: list) -> dict:
+    def _compute_snapshot_from_events(self, events: list, target_time: float) -> dict:
         """
         Reconstruye y devuelve un snapshot del estado del mundo a partir de una secuencia de eventos.
         """
+        # FIX: Start with a deepcopy of the initial state, not the current state.
+        initial_wos = deepcopy(self.initial_estado_visual.get('work_orders', {}))
         state = {
-            'work_orders': {},
+            'work_orders': initial_wos,
             'operators': {},
             'metrics': {}
         }
-        # Este método es una simulación de cómo el dashboard reconstruiría el estado.
-        # Procesa los eventos crudos para generar un estado final.
+
+        # Apply event changes sequentially up to the target_time
         for event in events:
             event_type = event.get('type')
             if event_type == 'work_order_update':
                 wo_id = event.get('id')
-                if wo_id:
-                    if wo_id not in state['work_orders']:
-                        state['work_orders'][wo_id] = {}
+                if wo_id in state['work_orders']:
+                    # The event contains the updated state for the WO at that timestamp.
+                    # We just need to apply all its fields.
+                    prev_wo = state['work_orders'][wo_id]
                     state['work_orders'][wo_id].update(event)
+
+                    new_agent = event.get('assigned_agent_id')
+                    old_agent = prev_wo.get('assigned_agent_id')
+
+                    if new_agent != old_agent:
+                        # Un-assign from old agent
+                        if old_agent and old_agent in state["operators"]:
+                            if state["operators"][old_agent].get('current_task') == wo_id:
+                                state["operators"][old_agent]['current_task'] = None
+                                state["operators"][old_agent]['current_work_area'] = None
+
+                        # Assign to new agent
+                        if new_agent and new_agent in state["operators"]:
+                            state["operators"][new_agent]['current_task'] = wo_id
+                            work_area = event.get('work_area')
+                            if work_area:
+                                state["operators"][new_agent]['current_work_area'] = work_area
+
             elif event_type == 'estado_agente':
                 agent_id = event.get('agent_id')
                 if agent_id:
@@ -615,9 +751,22 @@ class ReplayViewerEngine:
                         state['operators'][agent_id] = {}
                     state['operators'][agent_id].update(event.get('data', {}))
 
-        # Convertir a listas de diccionarios para el snapshot
+        # Convert dicts to lists for the snapshot payload
         state['work_orders'] = list(state['work_orders'].values())
-        state['operators'] = list(state['operators'].values())
+        
+        operators_list = []
+        for op_id, op_data in state['operators'].items():
+            op_data['id'] = op_id # Add the ID into the dictionary
+            operators_list.append(op_data)
+        state['operators'] = operators_list
+
+        # Calculate metrics based on the reconstructed state
+        completed_wos = sum(1 for wo in state['work_orders'] if wo.get('status') == 'completed')
+        state['metrics'] = {
+            'total_work_orders': len(state['work_orders']),
+            'completed_work_orders': completed_wos,
+            'current_time': target_time
+        }
 
         return state
 
@@ -633,7 +782,7 @@ class ReplayViewerEngine:
                     timestamp=current_time,
                     elapsed_time=current_time,
                     total_duration=self.max_time
-                ))
+                ), block=False)
             else:
                 # Legacy mode: Send TIME_UPDATE message
                 message = {

@@ -88,6 +88,7 @@ class ProcessLifecycleManager:
         self.process: Optional[multiprocessing.Process] = None
         self.data_queue: Optional[multiprocessing.Queue] = None
         self.command_queue: Optional[multiprocessing.Queue] = None
+        self.ack_event: Optional[multiprocessing.Event] = None
 
         # State tracking
         self._startup_completed = False
@@ -250,14 +251,26 @@ class ProcessLifecycleManager:
         except queue.Empty:
             return None
 
+    def wait_for_ack(self, timeout: Optional[float] = None) -> bool:
+        """Waits for the dashboard to acknowledge an event."""
+        if not self.ack_event:
+            return False
+        return self.ack_event.wait(timeout)
+
+    def clear_ack(self):
+        """Clears the acknowledgment event."""
+        if self.ack_event:
+            self.ack_event.clear()
+
     def _start_process_internal(self, target_function: Callable, args: tuple) -> bool:
         """Internal process startup implementation"""
-        # 1. Create communication queues
+        # 1. Create communication queues and sync event
         self.data_queue = multiprocessing.Queue(maxsize=self.config.max_queue_size)
         self.command_queue = multiprocessing.Queue(maxsize=self.config.max_queue_size)
+        self.ack_event = multiprocessing.Event()
 
-        # 2. Create process with queues as first arguments
-        process_args = (self.data_queue, self.command_queue) + args
+        # 2. Create process with queues and event as first arguments
+        process_args = (self.data_queue, self.command_queue, self.ack_event) + args
         self.process = multiprocessing.Process(
             target=target_function,
             args=process_args
@@ -367,14 +380,17 @@ class ProcessLifecycleManager:
         if self.process:
             self.process = None
 
-        if self.data_queue:
+        if self.command_queue:
             # Clear queue
             try:
-                while not self.data_queue.empty():
-                    self.data_queue.get_nowait()
+                while not self.command_queue.empty():
+                    self.command_queue.get_nowait()
             except:
                 pass
-            self.data_queue = None
+            self.command_queue = None
+
+        if self.ack_event:
+            self.ack_event = None
 
         self._startup_completed = False
         self._shutdown_initiated = False

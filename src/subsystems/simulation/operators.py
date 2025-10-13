@@ -286,6 +286,29 @@ class GroundOperator(BaseOperator):
                             'cargo_volume': self.cargo_volume
                         })
                         
+                        # NUEVO: Registrar evento work_order_update en cada paso
+                        if wo:
+                            self.almacen.registrar_evento('work_order_update', {
+                                'id': wo.id,
+                                'order_id': wo.order_id,
+                                'tour_id': getattr(wo, 'tour_id', None),
+                                'sku_id': wo.sku_id,
+                                'sku_name': wo.sku_name,
+                                'cantidad_total': wo.cantidad_total,
+                                'cantidad_restante': wo.cantidad_restante,
+                                'volumen_restante': wo.volumen_restante,
+                                'ubicacion': wo.ubicacion,
+                                'staging_id': wo.staging_id,
+                                'status': 'in_progress',
+                                'assigned_agent_id': wo.assigned_agent_id,
+                                'pick_sequence': wo.pick_sequence,
+                                'work_group': wo.work_group,
+                                'work_area': wo.work_area,
+                                'picking_executions': getattr(wo, 'picking_executions', 0),
+                                'tiempo_inicio': wo.tiempo_inicio,
+                                'tiempo_fin': getattr(wo, 'tiempo_fin', None)
+                            })
+                        
                         # Avanzar tiempo por celda
                         yield self.env.timeout(TIME_PER_CELL * self.default_speed)
                         
@@ -325,6 +348,30 @@ class GroundOperator(BaseOperator):
 
                 # Actualizar cargo
                 self.cargo_volume += wo.calcular_volumen_restante()
+
+                # NUEVO: Cambiar estado a 'picked' y registrar evento
+                if wo:
+                    wo.status = 'picked'
+                    self.almacen.registrar_evento('work_order_update', {
+                        'id': wo.id,
+                        'order_id': wo.order_id,
+                        'tour_id': getattr(wo, 'tour_id', None),
+                        'sku_id': wo.sku_id,
+                        'sku_name': wo.sku_name,
+                        'cantidad_total': wo.cantidad_total,
+                        'cantidad_restante': wo.cantidad_restante,
+                        'volumen_restante': wo.volumen_restante,
+                        'ubicacion': wo.ubicacion,
+                        'staging_id': wo.staging_id,
+                        'status': 'picked',
+                        'assigned_agent_id': wo.assigned_agent_id,
+                        'pick_sequence': wo.pick_sequence,
+                        'work_group': wo.work_group,
+                        'work_area': wo.work_area,
+                        'picking_executions': getattr(wo, 'picking_executions', 0),
+                        'tiempo_inicio': wo.tiempo_inicio,
+                        'tiempo_fin': getattr(wo, 'tiempo_fin', None)
+                    })
 
             # PASO 4: Navegar a staging area para descarga usando pathfinding paso a paso
             depot_location = self.almacen.data_manager.outbound_staging_locations.get(1, (0, 0))
@@ -560,6 +607,29 @@ class Forklift(BaseOperator):
                             'current_work_area': wo.work_area if wo else None,
                             'cargo_volume': self.cargo_volume
                         })
+
+                        # NUEVO: Registrar evento work_order_update en cada paso
+                        if wo:
+                            self.almacen.registrar_evento('work_order_update', {
+                                'id': wo.id,
+                                'order_id': wo.order_id,
+                                'tour_id': getattr(wo, 'tour_id', None),
+                                'sku_id': wo.sku_id,
+                                'sku_name': wo.sku_name,
+                                'cantidad_total': wo.cantidad_total,
+                                'cantidad_restante': wo.cantidad_restante,
+                                'volumen_restante': wo.volumen_restante,
+                                'ubicacion': wo.ubicacion,
+                                'staging_id': wo.staging_id,
+                                'status': 'in_progress',
+                                'assigned_agent_id': wo.assigned_agent_id,
+                                'pick_sequence': wo.pick_sequence,
+                                'work_group': wo.work_group,
+                                'work_area': wo.work_area,
+                                'picking_executions': getattr(wo, 'picking_executions', 0),
+                                'tiempo_inicio': wo.tiempo_inicio,
+                                'tiempo_fin': getattr(wo, 'tiempo_fin', None)
+                            })
                         
                         # Avanzar tiempo por celda
                         yield self.env.timeout(TIME_PER_CELL * self.default_speed)
@@ -588,6 +658,30 @@ class Forklift(BaseOperator):
 
                 # Actualizar cargo
                 self.cargo_volume += wo.calcular_volumen_restante()
+
+                # NUEVO: Cambiar estado a 'picked' y registrar evento
+                if wo:
+                    wo.status = 'picked'
+                    self.almacen.registrar_evento('work_order_update', {
+                        'id': wo.id,
+                        'order_id': wo.order_id,
+                        'tour_id': getattr(wo, 'tour_id', None),
+                        'sku_id': wo.sku_id,
+                        'sku_name': wo.sku_name,
+                        'cantidad_total': wo.cantidad_total,
+                        'cantidad_restante': wo.cantidad_restante,
+                        'volumen_restante': wo.volumen_restante,
+                        'ubicacion': wo.ubicacion,
+                        'staging_id': wo.staging_id,
+                        'status': 'picked',
+                        'assigned_agent_id': wo.assigned_agent_id,
+                        'pick_sequence': wo.pick_sequence,
+                        'work_group': wo.work_group,
+                        'work_area': wo.work_area,
+                        'picking_executions': getattr(wo, 'picking_executions', 0),
+                        'tiempo_inicio': wo.tiempo_inicio,
+                        'tiempo_fin': getattr(wo, 'tiempo_fin', None)
+                    })
 
             # PASO 4: Navegar a staging area para descarga usando pathfinding paso a paso
             depot_location = self.almacen.data_manager.outbound_staging_locations.get(1, (0, 0))
