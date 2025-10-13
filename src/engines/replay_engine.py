@@ -516,73 +516,12 @@ class ReplayViewerEngine:
                 if not wo_id:
                     continue
 
-                # Get previous state to detect changes
-                prev_wo = self.dashboard_wos_state.get(wo_id, {})
-
-                # Detect status change
-                new_status = evento.get('status')
-                old_status = prev_wo.get('status')
-                if old_status != new_status:
-                    if not silent:
-                        self._emit_event(WorkOrderStatusChangedEvent(
-                            timestamp=timestamp,
-                            wo_id=wo_id,
-                            old_status=old_status or 'unknown',
-                            new_status=new_status,
-                            agent_id=evento.get('assigned_agent_id')
-                        ))
-
-                # Detect assignment change
-                new_agent = evento.get('assigned_agent_id')
-                old_agent = prev_wo.get('assigned_agent_id')
-
-                if new_agent != old_agent:
-                    # Un-assign from old agent if they exist
-                    if old_agent and old_agent in estado_visual["operarios"]:
-                        if estado_visual["operarios"][old_agent].get('current_task') == wo_id:
-                            estado_visual["operarios"][old_agent]['current_task'] = None
-                            estado_visual["operarios"][old_agent]['current_work_area'] = None # Also clear work area
-
-                    # Assign to new agent
-                    if new_agent and new_agent in estado_visual["operarios"]:
-                        estado_visual["operarios"][new_agent]['current_task'] = wo_id
-                        # Also add the work area
-                        work_area = evento.get('work_area')
-                        if work_area:
-                            estado_visual["operarios"][new_agent]['current_work_area'] = work_area
-
-                if new_agent and new_agent != old_agent:
-                    if not silent:
-                        self._emit_event(WorkOrderAssignedEvent(
-                            timestamp=timestamp,
-                            wo_id=wo_id,
-                            agent_id=new_agent,
-                            timestamp_assigned=timestamp
-                        ))
-
-                # Detect progress change
-                new_cantidad = evento.get('cantidad_restante', 0)
-                old_cantidad = prev_wo.get('cantidad_restante', 0)
-                new_volumen = evento.get('volumen_restante', 0.0)
-                old_volumen = prev_wo.get('volumen_restante', 0.0)
-
-                if new_cantidad != old_cantidad or new_volumen != old_volumen:
-                    total_cantidad = evento.get('cantidad_total', new_cantidad)
-                    progress = 0.0
-                    if total_cantidad > 0:
-                        progress = ((total_cantidad - new_cantidad) / total_cantidad) * 100.0
-
-                    if not silent:
-                        self._emit_event(WorkOrderProgressUpdatedEvent(
-                            timestamp=timestamp,
-                            wo_id=wo_id,
-                            cantidad_restante=new_cantidad,
-                            volumen_restante=new_volumen,
-                            progress_percentage=progress
-                        ))
-
-                # Update internal state
+                # Update internal state cache
                 self.dashboard_wos_state[wo_id] = evento.copy()
+
+                # Forward the complete, original event directly to the dashboard process
+                if not silent and self.dashboard_communicator:
+                    self.dashboard_communicator._send_message_with_retry(evento, max_retries=1, timeout=0.1)
 
             # ===== Agent Events =====
             elif event_type == 'estado_agente':

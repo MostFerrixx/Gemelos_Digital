@@ -286,26 +286,28 @@ class GroundOperator(BaseOperator):
                             'cargo_volume': self.cargo_volume
                         })
                         
-                        # NUEVO: Registrar evento work_order_update en cada paso
+                        # NUEVO: Registrar evento work_order_update en cada paso (CORREGIDO)
                         if wo:
+                            progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
                             self.almacen.registrar_evento('work_order_update', {
                                 'id': wo.id,
                                 'order_id': wo.order_id,
                                 'tour_id': getattr(wo, 'tour_id', None),
                                 'sku_id': wo.sku_id,
-                                'sku_name': wo.sku_name,
-                                'cantidad_total': wo.cantidad_total,
-                                'cantidad_restante': wo.cantidad_restante,
-                                'volumen_restante': wo.volumen_restante,
-                                'ubicacion': wo.ubicacion,
-                                'staging_id': wo.staging_id,
+                                'product': wo.sku_name,  # CAMBIADO
                                 'status': 'in_progress',
                                 'assigned_agent_id': wo.assigned_agent_id,
-                                'pick_sequence': wo.pick_sequence,
+                                'priority': getattr(wo, 'priority', 99),  # NUEVO
+                                'items': getattr(wo, 'items', 1),  # NUEVO
+                                'total_qty': wo.cantidad_total,  # CAMBIADO
+                                'volume': getattr(wo, 'volume', wo.volumen_restante),  # CAMBIADO
+                                'location': wo.ubicacion,  # CAMBIADO
+                                'staging': wo.staging_id,  # CAMBIADO
                                 'work_group': wo.work_group,
                                 'work_area': wo.work_area,
-                                'picking_executions': getattr(wo, 'picking_executions', 0),
-                                'tiempo_inicio': wo.tiempo_inicio,
+                                'executions': getattr(wo, 'picking_executions', 0),  # CAMBIADO
+                                'start_time': wo.tiempo_inicio,  # CAMBIADO
+                                'progress': progress,  # NUEVO
                                 'tiempo_fin': getattr(wo, 'tiempo_fin', None)
                             })
                         
@@ -332,44 +334,29 @@ class GroundOperator(BaseOperator):
                 # Simular picking
                 self.status = "picking"
                 
-                # FASE 1: Capturar cambio de estado a picking
-                self.almacen.registrar_evento('estado_agente', {
-                    'agent_id': self.id,
-                    'tipo': self.type,
-                    'position': self.current_position,
-                    'status': self.status,
-                    'current_task': wo.id if wo else None,
-                    'current_work_area': wo.work_area if wo else None,
-                    'cargo_volume': self.cargo_volume
-                })
-                
-                print(f"[{self.id}] t={self.env.now:.1f} Picking en {wo.ubicacion}")
-                yield self.env.timeout(self.discharge_time)
-
-                # Actualizar cargo
-                self.cargo_volume += wo.calcular_volumen_restante()
-
-                # NUEVO: Cambiar estado a 'picked' y registrar evento
+                # NUEVO: Cambiar estado a 'picked' y registrar evento (CORREGIDO)
                 if wo:
                     wo.status = 'picked'
+                    progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
                     self.almacen.registrar_evento('work_order_update', {
                         'id': wo.id,
                         'order_id': wo.order_id,
                         'tour_id': getattr(wo, 'tour_id', None),
                         'sku_id': wo.sku_id,
-                        'sku_name': wo.sku_name,
-                        'cantidad_total': wo.cantidad_total,
-                        'cantidad_restante': wo.cantidad_restante,
-                        'volumen_restante': wo.volumen_restante,
-                        'ubicacion': wo.ubicacion,
-                        'staging_id': wo.staging_id,
+                        'product': wo.sku_name, # CAMBIADO
                         'status': 'picked',
                         'assigned_agent_id': wo.assigned_agent_id,
-                        'pick_sequence': wo.pick_sequence,
+                        'priority': getattr(wo, 'priority', 99),  # NUEVO
+                        'items': getattr(wo, 'items', 1),  # NUEVO
+                        'total_qty': wo.cantidad_total,  # CAMBIADO
+                        'volume': getattr(wo, 'volume', wo.volumen_restante),  # CAMBIADO
+                        'location': wo.ubicacion,  # CAMBIADO
+                        'staging': wo.staging_id,  # CAMBIADO
                         'work_group': wo.work_group,
                         'work_area': wo.work_area,
-                        'picking_executions': getattr(wo, 'picking_executions', 0),
-                        'tiempo_inicio': wo.tiempo_inicio,
+                        'executions': getattr(wo, 'picking_executions', 0) + 1,  # CAMBIADO y +1
+                        'start_time': wo.tiempo_inicio,  # CAMBIADO
+                        'progress': progress,  # NUEVO
                         'tiempo_fin': getattr(wo, 'tiempo_fin', None)
                     })
 
@@ -608,26 +595,28 @@ class Forklift(BaseOperator):
                             'cargo_volume': self.cargo_volume
                         })
 
-                        # NUEVO: Registrar evento work_order_update en cada paso
+                        # NUEVO: Registrar evento work_order_update en cada paso (CORREGIDO)
                         if wo:
+                            progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
                             self.almacen.registrar_evento('work_order_update', {
                                 'id': wo.id,
                                 'order_id': wo.order_id,
                                 'tour_id': getattr(wo, 'tour_id', None),
                                 'sku_id': wo.sku_id,
-                                'sku_name': wo.sku_name,
-                                'cantidad_total': wo.cantidad_total,
-                                'cantidad_restante': wo.cantidad_restante,
-                                'volumen_restante': wo.volumen_restante,
-                                'ubicacion': wo.ubicacion,
-                                'staging_id': wo.staging_id,
+                                'product': wo.sku_name,  # CAMBIADO
                                 'status': 'in_progress',
                                 'assigned_agent_id': wo.assigned_agent_id,
-                                'pick_sequence': wo.pick_sequence,
+                                'priority': getattr(wo, 'priority', 99),  # NUEVO
+                                'items': getattr(wo, 'items', 1),  # NUEVO
+                                'total_qty': wo.cantidad_total,  # CAMBIADO
+                                'volume': getattr(wo, 'volume', wo.volumen_restante),  # CAMBIADO
+                                'location': wo.ubicacion,  # CAMBIADO
+                                'staging': wo.staging_id,  # CAMBIADO
                                 'work_group': wo.work_group,
                                 'work_area': wo.work_area,
-                                'picking_executions': getattr(wo, 'picking_executions', 0),
-                                'tiempo_inicio': wo.tiempo_inicio,
+                                'executions': getattr(wo, 'picking_executions', 0),  # CAMBIADO
+                                'start_time': wo.tiempo_inicio,  # CAMBIADO
+                                'progress': progress,  # NUEVO
                                 'tiempo_fin': getattr(wo, 'tiempo_fin', None)
                             })
                         
@@ -656,30 +645,50 @@ class Forklift(BaseOperator):
                 yield self.env.timeout(LIFT_TIME)
                 self.set_lift_height(0)  # Altura baja
 
+                # --- NUEVO: Actualizar estado interno de la WO ---
+                if wo:
+                    wo.cantidad_restante = 0
+                    if hasattr(wo, 'picking_executions'):
+                        wo.picking_executions += 1
+                    else:
+                        wo.picking_executions = 1
+                # --- FIN NUEVO ---
+
+                # --- NUEVO: Actualizar estado interno de la WO ---
+                if wo:
+                    wo.cantidad_restante = 0
+                    if hasattr(wo, 'picking_executions'):
+                        wo.picking_executions += 1
+                    else:
+                        wo.picking_executions = 1
+                # --- FIN NUEVO ---
+
                 # Actualizar cargo
                 self.cargo_volume += wo.calcular_volumen_restante()
 
-                # NUEVO: Cambiar estado a 'picked' y registrar evento
+                # NUEVO: Cambiar estado a 'picked' y registrar evento (CORREGIDO)
                 if wo:
                     wo.status = 'picked'
+                    progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
                     self.almacen.registrar_evento('work_order_update', {
                         'id': wo.id,
                         'order_id': wo.order_id,
                         'tour_id': getattr(wo, 'tour_id', None),
                         'sku_id': wo.sku_id,
-                        'sku_name': wo.sku_name,
-                        'cantidad_total': wo.cantidad_total,
-                        'cantidad_restante': wo.cantidad_restante,
-                        'volumen_restante': wo.volumen_restante,
-                        'ubicacion': wo.ubicacion,
-                        'staging_id': wo.staging_id,
+                        'product': wo.sku_name, # CAMBIADO
                         'status': 'picked',
                         'assigned_agent_id': wo.assigned_agent_id,
-                        'pick_sequence': wo.pick_sequence,
+                        'priority': getattr(wo, 'priority', 99),  # NUEVO
+                        'items': getattr(wo, 'items', 1),  # NUEVO
+                        'total_qty': wo.cantidad_total,  # CAMBIADO
+                        'volume': getattr(wo, 'volume', wo.volumen_restante),  # CAMBIADO
+                        'location': wo.ubicacion,  # CAMBIADO
+                        'staging': wo.staging_id,  # CAMBIADO
                         'work_group': wo.work_group,
                         'work_area': wo.work_area,
-                        'picking_executions': getattr(wo, 'picking_executions', 0),
-                        'tiempo_inicio': wo.tiempo_inicio,
+                        'executions': getattr(wo, 'picking_executions', 0) + 1,  # CAMBIADO y +1
+                        'start_time': wo.tiempo_inicio,  # CAMBIADO
+                        'progress': progress,  # NUEVO
                         'tiempo_fin': getattr(wo, 'tiempo_fin', None)
                     })
 

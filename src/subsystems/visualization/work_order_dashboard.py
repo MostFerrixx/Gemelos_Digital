@@ -79,22 +79,49 @@ class WorkOrderTableModel(QAbstractTableModel):
         return len(COLUMN_HEADERS)
 
     def _convert_to_dict(self, data):
-        """Convert WorkOrderSnapshot to dictionary if needed."""
-        if hasattr(data, '__dict__'):
-            return {
-                'id': data.id,
-                'order_id': data.order_id,
-                'tour_id': data.tour_id,
-                'sku_id': data.sku_id,
-                'status': data.status,
-                'ubicacion': data.ubicacion,
-                'work_area': data.work_area,
-                'cantidad_restante': data.cantidad_restante,
-                'volumen_restante': data.volumen_restante,
-                'assigned_agent_id': data.assigned_agent_id,
-                'timestamp': data.timestamp
+        """
+        Convert WorkOrderSnapshot or dictionary to a standardized dictionary.
+        This ensures all keys defined in COLUMN_HEADERS are present.
+        """
+        if not isinstance(data, dict):
+            # If it's an object, convert it to a dictionary
+            source_dict = {
+                'id': getattr(data, 'id', ''),
+                'order_id': getattr(data, 'order_id', ''),
+                'tour_id': getattr(data, 'tour_id', ''),
+                'sku_id': getattr(data, 'sku_id', ''),
+                'product': getattr(data, 'product', ''),
+                'status': getattr(data, 'status', 'pending'),
+                'assigned_agent_id': getattr(data, 'assigned_agent_id', None),
+                'priority': getattr(data, 'priority', 9999),
+                'items': getattr(data, 'items', 0),
+                'total_qty': getattr(data, 'total_qty', getattr(data, 'cantidad_restante', 0)),
+                'volume': getattr(data, 'volume', getattr(data, 'volumen_restante', 0.0)),
+                'location': getattr(data, 'location', getattr(data, 'ubicacion', '')),
+                'staging': getattr(data, 'staging', ''),
+                'work_group': getattr(data, 'work_group', ''),
+                'work_area': getattr(data, 'work_area', ''),
+                'executions': getattr(data, 'executions', 0),
+                'start_time': getattr(data, 'start_time', 0.0),
+                'progress': getattr(data, 'progress', 0.0),
+                'timestamp': getattr(data, 'timestamp', 0.0)
             }
-        return data
+        else:
+            # If it's already a dictionary, use it directly
+            source_dict = data
+
+        # Ensure all expected keys are present, providing defaults if necessary
+        # This handles both objects and dictionaries gracefully.
+        return {
+            key: source_dict.get(key, default)
+            for default, key in [
+                ('', 'id'), ('', 'order_id'), ('', 'tour_id'), ('', 'sku_id'),
+                ('', 'product'), ('pending', 'status'), (None, 'assigned_agent_id'),
+                (9999, 'priority'), (0, 'items'), (0, 'total_qty'), (0.0, 'volume'),
+                ('', 'location'), ('', 'staging'), ('', 'work_group'), ('', 'work_area'),
+                (0, 'executions'), (0.0, 'start_time'), (0.0, 'progress')
+            ]
+        }
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid():
@@ -103,7 +130,8 @@ class WorkOrderTableModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.DisplayRole:
             row_data = self._convert_to_dict(self._data[index.row()])
             column_key = COLUMN_HEADERS[index.column()][1]
-            return row_data.get(column_key, "")
+            value = row_data.get(column_key, "")
+            return str(value)  # Convert all values to string for display
 
         elif role == Qt.ItemDataRole.BackgroundRole:
             # Color-code rows based on status
@@ -332,6 +360,10 @@ class WorkOrderDashboard(QMainWindow):
         elif message_type == "wo_completed":
             self._handle_wo_completed(message)
 
+        # NUEVO: Handle generic work order update for real-time data population
+        elif message_type == "work_order_update":
+            self._handle_wo_update(message)
+
         # Time Events
         elif message_type == "time_tick":
             self._handle_time_tick(message)
@@ -552,6 +584,40 @@ class WorkOrderDashboard(QMainWindow):
             self.model.dataChanged.emit(left_index, right_index)
 
             print(f"[DASHBOARD] WO {wo_id} COMPLETED at t={completion_time:.2f}s")
+
+    def _handle_wo_update(self, message: Dict[str, Any]):
+        """
+        Handle a generic WorkOrder update event.
+        This is the main handler for real-time data updates during replay.
+        """
+        if self._is_rebuilding_state:
+            return  # Skip during state rebuild
+
+        # FIX: The event data is at the top level, not in a 'data' key.
+        wo_data = message.copy()
+        wo_id = wo_data.get('id')
+
+        if not wo_id:
+            return
+
+        # Remove non-attribute keys before updating
+        wo_data.pop('type', None)
+        wo_data.pop('timestamp', None)
+
+        row = self._find_row_by_wo_id(wo_id)
+        if row >= 0:
+            # Update the model's underlying data source for the specific row
+            self.model._data[row].update(wo_data)
+            
+            # Update the local state cache as well
+            if wo_id in self._local_wo_state:
+                self._local_wo_state[wo_id].update(wo_data)
+
+            # Emit dataChanged for the entire row to trigger a UI refresh
+            left_index = self.model.index(row, 0)
+            right_index = self.model.index(row, self.model.columnCount() - 1)
+            self.model.dataChanged.emit(left_index, right_index)
+
 
     def _handle_time_update(self, message):
         """Updates the time slider and label."""
