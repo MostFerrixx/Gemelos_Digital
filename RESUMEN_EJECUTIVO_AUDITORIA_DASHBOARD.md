@@ -283,3 +283,12 @@ C) ❌ Mantener status quo (0h)
 
 **Autor:** AI Assistant (Claude Sonnet 4.5)
 **Contacto:** Responde en este chat con tu decision
+
+---
+
+## Nota Post-Implementación
+
+La arquitectura de Event Sourcing propuesta (Opción A) fue implementada exitosamente. Adicionalmente, se realizaron las siguientes mejoras:
+
+-   **Nuevo Estado 'picked':** Se ha añadido un nuevo estado `picked` al ciclo de vida de las órdenes de trabajo para una mayor granularidad.
+-   **Actualizaciones de Alta Frecuencia:** La frecuencia de los eventos `work_order_update` se ha aumentado a cada paso del movimiento de un operario, mejorando significativamente la capacidad de respuesta del dashboard.

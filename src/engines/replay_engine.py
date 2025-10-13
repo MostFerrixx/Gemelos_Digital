@@ -130,36 +130,33 @@ class ReplayViewerEngine:
             print("[ARCH] Event Sourcing model is DISABLED. Using legacy state management.")
 
     def inicializar_pygame(self):
-        """Inicializa ventana de Pygame para visualizacion de replay"""
-        # KEEP: Todo el metodo - Necesario para crear ventana
+        """Inicializa ventana de Pygame para visualizacion de replay en modo ventana REDIMENSIONABLE."""
+        pygame.init() # Asegurarse de que Pygame esté inicializado
 
+        # Volver a un tamaño de ventana inicial razonable y redimensionable
+        DEFAULT_SIM_WIDTH = 960
+        DEFAULT_SIM_HEIGHT = 800
         PANEL_WIDTH = 440
-        # 1. Obtener la clave de resolucion seleccionada por el usuario
-        resolution_key = self.configuracion.get('selected_resolution_key', "Pequena (800x800)")
 
-        # 2. Buscar el tamano (ancho, alto) en nuestro diccionario
-        self.window_size = SUPPORTED_RESOLUTIONS.get(resolution_key, (800, 800))
+        initial_window_width = DEFAULT_SIM_WIDTH + PANEL_WIDTH
+        initial_window_height = DEFAULT_SIM_HEIGHT
 
-        print(f"[DISPLAY] Resolucion seleccionada por el usuario: '{resolution_key}' -> {self.window_size[0]}x{self.window_size[1]}")
+        self.pantalla = pygame.display.set_mode((initial_window_width, initial_window_height), pygame.RESIZABLE)
+        pygame.display.set_caption("Replay Viewer - Gemelo Digital (Redimensionable)")
 
-        # 3. Hacemos la ventana principal mas ancha para acomodar el panel
-        main_window_width = self.window_size[0] + PANEL_WIDTH
-        main_window_height = self.window_size[1]
-        self.pantalla = pygame.display.set_mode((main_window_width, main_window_height), pygame.RESIZABLE)
-        pygame.display.set_caption("Replay Viewer - Gemelo Digital")
+        # `self.window_size` se refiere al área de la simulación
+        self.window_size = (DEFAULT_SIM_WIDTH, DEFAULT_SIM_HEIGHT)
+        print(f"[DISPLAY] Ventana inicial redimensionable: {initial_window_width}x{initial_window_height}")
+        print(f"[DISPLAY] Área de simulación inicial: {self.window_size[0]}x{self.window_size[1]}")
 
-        # 4. La superficie virtual mantiene el tamano logico del mapa
+        # La superficie virtual mantiene el tamaño lógico del mapa, no cambia
         self.virtual_surface = pygame.Surface((LOGICAL_WIDTH, LOGICAL_HEIGHT))
-        print(f"Ventana creada: {main_window_width}x{main_window_height}. Panel UI: {PANEL_WIDTH}px.")
 
         self.reloj = pygame.time.Clock()
         self.renderer = RendererOriginal(self.virtual_surface)
         
-        # PYGAME_GUI FASE 2.5: Inicializar UIManager y DashboardGUI refactorizada
+        # Inicializar el dashboard y otros componentes de la UI
         self._inicializar_pygame_gui()
-        
-        # NOTA: la creacion del ModernDashboard se realiza en _inicializar_pygame_gui().
-        # Aqui evitamos crear una segunda instancia para no duplicar elementos UI.
 
     def _inicializar_pygame_gui(self):
         """
@@ -382,6 +379,19 @@ class ReplayViewerEngine:
 
             for event in pygame.event.get():
                 if self.dashboard: self.dashboard.handle_mouse_event(event)
+                
+                # --- MANEJO DE VENTANA REDIMENSIONABLE ---
+                if event.type == pygame.VIDEORESIZE:
+                    new_width, new_height = event.w, event.h
+                    self.pantalla = pygame.display.set_mode((new_width, new_height), pygame.RESIZABLE)
+                    
+                    # Recalcular el área de la simulación (pantalla total - panel)
+                    PANEL_WIDTH = 440 # Asegurarse que el valor sea consistente
+                    self.window_size = (new_width - PANEL_WIDTH, new_height)
+                    print(f"[DISPLAY] Ventana redimensionada a: {new_width}x{new_height}. Nueva área de sim: {self.window_size[0]}x{self.window_size[1]}")
+                    # El dashboard y otros elementos se adaptarán en el siguiente ciclo de renderizado
+                # ------------------------------------------
+
                 # if self.replay_scrubber: self.replay_scrubber.handle_event(event)  # DESHABILITADO
                 if event.type == REPLAY_SEEK_EVENT:
                     playback_time = self.seek_to_time(event.target_time)

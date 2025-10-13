@@ -215,8 +215,7 @@ class VentanaConfiguracion:
         self.sequence_path_var = tk.StringVar(value="layouts/Warehouse_Logic.xlsx")
         self.map_scale_var = tk.DoubleVar(value=1.3)
 
-        # Resolucion
-        self.resolution_var = tk.StringVar(value="Pequena (800x800)")
+
 
         # Outbound Staging Distribution
         self.outbound_staging_vars = {
@@ -968,23 +967,7 @@ class VentanaConfiguracion:
         help_label = ttk.Label(frame_secuencia, text=help_text, foreground="gray", justify=tk.LEFT)
         help_label.grid(row=2, column=0, columnspan=3, sticky=tk.W, pady=5, padx=5)
 
-        # SECCION 3: Configuracion de Ventana
-        frame_ventana = ttk.LabelFrame(self.tab_layout_datos, text="Configuracion de Ventana", padding=10)
-        frame_ventana.pack(fill=tk.X, padx=10, pady=5)
 
-        # Resolucion con label descriptivo
-        res_frame = ttk.Frame(frame_ventana)
-        res_frame.pack(fill=tk.X, padx=5, pady=5)
-
-        ttk.Label(res_frame, text="Resolucion de Pantalla:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=5)
-        resoluciones = ["Pequena (800x800)", "Mediana (1024x768)", "Grande (1280x1024)", "Extra Grande (1920x1080)"]
-        combo = ttk.Combobox(res_frame, textvariable=self.resolution_var, values=resoluciones, width=25, state='readonly')
-        combo.pack(side=tk.LEFT, padx=5)
-        ttk.Label(res_frame, text="(Tamano de ventana del simulador)", foreground="gray").pack(side=tk.LEFT, padx=5)
-
-        # Texto explicativo
-        help_res = "Pequena: Rendimiento optimo | Mediana: Balance | Grande: Mejor visualizacion"
-        ttk.Label(frame_ventana, text=help_res, foreground="gray").pack(anchor=tk.W, padx=5, pady=(0, 5))
 
     def _generar_plantilla_desde_tmx(self):
         """Genera Warehouse_Logic.xlsx desde el archivo TMX"""
@@ -1422,7 +1405,7 @@ class VentanaConfiguracion:
                     self.layout_path_var.set(config.get('layout_file', "layouts/WH1.tmx"))
                     self.sequence_path_var.set(config.get('sequence_file', "layouts/Warehouse_Logic.xlsx"))
                     self.map_scale_var.set(config.get('map_scale', 1.3))
-                    self.resolution_var.set(config.get('selected_resolution_key', "Pequena (800x800)"))
+
 
                     # Outbound Staging
                     staging_dist = config.get('outbound_staging_distribution', {})
@@ -1472,7 +1455,7 @@ class VentanaConfiguracion:
             self.layout_path_var.set("layouts/WH1.tmx")
             self.sequence_path_var.set("layouts/Warehouse_Logic.xlsx")
             self.map_scale_var.set(1.3)
-            self.resolution_var.set("Pequena (800x800)")
+
 
             # Outbound Staging
             for i in range(1, 8):
@@ -1700,7 +1683,7 @@ class VentanaConfiguracion:
             'layout_file': self.layout_path_var.get(),
             'sequence_file': self.sequence_path_var.get(),
             'map_scale': self.map_scale_var.get(),
-            'selected_resolution_key': self.resolution_var.get(),
+
             'num_operarios_terrestres': self.num_operarios_terrestres.get(),
             'num_montacargas': self.num_montacargas.get(),
             'num_operarios_total': self.num_operarios_terrestres.get() + self.num_montacargas.get(),
@@ -1884,7 +1867,7 @@ class ConfiguradorSimulador:
             self.ventana_config.layout_path_var.set(config.get('layout_file', 'layouts/WH1.tmx'))
             self.ventana_config.sequence_path_var.set(config.get('sequence_file', 'layouts/Warehouse_Logic.xlsx'))
             self.ventana_config.map_scale_var.set(config.get('map_scale', 1.3))
-            self.ventana_config.resolution_var.set(config.get('selected_resolution_key', 'Pequena (800x800)'))
+
 
             # Asignacion de recursos eliminada - ahora está en "Flota de Agentes"
 

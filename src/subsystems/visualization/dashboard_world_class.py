@@ -88,7 +88,7 @@ class DashboardWorldClass:
             'progress': 40,
             'scrubber': 60,  # NUEVO: Espacio para el Replay Scrubber
             'operators': 0,  # Dinamico
-            'footer': 120
+            'footer': 180
         }
 
         # Inicializar el Replay Scrubber
@@ -701,7 +701,7 @@ class DashboardWorldClass:
             operarios_list.append(operario)
         
         # 4. Configurar scroll y dimensiones
-        operator_height = 45  # Altura de cada operario
+        operator_height = 60  # Altura de cada operario
         visible_operators = min(len(operarios_list), list_height // operator_height)
         
         # Calcular scroll offset si hay mas operarios de los visibles
@@ -727,89 +727,85 @@ class DashboardWorldClass:
     
     def _render_single_operator(self, surface: pygame.Surface, x: int, y: int, operario: Dict[str, Any]) -> None:
         """
-        Renderiza un operario individual con estado, carga y tipo.
+        Renderiza un operario individual con un layout mejorado y sin superposiciones.
         
         Args:
             surface: Superficie pygame donde dibujar
             x, y: Posicion del operario
             operario: Dict con datos del operario
         """
-        # Extraer datos del operario
-        operator_id = operario.get('id', 'Unknown')
-        operator_type = operario.get('tipo', 'GroundOperator')
-        estado = operario.get('estado', 'idle')
-        carga_actual = operario.get('carga_actual', 0)
-        capacidad_max = operario.get('capacidad_max', 100)
-        ubicacion = operario.get('ubicacion', 'Unknown')
-        current_task = operario.get('current_task', None)  # WorkOrder actual
-        current_work_area = operario.get('current_work_area', None)  # Work Area actual
-        
-        # Calcular porcentaje de carga
-        carga_porcentaje = (carga_actual / capacidad_max * 100) if capacidad_max > 0 else 0
-        
+        # Usar la nueva altura de 60px, dejando un pequeño margen
+        card_height = 55
+        operator_rect = pygame.Rect(x, y, self.panel_width - 30, card_height)
+
         # 1. Fondo del operario
-        operator_rect = pygame.Rect(x, y, self.panel_width - 30, 40)
         pygame.draw.rect(surface, self.colors['surface_bg'], operator_rect, border_radius=8)
         pygame.draw.rect(surface, self.colors['border_secondary'], operator_rect, width=1, border_radius=8)
-        
-        # 2. Icono del tipo de operario
-        icon = self._get_operator_icon(operator_type)
+
+        # --- Fila 1: ID y Work Order ---
+        y_row1 = y + 6
+
+        # Icono y ID del operario
+        icon = self._get_operator_icon(operario.get('tipo', 'GroundOperator'))
         icon_surface = self.fonts['operator_id'].render(icon, True, self.colors['accent_blue'])
-        surface.blit(icon_surface, (x + 8, y + 8))
+        surface.blit(icon_surface, (x + 8, y_row1 + 2))
         
-        # 3. ID del operario
-        id_text = self.fonts['operator_id'].render(operator_id, True, self.colors['text_primary'])
-        surface.blit(id_text, (x + 35, y + 6))
-        
-        # 3.5. WorkOrder actual y Work Area (si existe)
+        id_text = self.fonts['operator_id'].render(operario.get('id', 'Unknown'), True, self.colors['text_primary'])
+        surface.blit(id_text, (x + 25, y_row1))
+
+        # WorkOrder actual (alineada a la derecha)
+        current_task = operario.get('current_task')
         if current_task:
-            # Formato: "WO: WO-XXXX (Area_Ground)"
-            if current_work_area:
-                wo_text = f"WO: {current_task} ({current_work_area})"
-            else:
-                wo_text = f"WO: {current_task}"
-            
+            wo_text = f"WO: {current_task}"
             wo_surface = self.fonts['operator_detail'].render(wo_text, True, self.colors['accent_green'])
-            # Posicionar en la parte superior derecha del cuadro
-            wo_x = x + operator_rect.width - wo_surface.get_width() - 8
-            surface.blit(wo_surface, (wo_x, y + 6))
-        
-        # 4. Estado del operario
+            wo_x = operator_rect.right - wo_surface.get_width() - 8
+            surface.blit(wo_surface, (wo_x, y_row1))
+
+        # --- Fila 2: Estado y Ubicación ---
+        y_row2 = y + 22
+
+        # Estado del operario
+        estado = operario.get('estado', 'idle')
         estado_text = self._get_operator_status_text(estado)
         estado_color = self._get_operator_status_color(estado)
         estado_surface = self.fonts['operator_detail'].render(estado_text, True, estado_color)
-        surface.blit(estado_surface, (x + 35, y + 22))
-        
-        # 5. Barra de carga (si aplica)
+        surface.blit(estado_surface, (x + 25, y_row2))
+
+        # Ubicación (alineada a la derecha)
+        ubicacion = operario.get('ubicacion', 'Unknown')
+        ubicacion_text = f"@{ubicacion}"
+        ubicacion_surface = self.fonts['operator_detail'].render(ubicacion_text, True, self.colors['text_muted'])
+        ubicacion_x = operator_rect.right - ubicacion_surface.get_width() - 8
+        surface.blit(ubicacion_surface, (ubicacion_x, y_row2))
+
+        # --- Fila 3: Barra de Carga ---
+        y_row3 = y + 40
+        capacidad_max = operario.get('capacidad_max', 0)
+
         if capacidad_max > 0:
-            carga_x = x + 120
-            carga_y = y + 8
-            carga_width = 80
+            carga_actual = operario.get('carga_actual', 0)
+            carga_porcentaje = (carga_actual / capacidad_max * 100) if capacidad_max > 0 else 0
+            
+            carga_x = x + 25
+            carga_width = operator_rect.width - 100 # Ancho ajustado para la barra
             carga_height = 8
-            
-            # Fondo de la barra de carga
-            carga_bg_rect = pygame.Rect(carga_x, carga_y, carga_width, carga_height)
+
+            # Fondo de la barra
+            carga_bg_rect = pygame.Rect(carga_x, y_row3, carga_width, carga_height)
             pygame.draw.rect(surface, self.colors['surface_0'], carga_bg_rect, border_radius=4)
-            
-            # Relleno de la barra de carga
+
+            # Relleno de la barra
             if carga_porcentaje > 0:
                 fill_width = int(carga_width * (carga_porcentaje / 100.0))
                 if fill_width > 0:
-                    fill_rect = pygame.Rect(carga_x, carga_y, fill_width, carga_height)
+                    fill_rect = pygame.Rect(carga_x, y_row3, fill_width, carga_height)
                     carga_color = self._get_load_color(carga_porcentaje)
                     pygame.draw.rect(surface, carga_color, fill_rect, border_radius=4)
             
-            # Label de carga
-            carga_text = f"{carga_actual}/{capacidad_max}"
+            # Label de carga (a la derecha de la barra)
+            carga_text = f"{carga_actual}/{capacidad_max} L"
             carga_label_surface = self.fonts['operator_detail'].render(carga_text, True, self.colors['text_secondary'])
-            surface.blit(carga_label_surface, (carga_x + carga_width + 5, carga_y - 2))
-        
-        # 6. Ubicacion (si hay espacio)
-        if self.panel_width > 300:  # Solo si hay espacio suficiente
-            ubicacion_text = f"@{ubicacion}"
-            ubicacion_surface = self.fonts['operator_detail'].render(ubicacion_text, True, self.colors['text_muted'])
-            ubicacion_x = x + operator_rect.width - ubicacion_surface.get_width() - 8
-            surface.blit(ubicacion_surface, (ubicacion_x, y + 22))
+            surface.blit(carga_label_surface, (carga_x + carga_width + 8, y_row3 - 2))
     
     def _render_scroll_indicator(self, surface: pygame.Surface, operators_rect: pygame.Rect, 
                                 total_operators: int, visible_operators: int) -> None:
@@ -920,8 +916,6 @@ class DashboardWorldClass:
         """
         # 1. FONDO DEL FOOTER
         footer_rect = pygame.Rect(x, y, self.panel_width, self.section_heights['footer'])
-        
-        # Gradiente de fondo
         self._draw_gradient_rect(
             surface,
             footer_rect,
@@ -929,121 +923,76 @@ class DashboardWorldClass:
             self.colors['surface_0'],
             vertical=True
         )
-        
-        # Linea separadora superior
-        pygame.draw.line(
-            surface,
-            self.colors['border_primary'],
-            (x, y),
-            (x + self.panel_width, y),
-            2
-        )
-        
+        pygame.draw.line(surface, self.colors['border_primary'], (x, y), (x + self.panel_width, y), 2)
+
+        # Usar una variable para la posición Y actual para evitar superposiciones
+        current_y = y + 15
+
         # 2. SECCION DE CONTROLES DE TECLADO
-        controls_y = y + 10
+        controls_header = self.fonts['section_header'].render("Controles de Teclado", True, self.colors['text_primary'])
+        surface.blit(controls_header, (x + 15, current_y))
+        current_y += 25
         
-        # Header de controles
-        controls_header = self.fonts['section_header'].render(
-            "Controles de Teclado",
-            True,
-            self.colors['text_primary']
-        )
-        surface.blit(controls_header, (x + 15, controls_y))
-        controls_y += 25
-        
-        # Definir controles de teclado
         keyboard_controls = [
-            ("ESPACIO", "Pausa/Reanudar"),
-            ("+/-", "Velocidad +/-"),
-            ("R", "Reiniciar"),
-            ("ESC", "Salir"),
-            ("F11", "Pantalla Completa"),
-            ("H", "Ayuda")
+            ("ESPACIO", "Pausa/Reanudar"), ("+/-", "Velocidad"),
+            ("R", "Reiniciar"), ("ESC", "Salir"),
         ]
         
-        # Renderizar controles en 2 columnas
         control_width = (self.panel_width - 40) // 2
-        control_height = 20
+        control_height = 22
         
         for i, (key, description) in enumerate(keyboard_controls):
             col = i % 2
             row = i // 2
-            
             control_x = x + 15 + (col * (control_width + 10))
-            control_y = controls_y + (row * control_height)
+            control_y = current_y + (row * control_height)
             
-            # Tecla (con fondo destacado y mejor contraste)
-            key_rect = pygame.Rect(control_x, control_y, 40, 16)
-            pygame.draw.rect(surface, self.colors['surface_0'], key_rect, border_radius=4)
-            pygame.draw.rect(surface, self.colors['accent_blue'], key_rect, width=2, border_radius=4)
+            key_rect = pygame.Rect(control_x, control_y, 60, 18)
+            pygame.draw.rect(surface, self.colors['surface_0'], key_rect, border_radius=5)
+            pygame.draw.rect(surface, self.colors['accent_blue'], key_rect, width=1, border_radius=5)
             
-            # Texto de tecla con mejor contraste (blanco sobre fondo oscuro)
             key_text = self.fonts['footer_key'].render(key, True, self.colors['text_primary'])
-            key_text_rect = key_text.get_rect()
-            key_text_rect.center = key_rect.center
+            key_text_rect = key_text.get_rect(center=key_rect.center)
             surface.blit(key_text, key_text_rect)
             
-            # Descripcion con mejor contraste
-            desc_text = self.fonts['footer_desc'].render(description, True, self.colors['text_primary'])
-            surface.blit(desc_text, (control_x + 45, control_y + 2))
-        
-        # 3. SECCION DE INFORMACION DEL SISTEMA (reposicionada para evitar superposicion)
-        system_y = y + 70  # Movido mas arriba para evitar superposicion
-        
-        # Header de sistema
-        system_header = self.fonts['section_header'].render(
-            "Informacion del Sistema",
-            True,
-            self.colors['text_primary']
-        )
-        surface.blit(system_header, (x + 15, system_y))
-        system_y += 25
-        
-        # Informacion del sistema
-        system_info = [
-            ("Version", "v11.0.0-beta.1"),
-            ("Modo", "Replay Viewer"),
-            ("Dashboard", "World-Class"),
-            ("Estado", "Activo")
-        ]
-        
-        # Renderizar informacion del sistema
-        for i, (label, value) in enumerate(system_info):
-            info_y = system_y + (i * 18)
-            
-            # Label
+            desc_text = self.fonts['footer_desc'].render(description, True, self.colors['text_secondary'])
+            surface.blit(desc_text, (control_x + 68, control_y + 2))
+
+        # Actualizar current_y basado en el número de filas de controles
+        num_rows = (len(keyboard_controls) + 1) // 2
+        current_y += num_rows * control_height + 10
+
+        # 3. SECCION DE INFORMACION DEL SISTEMA
+        system_header = self.fonts['section_header'].render("Informacion del Sistema", True, self.colors['text_primary'])
+        surface.blit(system_header, (x + 15, current_y))
+        current_y += 28 # Aumentar espacio después del header
+
+        system_info = {
+            "Modo": "Replay Viewer",
+            "Dashboard": "World-Class v11.0"
+        }
+
+        for label, value in system_info.items():
             label_text = self.fonts['footer_desc'].render(f"{label}:", True, self.colors['text_muted'])
-            surface.blit(label_text, (x + 20, info_y))
+            surface.blit(label_text, (x + 20, current_y))
             
-            # Valor
             value_text = self.fonts['footer_desc'].render(value, True, self.colors['accent_green'])
-            surface.blit(value_text, (x + 80, info_y))
-        
-        # 4. INDICADOR DE ESTADO EN TIEMPO REAL (mas visible)
-        status_y = y + self.section_heights['footer'] - 30  # Movido mas arriba
-        
-        # Punto de estado mas grande y brillante (verde = activo)
-        status_dot_rect = pygame.Rect(x + 15, status_y + 8, 12, 12)
-        pygame.draw.circle(surface, self.colors['accent_green'], status_dot_rect.center, 6)
-        # Agregar un borde brillante para mayor visibilidad
-        pygame.draw.circle(surface, self.colors['accent_teal'], status_dot_rect.center, 6, width=2)
-        
-        # Texto de estado mas prominente
-        status_text = self.fonts['footer_desc'].render(
-            "Dashboard World-Class Activo",
-            True,
-            self.colors['accent_green']  # Color mas brillante
-        )
-        surface.blit(status_text, (x + 35, status_y + 5))
-        
-        # 5. VERSION Y COPYRIGHT
-        version_text = self.fonts['footer_desc'].render(
-            "Digital Twin Warehouse Simulator",
-            True,
-            self.colors['text_muted']
-        )
-        version_rect = version_text.get_rect()
-        version_rect.bottomright = (x + self.panel_width - 15, y + self.section_heights['footer'] - 5)
+            # Aumentar espacio entre etiqueta y valor
+            surface.blit(value_text, (x + 100, current_y))
+            current_y += 20 # Aumentar espaciado de línea
+
+        # 4. ELEMENTOS ANCLADOS AL FONDO
+        bottom_y = y + self.section_heights['footer']
+
+        # Indicador de estado
+        status_text_surface = self.fonts['footer_desc'].render("Digital Twin Activo", True, self.colors['accent_green'])
+        status_text_rect = status_text_surface.get_rect(bottomleft=(x + 35, bottom_y - 10))
+        surface.blit(status_text_surface, status_text_rect)
+        pygame.draw.circle(surface, self.colors['accent_green'], (x + 22, status_text_rect.centery), 5)
+
+        # Versión y Copyright
+        version_text = self.fonts['footer_desc'].render("Warehouse Simulator", True, self.colors['text_muted'])
+        version_rect = version_text.get_rect(bottomright=(x + self.panel_width - 15, bottom_y - 10))
         surface.blit(version_text, version_rect)
     
     # =========================================================================
