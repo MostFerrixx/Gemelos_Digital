@@ -2802,7 +2802,88 @@ class ConfigurationStorage:
 # SISTEMA DE SLOTS DE CONFIGURACION - FASE 2.3: CONFIGURATION UI
 # ========================================================================
 
-class ConfigurationSaveModeDialog(tk.Toplevel):
+
+# ========================================================================
+# CLASE BASE PARA VENTANAS EMERGENTES CON SCROLL Y AUTO-AJUSTE
+# ========================================================================
+
+class ScrollableToplevel(tk.Toplevel):
+    """
+    Una clase base para Toplevels que se auto-ajustan a su contenido
+    y añaden barras de scroll si el contenido excede el tamaño de la pantalla.
+    """
+    def __init__(self, parent, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+        self.parent = parent
+
+        # Frame principal que contendrá el canvas y el scrollbar
+        self.main_frame = ttk.Frame(self)
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Canvas para el contenido scrollable
+        self.canvas = tk.Canvas(self.main_frame)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Scrollbar vertical
+        self.v_scrollbar = ttk.Scrollbar(self.main_frame, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.canvas.configure(yscrollcommand=self.v_scrollbar.set)
+
+        # Scrollbar horizontal
+        self.h_scrollbar = ttk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.canvas.xview)
+        self.h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+        self.canvas.configure(xscrollcommand=self.h_scrollbar.set)
+
+        # El frame donde se debe colocar todo el contenido de la ventana hija
+        self.scrollable_frame = ttk.Frame(self.canvas)
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+
+        self.scrollable_frame.bind("<Configure>", self._on_frame_configure)
+
+        # Hacer modal
+        self.transient(parent)
+        self.grab_set()
+
+        # Llama al ajuste de tamaño después de que la UI de la clase hija se haya creado
+        self.parent.after(50, self.adjust_and_center)
+
+    def _on_frame_configure(self, event=None):
+        """Actualiza la región de scroll del canvas."""
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def adjust_and_center(self):
+        """
+        Ajusta el tamaño de la ventana al contenido y la centra.
+        El tamaño no excederá las dimensiones de la pantalla.
+        """
+        # Forzar la actualización de la UI para obtener el tamaño requerido
+        self.update_idletasks()
+
+        # Obtener el tamaño requerido por el contenido
+        req_width = self.scrollable_frame.winfo_reqwidth()
+        req_height = self.scrollable_frame.winfo_reqheight()
+
+        # Obtener el tamaño de la pantalla
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+
+        # El ancho y alto de la ventana no deben ser mayores que la pantalla
+        # Se deja un pequeño margen (e.g., 50px)
+        max_width = screen_width - 100
+        max_height = screen_height - 150
+
+        window_width = min(req_width + self.v_scrollbar.winfo_width() + 40, max_width)
+        window_height = min(req_height + self.h_scrollbar.winfo_height() + 40, max_height)
+
+        # Centrar la ventana
+        x = (screen_width // 2) - (window_width // 2)
+        y = (screen_height // 2) - (window_height // 2)
+
+        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.minsize(min(window_width, 400), min(window_height, 300))
+
+
+class ConfigurationSaveModeDialog(ScrollableToplevel):
     """
     Dialogo para seleccionar modo de guardado: New o Update
     """
@@ -2817,19 +2898,12 @@ class ConfigurationSaveModeDialog(tk.Toplevel):
             config_data: Datos de configuracion a guardar
         """
         super().__init__(parent)
-        self.parent = parent
         self.config_manager = config_manager
         self.config_data = config_data
         self.result = None
         
         # Configurar ventana
         self.title("Seleccionar Modo de Guardado")
-        self.geometry("400x200")
-        self.resizable(False, False)
-        
-        # Centrar ventana
-        self.transient(parent)
-        self.grab_set()
         
         # Crear UI
         self._create_ui()
@@ -2837,15 +2911,12 @@ class ConfigurationSaveModeDialog(tk.Toplevel):
         # Aplicar tema oscuro si está activo
         self._apply_dialog_theme()
         
-        # Centrar ventana en pantalla
-        self._center_window()
-        
         print("[CONFIGURATION_SAVE_MODE_DIALOG] Dialogo de modo de guardado creado")
     
     def _create_ui(self):
         """Crea la interfaz de usuario"""
         # Frame principal
-        main_frame = ttk.Frame(self)
+        main_frame = ttk.Frame(self.scrollable_frame)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
         # Titulo
@@ -3008,7 +3079,7 @@ class ConfigurationSaveModeDialog(tk.Toplevel):
             pass
 
 
-class ConfigurationDialog(tk.Toplevel):
+class ConfigurationDialog(ScrollableToplevel):
     """
     Dialogo para guardar configuracion con nombre personalizado.
     Reemplaza el boton "Valores por Defecto" con funcionalidad avanzada.
@@ -3025,45 +3096,32 @@ class ConfigurationDialog(tk.Toplevel):
             mode: Modo del dialogo ("save" o "load")
         """
         super().__init__(parent)
-        self.parent = parent
         self.config_manager = config_manager
         self.config_data = config_data
         self.mode = mode
         self.result = None
         
-        self._setup_window()
-        self._create_widgets()
-        self._center_window()
-        self._apply_dialog_theme()
-        
-        # Hacer modal
-        self.transient(parent)
-        self.grab_set()
-        
-        print(f"[CONFIGURATION_DIALOG] Dialogo {mode} inicializado")
-    
-    def _setup_window(self):
-        """Configura la ventana del dialogo"""
         if self.mode == "save":
             self.title("Guardar Configuracion")
-            self.geometry("500x400")
-        else:
-            self.title("Cargar Configuracion")
-            self.geometry("600x500")
+        else: # "load" or "use"
+            self.title("Cargar/Usar Configuracion")
+
+        self._create_widgets()
+        self._apply_dialog_theme()
         
-        self.resizable(True, True)
+        print(f"[CONFIGURATION_DIALOG] Dialogo {mode} inicializado")
     
     def _create_widgets(self):
         """Crea los widgets del dialogo"""
         if self.mode == "save":
             self._create_save_widgets()
-        else:
+        else: # "load" or "use"
             self._create_load_widgets()
     
     def _create_save_widgets(self):
         """Crea widgets para modo guardar con diseño mejorado"""
         # Frame principal con padding mejorado
-        main_frame = ttk.Frame(self)
+        main_frame = ttk.Frame(self.scrollable_frame)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
         
         # Titulo con icono
@@ -3156,11 +3214,12 @@ class ConfigurationDialog(tk.Toplevel):
     def _create_load_widgets(self):
         """Crea widgets para modo cargar"""
         # Frame principal
-        main_frame = ttk.Frame(self)
+        main_frame = ttk.Frame(self.scrollable_frame)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
         # Titulo
-        title_label = ttk.Label(main_frame, text="Cargar Configuracion", 
+        title_text = "Cargar/Usar Configuracion" if self.mode != 'load' else "Cargar Configuracion"
+        title_label = ttk.Label(main_frame, text=title_text, 
                                font=("Arial", 14, "bold"))
         title_label.pack(pady=(0, 20))
         
@@ -3222,7 +3281,8 @@ class ConfigurationDialog(tk.Toplevel):
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill=tk.X)
         
-        ttk.Button(button_frame, text="Cargar", command=self._load_configuration).pack(side=tk.RIGHT, padx=(5, 0))
+        action_text = "Usar" if self.mode == 'use' else "Cargar"
+        ttk.Button(button_frame, text=action_text, command=self._load_configuration).pack(side=tk.RIGHT, padx=(5, 0))
         ttk.Button(button_frame, text="Cancelar", command=self._cancel).pack(side=tk.RIGHT)
         
         # Cargar configuraciones
@@ -3537,7 +3597,7 @@ class ConfigurationDialog(tk.Toplevel):
             pass
 
 
-class ConfigurationOverwriteDialog(tk.Toplevel):
+class ConfigurationOverwriteDialog(ScrollableToplevel):
     """
     Dialogo para seleccionar configuracion existente para sobrescribir.
     Muestra todas las configuraciones con metadatos completos.
@@ -3545,31 +3605,24 @@ class ConfigurationOverwriteDialog(tk.Toplevel):
     
     def __init__(self, parent, config_manager, config_data=None):
         super().__init__(parent)
-        self.parent = parent
         self.config_manager = config_manager
         self.config_data = config_data
         self.result = None
         
         self._setup_window()
         self._create_widgets()
-        self._center_window()
         self._apply_dialog_theme()
-        
-        self.transient(parent)
-        self.grab_set()
         
         print("[CONFIGURATION_OVERWRITE_DIALOG] Dialogo de sobrescritura inicializado")
     
     def _setup_window(self):
         """Configura la ventana"""
         self.title("Seleccionar Configuracion para Sobrescribir")
-        self.geometry("800x600")
-        self.resizable(True, True)
     
     def _create_widgets(self):
         """Crea los widgets del dialogo con diseño mejorado"""
         # Frame principal con padding mejorado
-        main_frame = ttk.Frame(self)
+        main_frame = ttk.Frame(self.scrollable_frame)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
         
         # Titulo con icono
@@ -3809,7 +3862,7 @@ class ConfigurationOverwriteDialog(tk.Toplevel):
             # Silenciar errores de widgets que no soportan configuración
             pass
 
-class ConfigurationManagerDialog(tk.Toplevel):
+class ConfigurationManagerDialog(ScrollableToplevel):
     """
     Dialogo para gestionar configuraciones (eliminar, etc.).
     Funcionalidad avanzada de administracion.
@@ -3825,31 +3878,23 @@ class ConfigurationManagerDialog(tk.Toplevel):
             icons: Diccionario de iconos vectoriales
         """
         super().__init__(parent)
-        self.parent = parent
         self.config_manager = config_manager
         self.icons = icons or {}
         
         self._setup_window()
         self._create_widgets()
-        self._center_window()
         self._apply_dialog_theme()
-        
-        # Hacer modal
-        self.transient(parent)
-        self.grab_set()
         
         print("[CONFIGURATION_MANAGER_DIALOG] Dialogo de gestion inicializado")
     
     def _setup_window(self):
         """Configura la ventana del dialogo"""
         self.title("Gestionar Configuraciones")
-        self.geometry("700x500")
-        self.resizable(True, True)
     
     def _create_widgets(self):
         """Crea los widgets del dialogo con diseño mejorado"""
         # Frame principal con padding mejorado
-        main_frame = ttk.Frame(self)
+        main_frame = ttk.Frame(self.scrollable_frame)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
         
         # Titulo con icono
