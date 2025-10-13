@@ -113,4 +113,3 @@ Cuando completes esto, el sistema tendrá:
 ---
 
 **Nota:** Tu arquitectura es perfecta. El problema NO es de diseño, solo falta la implementación del consumidor. El 58% restante es más sencillo que el 42% que ya hiciste.
-

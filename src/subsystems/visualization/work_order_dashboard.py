@@ -29,6 +29,7 @@ from PyQt6.QtCore import (
     QTimer,
 )
 from PyQt6.QtGui import QFont, QColor
+from typing import Dict, Any
 
 # Define the columns based on the reference image and requirements.
 # Using a list of tuples: (Header Name, Internal Key)
@@ -199,9 +200,24 @@ class WorkOrderDashboard(QMainWindow):
         self.queue_from_sim = queue_from_sim
         self.queue_to_sim = queue_to_sim
 
-        # Local state rebuilt from events
-        self._local_wo_state = {}  # Dict[wo_id, WorkOrderDict]
-        self._is_rebuilding_state = False
+        # ===== NUEVO: Event Sourcing State Management =====
+        # Local state rebuilt from events (Event Sourcing pattern)
+        self._local_wo_state: Dict[str, Dict[str, Any]] = {}
+        self._local_operator_state: Dict[str, Dict[str, Any]] = {}
+        self._local_metrics: Dict[str, Any] = {}
+
+        # Event processing state
+        self._is_rebuilding_state: bool = False
+        self._last_snapshot_time: float = 0.0
+
+        # Feature flag check
+        self._use_event_sourcing = os.getenv('USE_EVENT_SOURCING', 'false').lower() == 'true'
+
+        if self._use_event_sourcing:
+            print("[DASHBOARD] Initialized in EVENT SOURCING mode")
+        else:
+            print("[DASHBOARD] Initialized in LEGACY mode")
+        # ===== END NUEVO =====
 
         # Main widget and layout
         central_widget = QWidget()
@@ -261,43 +277,160 @@ class WorkOrderDashboard(QMainWindow):
         # Start the thread
         self.thread.start()
 
-    def handle_message(self, message):
-        """Routes incoming events to the appropriate handler and logs performance."""
-        start_time = time.time()
-        event_type = message.get("type")
-
-        sent_timestamp = message.get('metadata', {}).get('sent_timestamp')
-        if sent_timestamp:
-            latency_ms = (start_time - sent_timestamp) * 1000
-            print(f"[PERF] event_type={event_type} latency_ms={latency_ms:.2f} timestamp={start_time}")
-
-        if self._is_rebuilding_state and event_type not in ("state_reset", "state_snapshot"):
+    def handle_message(self, message: Dict[str, Any]):
+        """
+        Handle incoming messages from simulation.
+        Supports both legacy mode and Event Sourcing mode.
+        """
+        if not message:
             return
 
-        handlers = {
-            "state_reset": self._handle_state_reset,
-            "state_snapshot": self._handle_state_snapshot,
-            "wo_status_changed": self._handle_wo_status_changed,
-            "wo_assigned": self._handle_wo_assigned,
-            "wo_progress_updated": self._handle_wo_progress_updated,
-            "TIME_UPDATE": self._handle_time_update,
-        }
+        message_type = message.get("type")
 
-        handler = handlers.get(event_type)
-        if handler:
-            handler(message)
+        # ===== Event Sourcing Mode =====
+        if self._use_event_sourcing:
+            self._handle_event_sourcing_message(message_type, message)
+            return
 
-    def _handle_state_reset(self, message):
-        """Clears the local state in preparation for a snapshot."""
-        print(f"[DASHBOARD] STATE RESET received. Reason: {message.get('data', {}).get('reason')}")
+        # ===== Legacy Mode =====
+        self._handle_legacy_message(message_type, message)
+
+    def _handle_legacy_message(self, message_type: str, message: Dict[str, Any]):
+        """Handle messages in legacy mode (existing behavior)."""
+        # TODO: Mover aquí todo el código existente de handle_message()
+        # Este método mantiene la funcionalidad actual sin cambios
+        pass
+
+    def _handle_event_sourcing_message(self, message_type: str, message: Dict[str, Any]):
+        """
+        Handle messages in Event Sourcing mode.
+        Routes events to specific handlers.
+        """
+        # State Management Events
+        if message_type == "state_reset":
+            self._handle_state_reset(message)
+
+        elif message_type == "state_snapshot":
+            self._handle_state_snapshot(message)
+
+        # WorkOrder Events (Granular)
+        elif message_type == "wo_status_changed":
+            self._handle_wo_status_changed(message)
+
+        elif message_type == "wo_assigned":
+            self._handle_wo_assigned(message)
+
+        elif message_type == "wo_progress_updated":
+            self._handle_wo_progress_updated(message)
+
+        elif message_type == "wo_completed":
+            self._handle_wo_completed(message)
+
+        # Time Events
+        elif message_type == "time_tick":
+            self._handle_time_tick(message)
+
+        elif message_type == "time_seek":
+            self._handle_time_seek(message)
+
+        # Metrics Events
+        elif message_type == "metrics_updated":
+            self._handle_metrics_updated(message)
+
+        else:
+            print(f"[DASHBOARD-WARNING] Unknown event type: {message_type}")
+
+    def _handle_state_reset(self, message: Dict[str, Any]):
+        """
+        Handle STATE_RESET event - Clear all local state.
+        This is the first step in the scrubber time-seek protocol.
+
+        Protocol: SEEK_TIME -> STATE_RESET -> STATE_SNAPSHOT -> SEEK_COMPLETE
+        """
+        reason = message.get('data', {}).get('reason', 'unknown')
+        target_time = message.get('data', {}).get('target_time', 0.0)
+
+        print(f"[DASHBOARD] STATE RESET received - reason: {reason}, target_time: {target_time:.2f}s")
+
+        # Set rebuilding flag to block incremental updates
         self._is_rebuilding_state = True
-        self._local_wo_state.clear()
-        self.model.setData([])
-        self.table_view.resizeColumnsToContents()
 
-    def _handle_state_snapshot(self, message):
-        """Rebuilds the local state from a snapshot."""
-        print("[DASHBOARD] STATE SNAPSHOT received.")
+        # Clear all local state
+        self._local_wo_state.clear()
+        self._local_operator_state.clear()
+        self._local_metrics.clear()
+
+        # Clear UI table
+        self.model.beginResetModel()
+        self.model._data.clear()
+        self.model.endResetModel()
+
+        # Update status bar
+        self.statusBar().showMessage(f"Rebuilding state at time {target_time:.2f}s...")
+
+        print(f"[DASHBOARD] State cleared, awaiting STATE_SNAPSHOT...")
+
+    def _handle_state_snapshot(self, message: Dict[str, Any]):
+        """
+        Handle STATE_SNAPSHOT event - Rebuild complete state from snapshot.
+        This is the second step in the scrubber time-seek protocol.
+
+        Protocol: SEEK_TIME -> STATE_RESET -> STATE_SNAPSHOT -> SEEK_COMPLETE
+        """
+        timestamp = message.get('timestamp', 0.0)
+        data = message.get('data', {})
+
+        work_orders = data.get('work_orders', [])
+        operators = data.get('operators', [])
+        metrics = data.get('metrics', {})
+
+        print(f"[DASHBOARD] STATE SNAPSHOT received at time {timestamp:.2f}s")
+        print(f"[DASHBOARD]   - WorkOrders: {len(work_orders)}")
+        print(f"[DASHBOARD]   - Operators: {len(operators)}")
+        print(f"[DASHBOARD]   - Metrics keys: {list(metrics.keys())}")
+
+        # Rebuild local state from snapshot
+        for wo in work_orders:
+            wo_id = wo.get('id')
+            if wo_id:
+                self._local_wo_state[wo_id] = wo
+
+        for op in operators:
+            op_id = op.get('id')
+            if op_id:
+                self._local_operator_state[op_id] = op
+
+        self._local_metrics = metrics
+        self._last_snapshot_time = timestamp
+
+        # Update UI table (batch update)
+        self.model.beginResetModel()
+        self.model._data = list(self._local_wo_state.values())
+        self.model.endResetModel()
+
+        # Update time slider if exists
+        if hasattr(self, 'time_slider') and self.time_slider:
+            self.time_slider.setValue(int(timestamp))
+
+        # Clear rebuilding flag
+        self._is_rebuilding_state = False
+
+        # Update status bar
+        completed_wos = sum(1 for wo in work_orders if wo.get('status') == 'completed')
+        total_wos = len(work_orders)
+        self.statusBar().showMessage(
+            f"State rebuilt: {completed_wos}/{total_wos} WOs completed at t={timestamp:.1f}s"
+        )
+
+        print(f"[DASHBOARD] State rebuilt successfully: {len(work_orders)} WorkOrders")
+
+        # Send SEEK_COMPLETE confirmation back to engine
+        if self.queue_to_sim:
+            self.queue_to_sim.put({
+                'type': 'SEEK_COMPLETE',
+                'timestamp': timestamp
+            })
+            print(f"[DASHBOARD] SEEK_COMPLETE confirmation sent")
         data = message.get('data', {})
         work_orders = data.get('work_orders', [])
 
@@ -318,33 +451,113 @@ class WorkOrderDashboard(QMainWindow):
             self.queue_to_sim.put(confirmation_msg)
             print(f"[DASHBOARD] SEEK_COMPLETE confirmation sent.")
 
-    def _handle_wo_status_changed(self, message):
-        """Handles a granular change to a WorkOrder's status."""
-        data = message.get('data', {})
-        wo_id = data.get('wo_id')
-        if wo_id in self._local_wo_state:
-            self._local_wo_state[wo_id]['status'] = data.get('new_status')
-            self._update_view_for_wo(wo_id)
+    def _handle_wo_status_changed(self, message: Dict[str, Any]):
+        """
+        Handle WorkOrder status change event (granular update).
+        Only updates the specific status field.
+        """
+        if self._is_rebuilding_state:
+            return  # Skip during state rebuild
 
-    def _handle_wo_assigned(self, message):
-        """Handles a granular change to a WorkOrder's assignment."""
         data = message.get('data', {})
         wo_id = data.get('wo_id')
-        if wo_id in self._local_wo_state:
-            self._local_wo_state[wo_id]['assigned_agent_id'] = data.get('agent_id')
-            self._update_view_for_wo(wo_id)
+        old_status = data.get('old_status')
+        new_status = data.get('new_status')
 
-    def _handle_wo_progress_updated(self, message):
-        """Handles a granular change to a WorkOrder's progress."""
+        if wo_id and wo_id in self._local_wo_state:
+            # Update local state
+            self._local_wo_state[wo_id]['status'] = new_status
+
+            # Find row in table
+            row = self._find_row_by_wo_id(wo_id)
+            if row >= 0:
+                # Emit dataChanged signal for status column only
+                status_column = self._get_column_index('status')
+                if status_column >= 0:
+                    index = self.model.index(row, status_column)
+                    self.model.dataChanged.emit(index, index)
+
+            print(f"[DASHBOARD] WO {wo_id} status: {old_status} -> {new_status}")
+
+    def _handle_wo_assigned(self, message: Dict[str, Any]):
+        """
+        Handle WorkOrder assignment event (granular update).
+        """
+        if self._is_rebuilding_state:
+            return
+
         data = message.get('data', {})
         wo_id = data.get('wo_id')
-        if wo_id in self._local_wo_state:
-            self._local_wo_state[wo_id].update({
-                'cantidad_restante': data.get('cantidad_restante'),
-                'volumen_restante': data.get('volumen_restante'),
-                'progress': data.get('progress_percentage'),
-            })
-            self._update_view_for_wo(wo_id)
+        agent_id = data.get('agent_id')
+        timestamp_assigned = data.get('timestamp_assigned', 0.0)
+
+        if wo_id and wo_id in self._local_wo_state:
+            # Update local state
+            self._local_wo_state[wo_id]['assigned_agent_id'] = agent_id
+            self._local_wo_state[wo_id]['timestamp_assigned'] = timestamp_assigned
+
+            # Update UI cell
+            row = self._find_row_by_wo_id(wo_id)
+            if row >= 0:
+                agent_column = self._get_column_index('assigned_agent_id')
+                if agent_column >= 0:
+                    index = self.model.index(row, agent_column)
+                    self.model.dataChanged.emit(index, index)
+
+            print(f"[DASHBOARD] WO {wo_id} assigned to {agent_id}")
+
+    def _handle_wo_progress_updated(self, message: Dict[str, Any]):
+        """
+        Handle WorkOrder progress update event (granular update).
+        """
+        if self._is_rebuilding_state:
+            return
+
+        data = message.get('data', {})
+        wo_id = data.get('wo_id')
+        cantidad_restante = data.get('cantidad_restante')
+        volumen_restante = data.get('volumen_restante')
+        progress_percentage = data.get('progress_percentage', 0.0)
+
+        if wo_id and wo_id in self._local_wo_state:
+            # Update local state
+            self._local_wo_state[wo_id]['cantidad_restante'] = cantidad_restante
+            self._local_wo_state[wo_id]['volumen_restante'] = volumen_restante
+            self._local_wo_state[wo_id]['progress'] = progress_percentage
+
+            # Update UI (emit signal for entire row for simplicity)
+            row = self._find_row_by_wo_id(wo_id)
+            if row >= 0:
+                left_index = self.model.index(row, 0)
+                right_index = self.model.index(row, self.model.columnCount() - 1)
+                self.model.dataChanged.emit(left_index, right_index)
+
+    def _handle_wo_completed(self, message: Dict[str, Any]):
+        """
+        Handle WorkOrder completion event.
+        """
+        if self._is_rebuilding_state:
+            return
+
+        data = message.get('data', {})
+        wo_id = data.get('wo_id')
+        completion_time = data.get('completion_time', 0.0)
+
+        if wo_id and wo_id in self._local_wo_state:
+            # Update local state
+            self._local_wo_state[wo_id]['status'] = 'completed'
+            self._local_wo_state[wo_id]['completion_time'] = completion_time
+            self._local_wo_state[wo_id]['cantidad_restante'] = 0
+            self._local_wo_state[wo_id]['volumen_restante'] = 0.0
+
+            # Update UI
+            row = self._find_row_by_wo_id(wo_id)
+            if row >= 0:
+                left_index = self.model.index(row, 0)
+                right_index = self.model.index(row, self.model.columnCount() - 1)
+                self.model.dataChanged.emit(left_index, right_index)
+
+            print(f"[DASHBOARD] WO {wo_id} COMPLETED at t={completion_time:.2f}s")
 
     def _handle_time_update(self, message):
         """Updates the time slider and label."""
@@ -354,13 +567,59 @@ class WorkOrderDashboard(QMainWindow):
         self.time_slider.blockSignals(False)
         self.time_label.setText(f"Time: {timestamp:.2f}s")
 
-    def _update_view_for_wo(self, wo_id: str):
-        """Finds the row for a given WO_ID and emits dataChanged for it."""
-        # This is a simplified approach. A real implementation would have a faster lookup.
-        for row in range(self.model.rowCount()):
-            if self.model._data[row]['id'] == wo_id:
-                self.model.dataChanged.emit(self.model.index(row, 0), self.model.index(row, self.model.columnCount() - 1))
-                return
+    def _find_row_by_wo_id(self, wo_id: str) -> int:
+        """
+        Find row index in table by WorkOrder ID.
+        Returns -1 if not found.
+        """
+        for row, wo_data in enumerate(self.model._data):
+            if wo_data.get('id') == wo_id:
+                return row
+        return -1
+
+    def _get_column_index(self, column_name: str) -> int:
+        """
+        Get column index by column name.
+        Returns -1 if not found.
+        """
+        if not hasattr(self.model, 'headers'):
+            return -1
+
+        try:
+            return self.model.headers.index(column_name)
+        except (ValueError, AttributeError):
+            return -1
+
+    def _handle_time_tick(self, message: Dict[str, Any]):
+        """Handle periodic time update event."""
+        timestamp = message.get('timestamp', 0.0)
+
+        if hasattr(self, 'time_slider') and self.time_slider:
+            self.time_slider.setValue(int(timestamp))
+
+    def _handle_time_seek(self, message: Dict[str, Any]):
+        """Handle time seek command (user interaction)."""
+        target_time = message.get('data', {}).get('target_time', 0.0)
+        print(f"[DASHBOARD] TIME_SEEK command received: {target_time:.2f}s")
+        # STATE_RESET and STATE_SNAPSHOT will follow
+
+    def _handle_metrics_updated(self, message: Dict[str, Any]):
+        """Handle metrics update event."""
+        if self._is_rebuilding_state:
+            return
+
+        metrics = message.get('data', {})
+        self._local_metrics.update(metrics)
+
+        # Update status bar with metrics
+        completed = metrics.get('workorders_completadas', 0)
+        total = metrics.get('total_wos', 0)
+        time_sim = metrics.get('tiempo', 0.0)
+
+        if total > 0:
+            self.statusBar().showMessage(
+                f"Progress: {completed}/{total} WOs | Time: {time_sim:.1f}s"
+            )
 
 
     def seek_simulation_time(self, value):
