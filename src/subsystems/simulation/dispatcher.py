@@ -810,6 +810,16 @@ class DispatcherV11:
                 'tiempo_fin': wo.tiempo_fin
             })
 
+            # NEW: Log work_order_completed for analytics and increment counter
+            self.almacen.registrar_evento('work_order_completed', {
+                'agent_id': operator_id,
+                'work_order_id': wo.id,
+                'data': {
+                    'duration': wo.tiempo_fin - wo.tiempo_inicio if wo.tiempo_inicio else 0
+                }
+            })
+            self.almacen.incrementar_contador_workorders()
+
         # Operator back to available
         if operator_id in self.operadores_activos:
             del self.operadores_activos[operator_id]

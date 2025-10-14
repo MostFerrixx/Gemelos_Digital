@@ -57,7 +57,8 @@ from core.config_utils import get_default_config, mostrar_resumen_config
 # REFACTOR: AnalyticsExporter extraction - Import analytics exporter
 from analytics.exporter import AnalyticsExporter as AnalyticsExporterV1
 # REFACTOR PHASE 2: Enhanced AnalyticsExporter with SimulationContext
-from analytics import AnalyticsExporter, SimulationContext, ExportResult
+from analytics.exporter_v2 import AnalyticsExporter
+from analytics.context import SimulationContext, ExportResult
 # REFACTOR PHASE 3: DashboardCommunicator integration - Import communication components
 from communication import DashboardCommunicator, create_simulation_data_provider, DashboardConfig
 # REFACTOR: DiagnosticTools extraction - Import diagnostics function

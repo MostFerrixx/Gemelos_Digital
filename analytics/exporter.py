@@ -11,7 +11,7 @@ import json
 import subprocess
 from datetime import datetime
 from analytics_engine import AnalyticsEngine
-from subsystems.utils.helpers import exportar_metricas, mostrar_metricas_consola
+from src.subsystems.utils.helpers import exportar_metricas, mostrar_metricas_consola
 
 
 class AnalyticsExporter:
@@ -100,9 +100,17 @@ class AnalyticsExporter:
             excel_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.xlsx")
             archivo_excel = analytics_engine.export_to_excel(excel_filename)
 
+            # Generar archivo JSON con la misma información
+            json_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.json")
+            archivo_json = analytics_engine.export_to_json(json_filename)
+
             if archivo_excel:
                 archivos_generados.append(archivo_excel)
                 print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
+            
+            if archivo_json:
+                archivos_generados.append(archivo_json)
+                print(f"[3/4] Reporte de JSON generado: {archivo_json}")
 
                 # 4. PIPELINE AUTOMATIZADO: Visualizer -> PNG
                 print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
@@ -186,9 +194,17 @@ class AnalyticsExporter:
             excel_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.xlsx")
             archivo_excel = analytics_engine.export_to_excel(excel_filename)
 
+            # Generar archivo JSON con la misma información
+            json_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.json")
+            archivo_json = analytics_engine.export_to_json(json_filename)
+
             if archivo_excel:
                 archivos_generados.append(archivo_excel)
                 print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
+            
+            if archivo_json:
+                archivos_generados.append(archivo_json)
+                print(f"[3/4] Reporte de JSON generado: {archivo_json}")
 
                 # 4. PIPELINE AUTOMATIZADO: Visualizer -> PNG
                 print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")

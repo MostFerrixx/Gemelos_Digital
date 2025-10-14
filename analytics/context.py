@@ -84,7 +84,8 @@ class SimulationContext:
             raise ValueError("SimulationContext requiere almacen valido")
 
         if not self.configuracion:
-            raise ValueError("SimulationContext requiere configuracion valida")
+            # Permitir configuracion vacia como caso valido
+            self.configuracion = {}
 
         if not self.session_timestamp:
             raise ValueError("SimulationContext requiere session_timestamp valido")

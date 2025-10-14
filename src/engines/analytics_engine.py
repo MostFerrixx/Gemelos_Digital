@@ -108,35 +108,36 @@ class AnalyticsEngine:
         if self.events_df is None or self.events_df.empty:
             return pd.DataFrame()
         
-        # Tiempo total de simulacion - CORREGIDO: timestamps estan en segundos
+        # Tiempo total de simulacion
         tiempo_inicio = self.events_df['timestamp'].min()
         tiempo_fin = self.events_df['timestamp'].max()
-        tiempo_total_sim = tiempo_fin - tiempo_inicio
-        tiempo_total_horas = tiempo_total_sim / 3600  # CORREGIDO: Convertir segundos a horas
+        tiempo_total_sim_segundos = tiempo_fin - tiempo_inicio
         
-        # Total de tareas completadas - CORREGIDO: usar work_order_completed
+        print(f"[ANALYTICS-ENGINE] DEBUG: Tiempo simulación - Inicio: {tiempo_inicio}s, Fin: {tiempo_fin}s, Total: {tiempo_total_sim_segundos}s")
+        
+        # Total de tareas completadas
         work_order_completed_events = self.events_df[self.events_df['tipo'] == 'work_order_completed']
         total_tareas_completadas = len(work_order_completed_events)
         
-        # Productividad (Tareas/Hora)
-        if tiempo_total_horas > 0:
-            productividad = total_tareas_completadas / tiempo_total_horas
+        # Productividad (Tareas/Segundo)
+        if tiempo_total_sim_segundos > 0:
+            productividad_por_segundo = total_tareas_completadas / tiempo_total_sim_segundos
         else:
-            productividad = 0
+            productividad_por_segundo = 0
         
         # Crear DataFrame de resumen
         summary_data = {
             'Metrica': [
-                'Tiempo Total de Simulacion (horas)',
-                'Total de Tareas Completadas',
-                'Productividad (Tareas/Hora)',
-                'Tiempo de Inicio (sim)',
-                'Tiempo de Fin (sim)'
+                'Tiempo Total de Simulacion (segundos)',
+                'Total de Tareas Completadas (unidades)',
+                'Productividad (Tareas/Segundo)',
+                'Tiempo de Inicio (segundos)',
+                'Tiempo de Fin (segundos)'
             ],
             'Valor': [
-                round(tiempo_total_horas, 2),
+                round(tiempo_total_sim_segundos, 2),
                 total_tareas_completadas,
-                round(productividad, 2),
+                round(productividad_por_segundo, 4),
                 round(tiempo_inicio, 2),
                 round(tiempo_fin, 2)
             ]
@@ -148,100 +149,91 @@ class AnalyticsEngine:
     
     def _calculate_agent_performance(self) -> pd.DataFrame:
         """
-        REFACTOR: Calcula las metricas de rendimiento por agente usando agregacion simple
-        de los nuevos eventos ricos (trip_completed, operation_completed, work_order_completed).
+        REFACTOR: Calculates agent performance metrics based on the time difference
+        between consecutive 'estado_agente' events.
         
         Returns:
-            DataFrame con metricas de rendimiento por agente
+            DataFrame with performance metrics per agent.
         """
-        print("[ANALYTICS-ENGINE] Calculando rendimiento de agentes con nueva logica simplificada...")
-        
+        print("[ANALYTICS-ENGINE] Calculating agent performance using state-based time differences...")
+
         if self.events_df is None or self.events_df.empty:
             return pd.DataFrame()
-        
-        # Tiempo total de simulacion para calculo de tiempo ocioso
-        tiempo_total_simulacion = self.events_df['timestamp'].max() - self.events_df['timestamp'].min()
-        
-        # Obtener lista unica de agentes
-        agent_ids = self.events_df['assigned_agent_id'].unique()
+
+        # --- Agent ID Normalization --- 
+        def normalize_agent_id(agent_id):
+            if isinstance(agent_id, str):
+                return agent_id.replace("GroundOperator_", "").replace("Forklift_", "")
+            return agent_id
+
+        # Filter events and apply normalization
+        agent_events = self.events_df[self.events_df['tipo'] == 'estado_agente'].copy()
+        agent_events['agent_id'] = agent_events['agent_id'].apply(normalize_agent_id)
+
+        wo_completed_events = self.events_df[self.events_df['tipo'] == 'work_order_completed'].copy()
+        wo_completed_events['agent_id'] = wo_completed_events['agent_id'].apply(normalize_agent_id)
+
+        if agent_events.empty:
+            print("[ANALYTICS-ENGINE] No 'estado_agente' events found to calculate performance.")
+            return pd.DataFrame()
+
+        if 'status' not in agent_events.columns:
+            print("[ANALYTICS-ENGINE] 'status' column not found in 'estado_agente' events.")
+            return pd.DataFrame()
+
+        agent_ids = agent_events['agent_id'].unique()
         performance_data = []
         
+        sim_end_time = self.events_df['timestamp'].max()
+
         for agent_id in agent_ids:
-            # Filtrar eventos por agente
-            agent_events = self.events_df[self.events_df['assigned_agent_id'] == agent_id]
+            agent_df = agent_events[agent_events['agent_id'] == agent_id].sort_values(by='timestamp')
+            agent_df['duration'] = agent_df['timestamp'].diff().shift(-1)
             
-            # NUEVA LOGICA: Contar work_orders completadas por agente
-            work_order_events = agent_events[agent_events['tipo'] == 'work_order_completed']
-            tareas_completadas = len(work_order_events)
-            
-            # NUEVA LOGICA: Sumar duraciones de trip_completed para tiempo de viaje
-            trip_events = agent_events[agent_events['tipo'] == 'trip_completed']
-            tiempo_viaje_total = 0
-            for _, event in trip_events.iterrows():
-                if 'data' in event and event['data'] and 'duration' in event['data']:
-                    tiempo_viaje_total += event['data']['duration']
-            
-            # NUEVA LOGICA: Sumar duraciones de operation_completed para tiempo de picking
-            operation_events = agent_events[agent_events['tipo'] == 'operation_completed']
-            tiempo_picking_total = 0
-            for _, event in operation_events.iterrows():
-                if 'data' in event and event['data'] and 'duration' in event['data']:
-                    tiempo_picking_total += event['data']['duration']
-            
-            # Tiempo de descarga (mantener logica existente para discharge_completed)
-            tiempo_descarga_total = 0
-            discharge_completed_events = agent_events[agent_events['tipo'] == 'discharge_completed']
-            for _, event in discharge_completed_events.iterrows():
-                if 'data' in event and event['data'] and 'tiempo_total_descarga' in event['data']:
-                    tiempo_descarga_total += event['data']['tiempo_total_descarga'] / 60  # Segundos a minutos
-            
-            # Calcular tiempo total activo
-            tiempo_total_activo = tiempo_viaje_total + tiempo_picking_total + tiempo_descarga_total
-            
-            # Calcular tiempo ocioso
-            tiempo_ocioso = max(0, tiempo_total_simulacion - tiempo_total_activo)
-            
-            # Utilizacion de capacidad (mantener logica existente)
-            discharge_events = agent_events[agent_events['tipo'] == 'discharge_started']
-            utilizacion_capacidad_promedio = 0
-            if not discharge_events.empty:
-                capacidades = []
-                for _, event in discharge_events.iterrows():
-                    if 'data' in event and event['data']:
-                        carga = event['data'].get('carga_actual', 0)
-                        capacidad_max = event['data'].get('capacidad_maxima', 1)
-                        if capacidad_max > 0:
-                            capacidades.append((carga / capacidad_max) * 100)
-                
-                if capacidades:
-                    utilizacion_capacidad_promedio = sum(capacidades) / len(capacidades)
-            
-            # Determinar tipo de agente
-            agent_type = "Desconocido"
-            if not agent_events.empty:
-                # Buscar en cualquier evento que tenga agent_type en data
-                for _, event in agent_events.iterrows():
-                    if 'data' in event and event['data'] and 'agent_type' in event['data']:
-                        agent_type = event['data']['agent_type']
-                        break
-            
+            last_event_index = agent_df.index[-1]
+            last_event_timestamp = agent_df.loc[last_event_index, 'timestamp']
+            last_duration = sim_end_time - last_event_timestamp
+            agent_df.loc[last_event_index, 'duration'] = last_duration
+
+            status_times = agent_df.groupby('status')['duration'].sum()
+
+            tiempo_viaje = status_times.get('moving', 0)
+            tiempo_picking = status_times.get('picking', 0)
+            tiempo_descarga = status_times.get('dropping', 0) + status_times.get('unloading', 0)
+            tiempo_ocioso = status_times.get('idle', 0)
+
+            tareas_completadas = len(wo_completed_events[wo_completed_events['agent_id'] == agent_id])
+
+            agent_info = agent_df.iloc[0]
+            tipo_agente = agent_info['agent_type']
+            eventos_totales = len(agent_df)
+
+            tiempo_activo = tiempo_viaje + tiempo_picking + tiempo_descarga + status_times.get('lifting', 0)
+            tiempo_suma_estados = tiempo_activo + tiempo_ocioso
+
+            tiempo_total_simulacion = self.events_df['timestamp'].max() - self.events_df['timestamp'].min()
+            utilizacion_capacidad = 0
+            if tiempo_total_simulacion > 0:
+                utilizacion_capacidad = (tiempo_activo / tiempo_total_simulacion) * 100
+
             performance_data.append({
                 'Agent_ID': agent_id,
-                'Tipo_Agente': agent_type,
-                'Tareas_Completadas': tareas_completadas,
-                'Tiempo_Total_Activo': round(tiempo_total_activo, 2),
-                'Tiempo_Picking': round(tiempo_picking_total, 2),
-                'Tiempo_Viaje': round(tiempo_viaje_total, 2),
-                'Tiempo_Descarga': round(tiempo_descarga_total, 2),
-                'Tiempo_Ocioso': round(tiempo_ocioso, 2),
-                'Utilizacion_Capacidad_Promedio_Pct': round(utilizacion_capacidad_promedio, 2),
-                'Eventos_Totales': len(agent_events)
+                'Tipo_Agente': tipo_agente,
+                'Tareas_Completadas (unidades)': tareas_completadas,
+                'Tiempo_Activo (segundos)': round(tiempo_activo, 2),
+                'Tiempo_Picking (segundos)': round(tiempo_picking, 2),
+                'Tiempo_Viaje (segundos)': round(tiempo_viaje, 2),
+                'Tiempo_Descarga (segundos)': round(tiempo_descarga, 2),
+                'Tiempo_Elevacion (segundos)': round(status_times.get('lifting', 0), 2),
+                'Tiempo_Ocioso (segundos)': round(tiempo_ocioso, 2),
+                'Tiempo_Suma_Estados (segundos)': round(tiempo_suma_estados, 2),
+                'Utilizacion_Capacidad_Promedio (%)': round(utilizacion_capacidad, 2),
+                'Eventos_Totales (unidades)': eventos_totales
             })
-        
+
         performance_df = pd.DataFrame(performance_data)
-        print(f"[ANALYTICS-ENGINE] Rendimiento simplificado calculado para {len(performance_df)} agentes")
-        return performance_df
-    
+        print(f"[ANALYTICS-ENGINE] State-based performance calculated for {len(performance_df)} agents")
+        return performance_df    
     def _calculate_heatmap_data(self) -> pd.DataFrame:
         """
         Calcula los datos necesarios para generar heatmaps de actividad en el almacen.
@@ -267,11 +259,11 @@ class AnalyticsEngine:
         for x in range(warehouse_width):
             for y in range(warehouse_height):
                 heatmap_data.append({
-                    'x': x,
-                    'y': y,
-                    'tiempo_trabajo': 0.0,
-                    'tiempo_transito': 0.0,
-                    'tiempo_total': 0.0
+                    'x (coordenada)': x,
+                    'y (coordenada)': y,
+                    'tiempo_trabajo (segundos)': 0.0,
+                    'tiempo_transito (segundos)': 0.0,
+                    'tiempo_total (segundos)': 0.0
                 })
         
         heatmap_df = pd.DataFrame(heatmap_data)
@@ -304,8 +296,12 @@ class AnalyticsEngine:
         trabajo_count = 0
         
         for _, event in task_events.iterrows():
-            if 'data' in event and event['data']:
-                try:
+            try:
+                # Validar que event sea un diccionario antes de usar 'in'
+                if not isinstance(event, dict):
+                    continue
+                    
+                if 'data' in event and pd.notna(event['data']) and isinstance(event['data'], dict):
                     # Buscar coordenadas en task_ubicacion O location (ambos formatos de evento)
                     ubicacion = None
                     if 'task_ubicacion' in event['data']:
@@ -320,22 +316,22 @@ class AnalyticsEngine:
                         # Verificar que las coordenadas esten dentro del rango valido
                         if 0 <= x < warehouse_width and 0 <= y < warehouse_height:
                             # Buscar la fila correspondiente e incrementar tiempo_trabajo
-                            mask = (heatmap_df['x'] == x) & (heatmap_df['y'] == y)
-                            heatmap_df.loc[mask, 'tiempo_trabajo'] += tiempo_picking
+                            mask = (heatmap_df['x (coordenada)'] == x) & (heatmap_df['y (coordenada)'] == y)
+                            heatmap_df.loc[mask, 'tiempo_trabajo (segundos)'] += tiempo_picking
                             trabajo_count += 1
-                except (ValueError, TypeError, IndexError):
-                    # Saltar eventos con coordenadas o tiempo malformados
-                    continue
+            except (ValueError, TypeError, IndexError):
+                # Saltar eventos con coordenadas o tiempo malformados
+                continue
         
         print(f"[ANALYTICS-ENGINE] Procesados {trabajo_count} eventos de trabajo")
         
         # Calcular tiempo total (suma de trabajo y transito)
-        heatmap_df['tiempo_total'] = heatmap_df['tiempo_trabajo'] + heatmap_df['tiempo_transito']
+        heatmap_df['tiempo_total (segundos)'] = heatmap_df['tiempo_trabajo (segundos)'] + heatmap_df['tiempo_transito (segundos)']
         
         # Estadisticas de resumen
-        total_tiempo_trabajo = heatmap_df['tiempo_trabajo'].sum()
-        total_tiempo_transito = heatmap_df['tiempo_transito'].sum()
-        coordenadas_activas = len(heatmap_df[heatmap_df['tiempo_total'] > 0])
+        total_tiempo_trabajo = heatmap_df['tiempo_trabajo (segundos)'].sum()
+        total_tiempo_transito = heatmap_df['tiempo_transito (segundos)'].sum()
+        coordenadas_activas = len(heatmap_df[heatmap_df['tiempo_total (segundos)'] > 0])
         
         print(f"[ANALYTICS-ENGINE] Heatmap calculado: {coordenadas_activas} coordenadas activas")
         print(f"[ANALYTICS-ENGINE] Tiempo total trabajo: {total_tiempo_trabajo:.2f}, transito: {total_tiempo_transito:.2f}")
@@ -373,10 +369,14 @@ class AnalyticsEngine:
                         writer, sheet_name='Rendimiento de Agentes', index=False)
                 
                 # Hoja 3: Configuracion
-                config_df = pd.DataFrame([
-                    {'Parametro': key, 'Valor': str(value)}
-                    for key, value in self.config.items()
-                ])
+                # Validar que config sea un diccionario antes de iterar
+                if isinstance(self.config, dict) and self.config:
+                    config_df = pd.DataFrame([
+                        {'Parametro': key, 'Valor': str(value)}
+                        for key, value in self.config.items()
+                    ])
+                else:
+                    config_df = pd.DataFrame([{'Parametro': 'No config', 'Valor': 'N/A'}])
                 config_df.to_excel(writer, sheet_name='Configuracion', index=False)
                 print("[ANALYTICS-ENGINE] Hoja 'Configuracion' exportada")
                 
@@ -399,6 +399,82 @@ class AnalyticsEngine:
             print(f"[ANALYTICS-ENGINE] ERROR al exportar: {e}")
             return None
     
+    def export_to_json(self, filepath: str):
+        """
+        Exporta todos los datos a un archivo JSON con la misma información que el Excel.
+        """
+        print(f"[ANALYTICS-ENGINE] Exportando datos a JSON: {filepath}")
+        
+        try:
+            # Crear estructura de datos equivalente al Excel
+            json_data = {
+                "metadata": {
+                    "timestamp": pd.Timestamp.now().isoformat(),
+                    "total_events": len(self.event_log) if self.event_log else 0,
+                    "simulation_duration": self._get_simulation_duration()
+                },
+                "resumen_ejecutivo": {},
+                "rendimiento_agentes": [],
+                "configuracion": {},
+                "heatmap_data": [],
+                "visual_heatmap": {}
+            }
+            
+            # Resumen Ejecutivo
+            if self.summary_kpis is not None and not self.summary_kpis.empty:
+                for _, row in self.summary_kpis.iterrows():
+                    metrica = row.get('Métrica', row.get('Metrica', ''))
+                    valor = row.get('Valor', 0)
+                    json_data["resumen_ejecutivo"][metrica] = valor
+            
+            # Rendimiento de Agentes
+            if self.agent_performance is not None and not self.agent_performance.empty:
+                for _, row in self.agent_performance.iterrows():
+                    agent_data = {}
+                    for col in self.agent_performance.columns:
+                        agent_data[col] = row[col]
+                    json_data["rendimiento_agentes"].append(agent_data)
+            
+            # Configuración
+            if isinstance(self.config, dict) and self.config:
+                json_data["configuracion"] = self.config
+            else:
+                json_data["configuracion"] = {"No config": "N/A"}
+            
+            # Heatmap Data
+            if self.heatmap_data is not None and not self.heatmap_data.empty:
+                for _, row in self.heatmap_data.iterrows():
+                    heatmap_row = {}
+                    for col in self.heatmap_data.columns:
+                        heatmap_row[col] = row[col]
+                    json_data["heatmap_data"].append(heatmap_row)
+            
+            # Visual Heatmap (matriz simplificada)
+            if hasattr(self, '_heatmap_matrix') and self._heatmap_matrix is not None:
+                json_data["visual_heatmap"] = {
+                    "dimensions": self._heatmap_matrix.shape,
+                    "matrix": self._heatmap_matrix.tolist()
+                }
+            
+            # Escribir archivo JSON
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(json_data, f, indent=2, ensure_ascii=False, default=str)
+            
+            print(f"[ANALYTICS-ENGINE] Datos JSON exportados exitosamente: {filepath}")
+            return filepath
+            
+        except Exception as e:
+            print(f"[ANALYTICS-ENGINE] ERROR al exportar JSON: {e}")
+            return None
+    
+    def _get_simulation_duration(self):
+        """
+        Calcula la duración total de la simulación en segundos.
+        """
+        if self.events_df is not None and not self.events_df.empty:
+            return self.events_df['timestamp'].max() - self.events_df['timestamp'].min()
+        return 0.0
+    
     def _add_visual_heatmap_sheet(self, writer):
         """
         Crea una hoja VisualHeatmap con representacion grafica del almacen coloreada
@@ -419,9 +495,9 @@ class AnalyticsEngine:
         # Pivotar datos de formato largo (x, y, tiempo_total) a matriz 2D
         # x sera las columnas, y sera las filas
         heatmap_matrix = self.heatmap_data.pivot(
-            index='y',           # Filas (eje vertical)
-            columns='x',         # Columnas (eje horizontal)
-            values='tiempo_total' # Valores de las celdas
+            index='y (coordenada)',           # Filas (eje vertical)
+            columns='x (coordenada)',         # Columnas (eje horizontal)
+            values='tiempo_total (segundos)' # Valores de las celdas
         )
         
         # Ordenar indice y columnas para presentacion correcta del almacen

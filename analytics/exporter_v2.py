@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Optional
 
 from analytics_engine import AnalyticsEngine
-from subsystems.utils.helpers import exportar_metricas, mostrar_metricas_consola
+from src.subsystems.utils.helpers import exportar_metricas, mostrar_metricas_consola
 from .context import SimulationContext, ExportResult
 
 
@@ -137,6 +137,9 @@ class AnalyticsExporter:
             # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine -> Excel
             print("[3/4] Simulacion completada. Generando reporte de Excel...")
             try:
+                print(f"[DEBUG] Eventos en contexto: {len(self.context.event_log)}")
+                print(f"[DEBUG] Configuracion: {self.context.configuracion}")
+                
                 # Usar el metodo __init__ original con eventos y configuracion en memoria
                 analytics_engine = AnalyticsEngine(self.context.event_log, self.context.configuracion)
                 analytics_engine.process_events()
@@ -145,9 +148,19 @@ class AnalyticsExporter:
                 excel_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.xlsx")
                 archivo_excel = analytics_engine.export_to_excel(excel_filename)
 
+                # Generar archivo JSON con la misma información
+                json_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.json")
+                print(f"[DEBUG] Intentando generar JSON: {json_filename}")
+                archivo_json = analytics_engine.export_to_json(json_filename)
+                print(f"[DEBUG] Resultado JSON: {archivo_json}")
+
                 if archivo_excel:
                     result.add_file(archivo_excel)
                     print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
+                
+                if archivo_json:
+                    result.add_file(archivo_json)
+                    print(f"[3/4] Reporte de JSON generado: {archivo_json}")
 
                     # 4. PIPELINE AUTOMATIZADO: Visualizer -> PNG
                     print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
@@ -162,7 +175,12 @@ class AnalyticsExporter:
                     result.add_error("No se pudo generar el reporte de Excel")
 
             except Exception as e:
-                result.add_error(f"Error en pipeline de analiticas: {e}")
+                import traceback
+                traceback_str = traceback.format_exc()
+                error_details = f"Error en pipeline de analiticas: {e}"
+                result.add_error(error_details)
+                print(f"[ERROR ANALYTICS] {error_details}")
+                print(f"[TRACEBACK]\n{traceback_str}")
 
             # Timing final
             end_time = time.time()
@@ -253,30 +271,53 @@ class AnalyticsExporter:
 
             # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine -> Excel
             print("[3/4] Simulacion completada. Generando reporte de Excel...")
+            print(f"[DEBUG-TRACE] Eventos disponibles: {len(self.context.event_log)}")
             try:
                 analytics_engine = AnalyticsEngine(self.context.event_log, self.context.configuracion)
                 analytics_engine.process_events()
 
                 excel_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.xlsx")
+                print(f"[DEBUG-TRACE] Generando Excel: {excel_filename}")
                 archivo_excel = analytics_engine.export_to_excel(excel_filename)
+                print(f"[DEBUG-TRACE] Excel generado: {archivo_excel}")
+
+                # Generar archivo JSON con la misma información
+                json_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.json")
+                print(f"[DEBUG] Intentando generar JSON: {json_filename}")
+                try:
+                    archivo_json = analytics_engine.export_to_json(json_filename)
+                    print(f"[DEBUG] Resultado JSON: {archivo_json}")
+                except Exception as json_error:
+                    print(f"[ERROR] Error generando JSON: {json_error}")
+                    import traceback
+                    traceback.print_exc()
+                    archivo_json = None
 
                 if archivo_excel:
                     result.add_file(archivo_excel)
                     print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
+                
+                if archivo_json:
+                    result.add_file(archivo_json)
+                    print(f"[3/4] Reporte de JSON generado: {archivo_json}")
 
-                    # 4. PIPELINE AUTOMATIZADO: Visualizer -> PNG
-                    print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
-                    try:
-                        png_file = self._ejecutar_visualizador(archivo_excel, timestamp, output_dir)
-                        if png_file:
-                            result.add_file(png_file)
-                    except Exception as e:
-                        result.add_warning(f"Error generando heatmap PNG: {e}")
-                else:
+                # 4. PIPELINE AUTOMATIZADO: Visualizer -> PNG
+                print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
+                try:
+                    png_file = self._ejecutar_visualizador(archivo_excel, timestamp, output_dir)
+                    if png_file:
+                        result.add_file(png_file)
+                except Exception as e:
+                    result.add_warning(f"Error generando heatmap PNG: {e}")
                     result.add_error("No se pudo generar el reporte de Excel")
 
             except Exception as e:
-                result.add_error(f"Error en pipeline de analiticas: {e}")
+                import traceback
+                traceback_str = traceback.format_exc()
+                error_details = f"Error en pipeline de analiticas: {e}"
+                result.add_error(error_details)
+                print(f"[ERROR ANALYTICS] {error_details}")
+                print(f"[TRACEBACK]\n{traceback_str}")
 
             # Timing final
             end_time = time.time()
