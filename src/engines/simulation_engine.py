@@ -35,7 +35,7 @@ from subsystems.simulation.operators import crear_operarios
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from analytics_engine import AnalyticsEngine
+from engines.analytics_engine import AnalyticsEngine
 from subsystems.simulation.layout_manager import LayoutManager
 from subsystems.simulation.assignment_calculator import AssignmentCostCalculator
 from subsystems.simulation.data_manager import DataManager
@@ -50,15 +50,15 @@ from subsystems.config.settings import SUPPORTED_RESOLUTIONS, LOGICAL_WIDTH, LOG
 # from dynamic_pathfinding_integration import get_dynamic_pathfinding_wrapper  # Eliminado en limpieza
 # RESTORED: Replay system components for .jsonl generation
 from simulation_buffer import ReplayBuffer
-from core.replay_utils import agregar_evento_replay, volcar_replay_a_archivo
+from src.core.replay_utils import agregar_evento_replay, volcar_replay_a_archivo
 # REFACTOR: ConfigurationManager replaces cargar_configuracion logic
-from core.config_manager import ConfigurationManager, ConfigurationError
-from core.config_utils import get_default_config, mostrar_resumen_config
+from src.core.config_manager import ConfigurationManager, ConfigurationError
+from src.core.config_utils import get_default_config, mostrar_resumen_config
 # REFACTOR: AnalyticsExporter extraction - Import analytics exporter
-from analytics.exporter import AnalyticsExporter as AnalyticsExporterV1
+from src.analytics.exporter import AnalyticsExporter as AnalyticsExporterV1
 # REFACTOR PHASE 2: Enhanced AnalyticsExporter with SimulationContext
-from analytics.exporter_v2 import AnalyticsExporter
-from analytics.context import SimulationContext, ExportResult
+from src.analytics.exporter_v2 import AnalyticsExporter
+from src.analytics.context import SimulationContext, ExportResult
 # REFACTOR PHASE 3: DashboardCommunicator integration - Import communication components
 from communication import DashboardCommunicator, create_simulation_data_provider, DashboardConfig
 # REFACTOR: DiagnosticTools extraction - Import diagnostics function
@@ -281,7 +281,7 @@ class SimulationEngine:
         
         # 1. Inicializar LayoutManager con archivo TMX por defecto (OBLIGATORIO)
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-        tmx_file = os.path.join(project_root, "layouts", "WH1.tmx")
+        tmx_file = os.path.join(project_root, self.configuracion.get('layout_file', 'layouts/WH1.tmx'))
         print(f"[TMX] Cargando layout: {tmx_file}")
 
         try:
@@ -508,6 +508,7 @@ class SimulationEngine:
             
         print("Simulacion terminada. Saliendo de Pygame.")
         pygame.quit()
+        sys.exit(0)
     
     def _ejecutar_bucle_headless(self):
         """Bucle de ejecucion headless para maxima velocidad"""
@@ -773,6 +774,7 @@ class SimulationEngine:
         
         print("[CONSUMIDOR-FINAL] Bucle de consumidor terminado.")
         pygame.quit()
+        sys.exit(0)
     
     def _crear_almacen_mock(self):
         """Crea un mock del almacen para el dashboard cuando no hay datos del productor"""
@@ -936,6 +938,7 @@ class SimulationEngine:
         
         print("[REPLAY-ENGINE] Motor de replay terminado.")
         pygame.quit()
+        sys.exit(0)
     
     def _manejar_evento(self, evento):
         """Maneja los eventos de pygame"""
@@ -1403,6 +1406,7 @@ class SimulationEngine:
         limpiar_estado()
         pygame.quit()
         print("Recursos liberados. Hasta luego!")
+        sys.exit(0)
 
 def _run_simulation_process_static(visual_event_queue, configuracion):
     """
@@ -1456,7 +1460,8 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
         pygame.display.set_mode((1, 1), pygame.NOFRAME | pygame.HIDDEN)  # Superficie dummy minima
         
         # 1. Inicializar LayoutManager
-        tmx_file = os.path.join(os.path.dirname(__file__), "layouts", "WH1.tmx")
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+        tmx_file = os.path.join(project_root, configuracion.get('layout_file', 'layouts/WH1.tmx'))
         print(f"[PROCESO-SIMPY] Cargando layout: {tmx_file}")
         layout_manager = LayoutManager(tmx_file)
         
@@ -1717,6 +1722,7 @@ def _run_simulation_process_static(visual_event_queue, configuracion):
         limpiar_estado()
         pygame.quit()
         print("Recursos liberados. Hasta luego!")
+        sys.exit(0)
     
     # LEGACY: Method unused and commented during DiagnosticTools extraction
     # def _diagnosticar_data_manager(self):

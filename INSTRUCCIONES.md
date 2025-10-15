@@ -12,27 +12,34 @@
 ### Ejecutar Simulación Visual:
 ```bash
 python entry_points/run_live_simulation.py
+# O: make sim-visual
 ```
 
 ### Ejecutar Simulación Headless (sin GUI):
 ```bash
 python entry_points/run_live_simulation.py --headless
+# O: make sim
 ```
 
 ### Ejecutar Test Rápido:
 ```bash
 python test_quick_jsonl.py
+# O: make test
 ```
 
 ### Ejecutar Configurador con Sistema de Slots:
 ```bash
 python configurator.py
+# O: make config
 ```
 
 ### Ver Replay de Simulación:
 ```bash
 python entry_points/run_replay_viewer.py output/simulation_YYYYMMDD_HHMMSS/replay_events_YYYYMMDD_HHMMSS.jsonl
+# O: make replay FILE=output/simulation_YYYYMMDD_HHMMSS/replay_events_YYYYMMDD_HHMMSS.jsonl
 ```
+
+**NOTA:** Se ha creado un Makefile para comandos convenientes. Ejecuta `make help` para ver todas las opciones disponibles.
 
 ---
 

@@ -499,7 +499,7 @@ class ReplayViewerEngine:
 
         pygame.quit()
         print("[REPLAY] Modo replay terminado")
-        return 0
+        sys.exit(0)
 
     def _process_event_batch(self, eventos_a_procesar, silent=False):
         """
@@ -819,3 +819,4 @@ class ReplayViewerEngine:
 
         pygame.quit()
         print("[CLEANUP] Recursos limpiados exitosamente")
+        sys.exit(0)

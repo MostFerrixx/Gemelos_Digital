@@ -345,6 +345,7 @@ class GroundOperator(BaseOperator):
                 })
                 self.almacen.registrar_evento('task_completed', {
                     'agent_id': self.id,
+                    'task_id': wo.id,
                     'data': {
                         'task_ubicacion': wo.ubicacion,
                         'tiempo_picking': picking_duration
@@ -681,6 +682,7 @@ class Forklift(BaseOperator):
                 })
                 self.almacen.registrar_evento('task_completed', {
                     'agent_id': self.id,
+                    'task_id': wo.id,
                     'data': {
                         'task_ubicacion': wo.ubicacion,
                         'tiempo_picking': total_operation_duration

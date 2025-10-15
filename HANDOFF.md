@@ -34,25 +34,32 @@ Sistema de simulación de almacén completamente funcional con **Dashboard World
 ```bash
 # Simulación completa (headless)
 python entry_points/run_live_simulation.py --headless
+# O: make sim
 
 # Test rápido (3 órdenes)
 python test_quick_jsonl.py
+# O: make test
 
 # Simulación visual
 python entry_points/run_live_simulation.py
+# O: make sim-visual
 ```
 
 ### Configurador:
 ```bash
 # Sistema de slots completo
 python configurator.py
+# O: make config
 ```
 
 ### Replay:
 ```bash
 # Visualizar simulación
 python entry_points/run_replay_viewer.py output/simulation_*/replay_events_*.jsonl
+# O: make replay FILE=output/simulation_*/replay_events_*.jsonl
 ```
+
+**NOTA:** Se ha creado un Makefile para comandos convenientes. Usa `make help` para ver todas las opciones.
 
 ---
 

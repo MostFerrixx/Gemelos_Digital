@@ -141,7 +141,7 @@ class AnalyticsExporter:
                 print(f"[DEBUG] Configuracion: {self.context.configuracion}")
                 
                 # Usar el metodo __init__ original con eventos y configuracion en memoria
-                analytics_engine = AnalyticsEngine(self.context.event_log, self.context.configuracion)
+                analytics_engine = AnalyticsEngine(self.context.event_log, self.context.configuracion, self.context.almacen.layout_manager.grid_width, self.context.almacen.layout_manager.grid_height)
                 analytics_engine.process_events()
 
                 # Generar archivo Excel con ruta organizada
@@ -273,7 +273,7 @@ class AnalyticsExporter:
             print("[3/4] Simulacion completada. Generando reporte de Excel...")
             print(f"[DEBUG-TRACE] Eventos disponibles: {len(self.context.event_log)}")
             try:
-                analytics_engine = AnalyticsEngine(self.context.event_log, self.context.configuracion)
+                analytics_engine = AnalyticsEngine(self.context.event_log, self.context.configuracion, self.context.almacen.layout_manager.grid_width, self.context.almacen.layout_manager.grid_height)
                 analytics_engine.process_events()
 
                 excel_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.xlsx")

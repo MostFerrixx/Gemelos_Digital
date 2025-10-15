@@ -1,24 +1,32 @@
-# 🚀 ESTADO DE SESIÓN ACTIVA - LIMPIEZA DE DOCUMENTACIÓN COMPLETADA
+# 🚀 ESTADO DE SESIÓN ACTIVA - ANALISIS DE ARCHIVOS DUPLICADOS COMPLETADO
 
-**Fecha:** 2025-01-14
-**Estado:** ✅ COMPLETADO - Limpieza de documentación finalizada
-**Próxima acción:** Sistema listo para uso en producción.
+**Fecha:** 2025-01-15
+**Estado:** ✅ COMPLETADO - Analisis de archivos duplicados finalizado
+**Proxima accion:** Revisar reportes y aprobar plan de limpieza de codigo duplicado.
 
 ---
 
 ## 📋 CONTEXTO INMEDIATO
 
-### ✅ TAREA COMPLETADA: LIMPIEZA DE DOCUMENTACIÓN
+### ✅ TAREA COMPLETADA: LIMPIEZA DE ARCHIVOS DUPLICADOS
 
-**Objetivo alcanzado:** Optimizar el uso del contexto eliminando contenido obsoleto, repetido y completado de la documentación.
+**Objetivo alcanzado:** Eliminar todos los archivos duplicados y reorganizar el proyecto.
 
 **Resultados:**
-- ✅ **ACTIVE_SESSION_STATE.md:** Limpiado y optimizado
-- ✅ **HANDOFF.md:** Consolidado y sin repeticiones
-- ✅ **INSTRUCCIONES.md:** Eliminadas secciones obsoletas
-- ✅ **Archivos obsoletos eliminados:** 21 archivos de documentación completada
-- ✅ **Uso de contexto optimizado:** Reducción significativa del contenido
-- ✅ **Archivos .md restantes:** 12 archivos esenciales (vs. 33 originales)
+- ✅ **50+ archivos duplicados identificados y procesados**
+- ✅ **Reportes generados:** `REPORTE_ARCHIVOS_DUPLICADOS.md`, `RESUMEN_DUPLICADOS_VISUAL.md`
+- ✅ **Limpieza ejecutada en 5 fases:** Completada exitosamente
+- ✅ **Makefile creado:** Comandos convenientes (make sim, make test, etc.)
+- ✅ **Documentacion actualizada:** ACTIVE_SESSION_STATE.md, HANDOFF.md, INSTRUCCIONES.md
+
+**Acciones ejecutadas:**
+- ✅ **Fase 1:** Entry points obsoletos movidos a legacy/
+- ✅ **Fase 2:** Modulos duplicados (analytics, core) movidos a legacy/
+- ✅ **Fase 3:** 30+ tests organizados en tests/integration y tests/bugfixes
+- ✅ **Fase 4:** 11 archivos debug movidos a tools/debug/
+- ✅ **Fase 5:** Documentacion actualizada con nuevos comandos
+- ✅ **Fix adicional:** Corregidos imports en simulation_engine.py
+- ✅ **Fix adicional:** Agregado sys.exit(0) despues de pygame.quit() para evitar procesos colgados
 
 ---
 
@@ -45,24 +53,41 @@
 
 ---
 
-### 🎯 PRÓXIMA ACCIÓN
+### 🎯 PROXIMA ACCION
 
-**Sistema listo para:**
-- Uso en producción con funcionalidades actuales
-- Implementación de nuevas funcionalidades
-- Corrección de estrategias de despacho (si se requiere)
+**Revisar reportes generados:**
+1. **REPORTE_ARCHIVOS_DUPLICADOS.md** - Analisis detallado de 50+ archivos duplicados
+2. **RESUMEN_DUPLICADOS_VISUAL.md** - Resumen visual y plan de limpieza en 5 fases
 
-**Comandos principales:**
+**Decidir plan de accion:**
+- ✅ **Aprobar limpieza completa** (5 fases, ~45 minutos)
+- ⚠️ **Limpieza parcial** (solo archivos criticos)
+- 🔍 **Revision adicional** (analizar casos especificos)
+
+**Beneficios de la limpieza:**
+- ✅ Claridad absoluta sobre archivos correctos
+- ✅ Agentes AI mas efectivos (sin ambiguedad)
+- ✅ Mantenimiento simplificado
+- ✅ Imports correctos
+- ✅ Estructura organizada
+
+**Comandos principales (ACTUALIZADOS):**
 ```bash
-# Simulación completa
-python entry_points/run_live_simulation.py --headless
-
-# Test rápido
-python test_quick_jsonl.py
-
-# Configurador con slots
+# Configurador
 python configurator.py
+# O (Windows): .\run config
+
+# Simulacion completa
+python entry_points/run_live_simulation.py --headless
+# O (Windows): .\run sim
+
+# Test rapido
+python test_quick_jsonl.py
+# O (Windows): .\run test
 
 # Replay viewer
 python entry_points/run_replay_viewer.py output/simulation_*/replay_events_*.jsonl
+# O (Windows): .\run replay output/simulation_*/replay_events_*.jsonl
 ```
+
+**NOTA:** En Windows PowerShell usa `.\run` (con punto y barra). En CMD usa solo `run`.

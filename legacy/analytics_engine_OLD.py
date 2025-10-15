@@ -5,6 +5,7 @@ Procesa eventos de simulación y calcula métricas clave de rendimiento.
 """
 
 import pandas as pd
+from typing import List, Dict, Any
 import json
 import argparse
 from typing import List, Dict
@@ -15,22 +16,20 @@ from openpyxl.formatting.rule import ColorScaleRule
 class AnalyticsEngine:
     """Motor de analíticas para generar reportes ejecutivos a partir de eventos de simulación"""
     
-    def __init__(self, event_log: list, config: dict):
+    def __init__(self, event_log: List[Dict[str, Any]], config: Dict[str, Any], warehouse_width: int = None, warehouse_height: int = None):
         """
-        Inicializa el motor de analíticas.
-        
+        Initialize the analytics engine.
+
         Args:
-            event_log: Lista de eventos capturados durante la simulación
-            config: Configuración utilizada en la simulación
+            event_log: A list of event dictionaries from the simulation.
+            config: The simulation configuration.
+            warehouse_width: The width of the warehouse grid.
+            warehouse_height: The height of the warehouse grid.
         """
         self.event_log = event_log
         self.config = config
-        self.events_df = None
-        self.summary_kpis = None
-        self.agent_performance = None
-        self.heatmap_data = None
-        
-        print(f"[ANALYTICS-ENGINE] Inicializado con {len(event_log)} eventos")
+        self.warehouse_width = warehouse_width
+        self.warehouse_height = warehouse_height
     
     @classmethod
     def from_json_file(cls, json_filepath: str):
@@ -337,85 +336,253 @@ class AnalyticsEngine:
         print(f"[ANALYTICS-ENGINE] Rendimiento calculado para {len(performance_df)} agentes")
         return performance_df
     
-    def _calculate_heatmap_data(self) -> pd.DataFrame:
-        """
-        Calcula los datos necesarios para generar heatmaps de actividad en el almacén.
-        """
-        print("[ANALYTICS-ENGINE] Calculando datos de heatmap...")
-        
-        if self.events_df is None or self.events_df.empty:
-            return pd.DataFrame()
-        
-        # Usar dimensiones por defecto del almacén (basadas en el layout WH1.tmx)
-        warehouse_width = 50  # Ancho estándar del almacén
-        warehouse_height = 35  # Alto estándar del almacén
-        
-        print(f"[ANALYTICS-ENGINE] Dimensiones del almacén: {warehouse_width}x{warehouse_height}")
-        
-        heatmap_data = []
-        for x in range(warehouse_width):
-            for y in range(warehouse_height):
-                heatmap_data.append({
-                    'x': x,
-                    'y': y,
-                    'tiempo_trabajo': 0.0,
-                    'tiempo_transito': 0.0,
-                    'tiempo_total': 0.0
-                })
-        
-        heatmap_df = pd.DataFrame(heatmap_data)
-        print(f"[ANALYTICS-ENGINE] Creada grilla base con {len(heatmap_df)} coordenadas")
-        
-        # Procesar eventos de movimiento (estado_agente) para tiempo de tránsito
-        move_events = self.events_df[self.events_df['tipo'] == 'estado_agente']
-        transito_count = 0
-        
-        for _, event in move_events.iterrows():
-            try:
-                position = event.get('position')
-                if position is not None and isinstance(position, list) and len(position) >= 2:
-                    x, y = int(position[0]), int(position[1])
-                    if 0 <= x < warehouse_width and 0 <= y < warehouse_height:
-                        mask = (heatmap_df['x'] == x) & (heatmap_df['y'] == y)
-                        heatmap_df.loc[mask, 'tiempo_transito'] += 1.0
-                        transito_count += 1
-            except (ValueError, TypeError, IndexError, AttributeError):
-                continue
-        
-        print(f"[ANALYTICS-ENGINE] Procesados {transito_count} eventos de tránsito")
-        
-        # Procesar eventos de tareas completadas para tiempo de trabajo
-        task_events = self.events_df[self.events_df['tipo'] == 'task_completed']
-        trabajo_count = 0
-        
-        for _, event in task_events.iterrows():
-            try:
-                # Los eventos task_completed tienen la estructura: {'data': {'task_ubicacion': [...], 'tiempo_picking': ...}}
-                if 'data' in event and isinstance(event['data'], dict):
-                    ubicacion = event['data'].get('task_ubicacion')
-                    tiempo_picking = event['data'].get('tiempo_picking', 0)
+        def _calculate_heatmap_data(self) -> pd.DataFrame:
+    
+            """
+    
+            Calcula los datos necesarios para generar heatmaps de actividad en el almacén.
+    
+            """
+    
+            print("[ANALYTICS-ENGINE] Calculando datos de heatmap...")
+    
+            
+    
+            if self.events_df is None or self.events_df.empty:
+    
+                return pd.DataFrame()
+    
+            
+    
+            # Obtener dimensiones del layout TMX desde la configuración
+    
+            if self.warehouse_width is None or self.warehouse_height is None:
+    
+                try:
+    
+                    from src.subsystems.simulation.layout_manager import LayoutManager
+    
+                    import os
+    
+    
+    
+                    layout_file = self.config.get('layout_file', 'layouts/WH1.tmx')
+    
                     
-                    if ubicacion and isinstance(ubicacion, list) and len(ubicacion) >= 2 and tiempo_picking > 0:
-                        x, y = int(ubicacion[0]), int(ubicacion[1])
-                        if 0 <= x < warehouse_width and 0 <= y < warehouse_height:
+    
+                    # Resolver la ruta del archivo TMX
+    
+                    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    
+                    tmx_path = os.path.join(project_root, layout_file)
+    
+    
+    
+                    if not os.path.exists(tmx_path):
+    
+                        # Fallback a la ruta original si no se encuentra en el proyecto
+    
+                        tmx_path = layout_file
+    
+    
+    
+                    print(f"[ANALYTICS-ENGINE] Cargando dimensiones desde TMX: {tmx_path}")
+    
+                    
+    
+                    # Inicializar pygame dummy para pytmx
+    
+                    import os
+    
+                    os.environ['SDL_VIDEODRIVER'] = 'dummy'
+    
+                    import pygame
+    
+                    pygame.display.init()
+    
+                    pygame.display.set_mode((1, 1), pygame.NOFRAME)
+    
+    
+    
+                    layout = LayoutManager(tmx_path)
+    
+                    self.warehouse_width = layout.grid_width
+    
+                    self.warehouse_height = layout.grid_height
+    
+                    
+    
+                except (ImportError, FileNotFoundError, RuntimeError, pygame.error) as e:
+    
+                    print(f"[ANALYTICS-ENGINE] ADVERTENCIA: No se pudo cargar el layout TMX ({e}). Usando dimensiones por defecto.")
+    
+                    self.warehouse_width = 50  # Ancho estándar del almacén
+    
+                    self.warehouse_height = 35  # Alto estándar del almacén
+    
+            
+    
+            print(f"[ANALYTICS-ENGINE] Dimensiones del almacen: {self.warehouse_width}x{self.warehouse_height}")
+    
+            
+    
+            # Crear una grilla de ceros con las dimensiones del almacen
+    
+            coordenadas = [(x, y) for x in range(self.warehouse_width) for y in range(self.warehouse_height)]
+    
+            heatmap_df = pd.DataFrame(coordenadas, columns=['x', 'y'])
+    
+            heatmap_df['tiempo_trabajo'] = 0.0
+    
+            heatmap_df['tiempo_transito'] = 0.0
+    
+            
+    
+            # Procesar eventos de movimiento (estado_agente) para tiempo de tránsito
+    
+            move_events = self.events_df[self.events_df['tipo'] == 'estado_agente']
+    
+            transito_count = 0
+    
+            
+    
+            for _, event in move_events.iterrows():
+    
+                try:
+    
+                    position = event.get('position')
+    
+                    if position is not None and isinstance(position, list) and len(position) >= 2:
+    
+                        x, y = int(position[0]), int(position[1])
+    
+                        if 0 <= x < self.warehouse_width and 0 <= y < self.warehouse_height:
+    
                             mask = (heatmap_df['x'] == x) & (heatmap_df['y'] == y)
-                            heatmap_df.loc[mask, 'tiempo_trabajo'] += tiempo_picking
-                            trabajo_count += 1
-            except (ValueError, TypeError, IndexError, AttributeError):
-                continue
-        
-        print(f"[ANALYTICS-ENGINE] Procesados {trabajo_count} eventos de trabajo")
-        
-        heatmap_df['tiempo_total'] = heatmap_df['tiempo_trabajo'] + heatmap_df['tiempo_transito']
-        
-        total_tiempo_trabajo = heatmap_df['tiempo_trabajo'].sum()
-        total_tiempo_transito = heatmap_df['tiempo_transito'].sum()
-        coordenadas_activas = len(heatmap_df[heatmap_df['tiempo_total'] > 0])
-        
-        print(f"[ANALYTICS-ENGINE] Heatmap calculado: {coordenadas_activas} coordenadas activas")
-        print(f"[ANALYTICS-ENGINE] Tiempo total trabajo: {total_tiempo_trabajo:.2f}, tránsito: {total_tiempo_transito:.2f}")
-        
-        return heatmap_df
+    
+                            heatmap_df.loc[mask, 'tiempo_transito'] += 1.0
+    
+                            transito_count += 1
+    
+                except (ValueError, TypeError, IndexError, AttributeError):
+    
+                    continue
+    
+            
+    
+            print(f"[ANALYTICS-ENGINE] Procesados {transito_count} eventos de tránsito")
+    
+            
+    
+            # Crear un diccionario para mapear work_order_id a su ubicación
+    
+            work_order_locations = {}
+    
+            wo_update_events = self.events_df[self.events_df['tipo'] == 'work_order_update']
+    
+            for _, event in wo_update_events.iterrows():
+    
+                if event.get('id') and event.get('location'):
+    
+                    work_order_locations[event['id']] = event['location']
+    
+    
+    
+            picking_times = {}
+    
+            agent_states = {} # To track the last state of each agent
+    
+    
+    
+            for _, event in self.events_df.sort_values('timestamp').iterrows():
+    
+                if event['tipo'] == 'estado_agente':
+    
+                    agent_id = event.get('agent_id')
+    
+                    if agent_id:
+    
+                        last_state = agent_states.get(agent_id)
+    
+                        if last_state and last_state['status'] == 'picking':
+    
+                            task_id = last_state.get('current_task')
+    
+                            if task_id:
+    
+                                duration = event['timestamp'] - last_state['timestamp']
+    
+                                picking_times[task_id] = picking_times.get(task_id, 0) + duration
+    
+                        agent_states[agent_id] = event
+    
+    
+    
+            # Procesar eventos de tareas completadas para tiempo de trabajo
+    
+            task_events = self.events_df[self.events_df['tipo'] == 'task_completed']
+    
+            trabajo_count = 0
+    
+    
+    
+            for _, event in task_events.iterrows():
+    
+                try:
+    
+                    work_order_id = event.get('task_id')
+    
+                    if work_order_id in work_order_locations:
+    
+                        ubicacion = work_order_locations[work_order_id]
+    
+                        tiempo_picking = picking_times.get(work_order_id, 0)
+    
+    
+    
+                        if ubicacion and isinstance(ubicacion, list) and len(ubicacion) >= 2 and tiempo_picking > 0:
+    
+                            x, y = int(ubicacion[0]), int(ubicacion[1])
+    
+                            if 0 <= x < self.warehouse_width and 0 <= y < self.warehouse_height:
+    
+                                mask = (heatmap_df['x'] == x) & (heatmap_df['y'] == y)
+    
+                                heatmap_df.loc[mask, 'tiempo_trabajo'] += tiempo_picking
+    
+                                trabajo_count += 1
+    
+                except (ValueError, TypeError, IndexError, AttributeError):
+    
+                    continue
+    
+            
+    
+            print(f"[ANALYTICS-ENGINE] Procesados {trabajo_count} eventos de trabajo")
+    
+            
+    
+            heatmap_df['tiempo_total'] = heatmap_df['tiempo_trabajo'] + heatmap_df['tiempo_transito']
+    
+            
+    
+            total_tiempo_trabajo = heatmap_df['tiempo_trabajo'].sum()
+    
+            total_tiempo_transito = heatmap_df['tiempo_transito'].sum()
+    
+            coordenadas_activas = len(heatmap_df[heatmap_df['tiempo_total'] > 0])
+    
+            
+    
+            print(f"[ANALYTICS-ENGINE] Heatmap calculado: {coordenadas_activas} coordenadas activas")
+    
+            print(f"[ANALYTICS-ENGINE] Tiempo total trabajo: {total_tiempo_trabajo:.2f}, tránsito: {total_tiempo_transito:.2f}")
+    
+            
+    
+            return heatmap_df
+    
+    
     
     def export_to_excel(self, filepath: str):
         """
@@ -485,7 +652,8 @@ class AnalyticsEngine:
                 "rendimiento_agentes": [],
                 "configuracion": {},
                 "heatmap_data": [],
-                "visual_heatmap": {}
+                "visual_heatmap": {},
+                "heatmap_csv": ""
             }
             
             # Resumen Ejecutivo
@@ -497,11 +665,7 @@ class AnalyticsEngine:
             
             # Rendimiento de Agentes
             if self.agent_performance is not None and not self.agent_performance.empty:
-                for _, row in self.agent_performance.iterrows():
-                    agent_data = {}
-                    for col in self.agent_performance.columns:
-                        agent_data[col] = row[col]
-                    json_data["rendimiento_agentes"].append(agent_data)
+                json_data["rendimiento_agentes"] = self.agent_performance.to_dict(orient='records')
             
             # Configuración
             if isinstance(self.config, dict) and self.config:
@@ -511,18 +675,23 @@ class AnalyticsEngine:
             
             # Heatmap Data
             if self.heatmap_data is not None and not self.heatmap_data.empty:
-                for _, row in self.heatmap_data.iterrows():
-                    heatmap_row = {}
-                    for col in self.heatmap_data.columns:
-                        heatmap_row[col] = row[col]
-                    json_data["heatmap_data"].append(heatmap_row)
+                json_data["heatmap_data"] = self.heatmap_data.to_dict(orient='records')
             
             # Visual Heatmap (matriz simplificada)
-            if hasattr(self, '_heatmap_matrix') and self._heatmap_matrix is not None:
+            if self.heatmap_data is not None and not self.heatmap_data.empty:
+                heatmap_matrix = self.heatmap_data.pivot(
+                    index='y',
+                    columns='x',
+                    values='tiempo_total'
+                ).fillna(0)
                 json_data["visual_heatmap"] = {
-                    "dimensions": self._heatmap_matrix.shape,
-                    "matrix": self._heatmap_matrix.tolist()
+                    "dimensions": heatmap_matrix.shape,
+                    "matrix": heatmap_matrix.values.tolist()
                 }
+                
+                # Convertir la matriz a formato CSV string
+                csv_string = "\n".join([",".join(map(str, row)) for row in heatmap_matrix.values.tolist()])
+                json_data["heatmap_csv"] = csv_string
             
             # Escribir archivo JSON
             with open(filepath, 'w', encoding='utf-8') as f:
