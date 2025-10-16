@@ -159,8 +159,8 @@ class DashboardWorldClass:
             'status_lifting': (203, 166, 247),  # #CBA6F7 (purpura)
             'status_assigned': (249, 226, 175),  # #F9E2AF (amarillo)
             'status_in_progress': (148, 226, 213), # #94E2D5 (teal)
-            'status_completed': (166, 227, 161), # #A6E3A1 (verde)
-            'status_pending': (186, 194, 222),   # #BAC2DE (gris claro)
+            'status_staged': (166, 227, 161), # #A6E3A1 (verde)
+            'status_released': (186, 194, 222),   # #BAC2DE (gris claro)
         }
         
         print("[DASHBOARD-WC] Esquema de colores cargado")

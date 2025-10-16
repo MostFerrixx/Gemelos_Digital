@@ -185,7 +185,7 @@ output/simulation_20251008_140900/
 ### Formato de replay_events_YYYYMMDD_HHMMSS.jsonl:
 ```jsonl
 {"type":"SIMULATION_START","timestamp":0.0,"config":{...}}
-{"type":"work_order_update","timestamp":125.5,"id":"WO-0001","status":"completed",...}
+{"type":"work_order_update","timestamp":125.5,"id":"WO-0001","status":"staged",...}
 {"type":"estado_agente","timestamp":126.0,"agent_id":"GroundOp-01","data":{...}}
 ...
 {"type":"SIMULATION_END","timestamp":4919.5,"summary":{...}}

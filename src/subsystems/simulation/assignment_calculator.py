@@ -253,7 +253,7 @@ class AssignmentCostCalculator:
 
             for wo in work_orders:
                 # Skip work orders that are already assigned
-                if hasattr(wo, 'status') and wo.status != 'pending':
+                if hasattr(wo, 'status') and wo.status != 'released':
                     continue
 
                 cost_result = self.calculate_cost(operator, wo)

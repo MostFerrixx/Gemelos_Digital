@@ -51,7 +51,7 @@ estado_visual = {
         # Estructura de cada WorkOrder:
         # {
         #     "id": str,                    # ID unico
-        #     "status": str,                # "pending" | "assigned" | "in_progress" | "completed"
+        #     "status": str,                # "released" | "assigned" | "in_progress" | "staged"
         #     "assigned_to": str | None,    # agent_id asignado
         #     "location": tuple(int, int),  # Posicion en grid
         #     "work_area": str,             # Work area string

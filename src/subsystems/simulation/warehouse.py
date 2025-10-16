@@ -36,7 +36,7 @@ class WorkOrder:
         self.ubicacion = ubicacion
         self.work_area = work_area
         self.pick_sequence = pick_sequence
-        self.status = "pending"
+        self.status = "released"
         self.assigned_agent_id = None
         self.tiempo_inicio = None
         self.tiempo_fin = None

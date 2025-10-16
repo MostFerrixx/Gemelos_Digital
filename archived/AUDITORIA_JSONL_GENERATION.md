@@ -78,7 +78,7 @@ def registrar_evento(self, tipo: str, datos: Dict[str, Any]):
 self.almacen.registrar_evento('work_order_update', {
     'id': wo.id,
     'order_id': wo.order_id,
-    'status': 'completed',
+    'status': 'staged',
     ...
 })
 ```

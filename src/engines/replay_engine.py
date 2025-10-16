@@ -318,7 +318,7 @@ class ReplayViewerEngine:
             initial_task_id = agent_data.get('current_task')
             if initial_task_id and initial_task_id in self.dashboard_wos_state:
                 wo_state = self.dashboard_wos_state[initial_task_id]
-                if wo_state.get('status') == 'pending':
+                if wo_state.get('status') == 'released':
                     print(f"[SYNC] Agente inicial {agent_id} tiene tarea {initial_task_id}. Actualizando estado a 'in_progress'.")
                     self._emit_event(WorkOrderStatusChangedEvent(
                         timestamp=initial_sync_timestamp,
@@ -545,8 +545,8 @@ class ReplayViewerEngine:
                         # Agent started a new task
                         if new_task_id and new_task_id in self.dashboard_wos_state:
                             wo_state = self.dashboard_wos_state[new_task_id]
-                            # If the WO was 'pending' or 'assigned', it's now 'in_progress'.
-                            if wo_state.get('status') in ['pending', 'assigned']:
+                            # If the WO was 'released' or 'assigned', it's now 'in_progress'.
+                            if wo_state.get('status') in ['released', 'assigned']:
                                 if not silent:
                                     self._emit_event(WorkOrderStatusChangedEvent(
                                         timestamp=timestamp,
@@ -710,7 +710,7 @@ class ReplayViewerEngine:
         state['operators'] = operators_list
 
         # Calculate metrics based on the reconstructed state
-        completed_wos = sum(1 for wo in state['work_orders'] if wo.get('status') == 'completed')
+        completed_wos = sum(1 for wo in state['work_orders'] if wo.get('status') == 'staged')
         state['metrics'] = {
             'total_work_orders': len(state['work_orders']),
             'completed_work_orders': completed_wos,
@@ -761,7 +761,7 @@ class ReplayViewerEngine:
         
         for wo_id, wo_data in work_orders.items():
             status = wo_data.get('status', 'unknown')
-            if status in ['completed', 'Completada', 'COMPLETED']:
+            if status in ['staged', 'Completada', 'COMPLETED']:
                 workorders_completadas += 1
                 tareas_completadas += 3
         

@@ -57,10 +57,13 @@ COLUMN_HEADERS = [
 
 # Define status colors for visual differentiation
 STATUS_COLORS = {
-    'pending': QColor(255, 193, 7),      # Amber/Yellow
-    'assigned': QColor(0, 123, 255),      # Blue
-    'in_progress': QColor(255, 87, 34),   # Orange
-    'completed': QColor(40, 167, 69),     # Green
+    'released': QColor(255, 193, 7),      # Amber/Yellow (estado inicial)
+    'assigned': QColor(0, 123, 255),      # Blue (asignada a operario)
+    'in_progress': QColor(255, 87, 34),   # Orange (en proceso de picking)
+    'staged': QColor(40, 167, 69),        # Green (completada y en staging)
+    # Legacy support (por si acaso)
+    'pending': QColor(255, 193, 7),       # Amber/Yellow (deprecated)
+    'completed': QColor(40, 167, 69),     # Green (deprecated)
 }
 
 class WorkOrderTableModel(QAbstractTableModel):
@@ -91,7 +94,7 @@ class WorkOrderTableModel(QAbstractTableModel):
                 'tour_id': getattr(data, 'tour_id', ''),
                 'sku_id': getattr(data, 'sku_id', ''),
                 'product': getattr(data, 'product', ''),
-                'status': getattr(data, 'status', 'pending'),
+                'status': getattr(data, 'status', 'released'),
                 'assigned_agent_id': getattr(data, 'assigned_agent_id', None),
                 'priority': getattr(data, 'priority', 9999),
                 'items': getattr(data, 'items', 0),
@@ -116,7 +119,7 @@ class WorkOrderTableModel(QAbstractTableModel):
             key: source_dict.get(key, default)
             for default, key in [
                 ('', 'id'), ('', 'order_id'), ('', 'tour_id'), ('', 'sku_id'),
-                ('', 'product'), ('pending', 'status'), (None, 'assigned_agent_id'),
+                ('', 'product'), ('released', 'status'), (None, 'assigned_agent_id'),
                 (9999, 'priority'), (0, 'items'), (0, 'total_qty'), (0.0, 'volume'),
                 ('', 'location'), ('', 'staging'), ('', 'work_group'), ('', 'work_area'),
                 (0, 'executions'), (0.0, 'start_time'), (0.0, 'progress')
@@ -136,7 +139,7 @@ class WorkOrderTableModel(QAbstractTableModel):
         elif role == Qt.ItemDataRole.BackgroundRole:
             # Color-code rows based on status
             row_data = self._convert_to_dict(self._data[index.row()])
-            status = row_data.get('status', 'pending')
+            status = row_data.get('status', 'released')
             if status in STATUS_COLORS:
                 return STATUS_COLORS[status]
 
@@ -457,10 +460,10 @@ class WorkOrderDashboard(QMainWindow):
         self._is_rebuilding_state = False
 
         # Update status bar
-        completed_wos = sum(1 for wo in work_orders if wo.get('status') == 'completed')
+        completed_wos = sum(1 for wo in work_orders if wo.get('status') == 'staged')
         total_wos = len(work_orders)
         self.statusBar().showMessage(
-            f"State rebuilt: {completed_wos}/{total_wos} WOs completed at t={timestamp:.1f}s"
+            f"State rebuilt: {completed_wos}/{total_wos} WOs staged at t={timestamp:.1f}s"
         )
 
         print(f"[DASHBOARD] State rebuilt successfully: {len(work_orders)} WorkOrders")
@@ -568,12 +571,12 @@ class WorkOrderDashboard(QMainWindow):
         row = self._find_row_by_wo_id(wo_id)
         if row >= 0:
             # BUGFIX: Update the model's actual data source.
-            self.model._data[row]['status'] = 'completed'
+            self.model._data[row]['status'] = 'staged'
             self.model._data[row]['completion_time'] = completion_time
             self.model._data[row]['cantidad_restante'] = 0
             self.model._data[row]['volumen_restante'] = 0.0
             if wo_id in self._local_wo_state:
-                self._local_wo_state[wo_id]['status'] = 'completed'
+                self._local_wo_state[wo_id]['status'] = 'staged'
                 self._local_wo_state[wo_id]['completion_time'] = completion_time
                 self._local_wo_state[wo_id]['cantidad_restante'] = 0
                 self._local_wo_state[wo_id]['volumen_restante'] = 0.0
@@ -765,7 +768,7 @@ if __name__ == '__main__':
         },
         {
             "id": "WO_0002", "order_id": "ORD-002", "tour_id": "TOUR-B", "sku_id": "SKU002",
-            "product": "Product B", "status": "pending", "assigned_agent_id": "None",
+            "product": "Product B", "status": "released", "assigned_agent_id": "None",
             "priority": 5000, "items": 2, "total_qty": 20, "volume": 10.0, "location": "(5, 6)",
             "staging": "(7, 8)", "work_group": "wg_b", "work_area": "wa_b", "executions": 0,
             "start_time": 0.0, "progress": 0.0

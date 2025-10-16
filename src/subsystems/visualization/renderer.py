@@ -386,12 +386,12 @@ def renderizar_tareas_pendientes(surface: pygame.Surface,
                 wo_id = tarea.id if hasattr(tarea, 'id') else 'WO-???'
             else:
                 # Es un dict
-                status = tarea.get('status', 'pending')
+                status = tarea.get('status', 'released')
                 location = tarea.get('location', (0, 0))
                 wo_id = tarea.get('id', 'WO-???')
 
-            # No renderizar tareas completadas
-            if status == 'completed':
+            # No renderizar tareas completadas (staged)
+            if status == 'staged':
                 continue
 
             # Convertir posicion grid a pixel
@@ -399,7 +399,7 @@ def renderizar_tareas_pendientes(surface: pygame.Surface,
             pixel_x, pixel_y = _convertir_grid_a_pixel_seguro(layout_manager, grid_x, grid_y)
 
             # Determinar color segun status
-            if status == 'pending':
+            if status == 'released':
                 color = COLOR_TAREA_PENDIENTE
             elif status == 'assigned':
                 color = COLOR_TAREA_ASIGNADA

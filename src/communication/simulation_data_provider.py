@@ -216,7 +216,7 @@ class SimulationEngineDataProvider:
                 try:
                     work_orders = self.get_all_work_orders()
                     stats['work_order_count'] = len(work_orders)
-                    stats['active_work_orders'] = len([wo for wo in work_orders if wo.status not in ['completed', 'cancelled']])
+                    stats['active_work_orders'] = len([wo for wo in work_orders if wo.status not in ['staged', 'cancelled']])
                 except:
                     stats['work_order_count'] = -1
                     stats['active_work_orders'] = -1

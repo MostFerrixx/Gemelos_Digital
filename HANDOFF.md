@@ -3,7 +3,7 @@
 **Proyecto:** Simulador de Gemelo Digital de Almacén  
 **Rama:** `main`  
 **Estado:** ✅ Sistema completamente funcional  
-**Última Actualización:** 2025-01-14
+**Última Actualización:** 2025-10-16
 
 ---
 
@@ -21,6 +21,15 @@ Sistema de simulación de almacén completamente funcional con **Dashboard World
 - **Solución Holística:** Estado autoritativo con navegación temporal
 - **Cálculos de Tiempo:** Corregidos y validados en Excel
 - **Generación de Archivos:** .jsonl, .xlsx, .json funcionando
+- **Nomenclatura de Estados:** Actualizada (completed → staged, pending → released)
+
+### ⚠️ CAMBIO IMPORTANTE: NOMENCLATURA DE ESTADOS WO
+
+**Estados de Work Orders actualizados:**
+- `pending` → `released` (estado inicial de WO)
+- `completed` → `staged` (estado final de WO, preparado para despacho)
+
+Todos los archivos del sistema han sido actualizados para reflejar esta nueva nomenclatura.
 
 ### ❌ PROBLEMA PENDIENTE
 

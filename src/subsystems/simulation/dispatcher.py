@@ -104,7 +104,7 @@ class DispatcherV11:
         for wo in work_orders:
             self.lista_maestra_work_orders.append(wo)
             self.work_orders_pendientes.append(wo)
-            wo.status = "pending"
+            wo.status = "released"
 
         # FASE 2: Configurar contador inicial de WorkOrders para metadata
         if not hasattr(self, 'work_orders_total_inicial') or self.work_orders_total_inicial == 0:
@@ -607,9 +607,9 @@ class DispatcherV11:
         # If we couldn't select any WOs, mark oversized ones as completed to avoid infinite loop
         if not selected and skipped_oversized:
             print(f"[DISPATCHER] ERROR: {len(skipped_oversized)} WorkOrders too large for any operator!")
-            print(f"[DISPATCHER] Marking oversized WorkOrders as completed to avoid deadlock...")
+            print(f"[DISPATCHER] Marking oversized WorkOrders as staged to avoid deadlock...")
             for wo in skipped_oversized:
-                wo.status = "completed"
+                wo.status = "staged"
                 wo.cantidad_restante = 0
                 self.work_orders_completados.append(wo)
                 # Remove from pending
@@ -783,7 +783,7 @@ class DispatcherV11:
             self.work_orders_completados.append(wo)
 
             # Update WorkOrder state
-            wo.status = "completed"
+            wo.status = "staged"
             wo.tiempo_fin = self.env.now
             
             # BUGFIX FASE4: Emitir evento work_order_update para registrar completado
@@ -794,7 +794,7 @@ class DispatcherV11:
                 'tour_id': getattr(wo, 'tour_id', None),
                 'sku_id': wo.sku_id,
                 'product': wo.sku_name,
-                'status': 'completed',
+                'status': 'staged',
                 'assigned_agent_id': wo.assigned_agent_id,
                 'priority': getattr(wo, 'priority', 99),
                 'items': getattr(wo, 'items', 1),
