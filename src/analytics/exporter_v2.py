@@ -365,8 +365,8 @@ class AnalyticsExporter:
         output_filename = os.path.join(output_dir, f"warehouse_heatmap_{timestamp}.png")
 
         try:
-            # Construir rutas dinamicamente
-            script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            # Construir rutas dinamicamente - los archivos están en el directorio raíz del proyecto
+            script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             visualizer_path = os.path.join(script_dir, "visualizer.py")
             tmx_path = os.path.join(script_dir, self.context.configuracion.get('layout_file', 'layouts/WH1.tmx'))
 

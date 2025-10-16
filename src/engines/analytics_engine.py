@@ -269,21 +269,22 @@ class AnalyticsEngine:
         heatmap_df = pd.DataFrame(heatmap_data)
         print(f"[ANALYTICS-ENGINE] Creada grilla base con {len(heatmap_df)} coordenadas")
         
-        # Calcular tiempo de transito (eventos agent_moved)
-        move_events = self.events_df[self.events_df['tipo'] == 'agent_moved']
+        # Calcular tiempo de transito (eventos estado_agente)
+        move_events = self.events_df[self.events_df['tipo'] == 'estado_agente']
         transito_count = 0
         
         for _, event in move_events.iterrows():
-            if 'data' in event and event['data'] and 'position' in event['data']:
+            # Los eventos estado_agente tienen position directamente en el evento, no en data
+            if 'position' in event and event['position']:
                 try:
-                    position = event['data']['position']
-                    if isinstance(position, list) and len(position) >= 2:
+                    position = event['position']
+                    if isinstance(position, (list, tuple)) and len(position) >= 2:
                         x, y = int(position[0]), int(position[1])
                         # Verificar que las coordenadas esten dentro del rango valido
                         if 0 <= x < warehouse_width and 0 <= y < warehouse_height:
                             # Buscar la fila correspondiente e incrementar tiempo_transito
-                            mask = (heatmap_df['x'] == x) & (heatmap_df['y'] == y)
-                            heatmap_df.loc[mask, 'tiempo_transito'] += 1.0  # 1 unidad de tiempo por movimiento
+                            mask = (heatmap_df['x (coordenada)'] == x) & (heatmap_df['y (coordenada)'] == y)
+                            heatmap_df.loc[mask, 'tiempo_transito (segundos)'] += 1.0  # 1 unidad de tiempo por movimiento
                             transito_count += 1
                 except (ValueError, TypeError, IndexError):
                     # Saltar eventos con coordenadas malformadas
@@ -311,7 +312,7 @@ class AnalyticsEngine:
                     
                     tiempo_picking = event['data'].get('tiempo_picking', 0)
                     
-                    if ubicacion and isinstance(ubicacion, list) and len(ubicacion) >= 2 and tiempo_picking > 0:
+                    if ubicacion and isinstance(ubicacion, (list, tuple)) and len(ubicacion) >= 2 and tiempo_picking > 0:
                         x, y = int(ubicacion[0]), int(ubicacion[1])
                         # Verificar que las coordenadas esten dentro del rango valido
                         if 0 <= x < warehouse_width and 0 <= y < warehouse_height:
@@ -501,8 +502,8 @@ class AnalyticsEngine:
         )
         
         # Ordenar indice y columnas para presentacion correcta del almacen
-        # y=0 en la parte superior, x=0 en la izquierda
-        heatmap_matrix = heatmap_matrix.sort_index(ascending=False)  # y invertido (arriba-abajo)
+        # y=0 en la parte inferior, x=0 en la izquierda (como en el layout real)
+        heatmap_matrix = heatmap_matrix.sort_index(ascending=True)   # y normal (abajo-arriba)
         heatmap_matrix = heatmap_matrix.sort_index(axis=1)           # x normal (izquierda-derecha)
         
         # Rellenar valores NaN con 0 (coordenadas sin actividad)
