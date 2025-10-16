@@ -107,7 +107,12 @@ class ConfigurationManager:
         if 'assignment_rules' in config and config['assignment_rules']:
             sanitized_rules = {}
             for agent_type, rules in config['assignment_rules'].items():
-                sanitized_rules[agent_type] = {int(k): v for k, v in rules.items()}
+                # BUGFIX: Verificar que rules es un diccionario antes de iterar
+                if isinstance(rules, dict) and rules:
+                    sanitized_rules[agent_type] = {int(k): v for k, v in rules.items()}
+                else:
+                    # Si rules es vacío o no es un diccionario, mantenerlo como está
+                    sanitized_rules[agent_type] = rules
             config['assignment_rules'] = sanitized_rules
             print("[CONFIG] assignment_rules sanitizada (str -> int)")
 

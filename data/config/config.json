@@ -15,7 +15,7 @@
         }
     },
     "capacidad_carro": 150,
-    "dispatch_strategy": "Optimizacion Global",
+    "dispatch_strategy": "Ejecucion de Plan (Filtro por Prioridad)",
     "tour_type": "Tour Mixto (Multi-Destino)",
     "layout_file": "layouts/WH1.tmx",
     "sequence_file": "layouts/Warehouse_Logic.xlsx",

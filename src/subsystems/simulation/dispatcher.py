@@ -74,7 +74,10 @@ class DispatcherV11:
         self.operadores_activos: Dict[str, Any] = {}             # {operator_id: assigned_tour}
 
         # Dispatch Strategy (from config.json)
+        print(f"[DISPATCHER DEBUG] Configuración recibida: {configuracion}")
+        print(f"[DISPATCHER DEBUG] dispatch_strategy en config: '{configuracion.get('dispatch_strategy', 'NO ENCONTRADO')}'")
         self.estrategia = configuracion.get('dispatch_strategy', 'Optimizacion Global')
+        print(f"[DISPATCHER DEBUG] Estrategia asignada: '{self.estrategia}'")
 
         # Statistics
         self.total_asignaciones = 0
@@ -87,9 +90,9 @@ class DispatcherV11:
         self.max_wos_por_tour = configuracion.get('max_wos_por_tour', 20)
         self.radio_cercania = configuracion.get('radio_cercania', 100)  # Grid cells
 
-        # print(f"[DISPATCHER] Inicializado con estrategia: '{self.estrategia}'")
-        # print(f"[DISPATCHER] Max WOs por tour: {self.max_wos_por_tour}, "
-        #       f"Radio cercania: {self.radio_cercania}")
+        print(f"[DISPATCHER] Inicializado con estrategia: '{self.estrategia}'")
+        print(f"[DISPATCHER] Max WOs por tour: {self.max_wos_por_tour}, "
+              f"Radio cercania: {self.radio_cercania}")
 
     def agregar_work_orders(self, work_orders: List[Any]) -> None:
         """
@@ -196,7 +199,7 @@ class DispatcherV11:
             
             return None
 
-        # print(f"[DISPATCHER] Estrategia '{self.estrategia}' selecciono {len(candidatos)} candidatos")
+        print(f"[DISPATCHER] Estrategia '{self.estrategia}' selecciono {len(candidatos)} candidatos")
 
         # Step 3: Select best batch based on strategy
         if self.estrategia == "Optimizacion Global":
@@ -255,12 +258,14 @@ class DispatcherV11:
             return self._estrategia_fifo(operator)
         elif self.estrategia == "Optimizacion Global":
             return self._estrategia_optimizacion_global(operator)
+        elif self.estrategia == "Ejecucion de Plan (Filtro por Prioridad)":
+            return self._estrategia_ejecucion_plan(operator)
         elif self.estrategia == "Cercania":
             return self._estrategia_cercania(operator)
         else:
-            # Default to FIFO if unknown strategy
-            print(f"[DISPATCHER WARN] Estrategia desconocida '{self.estrategia}', usando FIFO")
-            return self._estrategia_fifo(operator)
+            # Default to Optimizacion Global if unknown strategy
+            print(f"[DISPATCHER WARN] Estrategia desconocida '{self.estrategia}', usando Optimizacion Global")
+            return self._estrategia_optimizacion_global(operator)
 
     def _estrategia_fifo(self, operator: Any) -> List[Any]:
         """
@@ -319,6 +324,38 @@ class DispatcherV11:
         
         # Paso 4: Construir tour siguiendo pick_sequence desde la primera WO (solo mismo área)
         tour_wos = self._construir_tour_por_secuencia(operator, best_first_wo, candidatos_area_prioridad)
+        
+        return tour_wos
+
+    def _estrategia_ejecucion_plan(self, operator: Any) -> List[Any]:
+        """
+        Ejecución de Plan (Filtro por Prioridad):
+        ÚNICA DIFERENCIA respecto a Optimización Global:
+        - NO usa AssignmentCostCalculator para la primera WO
+        - Selecciona la WO con el pick_sequence más pequeño del área con mayor prioridad
+        - El resto del tour se construye igual que Optimización Global
+        """
+        # Paso 1: Filtrar por compatibilidad de área de trabajo
+        candidatos_compatibles = [wo for wo in self.work_orders_pendientes
+                                 if operator.can_handle_work_area(wo.work_area)]
+        
+        if not candidatos_compatibles:
+            return []
+        
+        # Paso 2: Filtrar solo WOs del área de trabajo con MAYOR prioridad
+        candidatos_area_prioridad = self._filtrar_por_area_prioridad(operator, candidatos_compatibles)
+        
+        if not candidatos_area_prioridad:
+            return []
+        
+        # Paso 3: Seleccionar la primera WO con el pick_sequence más pequeño (SIN AssignmentCostCalculator)
+        print(f"[DISPATCHER DEBUG] Ejecucion de Plan: Buscando WO con menor pick_sequence entre {len(candidatos_area_prioridad)} candidatos")
+        primera_wo = min(candidatos_area_prioridad, key=lambda wo: wo.pick_sequence)
+        
+        print(f"[DISPATCHER DEBUG] Ejecucion de Plan: Primera WO seleccionada: {primera_wo.id} con pick_sequence={primera_wo.pick_sequence}")
+        
+        # Paso 4: Construir tour siguiendo pick_sequence desde la primera WO (igual que Optimización Global)
+        tour_wos = self._construir_tour_por_secuencia(operator, primera_wo, candidatos_area_prioridad)
         
         return tour_wos
 

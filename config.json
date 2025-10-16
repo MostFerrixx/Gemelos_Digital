@@ -15,12 +15,11 @@
         }
     },
     "capacidad_carro": 150,
-    "dispatch_strategy": "Tour Simple",
+    "dispatch_strategy": "Ejecucion de Plan (Filtro por Prioridad)",
     "tour_type": "Tour Mixto (Multi-Destino)",
     "layout_file": "layouts/WH1.tmx",
     "sequence_file": "layouts/Warehouse_Logic.xlsx",
     "map_scale": 1.3,
-    "selected_resolution_key": "Pequena (800x800)",
     "num_operarios_terrestres": 2,
     "num_montacargas": 1,
     "num_operarios_total": 3,

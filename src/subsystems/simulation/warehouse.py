@@ -177,6 +177,8 @@ class AlmacenMejorado:
         # BUGFIX JSONL: Crear dispatcher DESPUÉS de completar inicialización
         # para evitar problemas de referencia con replay_buffer
         from .dispatcher import DispatcherV11
+        print(f"[WAREHOUSE DEBUG] Configuración pasada al DispatcherV11: {configuracion}")
+        print(f"[WAREHOUSE DEBUG] dispatch_strategy en config: '{configuracion.get('dispatch_strategy', 'NO ENCONTRADO')}'")
         self.dispatcher = DispatcherV11(
             env=env,
             almacen=self,
