@@ -171,7 +171,7 @@ class SimulationEngine:
         # REFACTOR: Pygame ya esta inicializado en crear_simulacion(), solo configurar ventana
         
         PANEL_WIDTH = 400
-        # 1. Obtener la clave de resolucion seleccionada por el usuario
+        # 1. Usar resolucion por defecto (ya no es requerida en config)
         resolution_key = self.configuracion.get('selected_resolution_key', "Pequena (800x800)")
         
         # 2. Buscar el tamano (ancho, alto) en nuestro diccionario

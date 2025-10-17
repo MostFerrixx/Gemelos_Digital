@@ -200,8 +200,8 @@ class VentanaConfiguracion:
         self.vol_grande = tk.IntVar(value=80)
 
         # Recursos
-        self.num_operarios_terrestres = tk.IntVar(value=1)
-        self.num_montacargas = tk.IntVar(value=1)
+        self.num_operarios_terrestres = tk.IntVar(value=2)
+        self.num_montacargas = tk.IntVar(value=2)
         self.capacidad_montacargas = tk.IntVar(value=1000)
         self.capacidad_carro = tk.IntVar(value=150)
         self.tiempo_descarga_por_tarea = tk.IntVar(value=5)
@@ -1393,7 +1393,7 @@ class VentanaConfiguracion:
 
                     # Recursos
                     self.num_operarios_terrestres.set(config.get('num_operarios_terrestres', 2))
-                    self.num_montacargas.set(config.get('num_montacargas', 1))
+                    self.num_montacargas.set(config.get('num_montacargas', 2))
                     self.capacidad_montacargas.set(config.get('capacidad_montacargas', 1000))
                     self.tiempo_descarga_por_tarea.set(config.get('tiempo_descarga_por_tarea', 5))
 
@@ -1443,7 +1443,7 @@ class VentanaConfiguracion:
 
             # Recursos
             self.num_operarios_terrestres.set(2)
-            self.num_montacargas.set(1)
+            self.num_montacargas.set(2)
             self.capacidad_montacargas.set(1000)
             self.tiempo_descarga_por_tarea.set(5)
 
@@ -1854,8 +1854,8 @@ class ConfiguradorSimulador:
             self.ventana_config.capacidad_carro.set(config.get('capacidad_carro', 150))
 
             # Recursos
-            self.ventana_config.num_operarios_terrestres.set(config.get('num_operarios_terrestres', 1))
-            self.ventana_config.num_montacargas.set(config.get('num_montacargas', 1))
+            self.ventana_config.num_operarios_terrestres.set(config.get('num_operarios_terrestres', 2))
+            self.ventana_config.num_montacargas.set(config.get('num_montacargas', 2))
             self.ventana_config.capacidad_montacargas.set(config.get('capacidad_montacargas', 1000))
             self.ventana_config.tiempo_descarga_por_tarea.set(config.get('tiempo_descarga_por_tarea', 5))
 

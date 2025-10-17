@@ -866,9 +866,9 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
                 env=env,
                 almacen=almacen,
                 configuracion=configuracion,
-                capacity=150,  # Default capacity
+                capacity=150,
                 discharge_time=5,
-                work_area_priorities={"Area_Ground": 1, "Area_High": 2, "Area_Special": 3},  # FIX: Use available areas
+                work_area_priorities={"Area_Ground": 1, "Area_High": 2, "Area_Special": 3},
                 pathfinder=pathfinder,
                 layout_manager=layout_manager,
                 simulador=simulador
@@ -885,9 +885,9 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
                 env=env,
                 almacen=almacen,
                 configuracion=configuracion,
-                capacity=1000,  # Default capacity
+                capacity=1000,
                 discharge_time=5,
-                work_area_priorities={"Area_High": 1, "Area_Special": 2},  # FIX: Use available areas
+                work_area_priorities={"Area_High": 1, "Area_Special": 2},
                 pathfinder=pathfinder,
                 layout_manager=layout_manager,
                 simulador=simulador

@@ -1,17 +1,14 @@
 {
     "metadata": {
-        "id": "config_config_por_defecto_20251009_010135",
-        "name": "Config Por Defecto",
-        "description": "Configuración por defecto del sistema",
-        "created_at": "2025-10-15T23:57:21.490073",
-        "modified_at": "2025-10-15T23:57:21.490124",
+        "id": "config_actual_20251016_211359",
+        "name": "Actual",
+        "description": "Actual",
+        "created_at": "2025-10-17T11:26:53.465631",
+        "modified_at": "2025-10-17T11:26:53.465660",
         "version": "1.0",
-        "tags": [
-            "default",
-            "basica"
-        ],
+        "tags": [],
         "author": "Usuario",
-        "is_default": true
+        "is_default": false
     },
     "configuration": {
         "total_ordenes": 30,
@@ -55,22 +52,6 @@
         },
         "agent_types": [
             {
-                "type": "GroundOperator",
-                "capacity": 150,
-                "discharge_time": 5,
-                "work_area_priorities": {
-                    "Area_Ground": 1
-                }
-            },
-            {
-                "type": "GroundOperator",
-                "capacity": 150,
-                "discharge_time": 5,
-                "work_area_priorities": {
-                    "Area_Ground": 1
-                }
-            },
-            {
                 "type": "Forklift",
                 "capacity": 300,
                 "discharge_time": 5,
@@ -81,11 +62,42 @@
             },
             {
                 "type": "Forklift",
-                "capacity": 300,
-                "discharge_time": 5,
+                "capacity": 1000,
+                "discharge_time": 6,
                 "work_area_priorities": {
-                    "Area_High": 1,
-                    "Area_Special": 2
+                    "Area_Ground": 1
+                }
+            },
+            {
+                "type": "Forklift",
+                "capacity": 1000,
+                "discharge_time": 6,
+                "work_area_priorities": {
+                    "Area_Ground": 1
+                }
+            },
+            {
+                "type": "Forklift",
+                "capacity": 1000,
+                "discharge_time": 6,
+                "work_area_priorities": {
+                    "Area_Ground": 1
+                }
+            },
+            {
+                "type": "Forklift",
+                "capacity": 1000,
+                "discharge_time": 6,
+                "work_area_priorities": {
+                    "Area_Ground": 1
+                }
+            },
+            {
+                "type": "Forklift",
+                "capacity": 1000,
+                "discharge_time": 6,
+                "work_area_priorities": {
+                    "Area_Ground": 1
                 }
             }
         ],

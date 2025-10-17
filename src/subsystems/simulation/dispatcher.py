@@ -202,11 +202,12 @@ class DispatcherV11:
         print(f"[DISPATCHER] Estrategia '{self.estrategia}' selecciono {len(candidatos)} candidatos")
 
         # Step 3: Select best batch based on strategy
-        if self.estrategia == "Optimizacion Global":
-            # Para Optimización Global, usar el tour construido por proximidad
-            # Los candidatos ya están ordenados por proximidad en _estrategia_optimizacion_global
+        if self.estrategia in ("Optimizacion Global", "Ejecucion de Plan (Filtro por Prioridad)"):
+            # Para estas estrategias, los candidatos YA representan el tour correcto
+            # - Optimizacion Global: primera WO por costo, resto por pick_sequence
+            # - Ejecucion de Plan: todo por pick_sequence desde la primera WO
             selected_work_orders = candidatos
-            print(f"[DISPATCHER] Optimización Global: usando tour construido por proximidad ({len(selected_work_orders)} WOs)")
+            print(f"[DISPATCHER] {self.estrategia}: usando tour construido por la estrategia ({len(selected_work_orders)} WOs)")
         else:
             # Para otras estrategias, usar selección por costo
             selected_work_orders = self._seleccionar_mejor_batch(operator, candidatos)
@@ -298,9 +299,9 @@ class DispatcherV11:
     def _estrategia_optimizacion_global(self, operator: Any) -> List[Any]:
         """
         Optimización Global CORRECTA:
-        1. Filtrar WOs del área de trabajo con MAYOR prioridad
-        2. Usar AssignmentCostCalculator solo para la PRIMERA WO entre esas
-        3. Para el resto del tour, seguir pick_sequence del Excel (solo del mismo área)
+        1. Considerar TODAS las WOs compatibles con el operador (todas las áreas compatibles)
+        2. Usar AssignmentCostCalculator solo para la PRIMERA WO (minimizar desplazamiento desde posicion actual)
+        3. Para el resto del tour, seguir pick_sequence del Excel (solo del mismo área que la primera WO)
         """
         # Paso 1: Filtrar por compatibilidad de área de trabajo
         candidatos_compatibles = [wo for wo in self.work_orders_pendientes
@@ -309,21 +310,23 @@ class DispatcherV11:
         if not candidatos_compatibles:
             return []
         
-        # Paso 2: Filtrar solo WOs del área de trabajo con MAYOR prioridad
+        # Paso 2: FILTRAR al área de MAYOR PRIORIDAD del operario (respeto estricto de WA)
         candidatos_area_prioridad = self._filtrar_por_area_prioridad(operator, candidatos_compatibles)
-        
         if not candidatos_area_prioridad:
             return []
-        
-        # Paso 3: Usar AssignmentCostCalculator para encontrar la MEJOR primera WO
-        print(f"[DISPATCHER DEBUG] Buscando mejor primera WO entre {len(candidatos_area_prioridad)} candidatos")
+
+        # Paso 3: Usar AssignmentCostCalculator para encontrar la MEJOR primera WO dentro del área prioritaria
+        print(f"[DISPATCHER DEBUG] [Optimización Global] Evaluando mejor primera WO (area prioritaria) entre {len(candidatos_area_prioridad)} candidatos")
         best_first_wo = self._encontrar_mejor_primera_wo(operator, candidatos_area_prioridad)
         if not best_first_wo:
             print(f"[DISPATCHER DEBUG] No se encontró mejor primera WO")
             return []
         
-        # Paso 4: Construir tour siguiendo pick_sequence desde la primera WO (solo mismo área)
-        tour_wos = self._construir_tour_por_secuencia(operator, best_first_wo, candidatos_area_prioridad)
+        print(f"[DISPATCHER] [Optimización Global] Primera WO por costo: {best_first_wo.id} (seq={best_first_wo.pick_sequence}, area={best_first_wo.work_area})")
+        
+        # Paso 4: Construir tour siguiendo pick_sequence desde la primera WO
+        # Preferir misma área, pero permitir cambio de área si se agota la secuencia
+        tour_wos = self._construir_tour_por_secuencia(operator, best_first_wo, candidatos_compatibles)
         
         return tour_wos
 
@@ -442,119 +445,96 @@ class DispatcherV11:
 
     def _construir_tour_por_secuencia(self, operator: Any, primera_wo: Any, candidatos: List[Any]) -> List[Any]:
         """
-        Construye tour siguiendo pick_sequence desde la primera WO (solo mismo área)
-        
-        Args:
-            operator: Operador para evaluar capacidad
-            primera_wo: Primera WorkOrder seleccionada
-            candidatos: Lista de WorkOrders del mismo área
-            
-        Returns:
-            List[WorkOrder] - Tour construido siguiendo pick_sequence
+        Construye tour siguiendo pick_sequence desde la primera WO.
+        - Agota todas las WOs del área de la primera WO antes de pasar a la siguiente área
+          en orden de prioridad del operador (2, luego 3, etc.).
+        - Mantiene la posición de secuencia entre cambios de área (cíclica).
         """
         if not primera_wo or not candidatos:
             return []
-        
-        # Filtrar solo WOs del mismo área que la primera WO
-        mismo_area_wos = [wo for wo in candidatos if wo.work_area == primera_wo.work_area]
-        
-        # Ordenar por pick_sequence, pero mantener la primera WO al inicio
-        mismo_area_wos.sort(key=lambda wo: wo.pick_sequence)
-        
-        # Mover la primera WO al inicio del tour si no está ya ahí
-        if primera_wo in mismo_area_wos:
-            mismo_area_wos.remove(primera_wo)
-            mismo_area_wos.insert(0, primera_wo)
-        
-        # Construir tour respetando capacidad
-        tour_wos = []
+
+        # Agregar primera WO si cabe
+        tour_wos: List[Any] = []
         volume_acumulado = 0
-        
-        # Agregar primera WO
         primera_volume = primera_wo.calcular_volumen_restante()
         if primera_volume <= operator.capacity:
             tour_wos.append(primera_wo)
             volume_acumulado += primera_volume
-        
-        # Construir tour siguiendo pick_sequence desde la primera WO (REGLAS DOCUMENTADAS)
-        # Regla 2: Mantener posición actual en pick_sequence y evaluar siguiente
-        # Regla 3: Evaluar cada WO en orden de pick_sequence
-        # Regla 5: Al llegar al final, reiniciar desde 1
-        
-        # Ordenar todas las WOs por pick_sequence
-        all_area_wos = sorted(mismo_area_wos, key=lambda wo: wo.pick_sequence)
-        
-        # Encontrar la posición de la primera WO en la secuencia
-        first_wo_sequence = primera_wo.pick_sequence
-        current_sequence_position = first_wo_sequence  # Empezar desde la misma posición
-        
-        # Obtener el máximo pick_sequence para saber cuándo reiniciar
-        max_pick_sequence = max(wo.pick_sequence for wo in all_area_wos)
-        
-        # Agregar WOs siguientes en orden de pick_sequence (AGOTAR MISMO PICK_SEQUENCE PRIMERO)
-        while (len(tour_wos) < self.max_wos_por_tour and 
-               volume_acumulado < operator.capacity):
+
+        # Preparar lista de áreas compatibles ordenadas por prioridad del operador
+        areas_presentes = {}
+        for wo in candidatos:
+            pr = operator.get_priority_for_work_area(wo.work_area)
+            if pr != 999:
+                areas_presentes[wo.work_area] = pr
+
+        # Ordenar áreas por prioridad
+        otras_areas = [a for a in areas_presentes.keys() if a != primera_wo.work_area]
+        otras_areas.sort(key=lambda a: areas_presentes[a])
+        ordered_areas = [primera_wo.work_area] + otras_areas
+
+        # Estado de secuencia: iniciar en pick_sequence de la primera WO
+        current_sequence_position = primera_wo.pick_sequence
+        usadas = set(tour_wos)
+
+        # Consumir cada área en orden de prioridad
+        for area in ordered_areas:
+            if len(tour_wos) >= self.max_wos_por_tour or volume_acumulado >= operator.capacity:
+                break
+                
+            # Obtener WOs disponibles del área actual
+            area_wos = [wo for wo in candidatos if wo.work_area == area and wo not in usadas]
+            if not area_wos:
+                continue
+                
+            area_wos.sort(key=lambda wo: wo.pick_sequence)
+            max_seq = max(wo.pick_sequence for wo in area_wos)
             
-            # Buscar TODAS las WOs del mismo pick_sequence (priorizando proximidad)
-            same_sequence_wos = []
-            for wo in all_area_wos:
-                if wo.pick_sequence == current_sequence_position and wo != primera_wo:
-                    wo_volume = wo.calcular_volumen_restante()
-                    if volume_acumulado + wo_volume <= operator.capacity:
-                        # Calcular distancia desde la última WO del tour
-                        if tour_wos:
-                            last_wo_position = tour_wos[-1].ubicacion
-                            distance = abs(wo.ubicacion[0] - last_wo_position[0]) + abs(wo.ubicacion[1] - last_wo_position[1])
-                        else:
-                            # Si no hay WOs en el tour, usar posición del operador
-                            current_pos = operator.current_position
-                            if current_pos is None:
-                                staging_locs = self.data_manager.get_outbound_staging_locations()
-                                current_pos = staging_locs.get(1, (3, 29))
-                            distance = abs(wo.ubicacion[0] - current_pos[0]) + abs(wo.ubicacion[1] - current_pos[1])
+            # Consumir WOs del área siguiendo pick_sequence cíclico
+            seq_checked = set()
+            while len(tour_wos) < self.max_wos_por_tour and volume_acumulado < operator.capacity:
+                # Buscar WOs del pick_sequence actual
+                candidatos_seq = []
+                for wo in area_wos:
+                    if (wo.pick_sequence == current_sequence_position and 
+                        wo not in usadas and
+                        volume_acumulado + wo.calcular_volumen_restante() <= operator.capacity):
                         
-                        same_sequence_wos.append((wo, distance))
-            
-            if same_sequence_wos:
-                # Ordenar por proximidad y tomar la más cercana
-                same_sequence_wos.sort(key=lambda x: x[1])
-                next_wo, best_distance = same_sequence_wos[0]
-                
-                # Agregar la WO al tour
-                wo_volume = next_wo.calcular_volumen_restante()
-                tour_wos.append(next_wo)
-                volume_acumulado += wo_volume
-                # Log solo para debugging específico
-                if len(tour_wos) <= 3:  # Solo log para las primeras 3 WOs
-                    print(f"[DISPATCHER DEBUG] Agregada WO {next_wo.id} (pick_sequence: {next_wo.pick_sequence}, distancia: {best_distance})")
-                
-                # Remover la WO de la lista para no repetirla
-                all_area_wos.remove(next_wo)
-                
-                # NO avanzar current_sequence_position - mantener hasta agotar todas las WOs del mismo pick_sequence
-            else:
-                # No hay más WOs del mismo pick_sequence, avanzar al siguiente
-                current_sequence_position += 1
-                
-                # Verificar si hay WOs disponibles en algún pick_sequence
-                available_wos = [wo for wo in all_area_wos if wo != primera_wo]
-                if not available_wos:
-                    print(f"[DISPATCHER DEBUG] No hay más WOs disponibles, terminando tour")
-                    break
-                
-                # Regla 5: Si llegamos al final, reiniciar desde 1
-                if current_sequence_position > max_pick_sequence:
-                    current_sequence_position = 1
-                    print(f"[DISPATCHER DEBUG] Llegado al final de pick_sequence, reiniciando desde 1")
-                
-                # Verificar si hemos dado una vuelta completa sin encontrar WOs
-                if current_sequence_position == first_wo_sequence:
-                    print(f"[DISPATCHER DEBUG] Vuelta completa sin encontrar más WOs, terminando tour")
-                    break
-        
-        print(f"[DISPATCHER] Tour construido: {len(tour_wos)} WOs, "
-              f"volumen total: {volume_acumulado}/{operator.capacity}")
-        
+                        # Calcular distancia desde última WO o posición del operador
+                        if tour_wos:
+                            last_pos = tour_wos[-1].ubicacion
+                        else:
+                            last_pos = operator.current_position or (3, 29)
+                        dist = abs(wo.ubicacion[0] - last_pos[0]) + abs(wo.ubicacion[1] - last_pos[1])
+                        candidatos_seq.append((wo, dist))
+
+                if candidatos_seq:
+                    # Agregar la WO más cercana
+                    candidatos_seq.sort(key=lambda x: x[1])
+                    wo_sel, _ = candidatos_seq[0]
+                    vol_sel = wo_sel.calcular_volumen_restante()
+                    
+                    tour_wos.append(wo_sel)
+                    usadas.add(wo_sel)
+                    volume_acumulado += vol_sel
+                    area_wos.remove(wo_sel)
+                    
+                    # Mantener current_sequence_position hasta agotar este seq
+                    seq_checked.clear()
+                else:
+                    # Marcar este seq como revisado
+                    seq_checked.add(current_sequence_position)
+                    
+                    # Avanzar secuencia cíclicamente
+                    current_sequence_position += 1
+                    if current_sequence_position > max_seq:
+                        current_sequence_position = 1
+                    
+                    # Si revisamos todos los seqs disponibles, salir del área
+                    if len(seq_checked) >= len(set(wo.pick_sequence for wo in area_wos)):
+                        break
+
+        print(f"[DISPATCHER] Tour construido: {len(tour_wos)} WOs, volumen total: {volume_acumulado}/{operator.capacity}")
         return tour_wos
 
     def _estrategia_cercania(self, operator: Any) -> List[Any]:
@@ -736,6 +716,7 @@ class DispatcherV11:
                 'total_qty': wo.cantidad_total,
                 'volume': getattr(wo, 'volume', wo.volumen_restante),
                 'location': wo.ubicacion,
+                'pick_sequence': getattr(wo, 'pick_sequence', None),
                 'staging': wo.staging_id,
                 'work_group': wo.work_group,
                 'work_area': wo.work_area,
@@ -783,6 +764,7 @@ class DispatcherV11:
             'total_qty': work_order.cantidad_total,
             'volume': getattr(work_order, 'volume', work_order.volumen_restante),
             'location': work_order.ubicacion,
+                'pick_sequence': getattr(work_order, 'pick_sequence', None),
             'staging': work_order.staging_id,
             'work_group': work_order.work_group,
             'work_area': work_order.work_area,
@@ -838,6 +820,7 @@ class DispatcherV11:
                 'total_qty': wo.cantidad_total,
                 'volume': getattr(wo, 'volume', wo.volumen_restante),
                 'location': wo.ubicacion,
+                'pick_sequence': getattr(wo, 'pick_sequence', None),
                 'staging': wo.staging_id,
                 'work_group': wo.work_group,
                 'work_area': wo.work_area,

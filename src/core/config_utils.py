@@ -26,13 +26,10 @@ def get_default_config() -> dict:
         'layout_file': 'layouts/WH1.tmx',
         'sequence_file': 'layouts/Warehouse_Logic.xlsx',
 
-        # Configuracion de ventana
-        'selected_resolution_key': 'Pequena (800x800)',
-
         # Configuracion de operarios
-        'num_operarios_terrestres': 1,
-        'num_montacargas': 1,
-        'num_operarios_total': 2,
+        'num_operarios_terrestres': 2,
+        'num_montacargas': 2,
+        'num_operarios_total': 4,
         'capacidad_montacargas': 1000,
 
         # Configuracion de asignacion de recursos
@@ -44,7 +41,45 @@ def get_default_config() -> dict:
         # Compatibilidad con codigo existente
         'tareas_zona_a': 0,
         'tareas_zona_b': 0,
-        'num_operarios': 2
+        'num_operarios': 4,
+        
+        # Agent types configuration
+        'agent_types': [
+            {
+                "type": "GroundOperator",
+                "capacity": 150,
+                "discharge_time": 5,
+                "work_area_priorities": {
+                    "Area_Ground": 1
+                }
+            },
+            {
+                "type": "GroundOperator", 
+                "capacity": 150,
+                "discharge_time": 5,
+                "work_area_priorities": {
+                    "Area_Ground": 1
+                }
+            },
+            {
+                "type": "Forklift",
+                "capacity": 1000,
+                "discharge_time": 5,
+                "work_area_priorities": {
+                    "Area_High": 1,
+                    "Area_Special": 2
+                }
+            },
+            {
+                "type": "Forklift",
+                "capacity": 1000,
+                "discharge_time": 5,
+                "work_area_priorities": {
+                    "Area_High": 1,
+                    "Area_Special": 2
+                }
+            }
+        ]
     }
 
 

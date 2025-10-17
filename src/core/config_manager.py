@@ -31,7 +31,6 @@ class ConfigurationManager:
     REQUIRED_KEYS = [
         'layout_file',
         'sequence_file',
-        'selected_resolution_key',
         'num_operarios_total'
     ]
 
