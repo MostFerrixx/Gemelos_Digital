@@ -10,6 +10,32 @@ import simpy
 from typing import List, Dict, Any, Optional, Tuple
 
 
+def determinar_staging_destino(work_orders: List[Any], data_manager: Any) -> Tuple[int, Tuple[int, int]]:
+    """
+    Determina el staging correcto basado en las WorkOrders del tour
+    
+    Args:
+        work_orders: Lista de WorkOrders del tour
+        data_manager: DataManager para obtener ubicaciones de staging
+        
+    Returns:
+        Tuple[int, Tuple[int, int]]: (staging_id, ubicacion)
+    """
+    if not work_orders:
+        # Default to staging 1 if no work orders
+        staging_locs = data_manager.get_outbound_staging_locations()
+        return 1, staging_locs.get(1, (3, 29))
+    
+    # Get staging_id from first work order (all should be same in Tour Simple)
+    staging_id = work_orders[0].staging_id
+    
+    # Get staging location from data_manager
+    staging_locs = data_manager.get_outbound_staging_locations()
+    ubicacion = staging_locs.get(staging_id, (3, 29))  # Default to staging 1 location
+    
+    return staging_id, ubicacion
+
+
 class BaseOperator:
     """
     Base class for warehouse operators
@@ -378,7 +404,9 @@ class GroundOperator(BaseOperator):
                     })
 
             # PASO 4: Navegar a staging area para descarga usando pathfinding paso a paso
-            depot_location = self.almacen.data_manager.outbound_staging_locations.get(1, (0, 0))
+            # Determine correct staging based on work orders
+            staging_id, depot_location = determinar_staging_destino(work_orders, self.almacen.data_manager)
+            print(f"[{self.id}] Navegando a staging {staging_id} en ubicación {depot_location}")
 
             if hasattr(self.almacen, 'route_calculator') and self.almacen.route_calculator:
                 try:
@@ -731,7 +759,9 @@ class Forklift(BaseOperator):
                     })
 
             # PASO 4: Navegar a staging area para descarga usando pathfinding paso a paso
-            depot_location = self.almacen.data_manager.outbound_staging_locations.get(1, (0, 0))
+            # Determine correct staging based on work orders
+            staging_id, depot_location = determinar_staging_destino(work_orders, self.almacen.data_manager)
+            print(f"[{self.id}] Navegando a staging {staging_id} en ubicación {depot_location}")
 
             if hasattr(self.almacen, 'route_calculator') and self.almacen.route_calculator:
                 try:
