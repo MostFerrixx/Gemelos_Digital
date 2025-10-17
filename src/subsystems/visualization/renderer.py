@@ -320,8 +320,18 @@ def renderizar_agentes(surface: pygame.Surface,
 
             # Dibujar ID del agente encima
             if font:
-                # Mostrar solo ultimos caracteres del ID para no saturar
-                id_corto = agent_id.split('_')[-1] if '_' in agent_id else agent_id[-2:]
+                # Convertir ID largo a formato corto para display
+                if 'GroundOp-' in agent_id:
+                    # GroundOp-01 -> GO1
+                    number = agent_id.replace('GroundOp-', '').lstrip('0') or '1'
+                    id_corto = f"GO{number}"
+                elif 'Forklift-' in agent_id:
+                    # Forklift-01 -> FL1  
+                    number = agent_id.replace('Forklift-', '').lstrip('0') or '1'
+                    id_corto = f"FL{number}"
+                else:
+                    # Fallback: mostrar solo ultimos caracteres del ID para no saturar
+                    id_corto = agent_id.split('_')[-1] if '_' in agent_id else agent_id[-2:]
                 texto = font.render(id_corto, True, (255, 255, 255))
                 texto_rect = texto.get_rect(center=(int(x), int(y) - 15))
 
@@ -558,35 +568,39 @@ def renderizar_diagnostico_layout(surface: pygame.Surface, layout_manager) -> No
 
 def _determinar_color_agente(tipo: str, status: str) -> Tuple[int, int, int]:
     """
-    Determina el color de un agente segun su tipo y status.
+    Determina el color de un agente segun su status (igual que el dashboard).
 
     Args:
-        tipo: Tipo de agente ("terrestre" | "montacargas")
-        status: Status del agente ("idle" | "working" | "traveling")
+        tipo: Tipo de agente ("terrestre" | "montacargas") - NO USADO
+        status: Status del agente ("idle" | "moving" | "picking" | "lifting" | "unloading" | "working")
 
     Returns:
         Tupla RGB (r, g, b)
 
-    Logica de colores:
-        1. Si status == "idle": Siempre gris (COLOR_AGENTE_IDLE)
-        2. Si status == "working": Siempre verde (COLOR_AGENTE_TRABAJANDO)
-        3. Si status == "traveling": Color segun tipo
-           - terrestre: Naranja (COLOR_AGENTE_TERRESTRE)
-           - montacargas: Azul (COLOR_AGENTE_MONTACARGAS)
+    Logica de colores (igual que dashboard):
+        - moving (En ruta): Verde claro #A6E3A1
+        - picking (Picking): Azul claro #89B4FA  
+        - lifting (Elevando): Púrpura claro #CBA6F7
+        - unloading (Descargando): Rosa/Rojo claro #F38BA8
+        - idle (Inactivo): Gris #808080
+        - working (Trabajando): Naranja #FF9800
     """
-    # Prioridad 1: Status idle
-    if status == 'idle':
-        return COLOR_AGENTE_IDLE
-
-    # Prioridad 2: Status working
-    if status == 'working':
-        return COLOR_AGENTE_TRABAJANDO
-
-    # Prioridad 3: Color segun tipo (para traveling u otros)
-    if tipo == 'montacargas' or tipo == 'Forklift':  # NUEVO: Soporte para Forklift
-        return COLOR_AGENTE_MONTACARGAS
-    else:
-        return COLOR_AGENTE_TERRESTRE
+    # Colores del dashboard por status
+    status_colors = {
+        'moving': (166, 227, 161),    # #A6E3A1 - Verde claro (En ruta)
+        'picking': (137, 180, 250),   # #89B4FA - Azul claro (Picking)
+        'lifting': (203, 166, 247),   # #CBA6F7 - Púrpura claro (Elevando)
+        'unloading': (243, 139, 168), # #F38BA8 - Rosa/Rojo claro (Descargando)
+        'discharging': (243, 139, 168), # #F38BA8 - Mismo que unloading
+        'idle': (128, 128, 128),      # #808080 - Gris (Inactivo)
+        'working': (255, 152, 0),     # #FF9800 - Naranja (Trabajando)
+        'traveling': (166, 227, 161), # #A6E3A1 - Mismo que moving
+        'waiting': (128, 128, 128),   # #808080 - Gris (Esperando)
+        'error': (255, 0, 0),         # #FF0000 - Rojo (Error)
+    }
+    
+    # Retornar color segun status, fallback a gris si no se encuentra
+    return status_colors.get(status.lower(), status_colors['idle'])
 
 
 def _convertir_grid_a_pixel_seguro(layout_manager,

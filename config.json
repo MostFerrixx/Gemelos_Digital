@@ -40,6 +40,22 @@
     },
     "agent_types": [
         {
+            "type": "GroundOperator",
+            "capacity": 150,
+            "discharge_time": 3,
+            "work_area_priorities": {
+                "Area_Ground": 1
+            }
+        },
+        {
+            "type": "GroundOperator",
+            "capacity": 100,
+            "discharge_time": 4,
+            "work_area_priorities": {
+                "Area_Special": 1
+            }
+        },
+        {
             "type": "Forklift",
             "capacity": 300,
             "discharge_time": 5,
@@ -50,42 +66,26 @@
         },
         {
             "type": "Forklift",
-            "capacity": 1000,
+            "capacity": 250,
             "discharge_time": 6,
             "work_area_priorities": {
-                "Area_Ground": 1
+                "Area_Special": 1
             }
         },
         {
             "type": "Forklift",
-            "capacity": 1000,
+            "capacity": 250,
             "discharge_time": 6,
             "work_area_priorities": {
-                "Area_Ground": 1
+                "Area_Special": 1
             }
         },
         {
             "type": "Forklift",
-            "capacity": 1000,
+            "capacity": 250,
             "discharge_time": 6,
             "work_area_priorities": {
-                "Area_Ground": 1
-            }
-        },
-        {
-            "type": "Forklift",
-            "capacity": 1000,
-            "discharge_time": 6,
-            "work_area_priorities": {
-                "Area_Ground": 1
-            }
-        },
-        {
-            "type": "Forklift",
-            "capacity": 1000,
-            "discharge_time": 6,
-            "work_area_priorities": {
-                "Area_Ground": 1
+                "Area_Special": 1
             }
         }
     ],

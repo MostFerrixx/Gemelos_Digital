@@ -1,6 +1,6 @@
 {
     "version": "1.0",
-    "last_updated": "2025-10-17T11:26:53.467292",
+    "last_updated": "2025-10-17T12:46:22.857799",
     "configurations": [
         {
             "id": "config_config_producción_20251009_010135",
@@ -35,8 +35,8 @@
             "id": "config_actual_20251016_211359",
             "name": "Actual",
             "description": "Actual",
-            "created_at": "2025-10-17T11:26:53.465631",
-            "modified_at": "2025-10-17T11:26:53.465660",
+            "created_at": "2025-10-17T12:46:22.855808",
+            "modified_at": "2025-10-17T12:46:22.855822",
             "version": "1.0",
             "tags": [],
             "is_default": false,
