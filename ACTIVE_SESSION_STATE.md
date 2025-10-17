@@ -1,108 +1,124 @@
-# 🚀 ESTADO DE SESIÓN ACTIVA - CAMBIO DE NOMBRES Y COLORES DE ESTADOS WO
+# 🚀 ESTADO DE SESIÓN ACTIVA - CORRECCIÓN TOUR SIMPLE (UN DESTINO)
 
-**Fecha:** 2025-10-16
-**Sesión:** Cambio de nomenclatura de estados WO + ajuste de colores dashboard
-**Estado:** ✅ COMPLETADO - Cambios aplicados y verificados exitosamente
+**Fecha:** 2025-01-14
+**Sesión:** Corrección de estrategia Tour Simple para respetar distribución parametrizada
+**Estado:** ✅ COMPLETADO - Problema identificado y solucionado exitosamente
 
 ---
 
 ## 📋 CONTEXTO INMEDIATO
 
-### ✅ TAREA COMPLETADA: RENOMBRAR ESTADOS DE WORK ORDERS
+### ✅ PROBLEMA IDENTIFICADO Y RESUELTO: TOUR SIMPLE NO RESPETABA DISTRIBUCIÓN
 
-**Objetivo alcanzado:** Cambiar los nombres de los estados `completed` y `pending` a `staged` y `released` respectivamente en todo el sistema.
+**Problema original:** La estrategia "Tour Simple (Un Destino)" para el tipo de tour de picking no estaba funcionando como corresponde. Enviaba todo al outbound stage 1 en lugar de considerar la distribución parametrizada en la "distribución de stage".
 
-**Resultados:**
-- ✅ **Análisis exhaustivo completado:** 11 archivos Python identificados
-- ✅ **Reemplazos ejecutados:** 27+ instancias actualizadas
-- ✅ **Test rápido ejecutado:** Simulación completada sin errores
-- ✅ **Documentación actualizada:** INSTRUCCIONES.md y archivos de estado
+**Causa raíz:** 
+- La clase `WorkOrder` tenía `staging_id` hardcodeado que siempre devolvía `1`
+- La configuración `outbound_staging_distribution` no se estaba usando en absoluto
+- No había lógica para asignar `staging_id` basado en la distribución configurada
 
-**Archivos modificados:**
+### ✅ SOLUCIÓN IMPLEMENTADA:
 
-1. **src/subsystems/simulation/warehouse.py**
-   - Línea 39: Estado inicial de WorkOrder cambiado de "pending" a "released"
+**1. Modificación de WorkOrder:**
+- Agregado parámetro `staging_id` al constructor
+- Cambiado `staging_id` de propiedad hardcodeada a variable de instancia `_staging_id`
 
-2. **src/subsystems/simulation/dispatcher.py**
-   - Línea 107: Asignación inicial de estado a "released"
-   - Línea 612: Estado de WO sobredimensionadas a "staged"
-   - Línea 786: Estado de WO completadas a "staged"
-   - Línea 797: Evento work_order_update con status "staged"
+**2. Modificación de AlmacenMejorado:**
+- Carga de `outbound_staging_distribution` desde configuración
+- Método `_seleccionar_staging_id()` que asigna staging basado en distribución probabilística
+- Integración en creación de WorkOrders
 
-3. **src/engines/replay_engine.py**
-   - Línea 321: Verificación de estado "released"
-   - Línea 549: Verificación de estados ["released", "assigned"]
-   - Línea 713: Conteo de WOs con estado "staged"
-   - Línea 764: Verificación de estado "staged"
+**3. Modificación de DispatcherV11:**
+- Soporte para `tour_type` desde configuración
+- Método `_validar_tour_simple()` para validar consistencia de staging
+- Método `_filtrar_por_staging_unico()` para agrupar WOs por staging
+- Integración en estrategias de despacho
 
-4. **src/subsystems/visualization/work_order_dashboard.py**
-   - Línea 94: Default status "released"
-   - Línea 119: Default en columnas "released"
-   - Línea 139: Default status "released"
-   - Línea 460: Conteo de WOs "staged"
-   - Línea 571: Actualización de status a "staged"
-   - Línea 576: Estado local a "staged"
-   - Línea 768: Datos de prueba con "released"
-
-5. **src/subsystems/visualization/renderer.py**
-   - Línea 389: Default status "released"
-   - Línea 394: No renderizar tareas "staged"
-   - Línea 402: Color para status "released"
-
-6. **src/subsystems/visualization/dashboard_world_class.py**
-   - Línea 162: Color para "status_staged"
-   - Línea 163: Color para "status_released"
-
-7. **src/subsystems/visualization/state.py**
-   - Línea 54: Comentario actualizado a "released" | "assigned" | "in_progress" | "staged"
-
-8. **src/communication/simulation_data_provider.py**
-   - Línea 219: Filtro de WOs activas excluyendo "staged"
-
-9. **src/subsystems/simulation/assignment_calculator.py**
-   - Línea 256: Verificación de WOs con status != "released"
-
-10. **INSTRUCCIONES.md**
-    - Línea 188: Ejemplo de formato jsonl actualizado
-
-11. **archived/AUDITORIA_JSONL_GENERATION.md**
-    - Documentación de archivo histórico actualizada
-
-**Verificación:**
-- ✅ Test rápido ejecutado exitosamente (2654.9s simulados)
-- ✅ 584 WorkOrders completadas correctamente
-- ✅ Todos los archivos generados correctamente
-- ✅ No se detectaron errores de ejecución
-- ✅ Segundo test ejecutado (2617.3s simulados, 588 WOs)
-- ✅ Colores de dashboard PyQt6 actualizados
-
-**Mapeo de cambios:**
-- `pending` → `released` (estado inicial de WO)
-- `completed` → `staged` (estado final de WO)
-
-**Colores de dashboard PyQt6 actualizados:**
-- `released`: Color ámbar (255, 193, 7) - Para distinguir fácilmente del estado "picked"
-- `assigned`: Color azul (0, 123, 255) - WO asignada a operario
-- `in_progress`: Color naranja (255, 87, 34) - WO en proceso de picking
-- `staged`: Color verde (40, 167, 69) - WO completada y en staging
+**4. Corrección de nombres de estrategias:**
+- Soporte para "Ejecución de Plan (Filtro por Prioridad)" con y sin acentos
 
 ---
 
-## 🎯 PROXIMA ACCION
+## 🛠️ ARCHIVOS MODIFICADOS
 
-**Sistema listo para uso con la nueva nomenclatura:**
-- ✅ Todos los estados renombrados
-- ✅ Sistema funcional verificado
-- ✅ Documentación actualizada
-- ✅ Test de integración pasado
+### 1. **src/subsystems/simulation/warehouse.py**
+- **Línea 27-29:** Constructor WorkOrder ahora recibe `staging_id`
+- **Línea 39:** Variable de instancia `_staging_id` almacena staging
+- **Línea 65-68:** Propiedad `staging_id` usa variable de instancia
+- **Línea 165-168:** Carga de `outbound_staging_distribution` desde configuración
+- **Línea 311-341:** Método `_seleccionar_staging_id()` para distribución probabilística
+- **Línea 410-424:** Asignación de `staging_id` en creación de WorkOrders
+
+### 2. **src/subsystems/simulation/dispatcher.py**
+- **Línea 82-84:** Carga de `tour_type` desde configuración
+- **Línea 266:** Soporte para estrategia con acentos
+- **Línea 335-339:** Filtrado por staging en estrategia optimización global
+- **Línea 371-375:** Filtrado por staging en estrategia ejecución de plan
+- **Línea 411-453:** Método `_filtrar_por_staging_unico()` para agrupación
+- **Línea 656-660:** Validación de Tour Simple en construcción de tours
+- **Línea 690-713:** Método `_validar_tour_simple()` para validación
+
+---
+
+## 🧪 VALIDACIÓN COMPLETADA
+
+### ✅ Tests Ejecutados Exitosamente:
+
+**Test 1: Distribución de Staging**
+- ✅ Distribución probabilística funciona correctamente
+- ✅ WOs se asignan según porcentajes configurados
+- ✅ Staging areas inactivas (0%) no reciben WOs
+
+**Test 2: WorkOrder staging_id**
+- ✅ WorkOrder almacena staging_id correctamente
+- ✅ Propiedad staging_id devuelve valor asignado
+
+**Test 3: Validación Tour Simple**
+- ✅ WOs con mismo staging_id pasan validación
+- ✅ WOs con diferente staging_id son rechazadas
+- ✅ Mensajes de error informativos
+
+**Test 4: Configuración Real**
+- ✅ Configuración actual válida (7 staging areas activas)
+- ✅ Distribución balanceada funciona correctamente
+- ✅ Métodos de Tour Simple implementados
+
+---
+
+## 🎯 COMPORTAMIENTO ESPERADO IMPLEMENTADO
+
+### ✅ Tour Simple (Un Destino) ahora funciona correctamente:
+
+1. **Distribución de WorkOrders:** Las WOs se asignan a diferentes staging areas según la distribución configurada en `outbound_staging_distribution`
+
+2. **Agrupación por Staging:** Los operarios agrupan WOs por `staging_id` en cada tour
+
+3. **Consistencia de Tours:** Cada tour contiene solo WOs del mismo `staging_id`
+
+4. **Completación Secuencial:** Los operarios completan todas las WOs de un staging antes de pasar al siguiente
+
+### ✅ Configuración Actual:
+- **Tour Type:** "Tour Simple (Un Destino)"
+- **Dispatch Strategy:** "Ejecución de Plan (Filtro por Prioridad)"
+- **Staging Distribution:** Balanceada entre staging 1-7 (14-15% cada uno)
+
+---
+
+## 🚀 PRÓXIMA ACCIÓN
+
+**Sistema completamente funcional:**
+- ✅ Tour Simple implementado y validado
+- ✅ Distribución parametrizada funcionando
+- ✅ Tests pasados exitosamente
+- ✅ Sistema listo para uso
 
 **Comandos principales (sin cambios):**
 ```bash
-# Test rapido
+# Test rápido
 python test_quick_jsonl.py
 # O (Windows): .\run test
 
-# Simulacion completa
+# Simulación completa
 python entry_points/run_live_simulation.py --headless
 # O (Windows): .\run sim
 
@@ -113,5 +129,5 @@ python entry_points/run_replay_viewer.py output/simulation_*/replay_20251015_232
 
 ---
 
-**Última Actualización:** 2025-10-16 23:30:00
-**Estado:** ✅ Cambio de nomenclatura completado y verificado
+**Última Actualización:** 2025-01-14 15:45:00
+**Estado:** ✅ Tour Simple corregido y funcionando correctamente

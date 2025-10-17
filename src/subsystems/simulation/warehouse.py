@@ -26,7 +26,7 @@ class WorkOrder:
 
     def __init__(self, work_order_id: str, order_id: str, tour_id: str,
                  sku: SKU, cantidad: int, ubicacion: tuple,
-                 work_area: str, pick_sequence: int):
+                 work_area: str, pick_sequence: int, staging_id: int = 1):
         self.id = work_order_id
         self.order_id = order_id
         self.tour_id = tour_id
@@ -36,6 +36,7 @@ class WorkOrder:
         self.ubicacion = ubicacion
         self.work_area = work_area
         self.pick_sequence = pick_sequence
+        self._staging_id = staging_id  # Store staging_id as instance variable
         self.status = "released"
         self.assigned_agent_id = None
         self.tiempo_inicio = None
@@ -63,8 +64,8 @@ class WorkOrder:
     
     @property
     def staging_id(self) -> int:
-        """Get staging ID (placeholder)"""
-        return 1  # Default staging
+        """Get staging ID"""
+        return self._staging_id
     
     @property
     def work_group(self) -> str:
@@ -159,6 +160,11 @@ class AlmacenMejorado:
             'pequeno': {'porcentaje': 60, 'volumen': 5},
             'mediano': {'porcentaje': 30, 'volumen': 25},
             'grande': {'porcentaje': 10, 'volumen': 80}
+        })
+        
+        # Outbound staging distribution
+        self.outbound_staging_distribution = configuracion.get('outbound_staging_distribution', {
+            '1': 100, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0
         })
 
         # Counters (dual system: WorkOrders and PickingTasks)
@@ -302,6 +308,38 @@ class AlmacenMejorado:
         print(f"[WAREHOUSE WARN] No se encontró pick_sequence para {ubicacion} en {work_area}")
         return 999
 
+    def _seleccionar_staging_id(self) -> int:
+        """
+        Select staging ID based on outbound_staging_distribution configuration
+        
+        Returns:
+            int: Selected staging ID (1-7)
+        """
+        # Convert distribution to cumulative probabilities
+        staging_ids = []
+        probabilities = []
+        
+        for staging_id_str, percentage in self.outbound_staging_distribution.items():
+            staging_id = int(staging_id_str)
+            if percentage > 0:  # Only include staging areas with non-zero distribution
+                staging_ids.append(staging_id)
+                probabilities.append(percentage)
+        
+        if not staging_ids:
+            return 1  # Default to staging 1 if no distribution
+        
+        # Select based on weighted random choice
+        rand = random.random() * sum(probabilities)
+        cumulative = 0
+        
+        for i, prob in enumerate(probabilities):
+            cumulative += prob
+            if rand <= cumulative:
+                return staging_ids[i]
+        
+        # Fallback to first staging
+        return staging_ids[0]
+
     def _generar_flujo_ordenes(self):
         """Generate work orders flow based on configuration"""
         # print(f"[ALMACEN] Generando {self.total_ordenes} ordenes de trabajo...")
@@ -369,6 +407,9 @@ class AlmacenMejorado:
                 if cantidad_valida < cantidad_solicitada:
                     wo_adjusted_count += 1
 
+                # Select staging ID based on distribution
+                staging_id = self._seleccionar_staging_id()
+                
                 # Create work order with validated quantity
                 work_order = WorkOrder(
                     work_order_id=f"WO-{wo_counter:04d}",
@@ -378,7 +419,8 @@ class AlmacenMejorado:
                     cantidad=cantidad_valida,  # BUGFIX: Use validated quantity
                     ubicacion=ubicacion,
                     work_area=work_area,
-                    pick_sequence=self._obtener_pick_sequence_real(ubicacion, work_area)  # FIX: Use real pick_sequence from Excel
+                    pick_sequence=self._obtener_pick_sequence_real(ubicacion, work_area),  # FIX: Use real pick_sequence from Excel
+                    staging_id=staging_id  # Assign staging based on distribution
                 )
 
                 all_work_orders.append(work_order)  # BUGFIX FASE 2: Collect instead of immediate add

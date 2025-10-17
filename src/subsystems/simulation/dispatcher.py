@@ -78,6 +78,10 @@ class DispatcherV11:
         print(f"[DISPATCHER DEBUG] dispatch_strategy en config: '{configuracion.get('dispatch_strategy', 'NO ENCONTRADO')}'")
         self.estrategia = configuracion.get('dispatch_strategy', 'Optimizacion Global')
         print(f"[DISPATCHER DEBUG] Estrategia asignada: '{self.estrategia}'")
+        
+        # Tour Type (from config.json)
+        self.tour_type = configuracion.get('tour_type', 'Tour Mixto (Multi-Destino)')
+        print(f"[DISPATCHER DEBUG] Tour type: '{self.tour_type}'")
 
         # Statistics
         self.total_asignaciones = 0
@@ -259,7 +263,7 @@ class DispatcherV11:
             return self._estrategia_fifo(operator)
         elif self.estrategia == "Optimizacion Global":
             return self._estrategia_optimizacion_global(operator)
-        elif self.estrategia == "Ejecucion de Plan (Filtro por Prioridad)":
+        elif self.estrategia == "Ejecucion de Plan (Filtro por Prioridad)" or self.estrategia == "Ejecución de Plan (Filtro por Prioridad)":
             return self._estrategia_ejecucion_plan(operator)
         elif self.estrategia == "Cercania":
             return self._estrategia_cercania(operator)
@@ -328,6 +332,10 @@ class DispatcherV11:
         # Preferir misma área, pero permitir cambio de área si se agota la secuencia
         tour_wos = self._construir_tour_por_secuencia(operator, best_first_wo, candidatos_compatibles)
         
+        # Si es Tour Simple, filtrar por staging location
+        if self.tour_type == "Tour Simple (Un Destino)":
+            tour_wos = self._filtrar_por_staging_unico(operator, tour_wos)
+        
         return tour_wos
 
     def _estrategia_ejecucion_plan(self, operator: Any) -> List[Any]:
@@ -359,6 +367,10 @@ class DispatcherV11:
         
         # Paso 4: Construir tour siguiendo pick_sequence desde la primera WO (igual que Optimización Global)
         tour_wos = self._construir_tour_por_secuencia(operator, primera_wo, candidatos_area_prioridad)
+        
+        # Si es Tour Simple, filtrar por staging location
+        if self.tour_type == "Tour Simple (Un Destino)":
+            tour_wos = self._filtrar_por_staging_unico(operator, tour_wos)
         
         return tour_wos
 
@@ -395,6 +407,50 @@ class DispatcherV11:
               f"WOs encontradas: {len(best_area_wos)}")
         
         return best_area_wos
+
+    def _filtrar_por_staging_unico(self, operator: Any, work_orders: List[Any]) -> List[Any]:
+        """
+        Filtra WOs para que todas sean de una sola ubicación de staging
+        
+        Args:
+            operator: Operator instance
+            work_orders: List of WorkOrders to filter
+            
+        Returns:
+            List of WorkOrders with consistent staging_id
+        """
+        if not work_orders:
+            return []
+        
+        # Group by staging_id
+        staging_groups = {}
+        for wo in work_orders:
+            staging_id = wo.staging_id
+            if staging_id not in staging_groups:
+                staging_groups[staging_id] = []
+            staging_groups[staging_id].append(wo)
+        
+        # Select the group with most WOs that fit in capacity
+        best_group = []
+        best_volume = 0
+        
+        for staging_id, group_wos in staging_groups.items():
+            group_volume = sum(wo.calcular_volumen_restante() for wo in group_wos)
+            
+            if (group_volume <= operator.capacity and 
+                group_volume > best_volume):
+                best_group = group_wos
+                best_volume = group_volume
+        
+        # Limit to max_wos_por_tour
+        if len(best_group) > self.max_wos_por_tour:
+            best_group = best_group[:self.max_wos_por_tour]
+        
+        if best_group:
+            staging_id = best_group[0].staging_id
+            print(f"[DISPATCHER DEBUG] Tour Simple: Seleccionado grupo de {len(best_group)} WOs para staging {staging_id}")
+        
+        return best_group
 
     def _encontrar_mejor_primera_wo(self, operator: Any, candidatos: List[Any]) -> Optional[Any]:
         """
@@ -637,7 +693,7 @@ class DispatcherV11:
 
     def _construir_tour(self, operator: Any, work_orders: List[Any]) -> Optional[Dict[str, Any]]:
         """
-        Build optimal tour using RouteCalculator
+        Build optimal tour using RouteCalculator with tour_type support
 
         Args:
             operator: Operator instance
@@ -648,6 +704,12 @@ class DispatcherV11:
         """
         if not work_orders:
             return None
+
+        # Check if Tour Simple and validate staging consistency
+        if self.tour_type == "Tour Simple (Un Destino)":
+            work_orders = self._validar_tour_simple(work_orders)
+            if not work_orders:
+                return None
 
         # Get start position (operator's current position or depot)
         start_pos = operator.current_position
@@ -676,6 +738,31 @@ class DispatcherV11:
         except Exception as e:
             print(f"[DISPATCHER ERROR] Excepcion al calcular ruta: {e}")
             return None
+
+    def _validar_tour_simple(self, work_orders: List[Any]) -> List[Any]:
+        """
+        Validate Tour Simple: All WorkOrders must have the same staging_id
+        
+        Args:
+            work_orders: List of WorkOrders to validate
+            
+        Returns:
+            List of WorkOrders with consistent staging_id, or empty list if invalid
+        """
+        if not work_orders:
+            return []
+        
+        # Check staging consistency
+        staging_ids = set(wo.staging_id for wo in work_orders)
+        
+        if len(staging_ids) > 1:
+            print(f"[DISPATCHER ERROR] Tour Simple requiere WOs de una sola ubicación de staging")
+            print(f"[DISPATCHER ERROR] Encontradas ubicaciones: {staging_ids}")
+            print(f"[DISPATCHER ERROR] WOs: {[wo.id for wo in work_orders]}")
+            return []
+        
+        print(f"[DISPATCHER DEBUG] Tour Simple validado: {len(work_orders)} WOs para staging {list(staging_ids)[0]}")
+        return work_orders
 
     def _marcar_asignados(self, operator: Any, work_orders: List[Any]) -> None:
         """
