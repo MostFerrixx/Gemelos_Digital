@@ -378,8 +378,12 @@ class GroundOperator(BaseOperator):
                     }
                 })
                 
+                # ACTUALIZAR CARGO_VOLUME ANTES de poner cantidad_restante = 0
                 if wo:
+                    # Sumar el volumen ANTES de modificar cantidad_restante
+                    self.cargo_volume += wo.calcular_volumen_restante()
                     wo.status = 'picked'
+                    wo.cantidad_restante = 0
                     progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
                     self.almacen.registrar_evento('work_order_update', {
                         'id': wo.id,
@@ -717,21 +721,15 @@ class Forklift(BaseOperator):
                     }
                 })
 
+                # ACTUALIZAR CARGO_VOLUME ANTES de poner cantidad_restante = 0
                 if wo:
+                    # Sumar el volumen ANTES de modificar cantidad_restante
+                    self.cargo_volume += wo.calcular_volumen_restante()
                     wo.cantidad_restante = 0
                     if hasattr(wo, 'picking_executions'):
                         wo.picking_executions += 1
                     else:
                         wo.picking_executions = 1
-
-                if wo:
-                    wo.cantidad_restante = 0
-                    if hasattr(wo, 'picking_executions'):
-                        wo.picking_executions += 1
-                    else:
-                        wo.picking_executions = 1
-
-                self.cargo_volume += wo.calcular_volumen_restante()
 
                 if wo:
                     wo.status = 'picked'

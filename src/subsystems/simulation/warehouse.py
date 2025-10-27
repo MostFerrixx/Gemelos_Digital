@@ -517,6 +517,17 @@ class AlmacenMejorado:
                         print(f"[WARNING] Error calculating pixel coordinates from {position}: {e}")
                         pixel_x, pixel_y = position[0] * 32, position[1] * 32  # Fallback
                 
+                # Obtener capacidad real del operario desde configuracion
+                agent_type = datos.get('agent_type', 'Unknown')
+                capacidad_real = 150  # Default
+                
+                # Buscar capacidad en configuracion por tipo de agente
+                agent_types_config = self.configuracion.get('agent_types', [])
+                for agent_config in agent_types_config:
+                    if agent_config.get('type') == agent_type:
+                        capacidad_real = agent_config.get('capacity', 150)
+                        break
+                
                 replay_evento = {
                     'type': tipo,
                     'timestamp': self.env.now,
@@ -540,7 +551,7 @@ class AlmacenMejorado:
                         'tour_total_tasks': 0,
                         'current_item': 'N/A',
                         'carga': datos.get('cargo_volume', 0),
-                        'capacidad': 150 if datos.get('tipo') == 'GroundOperator' else 1000
+                        'capacidad': capacidad_real  # Usar capacidad real desde config.json
                     }
                 }
             else:
