@@ -1,17 +1,15 @@
 # Makefile para Gemelo Digital - Comandos Convenientes
 # Mantiene organizacion clara con comandos cortos
 
-.PHONY: help sim sim-visual replay config test clean
+.PHONY: help sim replay config clean
 
 # Comando por defecto: mostrar ayuda
 help:
 	@echo "=== GEMELO DIGITAL - COMANDOS DISPONIBLES ==="
 	@echo ""
-	@echo "  make sim          - Ejecutar simulacion headless (sin UI)"
-	@echo "  make sim-visual   - Ejecutar simulacion con interfaz grafica"
+	@echo "  make sim          - Generar archivo de replay para visualizacion"
 	@echo "  make replay FILE=<archivo.jsonl> - Ver replay de simulacion"
 	@echo "  make config       - Abrir configurador de simulacion"
-	@echo "  make test         - Ejecutar test rapido (3 ordenes)"
 	@echo "  make clean        - Limpiar archivos temporales"
 	@echo ""
 	@echo "Ejemplos:"
@@ -19,15 +17,13 @@ help:
 	@echo "  make replay FILE=output/simulation_20250115_120000/replay_events_20250115_120000.jsonl"
 	@echo ""
 
-# Simulacion headless (sin UI)
+# Simulacion (genera replay)
 sim:
-	@echo "Ejecutando simulacion headless..."
-	python entry_points/run_live_simulation.py --headless
+	@echo "Generando archivo de replay..."
+	python entry_points/run_generate_replay.py
 
-# Simulacion con interfaz grafica
-sim-visual:
-	@echo "Ejecutando simulacion con interfaz grafica..."
-	python entry_points/run_live_simulation.py
+# Nota: Para visualizar, usar replay:
+#   make replay FILE=output/simulation_*/replay_*.jsonl
 
 # Replay viewer
 replay:
@@ -43,11 +39,6 @@ endif
 config:
 	@echo "Abriendo configurador..."
 	python configurator.py
-
-# Test rapido
-test:
-	@echo "Ejecutando test rapido (3 ordenes)..."
-	python test_quick_jsonl.py
 
 # Limpiar archivos temporales
 clean:

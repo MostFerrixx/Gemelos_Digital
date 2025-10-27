@@ -21,8 +21,8 @@
     "sequence_file": "layouts/Warehouse_Logic.xlsx",
     "map_scale": 1.3,
     "num_operarios_terrestres": 2,
-    "num_montacargas": 1,
-    "num_operarios_total": 3,
+    "num_montacargas": 2,
+    "num_operarios_total": 4,
     "capacidad_montacargas": 1000,
     "tiempo_descarga_por_tarea": 5,
     "assignment_rules": {
@@ -74,7 +74,7 @@
             }
         }
     ],
-    "num_operarios": 3,
+    "num_operarios": 4,
     "tareas_zona_a": 0,
     "tareas_zona_b": 0
 }

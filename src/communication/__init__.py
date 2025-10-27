@@ -17,7 +17,7 @@ from .ipc_protocols import (
     WorkOrderAssignedEvent,
     WorkOrderProgressUpdatedEvent,
 )
-from .simulation_data_provider import SimulationEngineDataProvider, create_simulation_data_provider
+
 
 # Exceptions
 from .dashboard_communicator import (
@@ -44,9 +44,7 @@ __all__ = [
     'WorkOrderAssignedEvent',
     'WorkOrderProgressUpdatedEvent',
 
-    # Data providers
-    'SimulationEngineDataProvider',
-    'create_simulation_data_provider',
+
 
     # Exceptions
     'DashboardCommunicationError',

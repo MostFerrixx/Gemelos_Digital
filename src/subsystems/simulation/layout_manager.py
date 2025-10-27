@@ -18,7 +18,7 @@ class LayoutManager:
     Provides grid/pixel conversion, collision detection, and picking point extraction
     """
 
-    def __init__(self, tmx_file_path: str):
+    def __init__(self, tmx_file_path: str, headless: bool = False):
         """
         Initialize Layout Manager with TMX file
 
@@ -43,9 +43,10 @@ class LayoutManager:
         print(f"[LAYOUT-MANAGER] Cargando archivo TMX: {tmx_file_path}")
 
         try:
-            # Load TMX file using pytmx with pygame loader
-            # BUGFIX 2025-10-04: Usar load_pygame() para cargar imagenes de tiles
-            self.tmx_data = pytmx.load_pygame(tmx_file_path)
+            if headless:
+                self.tmx_data = pytmx.TiledMap(tmx_file_path)
+            else:
+                self.tmx_data = pytmx.load_pygame(tmx_file_path)
             print(f"[LAYOUT-MANAGER] TMX cargado exitosamente (con imagenes Pygame)")
 
         except FileNotFoundError:

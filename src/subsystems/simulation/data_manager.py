@@ -36,7 +36,7 @@ class DataManager:
     """
 
     def __init__(self, tmx_file_path: str, excel_file_path: str,
-                 configuracion: Optional[Dict[str, Any]] = None):
+                 configuracion: Optional[Dict[str, Any]] = None, headless: bool = False):
         """
         Initialize DataManager and load all warehouse data
 
@@ -65,7 +65,7 @@ class DataManager:
 
         # Create LayoutManager first (needed for validation)
         try:
-            self.layout_manager = LayoutManager(tmx_file_path)
+            self.layout_manager = LayoutManager(tmx_file_path, headless=headless)
         except Exception as e:
             raise DataManagerError(f"Failed to create LayoutManager: {e}")
 

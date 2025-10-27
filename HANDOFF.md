@@ -1,15 +1,20 @@
 # HANDOFF - Digital Twin Warehouse Simulator
 
-**Proyecto:** Simulador de Gemelo Digital de Almacén  
+**Proyecto:** Simulador de Gemelo Digital de Almacen  
 **Rama:** `main`  
-**Estado:** ✅ Sistema completamente funcional  
-**Última Actualización:** 2025-10-16
+**Estado:** ✅ Sistema completamente funcional (Headless + Replay)  
+**Ultima Actualizacion:** 2025-10-27
 
 ---
 
 ## 📋 RESUMEN EJECUTIVO
 
-Sistema de simulación de almacén completamente funcional con **Dashboard World-Class**, **Sistema de Slots de Configuración**, **Replay Scrubber**, **Dashboard PyQt6 en Tiempo Real** y **Solución Holística** implementados al 100%.
+Sistema de simulacion de almacen completamente funcional con **Generador de Eventos Headless**, **Sistema de Slots de Configuracion**, **Replay Viewer** y **Analytics Engine** implementados al 100%.
+
+**CAMBIO ARQUITECTONICO IMPORTANTE (2025-10-27):**
+- ✅ Eliminada simulacion en tiempo real (live simulation)
+- ✅ Arquitectura simplificada: Generacion headless → Visualizacion replay
+- ✅ Sistema mas eficiente, sin overhead de renderizado en tiempo real
 
 ### ✅ FUNCIONALIDADES COMPLETADAS
 
@@ -39,36 +44,23 @@ Todos los archivos del sistema han sido actualizados para reflejar esta nueva no
 
 ## 🚀 COMANDOS PRINCIPALES
 
-### Simulación:
+### Generar Eventos (Headless):
 ```bash
-# Simulación completa (headless)
-python entry_points/run_live_simulation.py --headless
-# O: make sim
+python entry_points/run_generate_replay.py
+```
 
-# Test rápido (3 órdenes)
-python test_quick_jsonl.py
-# O: make test
-
-# Simulación visual
-python entry_points/run_live_simulation.py
-# O: make sim-visual
+### Visualizar Replay:
+```bash
+python entry_points/run_replay_viewer.py output/simulation_*/replay_*.jsonl
 ```
 
 ### Configurador:
 ```bash
-# Sistema de slots completo
 python configurator.py
-# O: make config
 ```
 
-### Replay:
-```bash
-# Visualizar simulación
-python entry_points/run_replay_viewer.py output/simulation_*/replay_events_*.jsonl
-# O: make replay FILE=output/simulation_*/replay_events_*.jsonl
-```
-
-**NOTA:** Se ha creado un Makefile para comandos convenientes. Usa `make help` para ver todas las opciones.
+**NOTA:** La simulacion en tiempo real ha sido eliminada.  
+Flujo actual: `EventGenerator` (headless) → Archivo `.jsonl` → `ReplayViewer`
 
 ---
 
@@ -77,12 +69,12 @@ python entry_points/run_replay_viewer.py output/simulation_*/replay_events_*.jso
 ```
 src/
 ├── engines/
-│   ├── simulation_engine.py         # Motor principal
-│   ├── analytics_engine.py          # Motor de análisis
+│   ├── event_generator.py           # Motor headless de eventos
+│   ├── analytics_engine.py          # Motor de analisis
 │   └── replay_engine.py             # Motor de replay
 ├── subsystems/
 │   ├── simulation/
-│   │   ├── warehouse.py             # Almacén
+│   │   ├── warehouse.py             # Almacen
 │   │   ├── dispatcher.py            # Despachador
 │   │   └── operators.py             # Operarios
 │   └── visualization/
@@ -95,7 +87,6 @@ src/
 Archivos principales:
 ├── configurator.py                  # Sistema de slots
 ├── config.json                      # Configuración principal
-├── test_quick_jsonl.py              # Test rápido
 └── output/                          # Resultados
     └── simulation_YYYYMMDD_HHMMSS/
         ├── replay_events_*.jsonl    # Archivo de replay
@@ -105,18 +96,45 @@ Archivos principales:
 
 ---
 
-## 🔧 CONFIGURACIÓN
+## 🔄 CAMBIO ARQUITECTONICO: ELIMINACION DE LIVE SIMULATION (2025-10-27)
+
+### Archivos Eliminados:
+- ❌ `entry_points/run_live_simulation.py` - Entry point de simulacion en tiempo real
+- ❌ `src/engines/simulation_engine.py` - Motor de simulacion con rendering
+- ❌ `src/communication/simulation_data_provider.py` - Proveedor de datos para dashboard en tiempo real
+
+### Archivos Creados:
+- ✅ `src/engines/event_generator.py` - Motor headless puro de generacion de eventos
+- ✅ `entry_points/run_generate_replay.py` - Entry point headless para generar .jsonl
+
+### Archivos Modificados:
+- ✅ `Makefile` - Comandos actualizados (sim → genera replay)
+- ✅ `run.bat` - Scripts actualizados para Windows
+- ✅ `src/communication/__init__.py` - Eliminadas referencias a simulation_data_provider
+
+### Razon del Cambio:
+La simulacion en tiempo real introducia complejidad innecesaria con multiproceso, Pygame en tiempo real y comunicacion IPC compleja. La nueva arquitectura simplificada:
+1. **Genera eventos:** EventGenerator ejecuta simulacion SimPy pura (headless)
+2. **Exporta .jsonl:** Todos los eventos capturados en archivo de replay
+3. **Visualiza:** ReplayViewer reproduce eventos con Pygame
+4. **Analytics:** Reportes Excel/JSON/heatmap generados automaticamente
+
+**Ventajas:**
+- 🚀 Mayor velocidad (sin overhead de rendering)
+- 🧹 Codigo mas simple (sin multiproceso)
+- 🔍 Mejor debugging (eventos persistidos)
+- 📊 Analytics completos (siempre generados)
+
+---
+
+## 🔧 CONFIGURACION
 
 ### config.json (Default):
-- 50 órdenes
+- 30 órdenes
 - 2 operarios terrestres
-- 1 montacargas
-- Estrategia: "Optimización Global"
-
-### config_test_quick.json (Testing):
-- 3 órdenes
-- 2 operarios terrestres
-- 0 montacargas
+- 2 montacargas
+- Estrategia: "Ejecución de Plan (Filtro por Prioridad)"
+- Tour Type: "Tour Simple (Un Destino)"
 
 ---
 
@@ -133,21 +151,19 @@ output/simulation_YYYYMMDD_HHMMSS/
 
 ---
 
-## 🧪 TESTING
+## 🧪 USO DEL SISTEMA
 
-### Test Rápido:
-```bash
-python test_quick_jsonl.py
-```
-**Duración:** 20-40 segundos  
-**Output:** Reporte en consola + archivos en `output/`
-
-### Test Completo:
+### Ejecutar Simulación:
 ```bash
 python entry_points/run_live_simulation.py --headless
 ```
 **Duración:** 1-3 minutos  
 **Output:** Archivos en `output/`
+
+### Ver Replay:
+```bash
+python entry_points/run_replay_viewer.py output/simulation_*/replay_events_*.jsonl
+```
 
 ---
 
@@ -184,14 +200,14 @@ python entry_points/run_live_simulation.py --headless
 
 **Para nueva sesión:**
 1. Leer documentación en orden: ACTIVE_SESSION_STATE → HANDOFF → INSTRUCCIONES
-2. Ejecutar `python test_quick_jsonl.py` para verificar funcionamiento
-3. Sistema listo para uso o nuevas funcionalidades
+2. Ejecutar `python entry_points/run_live_simulation.py --headless` para iniciar simulación
+3. Usar `python entry_points/run_replay_viewer.py` para visualizar simulaciones
 
 **Archivos críticos:**
-- `test_quick_jsonl.py` - Test rápido
 - `entry_points/run_live_simulation.py` - Simulación completa
 - `entry_points/run_replay_viewer.py` - Visualizador
 - `configurator.py` - Sistema de slots
+- `config.json` - Configuración principal
 
 ---
 
