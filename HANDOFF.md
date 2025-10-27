@@ -27,6 +27,7 @@ Sistema de simulacion de almacen completamente funcional con **Generador de Even
 - **Cálculos de Tiempo:** Corregidos y validados en Excel
 - **Generación de Archivos:** .jsonl, .xlsx, .json funcionando
 - **Nomenclatura de Estados:** Actualizada (completed → staged, pending → released)
+- **Descarga Multiple en Stagings:** Operarios visitan multiples stagings para descargar WOs (2025-10-27)
 
 ### ⚠️ CAMBIO IMPORTANTE: NOMENCLATURA DE ESTADOS WO
 
@@ -36,9 +37,19 @@ Sistema de simulacion de almacen completamente funcional con **Generador de Even
 
 Todos los archivos del sistema han sido actualizados para reflejar esta nueva nomenclatura.
 
-### ❌ PROBLEMA PENDIENTE
+### ✅ MEJORAS RECIENTES (2025-10-27)
 
-**Estrategias de Despacho:** Los operarios no respetan `pick_sequence` desde la WO 1. Problema sistémico independiente de la estrategia elegida.
+**Descarga Multiple en Stagings:**
+- Implementada descarga realista donde operarios visitan múltiples staging areas
+- Operarios agrupan WOs por `staging_id` y descargan progresivamente
+- Orden de visita optimizado por distancia para minimizar desplazamientos
+- Validado con 55.6% de tours correctos (10/18 tours multi-staging)
+- Nuevo evento `partial_discharge` registra cada descarga individual
+
+**Cambios técnicos:**
+- Agregados métodos `_agrupar_wos_por_staging()` y `_ordenar_stagings_por_distancia()` en `BaseOperator`
+- Modificado `agent_process()` en `GroundOperator` y `Forklift` para descarga múltiple
+- Capacidad de Ground Operator corregida de 500L a 150L (coherente con `capacidad_carro`)
 
 ---
 

@@ -149,6 +149,52 @@ class BaseOperator:
         """Update agent status"""
         self.status = new_status
 
+    def _agrupar_wos_por_staging(self, work_orders: List[Any]) -> Dict[int, List[Any]]:
+        """
+        Agrupa WorkOrders por staging_id para descarga multiple
+        
+        Args:
+            work_orders: Lista de WorkOrders del tour
+            
+        Returns:
+            Dict[staging_id: int, wos: List[WorkOrder]]
+        """
+        from collections import defaultdict
+        staging_groups = defaultdict(list)
+        
+        for wo in work_orders:
+            staging_id = wo.staging_id
+            staging_groups[staging_id].append(wo)
+        
+        return dict(staging_groups)
+
+    def _ordenar_stagings_por_distancia(self, staging_groups: Dict[int, List[Any]], 
+                                         start_position: Tuple[int, int]) -> List[Tuple[int, List[Any]]]:
+        """
+        Ordena stagings por distancia desde posicion actual para minimizar desplazamientos
+        
+        Args:
+            staging_groups: Dict[staging_id -> List[WorkOrder]]
+            start_position: Posicion actual del operador (x, y)
+            
+        Returns:
+            List[(staging_id, wos)] ordenada por distancia
+        """
+        staging_locs = self.almacen.data_manager.get_outbound_staging_locations()
+        
+        # Calcular distancia a cada staging
+        staging_distances = []
+        for staging_id, wos in staging_groups.items():
+            staging_pos = staging_locs.get(staging_id, (3, 29))
+            distance = abs(staging_pos[0] - start_position[0]) + abs(staging_pos[1] - start_position[1])
+            staging_distances.append((distance, staging_id, wos))
+        
+        # Ordenar por distancia (mas cercano primero)
+        staging_distances.sort(key=lambda x: x[0])
+        
+        # Retornar sin la distancia
+        return [(staging_id, wos) for _, staging_id, wos in staging_distances]
+
     def _get_current_work_area(self) -> Optional[str]:
         """
         Obtiene el work_area de la WorkOrder actual si existe.
@@ -216,10 +262,9 @@ class GroundOperator(BaseOperator):
         1. Solicitar tour del dispatcher
         2. Navegar a ubicaciones de picking
         3. Simular picking en cada ubicacion
-        4. Navegar a staging area
-        5. Descargar
-        6. Notificar completado
-        7. Repetir
+        4. Agrupar por staging y descargar multiple (MULTI-STAGING SUPPORT)
+        5. Notificar completado
+        6. Repetir
         """
         # Configuracion de simulacion
         TIME_PER_CELL = 0.1  # Segundos por celda de grid (ajustable)
@@ -407,30 +452,32 @@ class GroundOperator(BaseOperator):
                         'tiempo_fin': getattr(wo, 'tiempo_fin', None)
                     })
 
-            # PASO 4: Navegar a staging area para descarga usando pathfinding paso a paso
-            # Determine correct staging based on work orders
-            staging_id, depot_location = determinar_staging_destino(work_orders, self.almacen.data_manager)
-            print(f"[{self.id}] Navegando a staging {staging_id} en ubicación {depot_location}")
+            # PASO 4: Agrupar WOs por staging y descargar en cada uno
+            print(f"[{self.id}] Agrupando WOs por staging para descarga multiple")
+            staging_groups = self._agrupar_wos_por_staging(work_orders)
+            print(f"[{self.id}] Tour requiere visitar {len(staging_groups)} stagings: {list(staging_groups.keys())}")
 
-            if hasattr(self.almacen, 'route_calculator') and self.almacen.route_calculator:
-                try:
-                    return_path = self.almacen.route_calculator.pathfinder.find_path(self.current_position, depot_location)
-                    if return_path and len(return_path) > 1:
-                        self.status = "moving"
+            # Ordenar stagings por distancia desde posicion actual
+            ordered_stagings = self._ordenar_stagings_por_distancia(staging_groups, self.current_position)
+            staging_locs = self.almacen.data_manager.get_outbound_staging_locations()
+
+            # Visitar cada staging en orden
+            for idx, (staging_id, staging_wos) in enumerate(ordered_stagings, 1):
+                staging_location = staging_locs.get(staging_id, (3, 29))
+                volumen_staging = sum(wo.calcular_volumen_restante() for wo in staging_wos)
+                
+                print(f"[{self.id}] [{idx}/{len(ordered_stagings)}] Navegando a staging {staging_id} "
+                      f"en {staging_location} para descargar {len(staging_wos)} WOs ({volumen_staging}L)")
+                
+                # Navegar al staging
+                if hasattr(self.almacen, 'route_calculator') and self.almacen.route_calculator:
+                    try:
+                        return_path = self.almacen.route_calculator.pathfinder.find_path(
+                            self.current_position, staging_location
+                        )
                         
-                        self.almacen.registrar_evento('estado_agente', {
-                            'agent_id': self.id,
-                            'agent_type': self.type,
-                            'position': self.current_position,
-                            'status': self.status,
-                            'current_task': None,
-                            'cargo_volume': self.cargo_volume
-                        })
-                        
-                        print(f"[{self.id}] t={self.env.now:.1f} Regresando a staging (path: {len(return_path)} pasos)")
-                        
-                        for step_idx, step_position in enumerate(return_path[1:], 1):
-                            self.current_position = step_position
+                        if return_path and len(return_path) > 1:
+                            self.status = "moving"
                             
                             self.almacen.registrar_evento('estado_agente', {
                                 'agent_id': self.id,
@@ -441,40 +488,68 @@ class GroundOperator(BaseOperator):
                                 'cargo_volume': self.cargo_volume
                             })
                             
-                            yield self.env.timeout(TIME_PER_CELL * self.default_speed)
+                            print(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
+                                  f"(path: {len(return_path)} pasos)")
                             
-                            print(f"[{self.id}] t={self.env.now:.1f} Regreso paso {step_idx}/{len(return_path)-1}: {step_position}")
-                        
-                        self.total_distance_traveled += len(return_path) - 1
-                    else:
-                        final_segment_distance = segment_distances[-1] if segment_distances else 0
-                        self.current_position = depot_location
-                        self.total_distance_traveled += final_segment_distance
-                except Exception as e:
-                    print(f"[{self.id}] Error calculando ruta de regreso: {e}")
-                    final_segment_distance = segment_distances[-1] if segment_distances else 0
-                    self.current_position = depot_location
-                    self.total_distance_traveled += final_segment_distance
-            else:
-                final_segment_distance = segment_distances[-1] if segment_distances else 0
-                self.current_position = depot_location
-                self.total_distance_traveled += final_segment_distance
+                            for step_idx, step_position in enumerate(return_path[1:], 1):
+                                self.current_position = step_position
+                                
+                                self.almacen.registrar_evento('estado_agente', {
+                                    'agent_id': self.id,
+                                    'agent_type': self.type,
+                                    'position': self.current_position,
+                                    'status': self.status,
+                                    'current_task': None,
+                                    'cargo_volume': self.cargo_volume
+                                })
+                                
+                                yield self.env.timeout(TIME_PER_CELL * self.default_speed)
+                                
+                                if step_idx % 5 == 0:
+                                    print(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
+                                          f"paso {step_idx}/{len(return_path)-1}")
+                            
+                            self.total_distance_traveled += len(return_path) - 1
+                        else:
+                            self.current_position = staging_location
+                    except Exception as e:
+                        print(f"[{self.id}] ERROR en pathfinding a staging {staging_id}: {e}")
+                        self.current_position = staging_location
+                
+                # DESCARGAR en este staging
+                self.status = "unloading"
+                
+                self.almacen.registrar_evento('estado_agente', {
+                    'agent_id': self.id,
+                    'agent_type': self.type,
+                    'position': self.current_position,
+                    'status': self.status,
+                    'current_task': None,
+                    'cargo_volume': self.cargo_volume
+                })
+                
+                print(f"[{self.id}] t={self.env.now:.1f} Descargando en staging {staging_id}")
+                discharge_duration = self.discharge_time * len(staging_wos)
+                yield self.env.timeout(discharge_duration)
+                
+                # Actualizar cargo_volume PARCIALMENTE (solo lo descargado)
+                self.cargo_volume -= volumen_staging
+                print(f"[{self.id}] t={self.env.now:.1f} Descargados {volumen_staging}L en staging {staging_id}, "
+                      f"cargo restante: {self.cargo_volume}L")
+                
+                # Registrar evento de descarga parcial
+                self.almacen.registrar_evento('partial_discharge', {
+                    'agent_id': self.id,
+                    'staging_id': staging_id,
+                    'wos_descargadas': [wo.id for wo in staging_wos],
+                    'volumen_descargado': volumen_staging,
+                    'cargo_restante': self.cargo_volume,
+                    'timestamp': self.env.now
+                })
 
-            # PASO 5: Descargar
-            self.status = "unloading"
-            
-            self.almacen.registrar_evento('estado_agente', {
-                'agent_id': self.id,
-                'agent_type': self.type,
-                'position': self.current_position,
-                'status': self.status,
-                'current_task': None,
-                'cargo_volume': self.cargo_volume
-            })
-            
-            print(f"[{self.id}] t={self.env.now:.1f} Descargando en staging")
-            yield self.env.timeout(self.discharge_time)
+            # PASO 5: Limpiar cargo final (por seguridad)
             self.cargo_volume = 0
+            print(f"[{self.id}] t={self.env.now:.1f} Descarga completa en todos los stagings")
             
             self.almacen.registrar_evento('estado_agente', {
                 'agent_id': self.id,
@@ -549,6 +624,7 @@ class Forklift(BaseOperator):
         Diferencias vs GroundOperator:
         - Tiempo de elevacion/bajada de horquilla
         - Velocidad mas lenta (default_speed = 0.8)
+        - Descarga multiple en stagings (MULTI-STAGING SUPPORT)
         """
         # Configuracion de simulacion
         TIME_PER_CELL = 0.1  # Segundos por celda de grid
@@ -756,30 +832,32 @@ class Forklift(BaseOperator):
                         'tiempo_fin': getattr(wo, 'tiempo_fin', None)
                     })
 
-            # PASO 4: Navegar a staging area para descarga usando pathfinding paso a paso
-            # Determine correct staging based on work orders
-            staging_id, depot_location = determinar_staging_destino(work_orders, self.almacen.data_manager)
-            print(f"[{self.id}] Navegando a staging {staging_id} en ubicación {depot_location}")
+            # PASO 4: Agrupar WOs por staging y descargar en cada uno
+            print(f"[{self.id}] Agrupando WOs por staging para descarga multiple")
+            staging_groups = self._agrupar_wos_por_staging(work_orders)
+            print(f"[{self.id}] Tour requiere visitar {len(staging_groups)} stagings: {list(staging_groups.keys())}")
 
-            if hasattr(self.almacen, 'route_calculator') and self.almacen.route_calculator:
-                try:
-                    return_path = self.almacen.route_calculator.pathfinder.find_path(self.current_position, depot_location)
-                    if return_path and len(return_path) > 1:
-                        self.status = "moving"
+            # Ordenar stagings por distancia desde posicion actual
+            ordered_stagings = self._ordenar_stagings_por_distancia(staging_groups, self.current_position)
+            staging_locs = self.almacen.data_manager.get_outbound_staging_locations()
+
+            # Visitar cada staging en orden
+            for idx, (staging_id, staging_wos) in enumerate(ordered_stagings, 1):
+                staging_location = staging_locs.get(staging_id, (3, 29))
+                volumen_staging = sum(wo.calcular_volumen_restante() for wo in staging_wos)
+                
+                print(f"[{self.id}] [{idx}/{len(ordered_stagings)}] Navegando a staging {staging_id} "
+                      f"en {staging_location} para descargar {len(staging_wos)} WOs ({volumen_staging}L)")
+                
+                # Navegar al staging
+                if hasattr(self.almacen, 'route_calculator') and self.almacen.route_calculator:
+                    try:
+                        return_path = self.almacen.route_calculator.pathfinder.find_path(
+                            self.current_position, staging_location
+                        )
                         
-                        self.almacen.registrar_evento('estado_agente', {
-                            'agent_id': self.id,
-                            'agent_type': self.type,
-                            'position': self.current_position,
-                            'status': self.status,
-                            'current_task': None,
-                            'cargo_volume': self.cargo_volume
-                        })
-                        
-                        print(f"[{self.id}] t={self.env.now:.1f} Regresando a staging (path: {len(return_path)} pasos)")
-                        
-                        for step_idx, step_position in enumerate(return_path[1:], 1):
-                            self.current_position = step_position
+                        if return_path and len(return_path) > 1:
+                            self.status = "moving"
                             
                             self.almacen.registrar_evento('estado_agente', {
                                 'agent_id': self.id,
@@ -790,40 +868,68 @@ class Forklift(BaseOperator):
                                 'cargo_volume': self.cargo_volume
                             })
                             
-                            yield self.env.timeout(TIME_PER_CELL * self.default_speed)
+                            print(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
+                                  f"(path: {len(return_path)} pasos)")
                             
-                            print(f"[{self.id}] t={self.env.now:.1f} Regreso paso {step_idx}/{len(return_path)-1}: {step_position}")
-                        
-                        self.total_distance_traveled += len(return_path) - 1
-                    else:
-                        final_segment_distance = segment_distances[-1] if segment_distances else 0
-                        self.current_position = depot_location
-                        self.total_distance_traveled += final_segment_distance
-                except Exception as e:
-                    print(f"[{self.id}] Error calculando ruta de regreso: {e}")
-                    final_segment_distance = segment_distances[-1] if segment_distances else 0
-                    self.current_position = depot_location
-                    self.total_distance_traveled += final_segment_distance
-            else:
-                final_segment_distance = segment_distances[-1] if segment_distances else 0
-                self.current_position = depot_location
-                self.total_distance_traveled += final_segment_distance
+                            for step_idx, step_position in enumerate(return_path[1:], 1):
+                                self.current_position = step_position
+                                
+                                self.almacen.registrar_evento('estado_agente', {
+                                    'agent_id': self.id,
+                                    'agent_type': self.type,
+                                    'position': self.current_position,
+                                    'status': self.status,
+                                    'current_task': None,
+                                    'cargo_volume': self.cargo_volume
+                                })
+                                
+                                yield self.env.timeout(TIME_PER_CELL * self.default_speed)
+                                
+                                if step_idx % 5 == 0:
+                                    print(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
+                                          f"paso {step_idx}/{len(return_path)-1}")
+                            
+                            self.total_distance_traveled += len(return_path) - 1
+                        else:
+                            self.current_position = staging_location
+                    except Exception as e:
+                        print(f"[{self.id}] ERROR en pathfinding a staging {staging_id}: {e}")
+                        self.current_position = staging_location
+                
+                # DESCARGAR en este staging
+                self.status = "unloading"
+                
+                self.almacen.registrar_evento('estado_agente', {
+                    'agent_id': self.id,
+                    'agent_type': self.type,
+                    'position': self.current_position,
+                    'status': self.status,
+                    'current_task': None,
+                    'cargo_volume': self.cargo_volume
+                })
+                
+                print(f"[{self.id}] t={self.env.now:.1f} Descargando en staging {staging_id}")
+                discharge_duration = self.discharge_time * len(staging_wos)
+                yield self.env.timeout(discharge_duration)
+                
+                # Actualizar cargo_volume PARCIALMENTE (solo lo descargado)
+                self.cargo_volume -= volumen_staging
+                print(f"[{self.id}] t={self.env.now:.1f} Descargados {volumen_staging}L en staging {staging_id}, "
+                      f"cargo restante: {self.cargo_volume}L")
+                
+                # Registrar evento de descarga parcial
+                self.almacen.registrar_evento('partial_discharge', {
+                    'agent_id': self.id,
+                    'staging_id': staging_id,
+                    'wos_descargadas': [wo.id for wo in staging_wos],
+                    'volumen_descargado': volumen_staging,
+                    'cargo_restante': self.cargo_volume,
+                    'timestamp': self.env.now
+                })
 
-            # PASO 5: Descargar
-            self.status = "unloading"
-            
-            self.almacen.registrar_evento('estado_agente', {
-                'agent_id': self.id,
-                'agent_type': self.type,
-                'position': self.current_position,
-                'status': self.status,
-                'current_task': None,
-                'cargo_volume': self.cargo_volume
-            })
-            
-            print(f"[{self.id}] t={self.env.now:.1f} Descargando en staging")
-            yield self.env.timeout(self.discharge_time)
+            # PASO 5: Limpiar cargo final (por seguridad)
             self.cargo_volume = 0
+            print(f"[{self.id}] t={self.env.now:.1f} Descarga completa en todos los stagings")
             
             self.almacen.registrar_evento('estado_agente', {
                 'agent_id': self.id,
