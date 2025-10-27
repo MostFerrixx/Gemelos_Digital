@@ -501,96 +501,224 @@ class DispatcherV11:
 
     def _construir_tour_por_secuencia(self, operator: Any, primera_wo: Any, candidatos: List[Any]) -> List[Any]:
         """
-        Construye tour siguiendo pick_sequence desde la primera WO.
-        - Agota todas las WOs del área de la primera WO antes de pasar a la siguiente área
-          en orden de prioridad del operador (2, luego 3, etc.).
-        - Mantiene la posición de secuencia entre cambios de área (cíclica).
+        Construye tour siguiendo pick_sequence con DOBLE BARRIDO por área.
+        
+        LÓGICA DE DOBLE BARRIDO:
+        
+        1. BARRIDO PRINCIPAL (Progresivo):
+           - Punto de inicio: min_seq (último pick_sequence agregado o 1 si primera área)
+           - Condición: wo.pick_sequence >= min_seq
+           - Objetivo: Mantener ruta progresiva y secuencial
+           - Orden: Ascendente por pick_sequence
+        
+        2. BARRIDO SECUNDARIO (Circular / Llenado de Huecos):
+           - Activación: Solo si queda capacidad después de Barrido 1
+           - Punto de inicio: pick_sequence = 1
+           - Condición: wo.pick_sequence < min_seq
+           - Objetivo: Maximizar utilización con retrocesos mínimos
+           - Orden: Ascendente por pick_sequence
+        
+        CAMBIO DE ÁREA:
+        - Al agotar un área, pasar a siguiente por prioridad
+        - Continuar desde último pick_sequence agregado
+        
+        RESTRICCIÓN DE STAGING:
+        - Tour Mixto (Multi-Destino): Sin restricción de staging_id
+        - Tour Simple (Un Destino): Con restricción de staging_id
+        
+        Args:
+            operator: Instancia de GroundOperator o Forklift
+            primera_wo: Primera WorkOrder del tour
+            candidatos: Lista de WorkOrders candidatas
+        
+        Returns:
+            List[WorkOrder]: Lista ordenada de WOs para el tour
         """
         if not primera_wo or not candidatos:
             return []
-
-        # Agregar primera WO si cabe
-        tour_wos: List[Any] = []
+        
+        # ==================== INICIALIZACIÓN ====================
+        tour_wos = []
         volume_acumulado = 0
         primera_volume = primera_wo.calcular_volumen_restante()
+        
+        # Validar que primera WO quepa
         if primera_volume <= operator.capacity:
             tour_wos.append(primera_wo)
             volume_acumulado += primera_volume
-
-        # Preparar lista de áreas compatibles ordenadas por prioridad del operador
+        else:
+            print(f"[DISPATCHER ERROR] Primera WO {primera_wo.id} excede capacidad")
+            return []
+        
+        # ==================== PREPARAR ÁREAS ====================
+        # Obtener áreas compatibles con el operador
         areas_presentes = {}
         for wo in candidatos:
             pr = operator.get_priority_for_work_area(wo.work_area)
-            if pr != 999:
+            if pr != 999:  # 999 = incompatible
                 areas_presentes[wo.work_area] = pr
-
-        # Ordenar áreas por prioridad
+        
+        # Ordenar áreas: primera área primero, luego resto por prioridad
         otras_areas = [a for a in areas_presentes.keys() if a != primera_wo.work_area]
         otras_areas.sort(key=lambda a: areas_presentes[a])
         ordered_areas = [primera_wo.work_area] + otras_areas
-
-        # Estado de secuencia: iniciar en pick_sequence de la primera WO
-        current_sequence_position = primera_wo.pick_sequence
-        usadas = set(tour_wos)
-
-        # Consumir cada área en orden de prioridad
+        
+        # ==================== RASTREO DE ESTADO ====================
+        ultimo_seq_agregado = primera_wo.pick_sequence  # Para cambio de área
+        usadas = {primera_wo}  # Set de WOs ya agregadas
+        
+        # ==================== LOGGING INICIAL ====================
+        print(f"[DISPATCHER] ===== INICIO CONSTRUCCION TOUR =====")
+        print(f"[DISPATCHER] Primera WO: {primera_wo.id} (seq={primera_wo.pick_sequence}, area={primera_wo.work_area})")
+        print(f"[DISPATCHER] Capacidad disponible: {operator.capacity}L")
+        print(f"[DISPATCHER] Áreas a procesar: {ordered_areas}")
+        print(f"[DISPATCHER] Tour type: {self.tour_type}")
+        
+        # ==================== PROCESAR CADA ÁREA ====================
         for area in ordered_areas:
-            if len(tour_wos) >= self.max_wos_por_tour or volume_acumulado >= operator.capacity:
+            # Verificar límites globales
+            if len(tour_wos) >= self.max_wos_por_tour:
+                print(f"[DISPATCHER] Límite max_wos_por_tour alcanzado: {self.max_wos_por_tour}")
                 break
-                
-            # Obtener WOs disponibles del área actual
-            area_wos = [wo for wo in candidatos if wo.work_area == area and wo not in usadas]
-            if not area_wos:
-                continue
-                
-            area_wos.sort(key=lambda wo: wo.pick_sequence)
-            max_seq = max(wo.pick_sequence for wo in area_wos)
             
-            # Consumir WOs del área siguiendo pick_sequence cíclico
-            seq_checked = set()
-            while len(tour_wos) < self.max_wos_por_tour and volume_acumulado < operator.capacity:
-                # Buscar WOs del pick_sequence actual
-                candidatos_seq = []
-                for wo in area_wos:
-                    if (wo.pick_sequence == current_sequence_position and 
-                        wo not in usadas and
-                        volume_acumulado + wo.calcular_volumen_restante() <= operator.capacity):
-                        
-                        # Calcular distancia desde última WO o posición del operador
-                        if tour_wos:
-                            last_pos = tour_wos[-1].ubicacion
-                        else:
-                            last_pos = operator.current_position or (3, 29)
-                        dist = abs(wo.ubicacion[0] - last_pos[0]) + abs(wo.ubicacion[1] - last_pos[1])
-                        candidatos_seq.append((wo, dist))
-
-                if candidatos_seq:
-                    # Agregar la WO más cercana
-                    candidatos_seq.sort(key=lambda x: x[1])
-                    wo_sel, _ = candidatos_seq[0]
-                    vol_sel = wo_sel.calcular_volumen_restante()
+            if volume_acumulado >= operator.capacity:
+                print(f"[DISPATCHER] Capacidad llena: {volume_acumulado}/{operator.capacity}L")
+                break
+            
+            # Obtener WOs disponibles del área actual
+            area_wos = [wo for wo in candidatos 
+                        if wo.work_area == area and wo not in usadas]
+            
+            # RESTRICCIÓN DE STAGING para Tour Simple
+            if self.tour_type == "Tour Simple (Un Destino)":
+                area_wos = [wo for wo in area_wos 
+                            if wo.staging_id == primera_wo.staging_id]
+            
+            if not area_wos:
+                print(f"[DISPATCHER] [{area}] No hay WOs disponibles")
+                continue
+            
+            # Ordenar por pick_sequence
+            area_wos_sorted = sorted(area_wos, key=lambda wo: wo.pick_sequence)
+            
+            # Determinar secuencia mínima para esta área
+            min_seq = ultimo_seq_agregado if area != primera_wo.work_area else 1
+            
+            print(f"\n[DISPATCHER] ===== PROCESANDO ÁREA: {area} =====")
+            print(f"[DISPATCHER] [{area}] WOs disponibles: {len(area_wos_sorted)}")
+            print(f"[DISPATCHER] [{area}] Capacidad restante: {operator.capacity - volume_acumulado}L")
+            print(f"[DISPATCHER] [{area}] Min sequence: {min_seq}")
+            
+            # ==================== BARRIDO 1: PRINCIPAL (PROGRESIVO) ====================
+            print(f"[DISPATCHER] [{area}] --- BARRIDO PRINCIPAL (seq >= {min_seq}) ---")
+            
+            wos_agregadas_barrido1 = 0
+            volumen_barrido1 = 0
+            
+            for wo in area_wos_sorted:
+                # Verificar límites
+                if len(tour_wos) >= self.max_wos_por_tour:
+                    break
+                
+                if volume_acumulado >= operator.capacity:
+                    break
+                
+                # CONDICIÓN BARRIDO 1: pick_sequence >= min_seq
+                if wo.pick_sequence < min_seq:
+                    continue  # Omitir para Barrido 2
+                
+                wo_volume = wo.calcular_volumen_restante()
+                
+                # Intentar agregar si cabe
+                if volume_acumulado + wo_volume <= operator.capacity:
+                    tour_wos.append(wo)
+                    usadas.add(wo)
+                    volume_acumulado += wo_volume
+                    volumen_barrido1 += wo_volume
+                    ultimo_seq_agregado = wo.pick_sequence  # ACTUALIZAR
+                    wos_agregadas_barrido1 += 1
                     
-                    tour_wos.append(wo_sel)
-                    usadas.add(wo_sel)
-                    volume_acumulado += vol_sel
-                    area_wos.remove(wo_sel)
-                    
-                    # Mantener current_sequence_position hasta agotar este seq
-                    seq_checked.clear()
+                    print(f"[DISPATCHER] [{area}]   ✓ WO {wo.id} agregada "
+                          f"(seq={wo.pick_sequence}, vol={wo_volume}L, "
+                          f"acum={volume_acumulado}L)")
                 else:
-                    # Marcar este seq como revisado
-                    seq_checked.add(current_sequence_position)
-                    
-                    # Avanzar secuencia cíclicamente
-                    current_sequence_position += 1
-                    if current_sequence_position > max_seq:
-                        current_sequence_position = 1
-                    
-                    # Si revisamos todos los seqs disponibles, salir del área
-                    if len(seq_checked) >= len(set(wo.pick_sequence for wo in area_wos)):
+                    # No cabe - seguir probando siguientes (pueden ser más pequeñas)
+                    print(f"[DISPATCHER] [{area}]   ✗ WO {wo.id} no cabe "
+                          f"(seq={wo.pick_sequence}, vol={wo_volume}L, "
+                          f"falta={wo_volume - (operator.capacity - volume_acumulado)}L)")
+            
+            print(f"[DISPATCHER] [{area}] Barrido Principal completado: "
+                  f"{wos_agregadas_barrido1} WOs, {volumen_barrido1}L")
+            
+            # ==================== BARRIDO 2: SECUNDARIO (CIRCULAR / LLENADO) ====================
+            # Solo ejecutar si queda capacidad
+            capacidad_restante = operator.capacity - volume_acumulado
+            
+            if capacidad_restante > 0 and len(tour_wos) < self.max_wos_por_tour:
+                print(f"[DISPATCHER] [{area}] --- BARRIDO SECUNDARIO (seq < {min_seq}) ---")
+                print(f"[DISPATCHER] [{area}] Capacidad restante: {capacidad_restante}L")
+                
+                wos_agregadas_barrido2 = 0
+                volumen_barrido2 = 0
+                
+                for wo in area_wos_sorted:
+                    # Verificar límites
+                    if len(tour_wos) >= self.max_wos_por_tour:
                         break
-
-        print(f"[DISPATCHER] Tour construido: {len(tour_wos)} WOs, volumen total: {volume_acumulado}/{operator.capacity}")
+                    
+                    if volume_acumulado >= operator.capacity:
+                        break
+                    
+                    # CONDICIÓN BARRIDO 2: pick_sequence < min_seq (llenado de huecos)
+                    if wo.pick_sequence >= min_seq:
+                        continue  # Ya evaluada en Barrido 1
+                    
+                    # Ya fue agregada
+                    if wo in usadas:
+                        continue
+                    
+                    wo_volume = wo.calcular_volumen_restante()
+                    
+                    # Intentar agregar si cabe
+                    if volume_acumulado + wo_volume <= operator.capacity:
+                        tour_wos.append(wo)
+                        usadas.add(wo)
+                        volume_acumulado += wo_volume
+                        volumen_barrido2 += wo_volume
+                        wos_agregadas_barrido2 += 1
+                        
+                        print(f"[DISPATCHER] [{area}]   ↻ WO {wo.id} agregada (RETROCESO) "
+                              f"(seq={wo.pick_sequence}, vol={wo_volume}L, "
+                              f"acum={volume_acumulado}L)")
+                    else:
+                        print(f"[DISPATCHER] [{area}]   ✗ WO {wo.id} no cabe "
+                              f"(seq={wo.pick_sequence}, vol={wo_volume}L)")
+                
+                print(f"[DISPATCHER] [{area}] Barrido Secundario completado: "
+                      f"{wos_agregadas_barrido2} WOs, {volumen_barrido2}L")
+            else:
+                print(f"[DISPATCHER] [{area}] Barrido Secundario OMITIDO "
+                      f"(capacidad restante: {capacidad_restante}L)")
+            
+            # Resumen del área
+            total_wos_area = wos_agregadas_barrido1 + (wos_agregadas_barrido2 if capacidad_restante > 0 else 0)
+            total_vol_area = volumen_barrido1 + (volumen_barrido2 if capacidad_restante > 0 else 0)
+            print(f"[DISPATCHER] [{area}] ÁREA COMPLETADA: "
+                  f"{total_wos_area} WOs totales, {total_vol_area}L totales")
+        
+        # ==================== RESUMEN FINAL ====================
+        utilizacion = (volume_acumulado / operator.capacity) * 100 if operator.capacity > 0 else 0
+        areas_usadas = set(wo.work_area for wo in tour_wos)
+        stagings_usados = set(wo.staging_id for wo in tour_wos)
+        
+        print(f"\n[DISPATCHER] ===== TOUR FINAL =====")
+        print(f"[DISPATCHER] Total WOs: {len(tour_wos)}")
+        print(f"[DISPATCHER] Volumen: {volume_acumulado}/{operator.capacity}L")
+        print(f"[DISPATCHER] Utilización: {utilizacion:.1f}%")
+        print(f"[DISPATCHER] Áreas: {areas_usadas}")
+        print(f"[DISPATCHER] Stagings: {stagings_usados}")
+        print(f"[DISPATCHER] Secuencias: [{', '.join(str(wo.pick_sequence) for wo in tour_wos)}]")
+        
         return tour_wos
 
     def _estrategia_cercania(self, operator: Any) -> List[Any]:

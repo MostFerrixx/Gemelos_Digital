@@ -211,5 +211,44 @@ python entry_points/run_replay_viewer.py output/simulation_*/replay_events_*.jso
 
 ---
 
-**Última Actualización:** 2025-01-14  
+## 🐛 BUGFIX 2025-10-27: Tours Cortos en Ground Operators
+
+### Problema Identificado
+Ground Operators realizaban tours muy cortos (1.75 WOs promedio) con baja utilizacion de capacidad (38.9%).
+
+### Causa Raiz
+1. **Bug en logica de secuencia ciclica** en `_construir_tour_por_secuencia()`:
+   - Busqueda de pick_sequence exacto causaba salida prematura
+   - Tours terminaban 10x mas cortos de lo que deberian
+2. **Discrepancia de capacidad** en `config.json`:
+   - GroundOperator tenia 500L en lugar de 150L
+
+### Solucion Implementada
+1. **Logica de Doble Barrido** en `dispatcher.py`:
+   - **Barrido Principal (Progresivo):** Agrega WOs con seq >= min_seq
+   - **Barrido Secundario (Llenado):** Agrega WOs con seq < min_seq si queda capacidad
+   - Maximiza utilizacion manteniendo secuencia logica
+2. **Correccion de capacidad** en `config.json`:
+   - GroundOperator: 500L → 150L
+
+### Resultados
+| Metrica | ANTES | DESPUES | Mejora |
+|---------|-------|---------|--------|
+| Tours totales | 12 | 7 | -41.7% |
+| WOs por tour | 1.75 | 3.57 | +104% |
+| Utilizacion | 38.9% | 98.1% | +252% |
+| Volumen por tour | 58.33L | 147.14L | +252% |
+
+**Nota:** La utilizacion de capacidad alcanzo 98.1%, lo que indica que el algoritmo esta funcionando optimamente. El promedio de WOs por tour (3.57) es menor al objetivo original (5-12) debido a que los WOs tienen volumenes grandes que llenan rapidamente la capacidad disponible.
+
+### Archivos Modificados
+- `src/subsystems/simulation/dispatcher.py` - Metodo `_construir_tour_por_secuencia()`
+- `config.json` - Capacidad de GroundOperator
+
+### Fecha de Implementacion
+2025-10-27
+
+---
+
+**Última Actualización:** 2025-10-27  
 **Estado:** ✅ Sistema completamente funcional

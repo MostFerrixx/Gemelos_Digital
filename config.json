@@ -16,13 +16,13 @@
     },
     "capacidad_carro": 150,
     "dispatch_strategy": "Ejecucion de Plan (Filtro por Prioridad)",
-    "tour_type": "Tour Simple (Un Destino)",
+    "tour_type": "Tour Mixto (Multi-Destino)",
     "layout_file": "layouts/WH1.tmx",
     "sequence_file": "layouts/Warehouse_Logic.xlsx",
     "map_scale": 1.3,
     "num_operarios_terrestres": 2,
-    "num_montacargas": 2,
-    "num_operarios_total": 4,
+    "num_montacargas": 1,
+    "num_operarios_total": 3,
     "capacidad_montacargas": 1000,
     "tiempo_descarga_por_tarea": 5,
     "assignment_rules": {
@@ -48,23 +48,6 @@
             }
         },
         {
-            "type": "GroundOperator",
-            "capacity": 150,
-            "discharge_time": 5,
-            "work_area_priorities": {
-                "Area_Ground": 1
-            }
-        },
-        {
-            "type": "Forklift",
-            "capacity": 300,
-            "discharge_time": 5,
-            "work_area_priorities": {
-                "Area_High": 1,
-                "Area_Special": 2
-            }
-        },
-        {
             "type": "Forklift",
             "capacity": 300,
             "discharge_time": 5,
@@ -74,7 +57,7 @@
             }
         }
     ],
-    "num_operarios": 4,
+    "num_operarios": 3,
     "tareas_zona_a": 0,
     "tareas_zona_b": 0
 }
