@@ -39,14 +39,24 @@ Todos los archivos del sistema han sido actualizados para reflejar esta nueva no
 
 ### ✅ MEJORAS RECIENTES (2025-10-27)
 
-**Descarga Multiple en Stagings:**
+**1. Descarga Multiple en Stagings:**
 - Implementada descarga realista donde operarios visitan múltiples staging areas
 - Operarios agrupan WOs por `staging_id` y descargan progresivamente
 - Orden de visita optimizado por distancia para minimizar desplazamientos
 - Validado con 55.6% de tours correctos (10/18 tours multi-staging)
 - Nuevo evento `partial_discharge` registra cada descarga individual
 
+**2. Correccion de Estrategia "Optimizacion Global":**
+- Corregida para usar doble barrido correctamente desde la primera WO seleccionada
+- Primera WO se selecciona por costo/distancia (AssignmentCostCalculator)
+- Resto del tour sigue pick_sequence con doble barrido (igual que "Ejecucion de Plan")
+- Ambas estrategias ahora comparten la misma logica de construccion de tours
+- Validado: Tours de 4.2 WOs promedio con 84% de utilizacion
+
 **Cambios técnicos:**
+- `dispatcher.py` linea 608: `min_seq` usa `ultimo_seq_agregado` para TODAS las areas
+- `dispatcher.py` linea 371: Ambas estrategias pasan `candidatos_compatibles` a construccion de tour
+- Eliminados caracteres Unicode (✓, ✗, ↻) reemplazados por ASCII (+, x, <)
 - Agregados métodos `_agrupar_wos_por_staging()` y `_ordenar_stagings_por_distancia()` en `BaseOperator`
 - Modificado `agent_process()` en `GroundOperator` y `Forklift` para descarga múltiple
 - Capacidad de Ground Operator corregida de 500L a 150L (coherente con `capacidad_carro`)

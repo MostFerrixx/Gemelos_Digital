@@ -344,7 +344,7 @@ class DispatcherV11:
         ÚNICA DIFERENCIA respecto a Optimización Global:
         - NO usa AssignmentCostCalculator para la primera WO
         - Selecciona la WO con el pick_sequence más pequeño del área con mayor prioridad
-        - El resto del tour se construye igual que Optimización Global
+        - El resto del tour se construye igual que Optimización Global (doble barrido con todas las áreas)
         """
         # Paso 1: Filtrar por compatibilidad de área de trabajo
         candidatos_compatibles = [wo for wo in self.work_orders_pendientes
@@ -366,7 +366,9 @@ class DispatcherV11:
         print(f"[DISPATCHER DEBUG] Ejecucion de Plan: Primera WO seleccionada: {primera_wo.id} con pick_sequence={primera_wo.pick_sequence}")
         
         # Paso 4: Construir tour siguiendo pick_sequence desde la primera WO (igual que Optimización Global)
-        tour_wos = self._construir_tour_por_secuencia(operator, primera_wo, candidatos_area_prioridad)
+        # IMPORTANTE: Pasar candidatos_compatibles (todas las áreas) para que el doble barrido
+        # pueda agregar WOs de otras áreas si es necesario
+        tour_wos = self._construir_tour_por_secuencia(operator, primera_wo, candidatos_compatibles)
         
         # Si es Tour Simple, filtrar por staging location
         if self.tour_type == "Tour Simple (Un Destino)":
@@ -602,7 +604,10 @@ class DispatcherV11:
             area_wos_sorted = sorted(area_wos, key=lambda wo: wo.pick_sequence)
             
             # Determinar secuencia mínima para esta área
-            min_seq = ultimo_seq_agregado if area != primera_wo.work_area else 1
+            # IMPORTANTE: Usar ultimo_seq_agregado para TODAS las áreas (incluida la primera)
+            # Esto asegura que el doble barrido comience desde donde quedó la primera WO
+            # seleccionada (ya sea por costo en Optimización Global o por seq en Ejecución de Plan)
+            min_seq = ultimo_seq_agregado
             
             print(f"\n[DISPATCHER] ===== PROCESANDO ÁREA: {area} =====")
             print(f"[DISPATCHER] [{area}] WOs disponibles: {len(area_wos_sorted)}")
@@ -638,12 +643,12 @@ class DispatcherV11:
                     ultimo_seq_agregado = wo.pick_sequence  # ACTUALIZAR
                     wos_agregadas_barrido1 += 1
                     
-                    print(f"[DISPATCHER] [{area}]   ✓ WO {wo.id} agregada "
+                    print(f"[DISPATCHER] [{area}]   + WO {wo.id} agregada "
                           f"(seq={wo.pick_sequence}, vol={wo_volume}L, "
                           f"acum={volume_acumulado}L)")
                 else:
-                    # No cabe - seguir probando siguientes (pueden ser más pequeñas)
-                    print(f"[DISPATCHER] [{area}]   ✗ WO {wo.id} no cabe "
+                    # No cabe - seguir probando siguientes (pueden ser mas pequenas)
+                    print(f"[DISPATCHER] [{area}]   x WO {wo.id} no cabe "
                           f"(seq={wo.pick_sequence}, vol={wo_volume}L, "
                           f"falta={wo_volume - (operator.capacity - volume_acumulado)}L)")
             
@@ -687,11 +692,11 @@ class DispatcherV11:
                         volumen_barrido2 += wo_volume
                         wos_agregadas_barrido2 += 1
                         
-                        print(f"[DISPATCHER] [{area}]   ↻ WO {wo.id} agregada (RETROCESO) "
+                        print(f"[DISPATCHER] [{area}]   < WO {wo.id} agregada (RETROCESO) "
                               f"(seq={wo.pick_sequence}, vol={wo_volume}L, "
                               f"acum={volume_acumulado}L)")
                     else:
-                        print(f"[DISPATCHER] [{area}]   ✗ WO {wo.id} no cabe "
+                        print(f"[DISPATCHER] [{area}]   x WO {wo.id} no cabe "
                               f"(seq={wo.pick_sequence}, vol={wo_volume}L)")
                 
                 print(f"[DISPATCHER] [{area}] Barrido Secundario completado: "
