@@ -370,9 +370,29 @@ def renderizar_rutas_tours(surface: pygame.Surface,
     operarios = estado_visual.get("operarios", {})
     work_orders = estado_visual.get("work_orders", {})
     
-    # Colores para diferentes tipos de agentes
-    COLOR_TERRESTRE = (255, 165, 0)  # Naranja
-    COLOR_MONTACARGAS = (100, 150, 255)  # Azul
+    # Paleta de colores distintivos para cada operario
+    # Colores vibrantes y distinguibles: Rojo, Verde, Azul, Amarillo, Magenta, Cian, Naranja, Rosa
+    PALETA_COLORES = [
+        (255, 50, 50),      # Rojo
+        (50, 255, 50),      # Verde brillante
+        (100, 150, 255),    # Azul
+        (255, 255, 0),      # Amarillo
+        (255, 0, 255),      # Magenta
+        (0, 255, 255),      # Cian
+        (255, 165, 0),      # Naranja
+        (255, 100, 150),    # Rosa
+        (150, 100, 255),    # Morado
+        (50, 200, 200),     # Turquesa
+        (200, 200, 50),    # Amarillo verdoso
+        (255, 150, 50),     # Anaranjado
+    ]
+    
+    # Funcion para asignar color único basado en ID del agente
+    def obtener_color_agente(agent_id: str) -> tuple:
+        """Retorna un color único para cada agente basado en su ID."""
+        # Usar hash del ID para seleccionar color de forma determinista
+        hash_val = hash(agent_id) % len(PALETA_COLORES)
+        return PALETA_COLORES[abs(hash_val)]
     
     # Renderizar ruta para cada operario que tiene tour asignado
     for agent_id, agente in operarios.items():
@@ -430,9 +450,8 @@ def renderizar_rutas_tours(surface: pygame.Surface,
             
             ubicaciones = ubicaciones_unicas  # Usar ubicaciones unicas
             
-            # Determinar color segun tipo de agente
-            tipo = agente.get('tipo', 'terrestre')
-            color_agente = COLOR_TERRESTRE if tipo == 'terrestre' else COLOR_MONTACARGAS
+            # Determinar color único para este agente
+            color_agente = obtener_color_agente(agent_id)
             
             # Dibujar lineas punteadas conectando los puntos (solo si hay mas de 1 ubicacion)
             if len(ubicaciones) > 1:
@@ -446,16 +465,25 @@ def renderizar_rutas_tours(surface: pygame.Surface,
             
             # Dibujar marcadores en cada punto de picking
             for i, (px, py) in enumerate(ubicaciones):
-                # Circulo mas grande para el punto actual si hay info de current_task
+                # Determinar si es el punto actual
                 current_task = agente.get('current_task')
                 is_current = (i < len(wo_ids) and wo_ids[i] == current_task)
                 
+                # Radio y color según si es actual
                 radio = 10 if is_current else 6
-                color_marcador = (255, 255, 0) if is_current else color_agente  # Amarillo para actual
+                
+                # El punto actual tiene borde más grueso y color más intenso
+                if is_current:
+                    # Hacer el color más intenso/bright para el punto actual
+                    color_marcador = tuple(min(255, c + 50) for c in color_agente)
+                    grosor_borde = 3
+                else:
+                    color_marcador = color_agente
+                    grosor_borde = 2
                 
                 # Dibujar marcador
                 pygame.draw.circle(surface, color_marcador, (int(px), int(py)), radio)
-                pygame.draw.circle(surface, (0, 0, 0), (int(px), int(py)), radio, 2)
+                pygame.draw.circle(surface, (0, 0, 0), (int(px), int(py)), radio, grosor_borde)
                 
                 # Numero de secuencia del punto
                 if i < 10:  # Solo mostrar numeros del 0-9 para no saturar

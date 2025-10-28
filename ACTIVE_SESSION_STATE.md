@@ -15,6 +15,7 @@
 - Agregado tracking de tours asignados en el replay engine
 - Lineas punteadas semi-transparentes conectando puntos de picking
 - Marcadores en puntos de picking con numeros de secuencia
+- **Cada operario tiene color unico y diferenciado** para distinguir rutas
 - Sistema completamente funcional y listo para uso
 
 ---
@@ -69,6 +70,9 @@
    - Nueva funcion `renderizar_rutas_tours()` para visualizar rutas de tours
    - Nueva funcion `_dibujar_linea_punteada_directo()` para lineas punteadas
    - Agregados marcadores de puntos de picking con numeros de secuencia
+   - **Paleta de 12 colores distintivos** para diferenciar cada operario
+   - **Asignacion de color unico basada en hash del ID** del agente
+   - Marcador actual con borde mas grueso y color intensificado
    - Actualizado __all__ para exportar nueva funcion
 
 2. **src/engines/replay_engine.py**
@@ -99,8 +103,10 @@
 **Nueva funcionalidad:**
 - Lineas punteadas semi-transparentes conectando puntos de picking
 - Marcadores circulares con numeros de secuencia en cada punto
+- **Cada operario tiene un color unico** de una paleta de 12 colores distintivos
+- Asignacion de color deterministica basada en hash del ID del agente
+- Punto actual destacado con borde mas grueso y color intensificado
 - Solo se muestran rutas de operarios en tours activos (working/moving/picking)
-- Colores diferenciados: Naranja para terrestres, Azul para montacargas
 
 ### TIEMPO ESTIMADO RESTANTE: 0 minutos (funcionalidad completa)
 
