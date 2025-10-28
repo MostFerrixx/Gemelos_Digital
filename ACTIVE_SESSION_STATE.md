@@ -1,44 +1,45 @@
-# 🚀 ESTADO DE SESIÓN ACTIVA - Sistema Listo
+# 🚀 ESTADO DE SESIÓN ACTIVA - Visualizacion de Rutas de Tours
 
-**Fecha:** 2025-10-27
-**Sesion:** Actualizacion de Documentacion
-**Estado:** ✅ SISTEMA LISTO PARA USO
+**Fecha:** 2025-10-28
+**Sesion:** Implementacion Visualizacion Rutas de Tours
+**Estado:** ✅ FUNCIONALIDAD IMPLEMENTADA
 
 ---
 
 ## 📋 CONTEXTO INMEDIATO
 
-### TAREA ACTUAL: Actualizar documentacion para eliminar referencias obsoletas
+### TAREA ACTUAL: Visualizacion de rutas de tours en el layout de simulacion
 
 ### CAMBIOS REALIZADOS:
-- Actualizado fecha en INSTRUCCIONES.md (2025-01-14 → 2025-10-27)
-- Corregidas referencias a run_live_simulation.py (archivo eliminado)
-- Reemplazadas por referencias a run_generate_replay.py (actual)
-- Actualizada arquitectura tecnica en INSTRUCCIONES.md
+- Implementada funcion `renderizar_rutas_tours()` en renderer.py
+- Agregado tracking de tours asignados en el replay engine
+- Lineas punteadas semi-transparentes conectando puntos de picking
+- Marcadores en puntos de picking con numeros de secuencia
 - Sistema completamente funcional y listo para uso
 
 ---
 
 ## 🛠️ PLAN DE IMPLEMENTACIÓN
 
-### FASE 1: Actualizar referencias a comandos - ✅ COMPLETADA
-- [x] Corregir referencias a run_live_simulation.py en HANDOFF.md
-- [x] Corregir referencias a run_live_simulation.py en INSTRUCCIONES.md
-- [x] Actualizar comandos de uso del sistema
+### FASE 1: Agregar tracking de tours - ✅ COMPLETADA
+- [x] Modificar replay_engine.py para rastrear tours asignados
+- [x] Agregar logica en procesamiento de eventos work_order_update
+- [x] Agregar logica en procesamiento de eventos estado_agente
 
-### FASE 2: Actualizar arquitectura tecnica - ✅ COMPLETADA
-- [x] Eliminar diagrama obsoleto de "Modo Visual (Multiproceso)"
-- [x] Actualizar diagrama de arquitectura headless
-- [x] Incluir diagrama de Replay Engine
+### FASE 2: Crear funcion de renderizado - ✅ COMPLETADA
+- [x] Implementar renderizar_rutas_tours() en renderer.py
+- [x] Crear _dibujar_linea_punteada_directo() para lineas punteadas
+- [x] Agregar marcadores de puntos de picking
 
-### FASE 3: Actualizar fechas - ✅ COMPLETADA
-- [x] Corregir fecha en INSTRUCCIONES.md (2025-01-14 → 2025-10-27)
-- [x] Verificar consistencia de fechas en documentos
+### FASE 3: Integrar en replay viewer - ✅ COMPLETADA
+- [x] Agregar llamada a renderizar_rutas_tours en replay_engine.py
+- [x] Renderizar rutas antes que los agentes (debajo visualmente)
+- [x] Actualizar exports del modulo renderer
 
-### FASE 4: Actualizar ACTIVE_SESSION_STATE.md - ✅ COMPLETADA
-- [x] Cambiar estado a "Sistema Listo"
-- [x] Actualizar contexto a documentacion
-- [x] Preparar para proximas instrucciones
+### FASE 4: Probar y validar - ✅ COMPLETADA
+- [x] Generar nuevo replay
+- [x] Visualizar replay con funcionalidad activada
+- [x] Verificar que las rutas se muestran correctamente
 
 ---
 
@@ -46,15 +47,16 @@
 
 ### Sistema Completamente Funcional:
 - **Generador de Replay:** Headless, genera eventos .jsonl
-- **Visualizador de Replay:** Pygame, reproduccion de eventos
+- **Visualizador de Replay:** Pygame, reproduccion de eventos con rutas de tours
 - **Estrategias Despacho:** Optimizacion Global y Ejecucion de Plan
 - **Descarga Multiple:** Stagings implementada
 - **Dashboard:** World-Class completado
 - **Configurador:** Sistema de slots funcional
+- **Visualizacion de Rutas:** Lineas punteadas y marcadores implementados
 
 ### Versión Actual:
 - **Rama:** main
-- **Estado:** 100% funcional
+- **Estado:** 100% funcional + Nueva feature de visualizacion de rutas
 - **Documentacion:** Actualizada y sin referencias obsoletas
 
 ---
@@ -63,37 +65,44 @@
 
 ### Archivos Modificados:
 
-1. **INSTRUCCIONES.md**
-   - Actualizada fecha (2025-01-14 → 2025-10-27)
-   - Corregidas referencias a run_live_simulation.py → run_generate_replay.py
-   - Actualizado diagrama de arquitectura tecnica
-   - Actualizados comandos de uso del sistema
+1. **src/subsystems/visualization/renderer.py**
+   - Nueva funcion `renderizar_rutas_tours()` para visualizar rutas de tours
+   - Nueva funcion `_dibujar_linea_punteada_directo()` para lineas punteadas
+   - Agregados marcadores de puntos de picking con numeros de secuencia
+   - Actualizado __all__ para exportar nueva funcion
 
-2. **HANDOFF.md**
-   - Corregidas referencias a run_live_simulation.py → run_generate_replay.py
-   - Actualizados archivos criticos en seccion SOPORTE
-   - Actualizados comandos de ejecucion de simulacion
+2. **src/engines/replay_engine.py**
+   - Agregada importacion de renderizar_rutas_tours
+   - Agregada llamada a renderizar_rutas_tours en el loop principal
+   - Agregado tracking de tours asignados en eventos work_order_update
+   - Agregado tracking de tours en eventos estado_agente con tour_actual
 
 3. **ACTIVE_SESSION_STATE.md** (este archivo)
-   - Actualizado estado a "Sistema Listo"
-   - Eliminada informacion obsoleta de sesion anterior
-   - Preparado para proximas instrucciones
+   - Actualizado estado a "Visualizacion de Rutas de Tours"
+   - Documentada nueva funcionalidad implementada
 
 ---
 
 ## ✅ ESTADO FINAL
 
 ### PRÓXIMO PASO:
-**Sistema completamente funcional y documentado correctamente.** No hay tareas pendientes. 
+**Sistema completamente funcional con nueva visualizacion de rutas de tours.** 
 
 **Estado del Sistema:**
 - ✅ Estrategia "Optimizacion Global" corregida con doble barrido
 - ✅ Descarga multiple en stagings implementada
 - ✅ Dashboard World-Class completado
 - ✅ Sistema de slots funcional
+- ✅ **NUEVO:** Visualizacion de rutas de tours con lineas punteadas y marcadores
 - ✅ Documentacion actualizada y sin referencias obsoletas
 
-### TIEMPO ESTIMADO RESTANTE: 0 minutos
+**Nueva funcionalidad:**
+- Lineas punteadas semi-transparentes conectando puntos de picking
+- Marcadores circulares con numeros de secuencia en cada punto
+- Solo se muestran rutas de operarios en tours activos (working/moving/picking)
+- Colores diferenciados: Naranja para terrestres, Azul para montacargas
+
+### TIEMPO ESTIMADO RESTANTE: 0 minutos (funcionalidad completa)
 
 ---
 
@@ -112,6 +121,6 @@ python entry_points/run_replay_viewer.py output/simulation_*/replay_*.jsonl
 
 ---
 
-**SISTEMA LISTO PARA USO** ✅
-**Fecha de actualizacion:** 2025-10-27
-**Resultado:** Documentacion actualizada, referencias obsoletas eliminadas, sistema completamente funcional
+**SISTEMA LISTO PARA USO CON VISUALIZACION DE RUTAS** ✅
+**Fecha de actualizacion:** 2025-10-28
+**Resultado:** Visualizacion de rutas de tours implementada, sistema completamente funcional

@@ -50,7 +50,7 @@ from subsystems.visualization.state import (
     disminuir_velocidad,
     obtener_velocidad_simulacion
 )
-from subsystems.visualization.renderer import RendererOriginal, renderizar_diagnostico_layout, renderizar_agentes
+from subsystems.visualization.renderer import RendererOriginal, renderizar_diagnostico_layout, renderizar_agentes, renderizar_rutas_tours
 from subsystems.visualization.dashboard import DashboardOriginal, DashboardGUI, DashboardWorldClass
 from subsystems.visualization.dashboard_modern import ModernDashboard
 from subsystems.visualization.dashboard_world_class import DashboardWorldClass as DashboardWC
@@ -477,6 +477,11 @@ class ReplayViewerEngine:
             self.pantalla.fill((240, 240, 240))
             virtual_surface.fill((25, 25, 25))
             if hasattr(self.layout_manager, 'tmx_data'): self.renderer.renderizar_mapa_tmx(virtual_surface, self.layout_manager.tmx_data)
+            
+            # Renderizar rutas de tours (antes que los agentes para que las rutas esten debajo)
+            renderizar_rutas_tours(virtual_surface, estado_visual, self.layout_manager)
+            
+            # Renderizar agentes
             if estado_visual.get("operarios"):
                 operarios_a_renderizar = [dict(d, id=id) for id, d in estado_visual["operarios"].items()]
                 renderizar_agentes(virtual_surface, operarios_a_renderizar, self.layout_manager)
@@ -529,6 +534,38 @@ class ReplayViewerEngine:
                 old_status = estado_visual["work_orders"][wo_id].get('status', 'none')
                 estado_visual["work_orders"][wo_id].update(evento)
                 new_status = estado_visual["work_orders"][wo_id].get('status', 'unknown')
+                
+                # Track WO assignment to operators for tour visualization
+                assigned_agent_id = evento.get('assigned_agent_id')
+                if assigned_agent_id:
+                    # Convertir ID completo (ej: "GroundOperator_GroundOp-01") a ID corto (ej: "GroundOp-01")
+                    # Buscar el ID corto en los operarios del estado
+                    agent_id_corto = None
+                    for key in estado_visual["operarios"].keys():
+                        # Verificar si el ID completo contiene el ID corto o viceversa
+                        if key in assigned_agent_id or assigned_agent_id in key:
+                            agent_id_corto = key
+                            break
+                    
+                    # Si no se encuentra, intentar convertir manualmente
+                    if not agent_id_corto:
+                        # Ejemplos: "GroundOperator_GroundOp-01" -> "GroundOp-01"
+                        if "GroundOp-" in assigned_agent_id:
+                            agent_id_corto = assigned_agent_id.replace("GroundOperator_", "")
+                        elif "Forklift-" in assigned_agent_id:
+                            agent_id_corto = assigned_agent_id.replace("Forklift_", "")
+                    
+                    # Usar ID corto si se encuentra
+                    if agent_id_corto:
+                        if agent_id_corto not in estado_visual["operarios"]:
+                            estado_visual["operarios"][agent_id_corto] = {}
+                        
+                        if 'work_orders_asignadas' not in estado_visual["operarios"][agent_id_corto]:
+                            estado_visual["operarios"][agent_id_corto]['work_orders_asignadas'] = []
+                        
+                        # Add WO to agent's tour if not already present
+                        if wo_id not in estado_visual["operarios"][agent_id_corto]['work_orders_asignadas']:
+                            estado_visual["operarios"][agent_id_corto]['work_orders_asignadas'].append(wo_id)
 
                 # Forward the complete, original event directly to the dashboard process
                 if not silent and self.dashboard_communicator:
@@ -571,6 +608,15 @@ class ReplayViewerEngine:
                     if agent_id not in estado_visual["operarios"]:
                         estado_visual["operarios"][agent_id] = {}
                     estado_visual["operarios"][agent_id].update(data)
+                    
+                    # Track tour information: extract WO IDs from tour_actual if available
+                    if 'tour_actual' in data and data['tour_actual']:
+                        tour_info = data['tour_actual']
+                        if isinstance(tour_info, dict) and 'work_orders' in tour_info:
+                            # Update work_orders_asignadas from tour
+                            wo_ids = [wo.get('id', wo) if isinstance(wo, dict) else wo 
+                                     for wo in tour_info['work_orders']]
+                            estado_visual["operarios"][agent_id]['work_orders_asignadas'] = wo_ids
                     
                     # DEBUG: Track status changes for utilization calculation
                     if 'status' in data and data['status'] != prev_agent_state.get('status'):

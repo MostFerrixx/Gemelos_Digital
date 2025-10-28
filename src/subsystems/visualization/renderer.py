@@ -347,6 +347,187 @@ def renderizar_agentes(surface: pygame.Surface,
             continue
 
 
+def renderizar_rutas_tours(surface: pygame.Surface,
+                           estado_visual: Dict[str, Any],
+                           layout_manager) -> None:
+    """
+    Renderiza las rutas de tours asignados a cada operario.
+    
+    Dibuja:
+    - Marcadores en los puntos de picking (ubicaciones de WOs)
+    - Lineas punteadas semi-transparentes conectando los puntos en orden
+    - Solo muestra rutas de operarios que estan trabajando en tours
+    
+    Args:
+        surface: pygame.Surface donde dibujar
+        estado_visual: Estado visual global
+        layout_manager: LayoutManager para conversion grid->pixel
+    """
+    # Validar entrada
+    if not estado_visual or not layout_manager:
+        return
+    
+    operarios = estado_visual.get("operarios", {})
+    work_orders = estado_visual.get("work_orders", {})
+    
+    # Colores para diferentes tipos de agentes
+    COLOR_TERRESTRE = (255, 165, 0)  # Naranja
+    COLOR_MONTACARGAS = (100, 150, 255)  # Azul
+    
+    # Renderizar ruta para cada operario que tiene tour asignado
+    for agent_id, agente in operarios.items():
+        try:
+            # Verificar si tiene tour asignado y WOs
+            wo_ids = agente.get('work_orders_asignadas', [])
+            if not wo_ids:
+                continue
+            
+            # Solo mostrar rutas de operarios que estan trabajando (comentar temporalmente para debug)
+            # if agente.get('status') not in ['working', 'moving', 'picking']:
+            #     continue
+            
+            # DEBUG: Solo mostrar info una vez por agente para no llenar logs
+            if not hasattr(renderizar_rutas_tours, '_debug_state'):
+                renderizar_rutas_tours._debug_state = {}
+            
+            if agent_id not in renderizar_rutas_tours._debug_state:
+                # Debug: logging reducido
+                renderizar_rutas_tours._debug_state[agent_id] = True
+            
+            # Extraer ubicaciones de las WOs
+            ubicaciones = []
+            for wo_id in wo_ids:
+                if wo_id in work_orders:
+                    wo = work_orders[wo_id]
+                    
+                    # Obtener ubicacion (puede ser grid o pixel)
+                    if 'ubicacion' in wo:
+                        ubicacion = wo['ubicacion']
+                    elif 'location' in wo:
+                        ubicacion = wo['location']
+                    else:
+                        continue
+                    
+                    # Convertir a pixel si es grid
+                    # Manejar tanto listas como tuplas
+                    if isinstance(ubicacion, (tuple, list)) and len(ubicacion) == 2:
+                        grid_x, grid_y = ubicacion[0], ubicacion[1]
+                        
+                        # Convertir grid a pixel
+                        pixel_x, pixel_y = _convertir_grid_a_pixel_seguro(
+                            layout_manager, grid_x, grid_y)
+                        ubicaciones.append((pixel_x, pixel_y))
+            
+            # Eliminar ubicaciones duplicadas (varias WOs en la misma ubicacion)
+            ubicaciones_unicas = []
+            for loc in ubicaciones:
+                if loc not in ubicaciones_unicas:
+                    ubicaciones_unicas.append(loc)
+            
+            # Validar que hay ubicaciones
+            if len(ubicaciones_unicas) < 1:
+                continue  # No hay ubicaciones
+            
+            ubicaciones = ubicaciones_unicas  # Usar ubicaciones unicas
+            
+            # Determinar color segun tipo de agente
+            tipo = agente.get('tipo', 'terrestre')
+            color_agente = COLOR_TERRESTRE if tipo == 'terrestre' else COLOR_MONTACARGAS
+            
+            # Dibujar lineas punteadas conectando los puntos (solo si hay mas de 1 ubicacion)
+            if len(ubicaciones) > 1:
+                for i in range(len(ubicaciones) - 1):
+                    x1, y1 = ubicaciones[i]
+                    x2, y2 = ubicaciones[i + 1]
+                    
+                    # Dibujar linea punteada directamente
+                    _dibujar_linea_punteada_directo(surface, (int(x1), int(y1)), 
+                                                   (int(x2), int(y2)), color_agente, 2, 8)
+            
+            # Dibujar marcadores en cada punto de picking
+            for i, (px, py) in enumerate(ubicaciones):
+                # Circulo mas grande para el punto actual si hay info de current_task
+                current_task = agente.get('current_task')
+                is_current = (i < len(wo_ids) and wo_ids[i] == current_task)
+                
+                radio = 10 if is_current else 6
+                color_marcador = (255, 255, 0) if is_current else color_agente  # Amarillo para actual
+                
+                # Dibujar marcador
+                pygame.draw.circle(surface, color_marcador, (int(px), int(py)), radio)
+                pygame.draw.circle(surface, (0, 0, 0), (int(px), int(py)), radio, 2)
+                
+                # Numero de secuencia del punto
+                if i < 10:  # Solo mostrar numeros del 0-9 para no saturar
+                    try:
+                        font = pygame.font.Font(None, 14)
+                        texto = font.render(str(i), True, (255, 255, 255))
+                        texto_rect = texto.get_rect(center=(int(px), int(py)))
+                        surface.blit(texto, texto_rect)
+                    except:
+                        pass
+        
+        except Exception as e:
+            # Si falla una ruta individual, continuar con las otras
+            print(f"[RENDERER] Error renderizando ruta: {e}")
+            continue
+
+
+def _dibujar_linea_punteada_directo(surface: pygame.Surface,
+                                    punto_inicio: Tuple[int, int],
+                                    punto_fin: Tuple[int, int],
+                                    color: Tuple[int, int, int],
+                                    grosor: int = 2,
+                                    segmento: int = 8) -> None:
+    """
+    Dibuja una linea punteada directamente en la superficie pygame.
+    Version simplificada sin transparencia para mejor rendimiento.
+    
+    Args:
+        surface: Superficie donde dibujar
+        punto_inicio: Coordenadas (x, y) del inicio
+        punto_fin: Coordenadas (x, y) del fin
+        color: Color RGB
+        grosor: Grosor de la linea
+        segmento: Longitud de cada segmento punteado
+    """
+    x1, y1 = punto_inicio
+    x2, y2 = punto_fin
+    
+    # Calcular vector de direccion
+    dx = x2 - x1
+    dy = y2 - y1
+    longitud = int((dx**2 + dy**2)**0.5)
+    
+    if longitud == 0:
+        return
+    
+    # Normalizar direccion
+    dx_norm = dx / longitud * segmento
+    dy_norm = dy / longitud * segmento
+    
+    # Dibujar segmentos punteados
+    distancia = 0
+    dibujar_segmento = True  # Alterna entre dibujar y saltar
+    
+    while distancia < longitud:
+        # Calcular posicion actual
+        x_actual = int(x1 + dx / longitud * distancia)
+        y_actual = int(y1 + dy / longitud * distancia)
+        
+        # Calcular posicion del siguiente segmento
+        siguiente_distancia = min(distancia + segmento, longitud)
+        x_sig = int(x1 + dx / longitud * siguiente_distancia)
+        y_sig = int(y1 + dy / longitud * siguiente_distancia)
+        
+        # Dibujar o saltar segun el estado
+        if dibujar_segmento:
+            pygame.draw.line(surface, color, (x_actual, y_actual), (x_sig, y_sig), grosor)
+        
+        distancia = siguiente_distancia
+        dibujar_segmento = not dibujar_segmento  # Alternar
+
+
 def renderizar_tareas_pendientes(surface: pygame.Surface,
                                  tareas_list: List[Any],
                                  layout_manager) -> None:
@@ -661,6 +842,7 @@ __all__ = [
 
     # Funciones de renderizado
     'renderizar_agentes',
+    'renderizar_rutas_tours',
     'renderizar_tareas_pendientes',
     'renderizar_dashboard',
     'renderizar_diagnostico_layout'
