@@ -410,13 +410,34 @@ def renderizar_rutas_tours(surface: pygame.Surface,
             if not hasattr(renderizar_rutas_tours, '_debug_state'):
                 renderizar_rutas_tours._debug_state = {}
             
+            # Contador de frames para logging periodico
+            if not hasattr(renderizar_rutas_tours, '_frame_count'):
+                renderizar_rutas_tours._frame_count = 0
+            renderizar_rutas_tours._frame_count += 1
+            
             if agent_id not in renderizar_rutas_tours._debug_state:
-                # Debug: logging reducido
+                # Debug: logging inicial
                 renderizar_rutas_tours._debug_state[agent_id] = True
             
             # Extraer ubicaciones de las WOs y agruparlas por ubicacion
             # Estructura: {ubicacion_pixel: {'wo_ids': [...], 'total': N}}
             ubicaciones_con_info = {}
+            
+            # Detectar WOs completadas usando current_task
+            # Si el agente tiene un current_task, todas las WOs ANTES en el tour ya se completaron
+            wos_completadas = set()
+            current_task = agente.get('current_task')
+            if current_task and current_task in wo_ids:
+                try:
+                    # Todas las WOs ANTES de current_task ya fueron completadas
+                    current_idx = wo_ids.index(current_task)
+                    wos_completadas = set(wo_ids[:current_idx])
+                    
+                    # DEBUG
+                    if agent_id not in renderizar_rutas_tours._debug_state:
+                        print(f"[RENDER-RUTAS] {agent_id}: {len(wos_completadas)} WOs completadas, current={current_task}")
+                except (ValueError, AttributeError, TypeError):
+                    pass
             
             for wo_id in wo_ids:
                 if wo_id not in work_orders:
@@ -452,9 +473,9 @@ def renderizar_rutas_tours(surface: pygame.Surface,
                 
                 ubicaciones_con_info[ubicacion_pixel]['wo_ids'].append(wo_id)
                 
-                # Contar solo WOs pendientes (no completadas)
-                status_wo = wo.get('status', 'unknown')
-                if status_wo not in ['completed', 'done']:
+                # Contar solo WOs pendientes (que NO han sido completadas)
+                # Si la WO NO está en el set de completadas, está pendiente
+                if wo_id not in wos_completadas:
                     ubicaciones_con_info[ubicacion_pixel]['wo_ids_pendientes'].append(wo_id)
             
             # Validar que hay ubicaciones
@@ -464,11 +485,16 @@ def renderizar_rutas_tours(surface: pygame.Surface,
             # Convertir a lista para mantener orden y agregar contador de WOs
             ubicaciones_con_contador = []
             for ubicacion_pixel, info in ubicaciones_con_info.items():
+                pendientes = len(info['wo_ids_pendientes'])
                 ubicaciones_con_contador.append({
                     'pos': ubicacion_pixel,
                     'total_wos': len(info['wo_ids']),
-                    'pendientes': len(info['wo_ids_pendientes'])
+                    'pendientes': pendientes
                 })
+                
+                # DEBUG: Log cada 60 frames (cada ~1 segundo)
+                if renderizar_rutas_tours._frame_count % 60 == 0:
+                    print(f"[RENDER-RUTAS] {agent_id} - Ubicacion {ubicacion_pixel}: {len(info['wo_ids'])} total, {pendientes} pendientes")
             
             ubicaciones = ubicaciones_con_contador
             
