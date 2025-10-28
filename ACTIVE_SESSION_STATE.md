@@ -23,6 +23,8 @@
 - **Contador dinamico** que refleja el progreso real de cada operario
 - **Solo muestra ubicaciones con WOs pendientes** para evitar visualizacion saturada
 - Filtra operarios inactivos para mostrar solo tours activos
+- **Oculta rutas cuando el operario va al staging o descarga** (solo muestra durante picking activo)
+- No muestra rutas cuando current_task NO es una WO del tour
 - Sistema completamente funcional y listo para uso
 
 ---
@@ -117,6 +119,7 @@
 - **Los numeros disminuyen en tiempo real** a medida que el agente avanza
 - Usa **current_task del agente** para detectar WOs ya completadas
 - Las WOs ANTES del current_task se excluyen automaticamente del contador
+- **NO muestra rutas cuando el operario va al staging o descarga** - Solo durante picking activo
 - Marcadores con fondo oscuro semi-transparente para mejor legibilidad
 - **Cada operario tiene un color unico** de una paleta de 12 colores distintivos
 - Asignacion de color deterministica basada en hash del ID del agente

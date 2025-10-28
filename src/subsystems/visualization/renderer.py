@@ -425,19 +425,27 @@ def renderizar_rutas_tours(surface: pygame.Surface,
             # Estructura: {ubicacion_pixel: {'wo_ids': [...], 'total': N}}
             ubicaciones_con_info = {}
             
+            # Detectar si esta yendo al staging o descargando (NO mostrar rutas en esos casos)
+            # Si current_task NO es una WO del tour, probablemente esta yendo al staging
+            current_task = agente.get('current_task')
+            is_delivering_to_staging = False
+            
+            if current_task and current_task not in wo_ids:
+                # Current task no es una WO del tour -> probablemente va al staging
+                is_delivering_to_staging = True
+            
+            # Si esta idle o sin current_task, NO mostrar rutas (podria estar descargando o en transicion)
+            if not current_task or is_delivering_to_staging:
+                continue
+            
             # Detectar WOs completadas usando current_task
             # Si el agente tiene un current_task, todas las WOs ANTES en el tour ya se completaron
             wos_completadas = set()
-            current_task = agente.get('current_task')
             if current_task and current_task in wo_ids:
                 try:
                     # Todas las WOs ANTES de current_task ya fueron completadas
                     current_idx = wo_ids.index(current_task)
                     wos_completadas = set(wo_ids[:current_idx])
-                    
-                    # DEBUG
-                    if agent_id not in renderizar_rutas_tours._debug_state:
-                        print(f"[RENDER-RUTAS] {agent_id}: {len(wos_completadas)} WOs completadas, current={current_task}")
                 except (ValueError, AttributeError, TypeError):
                     pass
             
