@@ -16,6 +16,8 @@
 - Lineas punteadas semi-transparentes conectando puntos de picking
 - Marcadores en puntos de picking con numeros de secuencia
 - **Cada operario tiene color unico y diferenciado** para distinguir rutas
+- **Los marcadores muestran el numero de WOs pendientes** en cada ubicacion
+- **Los numeros disminuyen** cuando las WOs se completan
 - Sistema completamente funcional y listo para uso
 
 ---
@@ -69,7 +71,9 @@
 1. **src/subsystems/visualization/renderer.py**
    - Nueva funcion `renderizar_rutas_tours()` para visualizar rutas de tours
    - Nueva funcion `_dibujar_linea_punteada_directo()` para lineas punteadas
-   - Agregados marcadores de puntos de picking con numeros de secuencia
+   - **Agrupacion de WOs por ubicacion** para mostrar contador de pendientes
+   - **Contador dinamico** que disminuye cuando las WOs se completan
+   - Marcadores con texto legible usando fondo oscuro semi-transparente
    - **Paleta de 12 colores distintivos** para diferenciar cada operario
    - **Asignacion de color unico basada en hash del ID** del agente
    - Marcador actual con borde mas grueso y color intensificado
@@ -102,7 +106,9 @@
 
 **Nueva funcionalidad:**
 - Lineas punteadas semi-transparentes conectando puntos de picking
-- Marcadores circulares con numeros de secuencia en cada punto
+- Marcadores circulares con **numero de WOs pendientes** en cada punto
+- **Los numeros disminuyen en tiempo real** a medida que se completan las WOs
+- Marcadores con fondo oscuro semi-transparente para mejor legibilidad
 - **Cada operario tiene un color unico** de una paleta de 12 colores distintivos
 - Asignacion de color deterministica basada en hash del ID del agente
 - Punto actual destacado con borde mas grueso y color intensificado

@@ -414,41 +414,63 @@ def renderizar_rutas_tours(surface: pygame.Surface,
                 # Debug: logging reducido
                 renderizar_rutas_tours._debug_state[agent_id] = True
             
-            # Extraer ubicaciones de las WOs
-            ubicaciones = []
-            for wo_id in wo_ids:
-                if wo_id in work_orders:
-                    wo = work_orders[wo_id]
-                    
-                    # Obtener ubicacion (puede ser grid o pixel)
-                    if 'ubicacion' in wo:
-                        ubicacion = wo['ubicacion']
-                    elif 'location' in wo:
-                        ubicacion = wo['location']
-                    else:
-                        continue
-                    
-                    # Convertir a pixel si es grid
-                    # Manejar tanto listas como tuplas
-                    if isinstance(ubicacion, (tuple, list)) and len(ubicacion) == 2:
-                        grid_x, grid_y = ubicacion[0], ubicacion[1]
-                        
-                        # Convertir grid a pixel
-                        pixel_x, pixel_y = _convertir_grid_a_pixel_seguro(
-                            layout_manager, grid_x, grid_y)
-                        ubicaciones.append((pixel_x, pixel_y))
+            # Extraer ubicaciones de las WOs y agruparlas por ubicacion
+            # Estructura: {ubicacion_pixel: {'wo_ids': [...], 'total': N}}
+            ubicaciones_con_info = {}
             
-            # Eliminar ubicaciones duplicadas (varias WOs en la misma ubicacion)
-            ubicaciones_unicas = []
-            for loc in ubicaciones:
-                if loc not in ubicaciones_unicas:
-                    ubicaciones_unicas.append(loc)
+            for wo_id in wo_ids:
+                if wo_id not in work_orders:
+                    continue
+                
+                wo = work_orders[wo_id]
+                
+                # Obtener ubicacion (puede ser grid o pixel)
+                if 'ubicacion' in wo:
+                    ubicacion = wo['ubicacion']
+                elif 'location' in wo:
+                    ubicacion = wo['location']
+                else:
+                    continue
+                
+                # Convertir a pixel si es grid
+                if not isinstance(ubicacion, (tuple, list)) or len(ubicacion) != 2:
+                    continue
+                
+                grid_x, grid_y = ubicacion[0], ubicacion[1]
+                
+                # Convertir grid a pixel
+                pixel_x, pixel_y = _convertir_grid_a_pixel_seguro(
+                    layout_manager, grid_x, grid_y)
+                ubicacion_pixel = (pixel_x, pixel_y)
+                
+                # Agrupar por ubicacion
+                if ubicacion_pixel not in ubicaciones_con_info:
+                    ubicaciones_con_info[ubicacion_pixel] = {
+                        'wo_ids': [],
+                        'wo_ids_pendientes': []
+                    }
+                
+                ubicaciones_con_info[ubicacion_pixel]['wo_ids'].append(wo_id)
+                
+                # Contar solo WOs pendientes (no completadas)
+                status_wo = wo.get('status', 'unknown')
+                if status_wo not in ['completed', 'done']:
+                    ubicaciones_con_info[ubicacion_pixel]['wo_ids_pendientes'].append(wo_id)
             
             # Validar que hay ubicaciones
-            if len(ubicaciones_unicas) < 1:
-                continue  # No hay ubicaciones
+            if len(ubicaciones_con_info) < 1:
+                continue
             
-            ubicaciones = ubicaciones_unicas  # Usar ubicaciones unicas
+            # Convertir a lista para mantener orden y agregar contador de WOs
+            ubicaciones_con_contador = []
+            for ubicacion_pixel, info in ubicaciones_con_info.items():
+                ubicaciones_con_contador.append({
+                    'pos': ubicacion_pixel,
+                    'total_wos': len(info['wo_ids']),
+                    'pendientes': len(info['wo_ids_pendientes'])
+                })
+            
+            ubicaciones = ubicaciones_con_contador
             
             # Determinar color único para este agente
             color_agente = obtener_color_agente(agent_id)
@@ -456,21 +478,23 @@ def renderizar_rutas_tours(surface: pygame.Surface,
             # Dibujar lineas punteadas conectando los puntos (solo si hay mas de 1 ubicacion)
             if len(ubicaciones) > 1:
                 for i in range(len(ubicaciones) - 1):
-                    x1, y1 = ubicaciones[i]
-                    x2, y2 = ubicaciones[i + 1]
+                    x1, y1 = ubicaciones[i]['pos']
+                    x2, y2 = ubicaciones[i + 1]['pos']
                     
                     # Dibujar linea punteada directamente
                     _dibujar_linea_punteada_directo(surface, (int(x1), int(y1)), 
                                                    (int(x2), int(y2)), color_agente, 2, 8)
             
             # Dibujar marcadores en cada punto de picking
-            for i, (px, py) in enumerate(ubicaciones):
-                # Determinar si es el punto actual
-                current_task = agente.get('current_task')
-                is_current = (i < len(wo_ids) and wo_ids[i] == current_task)
+            for i, ubicacion_info in enumerate(ubicaciones):
+                px, py = ubicacion_info['pos']
+                wo_pendientes = ubicacion_info['pendientes']
                 
-                # Radio y color según si es actual
-                radio = 10 if is_current else 6
+                # Determinar si es el punto actual (simplificado - podria mejorarse)
+                is_current = (wo_pendientes > 0 and i < 2)  # Aproximacion: puntos recientes
+                
+                # Radio basado en si hay WOs pendientes
+                radio = 12 if wo_pendientes > 0 else 6
                 
                 # El punto actual tiene borde más grueso y color más intenso
                 if is_current:
@@ -485,12 +509,26 @@ def renderizar_rutas_tours(surface: pygame.Surface,
                 pygame.draw.circle(surface, color_marcador, (int(px), int(py)), radio)
                 pygame.draw.circle(surface, (0, 0, 0), (int(px), int(py)), radio, grosor_borde)
                 
-                # Numero de secuencia del punto
-                if i < 10:  # Solo mostrar numeros del 0-9 para no saturar
+                # Mostrar numero de WOs pendientes
+                if wo_pendientes > 0:
                     try:
-                        font = pygame.font.Font(None, 14)
-                        texto = font.render(str(i), True, (255, 255, 255))
+                        font = pygame.font.Font(None, 16)
+                        # Renderizar texto con fondo oscuro para mejor legibilidad
+                        texto_str = str(wo_pendientes)
+                        texto = font.render(texto_str, True, (255, 255, 255))
                         texto_rect = texto.get_rect(center=(int(px), int(py)))
+                        
+                        # Dibujar fondo oscuro semi-transparente
+                        background_rect = pygame.Rect(
+                            texto_rect.x - 2, texto_rect.y - 1,
+                            texto_rect.width + 4, texto_rect.height + 2
+                        )
+                        # Crear superficie temporal con alpha
+                        bg_surface = pygame.Surface((background_rect.width, background_rect.height), pygame.SRCALPHA)
+                        bg_surface.fill((0, 0, 0, 180))  # Negro semi-transparente
+                        surface.blit(bg_surface, background_rect)
+                        
+                        # Dibujar texto
                         surface.blit(texto, texto_rect)
                     except:
                         pass
