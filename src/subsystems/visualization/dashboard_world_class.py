@@ -688,11 +688,15 @@ class DashboardWorldClass:
         # Convertir diccionario a lista de operarios con ID
         operarios_list = []
         for operator_id, operator_data in operarios_dict.items():
+            # IMPORTANTE: 'carga' es el campo correcto que contiene cargo_volume
+            # Tambien leer cargo_volume directamente si existe
+            carga_value = operator_data.get('cargo_volume') or operator_data.get('carga', 0)
+            
             operario = {
                 'id': operator_id,
                 'tipo': operator_data.get('tipo', 'GroundOperator'),
                 'estado': operator_data.get('status', 'idle'),
-                'carga_actual': operator_data.get('carga', 0),
+                'carga_actual': carga_value,
                 'capacidad_max': operator_data.get('capacidad', 100),
                 'ubicacion': f"({operator_data.get('x', 0)}, {operator_data.get('y', 0)})",
                 'current_task': operator_data.get('current_task', None),  # WorkOrder actual
@@ -783,7 +787,8 @@ class DashboardWorldClass:
         capacidad_max = operario.get('capacidad_max', 0)
 
         if capacidad_max > 0:
-            carga_actual = operario.get('carga_actual', 0)
+            # Leer cargo_volume o carga_actual (prioridad a cargo_volume)
+            carga_actual = operario.get('cargo_volume') or operario.get('carga_actual', 0)
             carga_porcentaje = (carga_actual / capacidad_max * 100) if capacidad_max > 0 else 0
             
             carga_x = x + 25

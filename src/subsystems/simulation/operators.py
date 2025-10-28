@@ -464,7 +464,8 @@ class GroundOperator(BaseOperator):
             # Visitar cada staging en orden
             for idx, (staging_id, staging_wos) in enumerate(ordered_stagings, 1):
                 staging_location = staging_locs.get(staging_id, (3, 29))
-                volumen_staging = sum(wo.calcular_volumen_restante() for wo in staging_wos)
+                # IMPORTANTE: Usar cantidad_inicial * sku.volumen porque cantidad_restante ya es 0 despues del picking
+                volumen_staging = sum(wo.cantidad_inicial * wo.sku.volumen for wo in staging_wos)
                 
                 print(f"[{self.id}] [{idx}/{len(ordered_stagings)}] Navegando a staging {staging_id} "
                       f"en {staging_location} para descargar {len(staging_wos)} WOs ({volumen_staging}L)")
@@ -844,7 +845,8 @@ class Forklift(BaseOperator):
             # Visitar cada staging en orden
             for idx, (staging_id, staging_wos) in enumerate(ordered_stagings, 1):
                 staging_location = staging_locs.get(staging_id, (3, 29))
-                volumen_staging = sum(wo.calcular_volumen_restante() for wo in staging_wos)
+                # IMPORTANTE: Usar cantidad_inicial * sku.volumen porque cantidad_restante ya es 0 despues del picking
+                volumen_staging = sum(wo.cantidad_inicial * wo.sku.volumen for wo in staging_wos)
                 
                 print(f"[{self.id}] [{idx}/{len(ordered_stagings)}] Navegando a staging {staging_id} "
                       f"en {staging_location} para descargar {len(staging_wos)} WOs ({volumen_staging}L)")

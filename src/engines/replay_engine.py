@@ -523,6 +523,30 @@ class ReplayViewerEngine:
                 if not silent and self.dashboard_communicator:
                     self.dashboard_communicator._send_message_with_retry(evento, max_retries=1, timeout=0.1)
 
+            # ===== Partial Discharge Events =====
+            elif event_type == 'partial_discharge':
+                agent_id = evento.get('agent_id')
+                cargo_restante = evento.get('cargo_restante', 0)
+                volumen_descargado = evento.get('volumen_descargado', 0)
+                
+                if agent_id:
+                    # Actualizar inmediatamente el cargo_volume en estado_visual
+                    if agent_id not in estado_visual["operarios"]:
+                        estado_visual["operarios"][agent_id] = {}
+                    
+                    # Obtener volumen ANTERIOR para comparacion
+                    volumen_anterior = estado_visual["operarios"][agent_id].get('carga', 0)
+                    
+                    # ACTUALIZAR EL VOLUMEN EN EL ESTADO VISUAL
+                    estado_visual["operarios"][agent_id]['carga'] = cargo_restante
+                    estado_visual["operarios"][agent_id]['cargo_volume'] = cargo_restante
+                    
+                    print(f"[PARTIAL-DISCHARGE] {agent_id}: {volumen_anterior}L -> {cargo_restante}L (descargados {volumen_descargado}L) en t={timestamp:.1f}s")
+                    
+                    # DEBUG: Verificar que el valor se actualizo
+                    nuevo_valor = estado_visual["operarios"][agent_id].get('carga', 'ERROR')
+                    print(f"[DEBUG-VOLUME] Valor en estado_visual despues de update: {nuevo_valor}L")
+
             # ===== Agent Events =====
             elif event_type == 'estado_agente':
                 agent_id = evento.get('agent_id')
