@@ -468,7 +468,9 @@ class ReplayViewerEngine:
                 replay_finalizado = True
                 self.playback_time = self.max_time
 
-            if estado_visual.get("operarios"): actualizar_metricas_tiempo(estado_visual["operarios"])
+            if estado_visual.get("operarios"): 
+                actualizar_metricas_tiempo(estado_visual["operarios"])
+            
             self._calcular_metricas_modern_dashboard(estado_visual)
             self._calcular_throughput_min(estado_visual)
 
@@ -518,6 +520,15 @@ class ReplayViewerEngine:
 
                 # Update internal state cache
                 self.dashboard_wos_state[wo_id] = evento.copy()
+                
+                # CRITICAL FIX: Update estado_visual["work_orders"] so metrics work correctly
+                if wo_id not in estado_visual["work_orders"]:
+                    estado_visual["work_orders"][wo_id] = {}
+                
+                # Get current status before update
+                old_status = estado_visual["work_orders"][wo_id].get('status', 'none')
+                estado_visual["work_orders"][wo_id].update(evento)
+                new_status = estado_visual["work_orders"][wo_id].get('status', 'unknown')
 
                 # Forward the complete, original event directly to the dashboard process
                 if not silent and self.dashboard_communicator:
@@ -560,6 +571,10 @@ class ReplayViewerEngine:
                     if agent_id not in estado_visual["operarios"]:
                         estado_visual["operarios"][agent_id] = {}
                     estado_visual["operarios"][agent_id].update(data)
+                    
+                    # DEBUG: Track status changes for utilization calculation
+                    if 'status' in data and data['status'] != prev_agent_state.get('status'):
+                        print(f"[DEBUG-UTIL] {agent_id}: {prev_agent_state.get('status', 'None')} -> {data['status']}")
 
                     # --- NEW LOGIC: Sync dashboard from agent state ---
                     new_task_id = data.get('current_task')
@@ -805,10 +820,14 @@ class ReplayViewerEngine:
             estado_visual["metricas"] = {}
         tiempo = self.playback_time
         completadas = estado_visual["metricas"].get("workorders_completadas", 0)
+        
+        # Calculate throughput: WOs per minute
         if tiempo > 0:
-            estado_visual["metricas"]["throughput_min"] = (completadas / max(tiempo, 1e-6)) * 60.0
+            throughput = (completadas / tiempo) * 60.0
         else:
-            estado_visual["metricas"]["throughput_min"] = 0.0
+            throughput = 0.0
+        
+        estado_visual["metricas"]["throughput_min"] = throughput
 
     def _send_initial_state_snapshot(self):
         """Envía el STATE_SNAPSHOT inicial al dashboard cuando se inicia."""

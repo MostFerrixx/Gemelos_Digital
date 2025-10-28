@@ -128,36 +128,25 @@ El sistema de slots permite gestionar múltiples configuraciones con metadatos c
 
 ## 🔧 ARQUITECTURA TÉCNICA
 
-### Modo Visual (Multiproceso):
-```
-┌─────────────────────────────────┐
-│  PROCESO PRODUCTOR (SimPy)      │
-│  - SimulationEngine              │
-│  - AlmacenMejorado               │
-│  - Dispatcher                    │
-│  - Operadores                    │
-│  - Genera eventos de simulación │
-└────────────┬────────────────────┘
-             │ visual_event_queue
-             ↓
-┌─────────────────────────────────┐
-│  PROCESO CONSUMIDOR (Pygame)    │
-│  - Lee eventos de la cola        │
-│  - Actualiza estado_visual       │
-│  - Renderiza dashboard           │
-│  - Copia eventos a replay_buffer │
-└─────────────────────────────────┘
-```
-
 ### Modo Headless (Proceso único):
 ```
 ┌─────────────────────────────────┐
-│  SimulationEngine (headless)    │
+│  EventGenerator (headless)      │
 │  - AlmacenMejorado               │
+│  - Dispatcher                    │
+│  - Operadores                    │
 │    └─ registrar_evento()         │
 │       ├─ event_log.append()      │
 │       └─ replay_buffer.add()     │
 │  - Sin GUI, máxima velocidad     │
+└─────────────────────────────────┘
+             │
+             ↓
+┌─────────────────────────────────┐
+│  Replay Engine (Pygame)         │
+│  - Lee eventos de .jsonl         │
+│  - Actualiza estado_visual       │
+│  - Renderiza dashboard           │
 └─────────────────────────────────┘
 ```
 
@@ -190,7 +179,7 @@ output/simulation_20251008_140900/
 
 ### Ejecutar Simulación:
 ```bash
-python entry_points/run_live_simulation.py --headless
+python entry_points/run_generate_replay.py
 ```
 **Propósito:** Simulación completa con configuración desde `config.json`  
 **Duración:** 1-3 minutos  
@@ -258,16 +247,16 @@ python entry_points/run_replay_viewer.py output/simulation_*/replay_events_*.jso
 
 **Para nueva sesión:**
 1. Leer documentación en orden: ACTIVE_SESSION_STATE → HANDOFF → INSTRUCCIONES
-2. Ejecutar `python entry_points/run_live_simulation.py --headless` para iniciar simulación
+2. Ejecutar `python entry_points/run_generate_replay.py` para iniciar simulación
 3. Usar `python entry_points/run_replay_viewer.py` para visualizar simulaciones
 
 **Archivos críticos para uso:**
-- `entry_points/run_live_simulation.py` - Simulación completa
+- `entry_points/run_generate_replay.py` - Generador de replay (headless)
 - `entry_points/run_replay_viewer.py` - Visualizador
 - `config.json` - Configuración principal
-- `output/simulation_*/replay_events_*.jsonl` - Archivos generados
+- `output/simulation_*/replay_*.jsonl` - Archivos generados
 
 ---
 
-**Última Actualización:** 2025-01-14  
+**Última Actualización:** 2025-10-27  
 **Estado:** ✅ Sistema completamente funcional

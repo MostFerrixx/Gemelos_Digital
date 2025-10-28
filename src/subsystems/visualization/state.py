@@ -398,14 +398,17 @@ def actualizar_metricas_tiempo(operarios_dict):
     traveling_count = 0
 
     # Contar operarios por status
-    for operario in operarios_dict.values():
+    for operario_id, operario in operarios_dict.items():
         status = operario.get('status', 'idle')
 
         # BUGFIX DASHBOARD METRICS: Alinear strings de status con valores reales del .jsonl
+        # Estados IDLE
         if status in ['idle', 'Esperando tour']:
             idle_count += 1
-        elif status in ['working', 'Trabajando']:  # Para futuras implementaciones
+        # Estados TRABAJANDO (picking, lifting, unloading, dropping)
+        elif status in ['working', 'Trabajando', 'picking', 'lifting', 'unloading', 'dropping']:
             working_count += 1
+        # Estados VIAJANDO (moving, traveling)
         elif status in ['traveling', 'moving', 'Moviendose']:
             traveling_count += 1
 
@@ -416,6 +419,8 @@ def actualizar_metricas_tiempo(operarios_dict):
         utilizacion = ((working_count + traveling_count) / total_operarios) * 100.0
     else:
         utilizacion = 0.0
+
+    # DEBUG removido - ya no necesario
 
     # Actualizar metricas globales
     estado_visual["metricas"]["operarios_idle"] = idle_count

@@ -176,7 +176,7 @@ output/simulation_YYYYMMDD_HHMMSS/
 
 ### Ejecutar Simulación:
 ```bash
-python entry_points/run_live_simulation.py --headless
+python entry_points/run_generate_replay.py
 ```
 **Duración:** 1-3 minutos  
 **Output:** Archivos en `output/`
@@ -221,11 +221,11 @@ python entry_points/run_replay_viewer.py output/simulation_*/replay_events_*.jso
 
 **Para nueva sesión:**
 1. Leer documentación en orden: ACTIVE_SESSION_STATE → HANDOFF → INSTRUCCIONES
-2. Ejecutar `python entry_points/run_live_simulation.py --headless` para iniciar simulación
+2. Ejecutar `python entry_points/run_generate_replay.py` para iniciar simulación
 3. Usar `python entry_points/run_replay_viewer.py` para visualizar simulaciones
 
 **Archivos críticos:**
-- `entry_points/run_live_simulation.py` - Simulación completa
+- `entry_points/run_generate_replay.py` - Generador de replay (headless)
 - `entry_points/run_replay_viewer.py` - Visualizador
 - `configurator.py` - Sistema de slots
 - `config.json` - Configuración principal
