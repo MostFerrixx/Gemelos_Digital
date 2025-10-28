@@ -18,6 +18,9 @@
 - **Cada operario tiene color unico y diferenciado** para distinguir rutas
 - **Los marcadores muestran el numero de WOs pendientes** en cada ubicacion
 - **Los numeros disminuyen** cuando las WOs se completan
+- **Usa current_task del agente** para rastrear progreso del tour
+- Las WOs ANTES del current_task se consideran completadas
+- **Contador dinamico** que refleja el progreso real de cada operario
 - Sistema completamente funcional y listo para uso
 
 ---
@@ -72,7 +75,9 @@
    - Nueva funcion `renderizar_rutas_tours()` para visualizar rutas de tours
    - Nueva funcion `_dibujar_linea_punteada_directo()` para lineas punteadas
    - **Agrupacion de WOs por ubicacion** para mostrar contador de pendientes
-   - **Contador dinamico** que disminuye cuando las WOs se completan
+   - **Contador dinamico basado en current_task** del agente
+   - Las WOs ANTES del current_task se excluyen del contador
+   - Los numeros disminuyen en tiempo real durante el replay
    - Marcadores con texto legible usando fondo oscuro semi-transparente
    - **Paleta de 12 colores distintivos** para diferenciar cada operario
    - **Asignacion de color unico basada en hash del ID** del agente
@@ -107,7 +112,9 @@
 **Nueva funcionalidad:**
 - Lineas punteadas semi-transparentes conectando puntos de picking
 - Marcadores circulares con **numero de WOs pendientes** en cada punto
-- **Los numeros disminuyen en tiempo real** a medida que se completan las WOs
+- **Los numeros disminuyen en tiempo real** a medida que el agente avanza
+- Usa **current_task del agente** para detectar WOs ya completadas
+- Las WOs ANTES del current_task se excluyen automaticamente del contador
 - Marcadores con fondo oscuro semi-transparente para mejor legibilidad
 - **Cada operario tiene un color unico** de una paleta de 12 colores distintivos
 - Asignacion de color deterministica basada en hash del ID del agente
