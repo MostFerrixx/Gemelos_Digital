@@ -21,6 +21,8 @@
 - **Usa current_task del agente** para rastrear progreso del tour
 - Las WOs ANTES del current_task se consideran completadas
 - **Contador dinamico** que refleja el progreso real de cada operario
+- **Solo muestra ubicaciones con WOs pendientes** para evitar visualizacion saturada
+- Filtra operarios inactivos para mostrar solo tours activos
 - Sistema completamente funcional y listo para uso
 
 ---

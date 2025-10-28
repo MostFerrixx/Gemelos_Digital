@@ -402,9 +402,11 @@ def renderizar_rutas_tours(surface: pygame.Surface,
             if not wo_ids:
                 continue
             
-            # Solo mostrar rutas de operarios que estan trabajando (comentar temporalmente para debug)
-            # if agente.get('status') not in ['working', 'moving', 'picking']:
-            #     continue
+            # Solo mostrar rutas de operarios que estan activamente trabajando en su tour
+            # No mostrar si esta idle, completed, o en estados finales
+            status_agente = agente.get('status', 'unknown')
+            if status_agente in ['idle', 'completed', 'done', 'finished']:
+                continue
             
             # DEBUG: Solo mostrar info una vez por agente para no llenar logs
             if not hasattr(renderizar_rutas_tours, '_debug_state'):
@@ -482,15 +484,18 @@ def renderizar_rutas_tours(surface: pygame.Surface,
             if len(ubicaciones_con_info) < 1:
                 continue
             
-            # Convertir a lista para mantener orden y agregar contador de WOs
+            # Convertir a lista y FILTRAR solo ubicaciones con WOs pendientes
             ubicaciones_con_contador = []
             for ubicacion_pixel, info in ubicaciones_con_info.items():
                 pendientes = len(info['wo_ids_pendientes'])
-                ubicaciones_con_contador.append({
-                    'pos': ubicacion_pixel,
-                    'total_wos': len(info['wo_ids']),
-                    'pendientes': pendientes
-                })
+                
+                # SOLO agregar ubicaciones que tienen WOs pendientes
+                if pendientes > 0:
+                    ubicaciones_con_contador.append({
+                        'pos': ubicacion_pixel,
+                        'total_wos': len(info['wo_ids']),
+                        'pendientes': pendientes
+                    })
                 
                 # DEBUG: Log cada 60 frames (cada ~1 segundo)
                 if renderizar_rutas_tours._frame_count % 60 == 0:
@@ -517,10 +522,10 @@ def renderizar_rutas_tours(surface: pygame.Surface,
                 wo_pendientes = ubicacion_info['pendientes']
                 
                 # Determinar si es el punto actual (simplificado - podria mejorarse)
-                is_current = (wo_pendientes > 0 and i < 2)  # Aproximacion: puntos recientes
+                is_current = (i < 2)  # Aproximacion: puntos recientes
                 
-                # Radio basado en si hay WOs pendientes
-                radio = 12 if wo_pendientes > 0 else 6
+                # Radio basado en cantidad de WOs
+                radio = 10 + min(wo_pendientes, 5)  # Radio 10-15 basado en cantidad
                 
                 # El punto actual tiene borde más grueso y color más intenso
                 if is_current:
@@ -535,29 +540,28 @@ def renderizar_rutas_tours(surface: pygame.Surface,
                 pygame.draw.circle(surface, color_marcador, (int(px), int(py)), radio)
                 pygame.draw.circle(surface, (0, 0, 0), (int(px), int(py)), radio, grosor_borde)
                 
-                # Mostrar numero de WOs pendientes
-                if wo_pendientes > 0:
-                    try:
-                        font = pygame.font.Font(None, 16)
-                        # Renderizar texto con fondo oscuro para mejor legibilidad
-                        texto_str = str(wo_pendientes)
-                        texto = font.render(texto_str, True, (255, 255, 255))
-                        texto_rect = texto.get_rect(center=(int(px), int(py)))
-                        
-                        # Dibujar fondo oscuro semi-transparente
-                        background_rect = pygame.Rect(
-                            texto_rect.x - 2, texto_rect.y - 1,
-                            texto_rect.width + 4, texto_rect.height + 2
-                        )
-                        # Crear superficie temporal con alpha
-                        bg_surface = pygame.Surface((background_rect.width, background_rect.height), pygame.SRCALPHA)
-                        bg_surface.fill((0, 0, 0, 180))  # Negro semi-transparente
-                        surface.blit(bg_surface, background_rect)
-                        
-                        # Dibujar texto
-                        surface.blit(texto, texto_rect)
-                    except:
-                        pass
+                # Mostrar numero de WOs pendientes (siempre > 0 porque ya filtramos)
+                try:
+                    font = pygame.font.Font(None, 16)
+                    # Renderizar texto con fondo oscuro para mejor legibilidad
+                    texto_str = str(wo_pendientes)
+                    texto = font.render(texto_str, True, (255, 255, 255))
+                    texto_rect = texto.get_rect(center=(int(px), int(py)))
+                    
+                    # Dibujar fondo oscuro semi-transparente
+                    background_rect = pygame.Rect(
+                        texto_rect.x - 2, texto_rect.y - 1,
+                        texto_rect.width + 4, texto_rect.height + 2
+                    )
+                    # Crear superficie temporal con alpha
+                    bg_surface = pygame.Surface((background_rect.width, background_rect.height), pygame.SRCALPHA)
+                    bg_surface.fill((0, 0, 0, 180))  # Negro semi-transparente
+                    surface.blit(bg_surface, background_rect)
+                    
+                    # Dibujar texto
+                    surface.blit(texto, texto_rect)
+                except:
+                    pass
         
         except Exception as e:
             # Si falla una ruta individual, continuar con las otras
