@@ -350,6 +350,31 @@ def renderizar_agentes(surface: pygame.Surface,
             continue
 
 
+# Paleta de colores distintivos para cada operario
+# Colores vibrantes y distinguibles: Rojo, Verde, Azul, Amarillo, Magenta, Cian, Naranja, Rosa
+PALETA_COLORES = [
+    (255, 50, 50),      # Rojo
+    (50, 255, 50),      # Verde brillante
+    (100, 150, 255),    # Azul
+    (255, 255, 0),      # Amarillo
+    (255, 0, 255),      # Magenta
+    (0, 255, 255),      # Cian
+    (255, 165, 0),      # Naranja
+    (255, 100, 150),    # Rosa
+    (150, 100, 255),    # Morado
+    (50, 200, 200),     # Turquesa
+    (200, 200, 50),     # Amarillo verdoso
+    (255, 150, 50),     # Anaranjado
+]
+
+
+def obtener_color_agente(agent_id: str) -> tuple:
+    """Retorna un color único para cada agente basado en su ID."""
+    # Usar hash del ID para seleccionar color de forma determinista
+    hash_val = hash(agent_id) % len(PALETA_COLORES)
+    return PALETA_COLORES[abs(hash_val)]
+
+
 def renderizar_rutas_tours(surface: pygame.Surface,
                            estado_visual: Dict[str, Any],
                            layout_manager) -> None:
@@ -372,30 +397,6 @@ def renderizar_rutas_tours(surface: pygame.Surface,
     
     operarios = estado_visual.get("operarios", {})
     work_orders = estado_visual.get("work_orders", {})
-    
-    # Paleta de colores distintivos para cada operario
-    # Colores vibrantes y distinguibles: Rojo, Verde, Azul, Amarillo, Magenta, Cian, Naranja, Rosa
-    PALETA_COLORES = [
-        (255, 50, 50),      # Rojo
-        (50, 255, 50),      # Verde brillante
-        (100, 150, 255),    # Azul
-        (255, 255, 0),      # Amarillo
-        (255, 0, 255),      # Magenta
-        (0, 255, 255),      # Cian
-        (255, 165, 0),      # Naranja
-        (255, 100, 150),    # Rosa
-        (150, 100, 255),    # Morado
-        (50, 200, 200),     # Turquesa
-        (200, 200, 50),    # Amarillo verdoso
-        (255, 150, 50),     # Anaranjado
-    ]
-    
-    # Funcion para asignar color único basado en ID del agente
-    def obtener_color_agente(agent_id: str) -> tuple:
-        """Retorna un color único para cada agente basado en su ID."""
-        # Usar hash del ID para seleccionar color de forma determinista
-        hash_val = hash(agent_id) % len(PALETA_COLORES)
-        return PALETA_COLORES[abs(hash_val)]
     
     # Renderizar ruta para cada operario que tiene tour asignado
     for agent_id, agente in operarios.items():
