@@ -392,7 +392,8 @@ class ReplayViewerEngine:
                     # El dashboard y otros elementos se adaptarán en el siguiente ciclo de renderizado
                 # ------------------------------------------
 
-                # if self.replay_scrubber: self.replay_scrubber.handle_event(event)  # DESHABILITADO
+                if self.replay_scrubber: 
+                    self.replay_scrubber.handle_event(event)
                 if event.type == REPLAY_SEEK_EVENT:
                     playback_time = self.seek_to_time(event.target_time)
                     replay_finalizado = (playback_time >= self.max_time)
@@ -442,9 +443,11 @@ class ReplayViewerEngine:
                     self._sync_dashboard_time(playback_time)
 
                 # Enqueue new events based on playback_time
+                # CRITICAL: Only enqueue events up to current playback_time to avoid overwriting restored state
                 for i in range(self.last_event_idx_enqueued + 1, len(self.eventos)):
                     evento = self.eventos[i]
-                    if (evento.get('timestamp') or 0.0) <= playback_time:
+                    event_time = evento.get('timestamp') or 0.0
+                    if event_time <= playback_time:
                         self.event_processing_queue.append((i, evento))
                         self.last_event_idx_enqueued = i
                     else:
@@ -607,7 +610,15 @@ class ReplayViewerEngine:
                     # Update visual state for Pygame rendering FIRST
                     if agent_id not in estado_visual["operarios"]:
                         estado_visual["operarios"][agent_id] = {}
-                    estado_visual["operarios"][agent_id].update(data)
+                    
+                    # CRITICAL: Preserve work_orders_asignadas if it exists (from seek restoration)
+                    # Only update it if tour_actual is explicitly provided
+                    existing_wos = estado_visual["operarios"][agent_id].get('work_orders_asignadas', [])
+                    
+                    # Remove work_orders_asignadas from data temporarily to prevent overwrite
+                    data_without_wos = {k: v for k, v in data.items() if k != 'work_orders_asignadas'}
+                    
+                    estado_visual["operarios"][agent_id].update(data_without_wos)
                     
                     # Track tour information: extract WO IDs from tour_actual if available
                     if 'tour_actual' in data and data['tour_actual']:
@@ -617,6 +628,12 @@ class ReplayViewerEngine:
                             wo_ids = [wo.get('id', wo) if isinstance(wo, dict) else wo 
                                      for wo in tour_info['work_orders']]
                             estado_visual["operarios"][agent_id]['work_orders_asignadas'] = wo_ids
+                    elif existing_wos:
+                        # Preserve existing work_orders_asignadas if no tour_actual in this event
+                        estado_visual["operarios"][agent_id]['work_orders_asignadas'] = existing_wos
+                    elif 'work_orders_asignadas' in data and data['work_orders_asignadas']:
+                        # Only use work_orders_asignadas from data if it's not empty and we don't have existing
+                        estado_visual["operarios"][agent_id]['work_orders_asignadas'] = data['work_orders_asignadas']
                     
                     # DEBUG: Track status changes for utilization calculation
                     if 'status' in data and data['status'] != prev_agent_state.get('status'):
