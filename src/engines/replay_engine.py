@@ -765,6 +765,10 @@ class ReplayViewerEngine:
             'metrics': {}
         }
 
+        # Track all WO assignments to operators (even if later completed)
+        # This allows us to reconstruct the full tour for visualization
+        operator_wo_assignments = {}  # {agent_id: set(wo_ids)}
+        
         # Apply event changes sequentially up to the target_time
         for event in events:
             event_type = event.get('type')
@@ -828,6 +832,11 @@ class ReplayViewerEngine:
                             if work_area:
                                 state["operators"][agent_id_para_usar]['current_work_area'] = work_area
                             
+                            # Track assignment in operator_wo_assignments
+                            if agent_id_para_usar not in operator_wo_assignments:
+                                operator_wo_assignments[agent_id_para_usar] = set()
+                            operator_wo_assignments[agent_id_para_usar].add(wo_id)
+                            
                             # Add WO to agent's tour
                             if 'work_orders_asignadas' not in state["operators"][agent_id_para_usar]:
                                 state["operators"][agent_id_para_usar]['work_orders_asignadas'] = []
@@ -875,16 +884,45 @@ class ReplayViewerEngine:
                         if 'work_orders_asignadas' in data:
                             print(f"[SEEK-DEBUG] estado_agente: {agent_id_para_usar} tiene work_orders_asignadas directamente: {len(data.get('work_orders_asignadas', []))}")
 
+        # Finalize: Ensure all operators have all their assigned WOs in work_orders_asignadas
+        # Create operators that have assignments but no estado_agente events
+        for op_id, assigned_wos in operator_wo_assignments.items():
+            if op_id not in state['operators']:
+                state['operators'][op_id] = {}
+        
+        # Merge assignments from operator_wo_assignments with existing work_orders_asignadas
+        for op_id, op_data in state['operators'].items():
+            # Get existing WOs from tour_actual or work_orders_asignadas
+            existing_wos = set(op_data.get('work_orders_asignadas', []))
+            
+            # Add all tracked assignments from work_order_update events
+            if op_id in operator_wo_assignments:
+                all_assigned_wos = existing_wos | operator_wo_assignments[op_id]
+            else:
+                all_assigned_wos = existing_wos
+            
+            # Sort by pick_sequence if available
+            if all_assigned_wos:
+                wo_list_with_seq = []
+                for wo_id in all_assigned_wos:
+                    if wo_id in state['work_orders']:
+                        wo = state['work_orders'][wo_id]
+                        pick_seq = wo.get('pick_sequence', 999999)
+                        wo_list_with_seq.append((pick_seq, wo_id))
+                
+                # Sort by pick_sequence and extract WO IDs
+                wo_list_with_seq.sort(key=lambda x: x[0])
+                op_data['work_orders_asignadas'] = [wo_id for _, wo_id in wo_list_with_seq]
+                
+                if len(op_data['work_orders_asignadas']) > 0:
+                    print(f"[SEEK-DEBUG] Finalizado: {op_id} tiene {len(op_data['work_orders_asignadas'])} WOs asignadas")
+        
         # Convert dicts to lists for the snapshot payload
         state['work_orders'] = list(state['work_orders'].values())
         
         operators_list = []
         for op_id, op_data in state['operators'].items():
             op_data['id'] = op_id # Add the ID into the dictionary
-            # Debug: verificar work_orders_asignadas antes de convertir
-            wos_count = len(op_data.get('work_orders_asignadas', []))
-            if wos_count > 0:
-                print(f"[SEEK-DEBUG] Snapshot: {op_id} tiene {wos_count} WOs asignadas antes de convertir a lista")
             operators_list.append(op_data)
         state['operators'] = operators_list
 
