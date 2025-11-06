@@ -16,8 +16,9 @@
 - Lineas punteadas semi-transparentes conectando puntos de picking
 - Marcadores en puntos de picking con numeros de secuencia
 - **Cada operario tiene color unico y diferenciado** para distinguir rutas
-- **Los marcadores muestran contador ACUMULADO de WOs restantes** desde esa ubicacion hasta el final del tour
+- **Los marcadores muestran contador ACUMULADO progresivo de WOs** desde el inicio hasta esa ubicacion
 - Ejemplo: Tour con 3 ubicaciones (5 WOs, 7 WOs, 10 WOs) muestra "5", "12", "22" respectivamente
+- Los numeros AUMENTAN a medida que avanzas en el tour (cada nodo tiene mas que el anterior)
 - **Los numeros disminuyen dinamicamente** a medida que el operario completa WOs
 - **Usa current_task del agente** para rastrear progreso del tour
 - Las WOs ANTES del current_task se consideran completadas

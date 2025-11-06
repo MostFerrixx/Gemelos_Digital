@@ -520,13 +520,13 @@ def renderizar_rutas_tours(surface: pygame.Surface,
                 key=lambda x: x[1]['pick_sequence_min']
             )
             
-            # Calcular acumulado desde cada ubicacion hasta el final
+            # Calcular acumulado desde el INICIO hasta cada ubicacion (inclusivo)
             ubicaciones_con_contador = []
             for i, (ubicacion_pixel, info) in enumerate(ubicaciones_ordenadas):
-                # Contar WOs desde esta ubicacion hasta el final
+                # Contar WOs desde el INICIO (j=0) hasta esta ubicacion (j=i, inclusivo)
                 contador_acumulado = sum(
                     len(ubicaciones_ordenadas[j][1]['wo_ids'])
-                    for j in range(i, len(ubicaciones_ordenadas))
+                    for j in range(0, i + 1)
                 )
                 
                 ubicaciones_con_contador.append({
@@ -534,10 +534,6 @@ def renderizar_rutas_tours(surface: pygame.Surface,
                     'pendientes': contador_acumulado,
                     'wos_en_esta_ubicacion': len(info['wo_ids'])
                 })
-                
-                # DEBUG: Log cada 60 frames (cada ~1 segundo)
-                if renderizar_rutas_tours._frame_count % 60 == 0:
-                    print(f"[RENDER-RUTAS] {agent_id} - Ubicacion {ubicacion_pixel}: acumulado={contador_acumulado}, en esta={len(info['wo_ids'])}")
             
             ubicaciones = ubicaciones_con_contador
             
