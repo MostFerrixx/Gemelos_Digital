@@ -449,11 +449,18 @@ def renderizar_rutas_tours(surface: pygame.Surface,
                 except (ValueError, AttributeError, TypeError):
                     pass
             
+            # Paso 1: Recopilar todas las WOs pendientes con su pick_sequence y ubicacion
+            wos_pendientes_con_info = []
+            
             for wo_id in wo_ids:
                 if wo_id not in work_orders:
                     continue
                 
                 wo = work_orders[wo_id]
+                
+                # Solo procesar WOs pendientes (no completadas)
+                if wo_id in wos_completadas:
+                    continue
                 
                 # Obtener ubicacion (puede ser grid o pixel)
                 if 'ubicacion' in wo:
@@ -474,40 +481,63 @@ def renderizar_rutas_tours(surface: pygame.Surface,
                     layout_manager, grid_x, grid_y)
                 ubicacion_pixel = (pixel_x, pixel_y)
                 
-                # Agrupar por ubicacion
-                if ubicacion_pixel not in ubicaciones_con_info:
-                    ubicaciones_con_info[ubicacion_pixel] = {
-                        'wo_ids': [],
-                        'wo_ids_pendientes': []
-                    }
+                # Obtener pick_sequence (orden en el tour)
+                pick_sequence = wo.get('pick_sequence', 0)
                 
-                ubicaciones_con_info[ubicacion_pixel]['wo_ids'].append(wo_id)
-                
-                # Contar solo WOs pendientes (que NO han sido completadas)
-                # Si la WO NO está en el set de completadas, está pendiente
-                if wo_id not in wos_completadas:
-                    ubicaciones_con_info[ubicacion_pixel]['wo_ids_pendientes'].append(wo_id)
+                wos_pendientes_con_info.append({
+                    'wo_id': wo_id,
+                    'ubicacion_pixel': ubicacion_pixel,
+                    'pick_sequence': pick_sequence
+                })
             
-            # Validar que hay ubicaciones
-            if len(ubicaciones_con_info) < 1:
+            # Validar que hay WOs pendientes
+            if len(wos_pendientes_con_info) < 1:
                 continue
             
-            # Convertir a lista y FILTRAR solo ubicaciones con WOs pendientes
+            # Paso 2: Ordenar WOs pendientes por pick_sequence (orden del tour)
+            wos_pendientes_con_info.sort(key=lambda x: x['pick_sequence'])
+            
+            # Paso 3: Agrupar por ubicacion y calcular contador acumulado
+            # El contador de cada ubicacion = WOs en esa ubicacion + todas las WOs siguientes
+            ubicaciones_unicas = {}
+            for wo_info in wos_pendientes_con_info:
+                ubicacion = wo_info['ubicacion_pixel']
+                if ubicacion not in ubicaciones_unicas:
+                    ubicaciones_unicas[ubicacion] = {
+                        'pick_sequence_min': wo_info['pick_sequence'],
+                        'wo_ids': []
+                    }
+                ubicaciones_unicas[ubicacion]['wo_ids'].append(wo_info['wo_id'])
+                ubicaciones_unicas[ubicacion]['pick_sequence_min'] = min(
+                    ubicaciones_unicas[ubicacion]['pick_sequence_min'],
+                    wo_info['pick_sequence']
+                )
+            
+            # Paso 4: Calcular contador acumulado para cada ubicacion
+            # Ordenar ubicaciones por pick_sequence
+            ubicaciones_ordenadas = sorted(
+                ubicaciones_unicas.items(),
+                key=lambda x: x[1]['pick_sequence_min']
+            )
+            
+            # Calcular acumulado desde cada ubicacion hasta el final
             ubicaciones_con_contador = []
-            for ubicacion_pixel, info in ubicaciones_con_info.items():
-                pendientes = len(info['wo_ids_pendientes'])
+            for i, (ubicacion_pixel, info) in enumerate(ubicaciones_ordenadas):
+                # Contar WOs desde esta ubicacion hasta el final
+                contador_acumulado = sum(
+                    len(ubicaciones_ordenadas[j][1]['wo_ids'])
+                    for j in range(i, len(ubicaciones_ordenadas))
+                )
                 
-                # SOLO agregar ubicaciones que tienen WOs pendientes
-                if pendientes > 0:
-                    ubicaciones_con_contador.append({
-                        'pos': ubicacion_pixel,
-                        'total_wos': len(info['wo_ids']),
-                        'pendientes': pendientes
-                    })
+                ubicaciones_con_contador.append({
+                    'pos': ubicacion_pixel,
+                    'pendientes': contador_acumulado,
+                    'wos_en_esta_ubicacion': len(info['wo_ids'])
+                })
                 
                 # DEBUG: Log cada 60 frames (cada ~1 segundo)
                 if renderizar_rutas_tours._frame_count % 60 == 0:
-                    print(f"[RENDER-RUTAS] {agent_id} - Ubicacion {ubicacion_pixel}: {len(info['wo_ids'])} total, {pendientes} pendientes")
+                    print(f"[RENDER-RUTAS] {agent_id} - Ubicacion {ubicacion_pixel}: acumulado={contador_acumulado}, en esta={len(info['wo_ids'])}")
             
             ubicaciones = ubicaciones_con_contador
             

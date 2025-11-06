@@ -16,11 +16,13 @@
 - Lineas punteadas semi-transparentes conectando puntos de picking
 - Marcadores en puntos de picking con numeros de secuencia
 - **Cada operario tiene color unico y diferenciado** para distinguir rutas
-- **Los marcadores muestran el numero de WOs pendientes** en cada ubicacion
-- **Los numeros disminuyen** cuando las WOs se completan
+- **Los marcadores muestran contador ACUMULADO de WOs restantes** desde esa ubicacion hasta el final del tour
+- Ejemplo: Tour con 3 ubicaciones (5 WOs, 7 WOs, 10 WOs) muestra "5", "12", "22" respectivamente
+- **Los numeros disminuyen dinamicamente** a medida que el operario completa WOs
 - **Usa current_task del agente** para rastrear progreso del tour
 - Las WOs ANTES del current_task se consideran completadas
-- **Contador dinamico** que refleja el progreso real de cada operario
+- **Contador ordenado por pick_sequence** (orden real del tour)
+- **Contador acumulado** que muestra WOs restantes hasta completar el tour
 - **Solo muestra ubicaciones con WOs pendientes** para evitar visualizacion saturada
 - Filtra operarios inactivos para mostrar solo tours activos
 - **Oculta rutas cuando el operario va al staging o descarga** (solo muestra durante picking activo)
