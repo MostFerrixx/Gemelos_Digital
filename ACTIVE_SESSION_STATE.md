@@ -13,8 +13,11 @@
 ### CAMBIOS REALIZADOS:
 - Implementada funcion `renderizar_rutas_tours()` en renderer.py
 - Agregado tracking de tours asignados en el replay engine
-- Lineas punteadas semi-transparentes conectando puntos de picking
-- Marcadores en puntos de picking con numeros de secuencia
+- **Operarios con color fijo unico en el perimetro** del circulo
+- **Centro del circulo del operario** muestra color de accion actual
+- **Nodos del tour con color del operario** para facil identificacion
+- **Eliminadas lineas entre nodos** para reducir saturacion visual
+- Marcadores en puntos de picking con contador acumulado
 - **Cada operario tiene color unico y diferenciado** para distinguir rutas
 - **Los marcadores muestran contador ACUMULADO progresivo de WOs** desde el inicio hasta esa ubicacion
 - Ejemplo: Tour con 3 ubicaciones (5 WOs, 7 WOs, 10 WOs) muestra "5", "12", "22" respectivamente

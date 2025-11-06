@@ -296,15 +296,18 @@ def renderizar_agentes(surface: pygame.Surface,
             status = agente.get('status', 'idle')
             agent_id = agente.get('id', 'Unknown')
 
-            # Determinar color segun tipo y status
-            color = _determinar_color_agente(tipo, status)
+            # Determinar color segun tipo y status (para el centro)
+            color_centro = _determinar_color_agente(tipo, status)
+            
+            # Obtener color unico por operario (para el borde)
+            color_borde = obtener_color_agente(agent_id)
 
-            # Dibujar agente como circulo
+            # Dibujar agente como circulo con centro de color de accion
             radio = 8
-            pygame.draw.circle(surface, color, (int(x), int(y)), radio)
+            pygame.draw.circle(surface, color_centro, (int(x), int(y)), radio)
 
-            # Dibujar borde negro para mejor visibilidad
-            pygame.draw.circle(surface, (0, 0, 0), (int(x), int(y)), radio, 1)
+            # Dibujar borde grueso de color unico del operario
+            pygame.draw.circle(surface, color_borde, (int(x), int(y)), radio, 3)
 
             # Dibujar direccion si esta en movimiento
             direccion_x = agente.get('direccion_x', 0)
@@ -539,16 +542,6 @@ def renderizar_rutas_tours(surface: pygame.Surface,
             
             # Determinar color único para este agente
             color_agente = obtener_color_agente(agent_id)
-            
-            # Dibujar lineas punteadas conectando los puntos (solo si hay mas de 1 ubicacion)
-            if len(ubicaciones) > 1:
-                for i in range(len(ubicaciones) - 1):
-                    x1, y1 = ubicaciones[i]['pos']
-                    x2, y2 = ubicaciones[i + 1]['pos']
-                    
-                    # Dibujar linea punteada directamente
-                    _dibujar_linea_punteada_directo(surface, (int(x1), int(y1)), 
-                                                   (int(x2), int(y2)), color_agente, 2, 8)
             
             # Dibujar marcadores en cada punto de picking
             for i, ubicacion_info in enumerate(ubicaciones):
