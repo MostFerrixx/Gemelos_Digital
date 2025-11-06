@@ -742,6 +742,10 @@ class ReplayViewerEngine:
                 # Asegurar que work_orders_asignadas existe
                 if 'work_orders_asignadas' not in operarios_dict[op_id]:
                     operarios_dict[op_id]['work_orders_asignadas'] = []
+                # Debug: verificar work_orders_asignadas después de copiar
+                wos_count = len(operarios_dict[op_id].get('work_orders_asignadas', []))
+                if wos_count > 0:
+                    print(f"[SEEK-DEBUG] estado_visual: {op_id} tiene {wos_count} WOs asignadas después de actualizar estado_visual")
         
         estado_visual['operarios'] = operarios_dict
         estado_visual['metricas'] = state_snapshot['metrics']
@@ -776,50 +780,84 @@ class ReplayViewerEngine:
                     old_agent = prev_wo.get('assigned_agent_id')
 
                     if new_agent != old_agent:
-                        # Un-assign from old agent
-                        if old_agent and old_agent in state["operators"]:
-                            if state["operators"][old_agent].get('current_task') == wo_id:
-                                state["operators"][old_agent]['current_task'] = None
-                                state["operators"][old_agent]['current_work_area'] = None
+                        # Un-assign from old agent (convertir ID si es necesario)
+                        if old_agent:
+                            old_agent_id_para_usar = old_agent
+                            for key in state["operators"].keys():
+                                if key in old_agent or old_agent in key:
+                                    old_agent_id_para_usar = key
+                                    break
                             
-                            # Remove WO from old agent's tour
-                            if 'work_orders_asignadas' in state["operators"][old_agent]:
-                                if wo_id in state["operators"][old_agent]['work_orders_asignadas']:
-                                    state["operators"][old_agent]['work_orders_asignadas'].remove(wo_id)
+                            if old_agent_id_para_usar in state["operators"]:
+                                if state["operators"][old_agent_id_para_usar].get('current_task') == wo_id:
+                                    state["operators"][old_agent_id_para_usar]['current_task'] = None
+                                    state["operators"][old_agent_id_para_usar]['current_work_area'] = None
+                                
+                                # Remove WO from old agent's tour
+                                if 'work_orders_asignadas' in state["operators"][old_agent_id_para_usar]:
+                                    if wo_id in state["operators"][old_agent_id_para_usar]['work_orders_asignadas']:
+                                        state["operators"][old_agent_id_para_usar]['work_orders_asignadas'].remove(wo_id)
 
                         # Assign to new agent
                         if new_agent:
-                            # Convertir ID completo (ej: "GroundOperator_GroundOp-01") a ID corto si es necesario
-                            # Buscar el operador por ID completo o corto
+                            # Convertir ID completo (ej: "GroundOperator_GroundOp-01") a ID corto (ej: "GroundOp-01")
+                            # Usar la misma lógica que en _process_event_batch
                             agent_id_para_usar = None
-                            if new_agent in state["operators"]:
-                                agent_id_para_usar = new_agent
-                            else:
-                                # Intentar encontrar por ID corto (sin prefijo)
-                                for op_id in state["operators"].keys():
-                                    if new_agent.endswith(op_id) or op_id in new_agent:
-                                        agent_id_para_usar = op_id
-                                        break
                             
-                            if agent_id_para_usar:
-                                state["operators"][agent_id_para_usar]['current_task'] = wo_id
-                                work_area = event.get('work_area')
-                                if work_area:
-                                    state["operators"][agent_id_para_usar]['current_work_area'] = work_area
-                                
-                                # Add WO to agent's tour
-                                if 'work_orders_asignadas' not in state["operators"][agent_id_para_usar]:
-                                    state["operators"][agent_id_para_usar]['work_orders_asignadas'] = []
-                                if wo_id not in state["operators"][agent_id_para_usar]['work_orders_asignadas']:
-                                    state["operators"][agent_id_para_usar]['work_orders_asignadas'].append(wo_id)
+                            # Primero buscar en los operadores existentes
+                            for key in state["operators"].keys():
+                                if key in new_agent or new_agent in key:
+                                    agent_id_para_usar = key
+                                    break
+                            
+                            # Si no se encuentra, intentar convertir manualmente
+                            if not agent_id_para_usar:
+                                if "GroundOp-" in new_agent:
+                                    agent_id_para_usar = new_agent.replace("GroundOperator_", "")
+                                elif "Forklift-" in new_agent:
+                                    agent_id_para_usar = new_agent.replace("Forklift_", "")
+                                else:
+                                    agent_id_para_usar = new_agent
+                            
+                            # Crear operador si no existe
+                            if agent_id_para_usar not in state["operators"]:
+                                state["operators"][agent_id_para_usar] = {}
+                            
+                            state["operators"][agent_id_para_usar]['current_task'] = wo_id
+                            work_area = event.get('work_area')
+                            if work_area:
+                                state["operators"][agent_id_para_usar]['current_work_area'] = work_area
+                            
+                            # Add WO to agent's tour
+                            if 'work_orders_asignadas' not in state["operators"][agent_id_para_usar]:
+                                state["operators"][agent_id_para_usar]['work_orders_asignadas'] = []
+                            if wo_id not in state["operators"][agent_id_para_usar]['work_orders_asignadas']:
+                                state["operators"][agent_id_para_usar]['work_orders_asignadas'].append(wo_id)
+                                print(f"[SEEK-DEBUG] work_order_update: Agregada WO {wo_id} a {agent_id_para_usar} (de {new_agent})")
 
             elif event_type == 'estado_agente':
                 agent_id = event.get('agent_id')
                 data = event.get('data', {})
                 if agent_id:
-                    if agent_id not in state['operators']:
-                        state['operators'][agent_id] = {}
-                    state['operators'][agent_id].update(data)
+                    # Convertir ID completo a ID corto si es necesario (misma lógica que en _process_event_batch)
+                    agent_id_para_usar = agent_id
+                    
+                    # Buscar si ya existe un operador con ID similar
+                    for key in state['operators'].keys():
+                        if key in agent_id or agent_id in key:
+                            agent_id_para_usar = key
+                            break
+                    
+                    # Si no se encuentra, intentar convertir manualmente
+                    if agent_id_para_usar == agent_id:
+                        if "GroundOp-" in agent_id:
+                            agent_id_para_usar = agent_id.replace("GroundOperator_", "")
+                        elif "Forklift-" in agent_id:
+                            agent_id_para_usar = agent_id.replace("Forklift_", "")
+                    
+                    if agent_id_para_usar not in state['operators']:
+                        state['operators'][agent_id_para_usar] = {}
+                    state['operators'][agent_id_para_usar].update(data)
                     
                     # Track tour information: extract WO IDs from tour_actual if available
                     if 'tour_actual' in data and data['tour_actual']:
@@ -828,7 +866,14 @@ class ReplayViewerEngine:
                             # Update work_orders_asignadas from tour
                             wo_ids = [wo.get('id', wo) if isinstance(wo, dict) else wo 
                                      for wo in tour_info['work_orders']]
-                            state['operators'][agent_id]['work_orders_asignadas'] = wo_ids
+                            state['operators'][agent_id_para_usar]['work_orders_asignadas'] = wo_ids
+                            print(f"[SEEK-DEBUG] estado_agente: {agent_id_para_usar} (de {agent_id}) tiene tour_actual con {len(wo_ids)} WOs")
+                        else:
+                            print(f"[SEEK-DEBUG] estado_agente: {agent_id_para_usar} tiene tour_actual pero sin work_orders: {type(tour_info)}")
+                    else:
+                        # Debug: verificar si hay work_orders_asignadas en otro lugar
+                        if 'work_orders_asignadas' in data:
+                            print(f"[SEEK-DEBUG] estado_agente: {agent_id_para_usar} tiene work_orders_asignadas directamente: {len(data.get('work_orders_asignadas', []))}")
 
         # Convert dicts to lists for the snapshot payload
         state['work_orders'] = list(state['work_orders'].values())
@@ -836,6 +881,10 @@ class ReplayViewerEngine:
         operators_list = []
         for op_id, op_data in state['operators'].items():
             op_data['id'] = op_id # Add the ID into the dictionary
+            # Debug: verificar work_orders_asignadas antes de convertir
+            wos_count = len(op_data.get('work_orders_asignadas', []))
+            if wos_count > 0:
+                print(f"[SEEK-DEBUG] Snapshot: {op_id} tiene {wos_count} WOs asignadas antes de convertir a lista")
             operators_list.append(op_data)
         state['operators'] = operators_list
 
