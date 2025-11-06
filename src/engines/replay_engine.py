@@ -770,20 +770,54 @@ class ReplayViewerEngine:
                             if state["operators"][old_agent].get('current_task') == wo_id:
                                 state["operators"][old_agent]['current_task'] = None
                                 state["operators"][old_agent]['current_work_area'] = None
+                            
+                            # Remove WO from old agent's tour
+                            if 'work_orders_asignadas' in state["operators"][old_agent]:
+                                if wo_id in state["operators"][old_agent]['work_orders_asignadas']:
+                                    state["operators"][old_agent]['work_orders_asignadas'].remove(wo_id)
 
                         # Assign to new agent
-                        if new_agent and new_agent in state["operators"]:
-                            state["operators"][new_agent]['current_task'] = wo_id
-                            work_area = event.get('work_area')
-                            if work_area:
-                                state["operators"][new_agent]['current_work_area'] = work_area
+                        if new_agent:
+                            # Convertir ID completo (ej: "GroundOperator_GroundOp-01") a ID corto si es necesario
+                            # Buscar el operador por ID completo o corto
+                            agent_id_para_usar = None
+                            if new_agent in state["operators"]:
+                                agent_id_para_usar = new_agent
+                            else:
+                                # Intentar encontrar por ID corto (sin prefijo)
+                                for op_id in state["operators"].keys():
+                                    if new_agent.endswith(op_id) or op_id in new_agent:
+                                        agent_id_para_usar = op_id
+                                        break
+                            
+                            if agent_id_para_usar:
+                                state["operators"][agent_id_para_usar]['current_task'] = wo_id
+                                work_area = event.get('work_area')
+                                if work_area:
+                                    state["operators"][agent_id_para_usar]['current_work_area'] = work_area
+                                
+                                # Add WO to agent's tour
+                                if 'work_orders_asignadas' not in state["operators"][agent_id_para_usar]:
+                                    state["operators"][agent_id_para_usar]['work_orders_asignadas'] = []
+                                if wo_id not in state["operators"][agent_id_para_usar]['work_orders_asignadas']:
+                                    state["operators"][agent_id_para_usar]['work_orders_asignadas'].append(wo_id)
 
             elif event_type == 'estado_agente':
                 agent_id = event.get('agent_id')
+                data = event.get('data', {})
                 if agent_id:
                     if agent_id not in state['operators']:
                         state['operators'][agent_id] = {}
-                    state['operators'][agent_id].update(event.get('data', {}))
+                    state['operators'][agent_id].update(data)
+                    
+                    # Track tour information: extract WO IDs from tour_actual if available
+                    if 'tour_actual' in data and data['tour_actual']:
+                        tour_info = data['tour_actual']
+                        if isinstance(tour_info, dict) and 'work_orders' in tour_info:
+                            # Update work_orders_asignadas from tour
+                            wo_ids = [wo.get('id', wo) if isinstance(wo, dict) else wo 
+                                     for wo in tour_info['work_orders']]
+                            state['operators'][agent_id]['work_orders_asignadas'] = wo_ids
 
         # Convert dicts to lists for the snapshot payload
         state['work_orders'] = list(state['work_orders'].values())

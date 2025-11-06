@@ -15,7 +15,9 @@
 - Agregado tracking de tours asignados en el replay engine
 - **Operarios con color fijo unico en el CENTRO** del circulo (igual que los nodos)
 - **Borde del circulo del operario** muestra color de accion actual (dinamico)
-- **Nodos del tour con color del operario** para facil identificacion
+- **Fix: Nodos del tour persisten durante seek** - Resuelto problema donde nodos desaparecian al mover barra de tiempo
+- Se restauran correctamente las work_orders_asignadas desde eventos historicos
+- Snapshot reconstruido incluye tour_actual y asignaciones de WOs
 - **Eliminadas lineas entre nodos** para reducir saturacion visual
 - Marcadores en puntos de picking con contador acumulado
 - **Cada operario tiene color unico y diferenciado** para distinguir rutas
