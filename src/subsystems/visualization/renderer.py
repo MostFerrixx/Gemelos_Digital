@@ -296,17 +296,17 @@ def renderizar_agentes(surface: pygame.Surface,
             status = agente.get('status', 'idle')
             agent_id = agente.get('id', 'Unknown')
 
-            # Determinar color segun tipo y status (para el centro)
-            color_centro = _determinar_color_agente(tipo, status)
+            # Determinar color segun tipo y status (para el borde - color de accion)
+            color_borde = _determinar_color_agente(tipo, status)
             
-            # Obtener color unico por operario (para el borde)
-            color_borde = obtener_color_agente(agent_id)
+            # Obtener color unico por operario (para el centro - igual que los nodos)
+            color_centro = obtener_color_agente(agent_id)
 
-            # Dibujar agente como circulo con centro de color de accion
+            # Dibujar agente como circulo con centro de color unico del operario
             radio = 8
             pygame.draw.circle(surface, color_centro, (int(x), int(y)), radio)
 
-            # Dibujar borde grueso de color unico del operario
+            # Dibujar borde grueso de color de accion (dinamico)
             pygame.draw.circle(surface, color_borde, (int(x), int(y)), radio, 3)
 
             # Dibujar direccion si esta en movimiento
