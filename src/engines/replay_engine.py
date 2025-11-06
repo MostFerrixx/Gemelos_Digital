@@ -732,7 +732,18 @@ class ReplayViewerEngine:
         # Update the global estado_visual for the Pygame UI
         global estado_visual
         estado_visual['work_orders'] = {wo['id']: wo for wo in state_snapshot['work_orders']}
-        estado_visual['operarios'] = {op['id']: op for op in state_snapshot['operators']}
+        
+        # Convertir lista de operadores a dict y asegurar que work_orders_asignadas existe
+        operarios_dict = {}
+        for op in state_snapshot['operators']:
+            op_id = op.get('id')
+            if op_id:
+                operarios_dict[op_id] = op.copy()
+                # Asegurar que work_orders_asignadas existe
+                if 'work_orders_asignadas' not in operarios_dict[op_id]:
+                    operarios_dict[op_id]['work_orders_asignadas'] = []
+        
+        estado_visual['operarios'] = operarios_dict
         estado_visual['metricas'] = state_snapshot['metrics']
 
         print(f"[EVENT-ENGINE] Seek complete: {len(events_to_replay)} events processed for snapshot.")
