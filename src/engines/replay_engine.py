@@ -112,10 +112,6 @@ class ReplayViewerEngine:
         self.last_event_idx_enqueued = -1
         self.event_processing_queue = []
 
-        # NEW: Event processing queue to smooth out updates
-        self.last_event_idx_enqueued = -1
-        self.event_processing_queue = []
-
         # HOLISTIC SOLUTION: Authoritative state computed from events
         self.authoritative_wo_state = {}  # Single source of truth for Work Orders
         self.temporal_mode_active = False  # Flag to indicate temporal navigation mode
@@ -392,8 +388,7 @@ class ReplayViewerEngine:
                     # El dashboard y otros elementos se adaptarán en el siguiente ciclo de renderizado
                 # ------------------------------------------
 
-                if self.replay_scrubber: 
-                    self.replay_scrubber.handle_event(event)
+                # if self.replay_scrubber: self.replay_scrubber.handle_event(event)  # DESHABILITADO
                 if event.type == REPLAY_SEEK_EVENT:
                     playback_time = self.seek_to_time(event.target_time)
                     replay_finalizado = (playback_time >= self.max_time)
@@ -443,11 +438,9 @@ class ReplayViewerEngine:
                     self._sync_dashboard_time(playback_time)
 
                 # Enqueue new events based on playback_time
-                # CRITICAL: Only enqueue events up to current playback_time to avoid overwriting restored state
                 for i in range(self.last_event_idx_enqueued + 1, len(self.eventos)):
                     evento = self.eventos[i]
-                    event_time = evento.get('timestamp') or 0.0
-                    if event_time <= playback_time:
+                    if (evento.get('timestamp') or 0.0) <= playback_time:
                         self.event_processing_queue.append((i, evento))
                         self.last_event_idx_enqueued = i
                     else:
@@ -495,11 +488,6 @@ class ReplayViewerEngine:
             if self.dashboard:
                 estado_visual['metricas']['max_time'] = self.max_time
                 self.dashboard.render(self.pantalla, estado_visual, offset_x=0)
-
-            # Renderizar ReplayScrubber - DESHABILITADO (redundante con dashboard)
-            # if self.replay_scrubber:
-            #     self.replay_scrubber.update(playback_time, self.max_time)
-            #     self.replay_scrubber.draw(self.pantalla)
 
             font = pygame.font.Font(None, 20)
             info_text = font.render(f"REPLAY: Tiempo {self.playback_time:.2f}s | Velocidad: {replay_speed:.2f}x | Eventos {len(self.processed_event_indices)}/{len(self.eventos)}", True, (255, 255, 255))
@@ -610,15 +598,7 @@ class ReplayViewerEngine:
                     # Update visual state for Pygame rendering FIRST
                     if agent_id not in estado_visual["operarios"]:
                         estado_visual["operarios"][agent_id] = {}
-                    
-                    # CRITICAL: Preserve work_orders_asignadas if it exists (from seek restoration)
-                    # Only update it if tour_actual is explicitly provided
-                    existing_wos = estado_visual["operarios"][agent_id].get('work_orders_asignadas', [])
-                    
-                    # Remove work_orders_asignadas from data temporarily to prevent overwrite
-                    data_without_wos = {k: v for k, v in data.items() if k != 'work_orders_asignadas'}
-                    
-                    estado_visual["operarios"][agent_id].update(data_without_wos)
+                    estado_visual["operarios"][agent_id].update(data)
                     
                     # Track tour information: extract WO IDs from tour_actual if available
                     if 'tour_actual' in data and data['tour_actual']:
@@ -628,12 +608,6 @@ class ReplayViewerEngine:
                             wo_ids = [wo.get('id', wo) if isinstance(wo, dict) else wo 
                                      for wo in tour_info['work_orders']]
                             estado_visual["operarios"][agent_id]['work_orders_asignadas'] = wo_ids
-                    elif existing_wos:
-                        # Preserve existing work_orders_asignadas if no tour_actual in this event
-                        estado_visual["operarios"][agent_id]['work_orders_asignadas'] = existing_wos
-                    elif 'work_orders_asignadas' in data and data['work_orders_asignadas']:
-                        # Only use work_orders_asignadas from data if it's not empty and we don't have existing
-                        estado_visual["operarios"][agent_id]['work_orders_asignadas'] = data['work_orders_asignadas']
                     
                     # DEBUG: Track status changes for utilization calculation
                     if 'status' in data and data['status'] != prev_agent_state.get('status'):
@@ -739,33 +713,14 @@ class ReplayViewerEngine:
         else:
             self.last_event_idx_enqueued = -1
 
-        # NEW: Reset event processing queue after a seek
-        self.event_processing_queue = []
-        if self.processed_event_indices:
-            self.last_event_idx_enqueued = max(self.processed_event_indices)
-        else:
-            self.last_event_idx_enqueued = -1
-
         # Update the global estado_visual for the Pygame UI
         global estado_visual
         estado_visual['work_orders'] = {wo['id']: wo for wo in state_snapshot['work_orders']}
-        
-        # Convertir lista de operadores a dict y asegurar que work_orders_asignadas existe
-        operarios_dict = {}
-        for op in state_snapshot['operators']:
-            op_id = op.get('id')
-            if op_id:
-                operarios_dict[op_id] = op.copy()
-                # Asegurar que work_orders_asignadas existe
-                if 'work_orders_asignadas' not in operarios_dict[op_id]:
-                    operarios_dict[op_id]['work_orders_asignadas'] = []
-                # Debug: verificar work_orders_asignadas después de copiar
-                wos_count = len(operarios_dict[op_id].get('work_orders_asignadas', []))
-                if wos_count > 0:
-                    print(f"[SEEK-DEBUG] estado_visual: {op_id} tiene {wos_count} WOs asignadas después de actualizar estado_visual")
-        
-        estado_visual['operarios'] = operarios_dict
+        estado_visual['operarios'] = {op['id']: op for op in state_snapshot['operators']}
         estado_visual['metricas'] = state_snapshot['metrics']
+        
+        # Sync time
+        self._sync_dashboard_time(target_time)
 
         print(f"[EVENT-ENGINE] Seek complete: {len(events_to_replay)} events processed for snapshot.")
         return target_time
@@ -782,158 +737,82 @@ class ReplayViewerEngine:
             'metrics': {}
         }
 
-        # Track all WO assignments to operators (even if later completed)
-        # This allows us to reconstruct the full tour for visualization
-        operator_wo_assignments = {}  # {agent_id: set(wo_ids)}
-        
         # Apply event changes sequentially up to the target_time
         for event in events:
             event_type = event.get('type')
             if event_type == 'work_order_update':
                 wo_id = event.get('id')
-                if wo_id in state['work_orders']:
+                if wo_id:
+                    # FIX: Create WO if it doesn't exist (for WOs created during simulation)
+                    if wo_id not in state['work_orders']:
+                        state['work_orders'][wo_id] = {}
+
                     # The event contains the updated state for the WO at that timestamp.
                     # We just need to apply all its fields.
-                    prev_wo = state['work_orders'][wo_id]
+                    prev_wo = state['work_orders'][wo_id].copy()
                     state['work_orders'][wo_id].update(event)
 
                     new_agent = event.get('assigned_agent_id')
                     old_agent = prev_wo.get('assigned_agent_id')
 
                     if new_agent != old_agent:
-                        # Un-assign from old agent (convertir ID si es necesario)
-                        if old_agent:
-                            old_agent_id_para_usar = old_agent
-                            for key in state["operators"].keys():
-                                if key in old_agent or old_agent in key:
-                                    old_agent_id_para_usar = key
-                                    break
-                            
-                            if old_agent_id_para_usar in state["operators"]:
-                                if state["operators"][old_agent_id_para_usar].get('current_task') == wo_id:
-                                    state["operators"][old_agent_id_para_usar]['current_task'] = None
-                                    state["operators"][old_agent_id_para_usar]['current_work_area'] = None
-                                
-                                # Remove WO from old agent's tour
-                                if 'work_orders_asignadas' in state["operators"][old_agent_id_para_usar]:
-                                    if wo_id in state["operators"][old_agent_id_para_usar]['work_orders_asignadas']:
-                                        state["operators"][old_agent_id_para_usar]['work_orders_asignadas'].remove(wo_id)
+                        # Un-assign from old agent
+                        if old_agent and old_agent in state["operators"]:
+                            if state["operators"][old_agent].get('current_task') == wo_id:
+                                state["operators"][old_agent]['current_task'] = None
+                                state["operators"][old_agent]['current_work_area'] = None
 
                         # Assign to new agent
-                        if new_agent:
-                            # Convertir ID completo (ej: "GroundOperator_GroundOp-01") a ID corto (ej: "GroundOp-01")
-                            # Usar la misma lógica que en _process_event_batch
-                            agent_id_para_usar = None
-                            
-                            # Primero buscar en los operadores existentes
-                            for key in state["operators"].keys():
-                                if key in new_agent or new_agent in key:
-                                    agent_id_para_usar = key
-                                    break
-                            
-                            # Si no se encuentra, intentar convertir manualmente
-                            if not agent_id_para_usar:
-                                if "GroundOp-" in new_agent:
-                                    agent_id_para_usar = new_agent.replace("GroundOperator_", "")
-                                elif "Forklift-" in new_agent:
-                                    agent_id_para_usar = new_agent.replace("Forklift_", "")
-                                else:
-                                    agent_id_para_usar = new_agent
-                            
-                            # Crear operador si no existe
-                            if agent_id_para_usar not in state["operators"]:
-                                state["operators"][agent_id_para_usar] = {}
-                            
-                            state["operators"][agent_id_para_usar]['current_task'] = wo_id
+                        if new_agent and new_agent in state["operators"]:
+                            state["operators"][new_agent]['current_task'] = wo_id
                             work_area = event.get('work_area')
                             if work_area:
-                                state["operators"][agent_id_para_usar]['current_work_area'] = work_area
+                                state["operators"][new_agent]['current_work_area'] = work_area
+                    
+                    # FIX: Also update work_orders_asignadas for the assigned agent
+                    # Moved OUTSIDE the conditional blocks to ensure it runs even if agent not yet in state
+                    # or if assignment didn't change but we need to populate the list.
+                    assigned_agent_id = event.get('assigned_agent_id')
+                    if assigned_agent_id:
+                        # Resolve short ID
+                        agent_id_corto = None
+                        for key in state["operators"].keys():
+                            if key in assigned_agent_id or assigned_agent_id in key:
+                                agent_id_corto = key
+                                break
+                        
+                        if not agent_id_corto:
+                            if "GroundOp-" in assigned_agent_id:
+                                agent_id_corto = assigned_agent_id.replace("GroundOperator_", "")
+                            elif "Forklift-" in assigned_agent_id:
+                                agent_id_corto = assigned_agent_id.replace("Forklift_", "")
+                        
+                        if agent_id_corto:
+                            if agent_id_corto not in state["operators"]:
+                                state["operators"][agent_id_corto] = {}
                             
-                            # Track assignment in operator_wo_assignments
-                            if agent_id_para_usar not in operator_wo_assignments:
-                                operator_wo_assignments[agent_id_para_usar] = set()
-                            operator_wo_assignments[agent_id_para_usar].add(wo_id)
+                            if 'work_orders_asignadas' not in state["operators"][agent_id_corto]:
+                                state["operators"][agent_id_corto]['work_orders_asignadas'] = []
                             
-                            # Add WO to agent's tour
-                            if 'work_orders_asignadas' not in state["operators"][agent_id_para_usar]:
-                                state["operators"][agent_id_para_usar]['work_orders_asignadas'] = []
-                            if wo_id not in state["operators"][agent_id_para_usar]['work_orders_asignadas']:
-                                state["operators"][agent_id_para_usar]['work_orders_asignadas'].append(wo_id)
-                                print(f"[SEEK-DEBUG] work_order_update: Agregada WO {wo_id} a {agent_id_para_usar} (de {new_agent})")
+                            if wo_id not in state["operators"][agent_id_corto]['work_orders_asignadas']:
+                                state["operators"][agent_id_corto]['work_orders_asignadas'].append(wo_id)
 
             elif event_type == 'estado_agente':
                 agent_id = event.get('agent_id')
-                data = event.get('data', {})
                 if agent_id:
-                    # Convertir ID completo a ID corto si es necesario (misma lógica que en _process_event_batch)
-                    agent_id_para_usar = agent_id
-                    
-                    # Buscar si ya existe un operador con ID similar
-                    for key in state['operators'].keys():
-                        if key in agent_id or agent_id in key:
-                            agent_id_para_usar = key
-                            break
-                    
-                    # Si no se encuentra, intentar convertir manualmente
-                    if agent_id_para_usar == agent_id:
-                        if "GroundOp-" in agent_id:
-                            agent_id_para_usar = agent_id.replace("GroundOperator_", "")
-                        elif "Forklift-" in agent_id:
-                            agent_id_para_usar = agent_id.replace("Forklift_", "")
-                    
-                    if agent_id_para_usar not in state['operators']:
-                        state['operators'][agent_id_para_usar] = {}
-                    state['operators'][agent_id_para_usar].update(data)
-                    
-                    # Track tour information: extract WO IDs from tour_actual if available
+                    if agent_id not in state['operators']:
+                        state['operators'][agent_id] = {}
+                    data = event.get('data', {})
+                    state['operators'][agent_id].update(data)
+
+                    # FIX: Reconstruct work_orders_asignadas from tour_actual
                     if 'tour_actual' in data and data['tour_actual']:
                         tour_info = data['tour_actual']
                         if isinstance(tour_info, dict) and 'work_orders' in tour_info:
-                            # Update work_orders_asignadas from tour
                             wo_ids = [wo.get('id', wo) if isinstance(wo, dict) else wo 
                                      for wo in tour_info['work_orders']]
-                            state['operators'][agent_id_para_usar]['work_orders_asignadas'] = wo_ids
-                            print(f"[SEEK-DEBUG] estado_agente: {agent_id_para_usar} (de {agent_id}) tiene tour_actual con {len(wo_ids)} WOs")
-                        else:
-                            print(f"[SEEK-DEBUG] estado_agente: {agent_id_para_usar} tiene tour_actual pero sin work_orders: {type(tour_info)}")
-                    else:
-                        # Debug: verificar si hay work_orders_asignadas en otro lugar
-                        if 'work_orders_asignadas' in data:
-                            print(f"[SEEK-DEBUG] estado_agente: {agent_id_para_usar} tiene work_orders_asignadas directamente: {len(data.get('work_orders_asignadas', []))}")
+                            state['operators'][agent_id]['work_orders_asignadas'] = wo_ids
 
-        # Finalize: Ensure all operators have all their assigned WOs in work_orders_asignadas
-        # Create operators that have assignments but no estado_agente events
-        for op_id, assigned_wos in operator_wo_assignments.items():
-            if op_id not in state['operators']:
-                state['operators'][op_id] = {}
-        
-        # Merge assignments from operator_wo_assignments with existing work_orders_asignadas
-        for op_id, op_data in state['operators'].items():
-            # Get existing WOs from tour_actual or work_orders_asignadas
-            existing_wos = set(op_data.get('work_orders_asignadas', []))
-            
-            # Add all tracked assignments from work_order_update events
-            if op_id in operator_wo_assignments:
-                all_assigned_wos = existing_wos | operator_wo_assignments[op_id]
-            else:
-                all_assigned_wos = existing_wos
-            
-            # Sort by pick_sequence if available
-            if all_assigned_wos:
-                wo_list_with_seq = []
-                for wo_id in all_assigned_wos:
-                    if wo_id in state['work_orders']:
-                        wo = state['work_orders'][wo_id]
-                        pick_seq = wo.get('pick_sequence', 999999)
-                        wo_list_with_seq.append((pick_seq, wo_id))
-                
-                # Sort by pick_sequence and extract WO IDs
-                wo_list_with_seq.sort(key=lambda x: x[0])
-                op_data['work_orders_asignadas'] = [wo_id for _, wo_id in wo_list_with_seq]
-                
-                if len(op_data['work_orders_asignadas']) > 0:
-                    print(f"[SEEK-DEBUG] Finalizado: {op_id} tiene {len(op_data['work_orders_asignadas'])} WOs asignadas")
-        
         # Convert dicts to lists for the snapshot payload
         state['work_orders'] = list(state['work_orders'].values())
         
@@ -1023,31 +902,6 @@ class ReplayViewerEngine:
             throughput = 0.0
         
         estado_visual["metricas"]["throughput_min"] = throughput
-
-    def _send_initial_state_snapshot(self):
-        """Envía el STATE_SNAPSHOT inicial al dashboard cuando se inicia."""
-        print("[DEBUG-EVENT] Sending initial STATE_SNAPSHOT to dashboard")
-
-        # Convertir dashboard_wos_state a lista para el snapshot
-        work_orders_list = []
-        for wo_id, wo_data in self.dashboard_wos_state.items():
-            work_orders_list.append(wo_data)
-
-        # Crear el snapshot inicial
-        initial_snapshot = StateSnapshotEvent(
-            timestamp=self.playback_time,
-            work_orders=work_orders_list,
-            operators=[],  # Por ahora vacío, se puede expandir después
-            metrics={
-                'total_work_orders': len(work_orders_list),
-                'completed_work_orders': 0,
-                'current_time': self.playback_time
-            }
-        )
-
-        # Enviar el snapshot
-        self._emit_event(initial_snapshot)
-        print(f"[DEBUG-EVENT] Initial STATE_SNAPSHOT sent with {len(work_orders_list)} WorkOrders")
 
     def limpiar_recursos(self):
         """Limpia recursos al cerrar"""
