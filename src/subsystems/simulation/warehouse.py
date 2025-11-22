@@ -242,12 +242,12 @@ class AlmacenMejorado:
         print(f"[ALMACEN] Inventario inicial: {sum(self.inventario.values())} unidades")
 
     def _validar_y_ajustar_cantidad(self, sku: SKU, cantidad_original: int,
-                                     work_area: str) -> int:
+                                     work_area: str) -> List[int]:
         """
-        Validate WorkOrder quantity against operator capacity
+        Divide cantidad solicitada en multiples WOs si excede capacidad.
 
-        BUGFIX CAPACITY VALIDATION: Ensures all WorkOrders are physically possible
-        by adjusting quantity if total volume exceeds operator capacity.
+        BUGFIX WO DIVISION: Cuando una orden solicita mas volumen del que cabe
+        en un operario, crea multiples WOs para completar la orden.
 
         Args:
             sku: SKU object with volumen attribute
@@ -255,8 +255,10 @@ class AlmacenMejorado:
             work_area: Work area identifier
 
         Returns:
-            Adjusted quantity (guaranteed to fit in at least one operator)
+            Lista de cantidades (una por cada WO necesaria para completar la orden)
         """
+        from typing import List
+        
         # Calculate total volume
         volumen_total = sku.volumen * cantidad_original
 
@@ -266,22 +268,29 @@ class AlmacenMejorado:
             self.max_operator_capacity  # Fallback to global max
         )
 
+        # Calculate units that fit per trip
+        unidades_por_viaje = max_capacity // sku.volumen
+
         # Check if volume exceeds capacity
-        if volumen_total > max_capacity:
-            # Calculate max quantity that fits
-            cantidad_ajustada = max_capacity // sku.volumen
-
-            # Ensure at least 1 unit (minimum viable WO)
-            cantidad_ajustada = max(1, cantidad_ajustada)
-
-            # Log adjustment
-            print(f"[ALMACEN WARNING] WO ajustada: SKU {sku.id} "
-                  f"cantidad {cantidad_original} -> {cantidad_ajustada} "
-                  f"(volumen {volumen_total} > capacidad {max_capacity})")
-
-            return cantidad_ajustada
+        if volumen_total <= max_capacity:
+            # Fits in a single trip
+            return [cantidad_original]
         else:
-            return cantidad_original
+            # Needs multiple trips
+            cantidades = []
+            cantidad_restante = cantidad_original
+            
+            while cantidad_restante > 0:
+                cantidad_viaje = min(unidades_por_viaje, cantidad_restante)
+                cantidades.append(cantidad_viaje)
+                cantidad_restante -= cantidad_viaje
+            
+            # Log division
+            print(f"[ALMACEN] WO DIVIDIDA: SKU {sku.id} "
+                  f"cantidad {cantidad_original} -> {len(cantidades)} WOs {cantidades} "
+                  f"(volumen {volumen_total} > capacidad {max_capacity})")
+            
+            return cantidades
 
     def _obtener_pick_sequence_real(self, ubicacion: tuple, work_area: str) -> int:
         """
@@ -388,42 +397,43 @@ class AlmacenMejorado:
             num_wos = random.randint(1, 3)
 
             for wo_num in range(num_wos):
-                wo_counter += 1
-
                 # Select picking location - ORIGINAL METHOD RESTORED
-                pick_idx = wo_counter % len(picking_points)
+                # Use order_counter instead of wo_counter for pick_idx to avoid bias
+                pick_idx = order_counter % len(picking_points)
                 ubicacion = picking_points[pick_idx]
                 work_area = work_areas[pick_idx] if pick_idx < len(work_areas) else "Area_Ground"
 
-                # BUGFIX CAPACITY VALIDATION: Validate quantity before creating WorkOrder
+                # BUGFIX WO DIVISION: Validate and potentially divide quantity
                 cantidad_solicitada = random.randint(1, 5)
-                cantidad_valida = self._validar_y_ajustar_cantidad(
+                cantidades = self._validar_y_ajustar_cantidad(
                     sku=sku,
                     cantidad_original=cantidad_solicitada,
                     work_area=work_area
                 )
 
-                # Track adjustments
-                if cantidad_valida < cantidad_solicitada:
+                # Track adjustments (when divided into multiple WOs)
+                if len(cantidades) > 1:
                     wo_adjusted_count += 1
 
                 # Select staging ID based on distribution
                 staging_id = self._seleccionar_staging_id()
                 
-                # Create work order with validated quantity
-                work_order = WorkOrder(
-                    work_order_id=f"WO-{wo_counter:04d}",
-                    order_id=f"ORD-{order_counter:04d}",
-                    tour_id=f"TOUR-{order_counter:04d}",
-                    sku=sku,
-                    cantidad=cantidad_valida,  # BUGFIX: Use validated quantity
-                    ubicacion=ubicacion,
-                    work_area=work_area,
-                    pick_sequence=self._obtener_pick_sequence_real(ubicacion, work_area),  # FIX: Use real pick_sequence from Excel
-                    staging_id=staging_id  # Assign staging based on distribution
-                )
+                # Create one work order for each quantity (may be 1 or multiple)
+                for cantidad in cantidades:
+                    wo_counter += 1
+                    work_order = WorkOrder(
+                        work_order_id=f"WO-{wo_counter:04d}",
+                        order_id=f"ORD-{order_counter:04d}",
+                        tour_id=f"TOUR-{order_counter:04d}",
+                        sku=sku,
+                        cantidad=cantidad,  # BUGFIX WO DIVISION: Each WO has its own quantity
+                        ubicacion=ubicacion,
+                        work_area=work_area,
+                        pick_sequence=self._obtener_pick_sequence_real(ubicacion, work_area),
+                        staging_id=staging_id
+                    )
 
-                all_work_orders.append(work_order)  # BUGFIX FASE 2: Collect instead of immediate add
+                    all_work_orders.append(work_order)
 
             order_counter += 1
 

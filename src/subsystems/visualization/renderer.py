@@ -406,10 +406,10 @@ def renderizar_rutas_tours(surface: pygame.Surface,
             if not wo_ids:
                 continue
             
-            # Solo ocultar si esta en estados finales (completed, done, finished)
-            # Pero mostrar incluso si esta idle (puede tener tour asignado pero no haber comenzado)
+            # Solo mostrar rutas de operarios que estan activamente trabajando en su tour
+            # No mostrar si esta idle, completed, o en estados finales
             status_agente = agente.get('status', 'unknown')
-            if status_agente in ['completed', 'done', 'finished']:
+            if status_agente in ['idle', 'completed', 'done', 'finished']:
                 continue
             
             # DEBUG: Solo mostrar info una vez por agente para no llenar logs
@@ -422,6 +422,7 @@ def renderizar_rutas_tours(surface: pygame.Surface,
             renderizar_rutas_tours._frame_count += 1
             
             if agent_id not in renderizar_rutas_tours._debug_state:
+                # Debug: logging inicial
                 renderizar_rutas_tours._debug_state[agent_id] = True
             
             # Extraer ubicaciones de las WOs y agruparlas por ubicacion
@@ -437,8 +438,8 @@ def renderizar_rutas_tours(surface: pygame.Surface,
                 # Current task no es una WO del tour -> probablemente va al staging
                 is_delivering_to_staging = True
             
-            # Solo ocultar si esta yendo al staging, pero mostrar si no tiene current_task (idle con tour asignado)
-            if is_delivering_to_staging:
+            # Si esta idle o sin current_task, NO mostrar rutas (podria estar descargando o en transicion)
+            if not current_task or is_delivering_to_staging:
                 continue
             
             # Detectar WOs completadas usando current_task

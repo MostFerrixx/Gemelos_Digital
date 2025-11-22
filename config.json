@@ -1,5 +1,5 @@
 {
-    "total_ordenes": 30,
+    "total_ordenes": 35,
     "distribucion_tipos": {
         "pequeno": {
             "porcentaje": 60,
@@ -15,7 +15,7 @@
         }
     },
     "capacidad_carro": 150,
-    "dispatch_strategy": "Optimizacion Global",
+    "dispatch_strategy": "Ejecucion de Plan (Filtro por Prioridad)",
     "tour_type": "Tour Mixto (Multi-Destino)",
     "layout_file": "layouts/WH1.tmx",
     "sequence_file": "layouts/Warehouse_Logic.xlsx",
@@ -45,6 +45,23 @@
             "discharge_time": 5,
             "work_area_priorities": {
                 "Area_Ground": 1
+            }
+        },
+        {
+            "type": "GroundOperator",
+            "capacity": 150,
+            "discharge_time": 5,
+            "work_area_priorities": {
+                "Area_Ground": 1
+            }
+        },
+        {
+            "type": "Forklift",
+            "capacity": 300,
+            "discharge_time": 5,
+            "work_area_priorities": {
+                "Area_High": 1,
+                "Area_Special": 2
             }
         },
         {
