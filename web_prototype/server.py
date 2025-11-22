@@ -174,6 +174,41 @@ def get_state(t: float):
             wo_id = data.get('id') or event.get('id')
             if wo_id:
                 current_state['work_orders'][wo_id] = event if not data else data
+    
+    # Compute work_orders_asignadas for each agent
+    # Based on desktop implementation in replay_engine.py
+    for agent_id in current_state['agents']:
+        assigned_wos = []
+        for wo_id, wo in current_state['work_orders'].items():
+            # Check if WO is assigned to this agent
+            wo_agent = wo.get('assigned_agent_id') or wo.get('agent_id')
+            wo_status = wo.get('status', 'released')
+            
+            # Normalize agent ID matching - WO agents are like "Forklift_Forklift-01" 
+            # but state agents are "Forklift-01"
+            # Extract the last part after underscore if present
+            if wo_agent:
+                if '_' in wo_agent:
+                    wo_agent_short = wo_agent.split('_')[-1]
+                else:
+                    wo_agent_short = wo_agent
+            else:
+                wo_agent_short = None
+            
+            # Only include WOs that are PENDING (not picked or staged)
+            # picked = completed picking, staged = delivered to staging
+            pending_statuses = ['assigned', 'in_progress']
+            if wo_agent_short == agent_id and wo_status in pending_statuses:
+                assigned_wos.append({
+                    'id': wo_id,
+                    'location': wo.get('location') or wo.get('ubicacion', [0, 0]),
+                    'status': wo_status,
+                    'pick_sequence': wo.get('pick_sequence', 0)
+                })
+        
+        # Sort by pick_sequence to maintain tour order
+        assigned_wos.sort(key=lambda x: x['pick_sequence'])
+        current_state['agents'][agent_id]['work_orders_asignadas'] = assigned_wos
 
     return {
         "timestamp": t,
@@ -181,6 +216,7 @@ def get_state(t: float):
         "agents": current_state['agents'],
         "work_orders": current_state['work_orders']
     }
+
 
 @app.get("/api/metrics")
 def get_metrics(t: float):

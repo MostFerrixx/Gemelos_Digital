@@ -4,155 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital Twin Web Viewer</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1e1e1e;
-            color: #e0e0e0;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        header {
-            background-color: #2d2d2d;
-            padding: 10px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #3d3d3d;
-        }
-
-        h1 {
-            margin: 0;
-            font-size: 1.2rem;
-        }
-
-        #main-container {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        #canvas-container {
-            flex: 1;
-            position: relative;
-            background-color: #121212;
-            overflow: auto;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        canvas {
-            background-color: #252525;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-        }
-
-        #sidebar {
-            width: 320px;
-            background-color: #252525;
-            border-left: 1px solid #3d3d3d;
-            padding: 15px;
-            overflow-y: auto;
-        }
-
-        #controls {
-            background-color: #2d2d2d;
-            padding: 15px;
-            border-top: 1px solid #3d3d3d;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        button {
-            background-color: #0078d4;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-
-        button:hover {
-            background-color: #106ebe;
-        }
-
-        input[type="range"] {
-            flex: 1;
-            accent-color: #0078d4;
-        }
-
-        .stat-card {
-            background-color: #333;
-            padding: 8px 10px;
-            border-radius: 4px;
-            margin-bottom: 8px;
-        }
-
-        .stat-title {
-            font-size: 0.75rem;
-            color: #aaa;
-            margin-bottom: 3px;
-        }
-
-        .stat-value {
-            font-size: 1rem;
-            font-weight: bold;
-        }
-
-        .agent-list-item {
-            padding: 8px;
-            border-bottom: 1px solid #3d3d3d;
-            font-size: 0.9rem;
-        }
-
-        .agent-status {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-
-        .status-idle {
-            background-color: #888;
-        }
-
-        .status-moving {
-            background-color: #ffff00;
-        }
-
-        .status-picking {
-            background-color: #00c800;
-        }
-
-        .status-unloading {
-            background-color: #00c800;
-        }
-
-        h3 {
-            margin: 15px 0 10px 0;
-            font-size: 1rem;
-        }
-
-        h4 {
-            margin: 15px 0 5px 0;
-            font-size: 0.85rem;
-            color: #9db;
-        }
-    </style>
+    <title>Gemelo Digital | Web Viewer</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
     <header>
-        <h1>Gemelo Digital - Web Viewer</h1>
-        <div id="connection-status" style="color: #00cc6a; font-size: 0.8rem;">● Connected</div>
+        <h1>Gemelo Digital</h1>
+        <div class="connection-status">Connected</div>
     </header>
 
     <div id="main-container">
@@ -161,72 +20,78 @@
         </div>
 
         <div id="sidebar">
-            <h3>Agents</h3>
-            <div id="agents-list">
-                <!-- Populated by JS -->
-            </div>
-
-            <h3>📊 Dashboard</h3>
-
-            <!-- Work Orders Section -->
-            <h4>Work Orders</h4>
-            <div class="stat-card">
-                <div class="stat-title">Total</div>
-                <div class="stat-value" id="metric-wo-total">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">🟢 Staged</div>
-                <div class="stat-value" id="metric-wo-staged" style="color: #00cc6a;">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">📦 Picked</div>
-                <div class="stat-value" id="metric-wo-picked" style="color: #00aaff;">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">⏳ In Progress</div>
-                <div class="stat-value" id="metric-wo-progress" style="color: #ffaa00;">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">📋 Assigned</div>
-                <div class="stat-value" id="metric-wo-assigned">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">⚪ Released</div>
-                <div class="stat-value" id="metric-wo-released" style="color: #aaa;">0</div>
-            </div>
-
-            <!-- Performance Section -->
-            <h4>Performance</h4>
-            <div class="stat-card">
-                <div class="stat-title">Throughput</div>
-                <div class="stat-value" id="metric-throughput">0.00</div>
-                <div style="font-size: 0.7rem; color: #888;">WO/min</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">Avg Time/WO</div>
-                <div class="stat-value" id="metric-avg-time">0.00</div>
-                <div style="font-size: 0.7rem; color: #888;">seconds</div>
-            </div>
-
             <!-- Agents Section -->
-            <h4>Agents Status</h4>
-            <div class="stat-card">
-                <div class="stat-title">🟢 Active</div>
-                <div class="stat-value" id="metric-agents-active" style="color: #00cc6a;">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">⚪ Idle</div>
-                <div class="stat-value" id="metric-agents-idle" style="color: #888;">0</div>
-            </div>
+            <section>
+                <h3>🤖 Agents</h3>
+                <div id="agents-list">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
+            <!-- Dashboard Section -->
+            <section>
+                <h3>📊 Dashboard</h3>
+
+                <!-- Work Orders Metrics -->
+                <h4>Work Orders</h4>
+                <div class="stat-card">
+                    <div class="stat-title">Total</div>
+                    <div class="stat-value" id="metric-wo-total">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">🟢 Staged</div>
+                    <div class="stat-value" id="metric-wo-staged">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">📦 Picked</div>
+                    <div class="stat-value" id="metric-wo-picked">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">⏳ In Progress</div>
+                    <div class="stat-value" id="metric-wo-progress">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">📋 Assigned</div>
+                    <div class="stat-value" id="metric-wo-assigned">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">⚪ Released</div>
+                    <div class="stat-value" id="metric-wo-released">0</div>
+                </div>
+
+                <!-- Performance Metrics -->
+                <h4>Performance</h4>
+                <div class="stat-card">
+                    <div class="stat-title">Throughput</div>
+                    <div class="stat-value" id="metric-throughput">0.00</div>
+                    <div class="stat-unit">WO/min</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Avg Time per WO</div>
+                    <div class="stat-value" id="metric-avg-time">0.00</div>
+                    <div class="stat-unit">seconds</div>
+                </div>
+
+                <!-- Agent Status Metrics -->
+                <h4>Agent Status</h4>
+                <div class="stat-card">
+                    <div class="stat-title">🟢 Active</div>
+                    <div class="stat-value" id="metric-agents-active">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">⚪ Idle</div>
+                    <div class="stat-value" id="metric-agents-idle">0</div>
+                </div>
+            </section>
         </div>
     </div>
 
     <div id="controls">
         <button id="play-pause-btn">Play</button>
-        <span id="current-time">00:00</span>
+        <span class="time-display" id="current-time">00:00</span>
         <input type="range" id="time-slider" min="0" max="100" value="0" step="0.1">
-        <span id="max-time">00:00</span>
-        <select id="speed-select" style="background: #333; color: white; border: none; padding: 5px;">
+        <span class="time-display" id="max-time">00:00</span>
+        <select id="speed-select">
             <option value="1">1x</option>
             <option value="2">2x</option>
             <option value="5">5x</option>
