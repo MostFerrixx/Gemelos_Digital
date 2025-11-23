@@ -971,6 +971,12 @@ const ResizeModule = {
 
         document.getElementById('canvas-section').style.flexBasis = `${clamped}%`;
         AppState.canvasHeightPercent = clamped;
+
+        // CRITICAL: Trigger canvas resize to scale content when container changes
+        // This was removed by mistake - without this, canvas doesn't scale!
+        if (CanvasModule && CanvasModule.resize) {
+            CanvasModule.resize();
+        }
     },
 
     stopDrag() {
