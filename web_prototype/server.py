@@ -32,7 +32,76 @@ class ReplayData:
     def __init__(self):
         self.events = []
         self.max_time = 0
+        self.snapshots = {}  # {timestamp: state_dict}
+        self.snapshot_interval = 60.0  # Create a snapshot every 60 seconds
         self.load_data()
+        self.precompute_snapshots()
+
+    def precompute_snapshots(self):
+        """Pre-computes state snapshots at regular intervals to speed up seeking."""
+        print(f"Pre-computing snapshots every {self.snapshot_interval}s...")
+        if not self.events:
+            return
+
+        # Initial state
+        current_state = {
+            "agents": {},
+            "work_orders": {}
+        }
+        
+        # Store initial snapshot at t=0
+        self.snapshots[0.0] = {
+            "agents": {},
+            "work_orders": {}
+        }
+
+        # Process all events in order and save snapshots
+        next_snapshot_time = self.snapshot_interval
+        
+        # We need to process events sequentially to build state
+        for event in self.events:
+            t = event.get('timestamp', 0)
+            
+            # If we passed a snapshot boundary, save current state
+            while t >= next_snapshot_time and next_snapshot_time <= self.max_time:
+                # Deep copy current state for the snapshot
+                import copy
+                self.snapshots[next_snapshot_time] = copy.deepcopy(current_state)
+                next_snapshot_time += self.snapshot_interval
+            
+            # Apply event to current_state (logic duplicated from get_state, but simplified)
+            self._apply_event_to_state(event, current_state)
+            
+        print(f"Created {len(self.snapshots)} snapshots.")
+
+    def _apply_event_to_state(self, event, state):
+        """Helper to apply a single event to a state dict."""
+        etype = event.get('event_type') or event.get('tipo') or event.get('type')
+        data = event.get('data', {})
+        agent_id = event.get('agent_id') or data.get('agent_id')
+        
+        if etype == 'agent_moved':
+            if agent_id:
+                if agent_id not in state['agents']:
+                    state['agents'][agent_id] = {}
+                pos = data.get('position') or [data.get('x', 0), data.get('y', 0)]
+                state['agents'][agent_id]['position'] = pos
+                state['agents'][agent_id]['type'] = data.get('agent_type', 'Unknown')
+                state['agents'][agent_id]['status'] = data.get('status', 'idle')
+                
+        elif etype == 'estado_agente':
+            if agent_id:
+                if agent_id not in state['agents']:
+                    state['agents'][agent_id] = {}
+                pos = event.get('position') or data.get('position') or [0, 0]
+                state['agents'][agent_id]['position'] = pos
+                state['agents'][agent_id]['type'] = event.get('agent_type') or data.get('agent_type', 'Unknown')
+                state['agents'][agent_id]['status'] = event.get('status') or data.get('status', 'idle')
+                
+        elif etype == 'work_order_update':
+            wo_id = data.get('id') or event.get('id')
+            if wo_id:
+                state['work_orders'][wo_id] = event if not data else data
 
     def load_data(self):
         print(f"Loading replay data from {REPLAY_FILE}...")
@@ -132,48 +201,25 @@ def get_state(t: float):
     # Naive implementation: Replay all events from 0 to t
     # In production, we would use snapshots/keyframes for performance
     
-    current_state = {
-        "agents": {},
-        "work_orders": {}
-    }
+    # OPTIMIZATION: Use nearest snapshot
+    snapshot_times = [st for st in replay_data.snapshots.keys() if st <= t]
     
-    # Filter events up to time t
-    relevant_events = [e for e in replay_data.events if e.get('timestamp', 0) <= t]
+    if snapshot_times:
+        base_time = max(snapshot_times)
+        # Deep copy to avoid modifying the snapshot
+        import copy
+        current_state = copy.deepcopy(replay_data.snapshots[base_time])
+        # Only process events AFTER the snapshot
+        relevant_events = [e for e in replay_data.events if base_time < e.get('timestamp', 0) <= t]
+    else:
+        current_state = {
+            "agents": {},
+            "work_orders": {}
+        }
+        relevant_events = [e for e in replay_data.events if e.get('timestamp', 0) <= t]
     
     for event in relevant_events:
-        # Support both old and new event formats
-        etype = event.get('event_type') or event.get('tipo') or event.get('type')
-        data = event.get('data', {})
-        agent_id = event.get('agent_id') or data.get('agent_id')
-        
-        # Handle both formats: old format has data nested, new format has fields at top level
-        if etype == 'agent_moved':
-            # Old format
-            if agent_id:
-                if agent_id not in current_state['agents']:
-                    current_state['agents'][agent_id] = {}
-                
-                pos = data.get('position') or [data.get('x', 0), data.get('y', 0)]
-                current_state['agents'][agent_id]['position'] = pos
-                current_state['agents'][agent_id]['type'] = data.get('agent_type', 'Unknown')
-                current_state['agents'][agent_id]['status'] = data.get('status', 'idle')
-                
-        elif etype == 'estado_agente':
-            # New format - fields at top level
-            if agent_id:
-                if agent_id not in current_state['agents']:
-                    current_state['agents'][agent_id] = {}
-                
-                # Position is at top level in new format
-                pos = event.get('position') or data.get('position') or [0, 0]
-                current_state['agents'][agent_id]['position'] = pos
-                current_state['agents'][agent_id]['type'] = event.get('agent_type') or data.get('agent_type', 'Unknown')
-                current_state['agents'][agent_id]['status'] = event.get('status') or data.get('status', 'idle')
-                
-        elif etype == 'work_order_update':
-            wo_id = data.get('id') or event.get('id')
-            if wo_id:
-                current_state['work_orders'][wo_id] = event if not data else data
+        replay_data._apply_event_to_state(event, current_state)
     
     # Compute work_orders_asignadas for each agent
     # Based on desktop implementation in replay_engine.py

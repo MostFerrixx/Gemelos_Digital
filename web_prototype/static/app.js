@@ -703,6 +703,9 @@ const CanvasModule = {
 // ============================================
 const ControlsModule = {
     playInterval: null,
+    seekDebounceTimer: null,
+    currentAbortController: null,
+    loadingTimeoutId: null,
 
     init() {
         console.log('[ControlsModule] Initializing...');
@@ -789,13 +792,46 @@ const ControlsModule = {
             this.stop();
         }
 
-        this.seekTo(targetTime);
+        // Update slider position immediately for smooth visual feedback
+        AppState.currentTime = targetTime;
+        this.updateUI(AppState);
+
+        // Cancel previous debounce timer
+        if (this.seekDebounceTimer) {
+            clearTimeout(this.seekDebounceTimer);
+        }
+
+        // Debounce: wait 100ms after last movement before fetching
+        this.seekDebounceTimer = setTimeout(() => {
+            this.seekTo(targetTime);
+            this.seekDebounceTimer = null;
+        }, 100);
     },
 
     async seekTo(time) {
+        // AGGRESSIVE CANCELLATION: Abort any pending request immediately
+        if (this.currentAbortController) {
+            this.currentAbortController.abort();
+            console.log('[ControlsModule] Aborted previous request');
+        }
+
+        // Create new abort controller for this request
+        this.currentAbortController = new AbortController();
+
+        // Show loading indicator if request takes longer than 200ms
+        this.loadingTimeoutId = setTimeout(() => {
+            this.setLoadingState(true);
+        }, 200);
+
         try {
-            const response = await fetch(`/api/state?t=${time}`);
+            const response = await fetch(`/api/state?t=${time}`, {
+                signal: this.currentAbortController.signal
+            });
             const data = await response.json();
+
+            // Clear loading timeout and hide indicator
+            clearTimeout(this.loadingTimeoutId);
+            this.setLoadingState(false);
 
             // Update AppState (will notify all subscribers)
             AppState.setTime(time);
@@ -805,8 +841,27 @@ const ControlsModule = {
 
             // Update metrics separately
             await this.updateMetrics(time);
+
+            // Clear controller reference
+            this.currentAbortController = null;
         } catch (error) {
+            // Clear loading timeout
+            clearTimeout(this.loadingTimeoutId);
+            this.setLoadingState(false);
+
+            if (error.name === 'AbortError') {
+                // Request was cancelled - this is expected behavior
+                console.log('[ControlsModule] Request cancelled (user moved slider)');
+                return;
+            }
             console.error('[ControlsModule] Error seeking:', error);
+        }
+    },
+
+    setLoadingState(isLoading) {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.style.display = isLoading ? 'flex' : 'none';
         }
     },
 

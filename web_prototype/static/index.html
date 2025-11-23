@@ -25,6 +25,11 @@
         <!-- Canvas Container (65% altura inicial) -->
         <div id="canvas-section">
             <canvas id="simCanvas"></canvas>
+            <!-- Loading Overlay (shown during slow seeks) -->
+            <div id="loading-overlay" style="display: none;">
+                <div class="spinner"></div>
+                <span>Loading...</span>
+            </div>
         </div>
 
         <!-- Resize Handle (arrastrable) -->
