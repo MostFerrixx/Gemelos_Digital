@@ -49,18 +49,21 @@ class ReplayData:
             "work_orders": {}
         }
         
-        # Store initial snapshot at t=0
-        self.snapshots[0.0] = {
-            "agents": {},
-            "work_orders": {}
-        }
-
         # Process all events in order and save snapshots
-        next_snapshot_time = self.snapshot_interval
+        next_snapshot_time = self.snapshot_interval  # First interval snapshot at 60s
+        prev_time = None
         
         # We need to process events sequentially to build state
         for event in self.events:
             t = event.get('timestamp', 0)
+            
+            # Apply event to current_state
+            self._apply_event_to_state(event, current_state)
+            
+            # Check if we just finished processing all t=0 events
+            if prev_time == 0 and t > 0 and 0.0 not in self.snapshots:
+                import copy
+                self.snapshots[0.0] = copy.deepcopy(current_state)
             
             # If we passed a snapshot boundary, save current state
             while t >= next_snapshot_time and next_snapshot_time <= self.max_time:
@@ -69,8 +72,12 @@ class ReplayData:
                 self.snapshots[next_snapshot_time] = copy.deepcopy(current_state)
                 next_snapshot_time += self.snapshot_interval
             
-            # Apply event to current_state (logic duplicated from get_state, but simplified)
-            self._apply_event_to_state(event, current_state)
+            prev_time = t
+        
+        # Save t=0 snapshot if we never exceeded t=0 (all events at t=0)
+        if 0.0 not in self.snapshots:
+            import copy
+            self.snapshots[0.0] = copy.deepcopy(current_state)
             
         print(f"Created {len(self.snapshots)} snapshots.")
 
@@ -101,7 +108,8 @@ class ReplayData:
         elif etype == 'work_order_update':
             wo_id = data.get('id') or event.get('id')
             if wo_id:
-                state['work_orders'][wo_id] = event if not data else data
+                # Use data if it has content, otherwise use the entire event (for synthetic events)
+                state['work_orders'][wo_id] = data if data else event
 
     def load_data(self):
         print(f"Loading replay data from {REPLAY_FILE}...")
