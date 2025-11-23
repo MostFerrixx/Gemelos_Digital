@@ -11,83 +11,51 @@
 <body>
     <header>
         <h1>Gemelo Digital</h1>
-        <div class="connection-status">Connected</div>
+        <div class="header-actions">
+            <button id="toggleTableBtn" class="toggle-table-btn">
+                <span class="icon">📊</span>
+                <span class="label">Table View</span>
+            </button>
+            <div class="connection-status">Connected</div>
+        </div>
     </header>
 
-    <div id="main-container">
-        <div id="canvas-container">
+    <!-- Layout Vertical: Canvas arriba, Panel abajo -->
+    <div id="main-layout">
+        <!-- Canvas Container (65% altura inicial) -->
+        <div id="canvas-section">
             <canvas id="simCanvas"></canvas>
         </div>
 
-        <div id="sidebar">
-            <!-- Agents Section -->
-            <section>
-                <h3>🤖 Agents</h3>
-                <div id="agents-list">
-                    <!-- Populated by JS -->
-                </div>
-            </section>
+        <!-- Resize Handle (arrastrable) -->
+        <div id="resize-handle" class="resize-handle">
+            <div class="resize-indicator"></div>
+        </div>
 
-            <!-- Dashboard Section -->
-            <section>
-                <h3>📊 Dashboard</h3>
+        <!-- Bottom Panel (35% altura, colapsable) -->
+        <div id="bottom-panel" class="bottom-panel collapsed">
+            <div class="panel-header">
+                <h2>Work Orders Dashboard</h2>
+                <div class="metrics-bar-compact" id="metricsBar">
+                    <!-- Métricas compactas pobladas por JS -->
+                </div>
+            </div>
 
-                <!-- Work Orders Metrics -->
-                <h4>Work Orders</h4>
-                <div class="stat-card">
-                    <div class="stat-title">Total</div>
-                    <div class="stat-value" id="metric-wo-total">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-title">🟢 Staged</div>
-                    <div class="stat-value" id="metric-wo-staged">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-title">📦 Picked</div>
-                    <div class="stat-value" id="metric-wo-picked">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-title">⏳ In Progress</div>
-                    <div class="stat-value" id="metric-wo-progress">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-title">📋 Assigned</div>
-                    <div class="stat-value" id="metric-wo-assigned">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-title">⚪ Released</div>
-                    <div class="stat-value" id="metric-wo-released">0</div>
-                </div>
-
-                <!-- Performance Metrics -->
-                <h4>Performance</h4>
-                <div class="stat-card">
-                    <div class="stat-title">Throughput</div>
-                    <div class="stat-value" id="metric-throughput">0.00</div>
-                    <div class="stat-unit">WO/min</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-title">Avg Time per WO</div>
-                    <div class="stat-value" id="metric-avg-time">0.00</div>
-                    <div class="stat-unit">seconds</div>
-                </div>
-
-                <!-- Agent Status Metrics -->
-                <h4>Agent Status</h4>
-                <div class="stat-card">
-                    <div class="stat-title">🟢 Active</div>
-                    <div class="stat-value" id="metric-agents-active">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-title">⚪ Idle</div>
-                    <div class="stat-value" id="metric-agents-idle">0</div>
-                </div>
-            </section>
+            <div class="table-container">
+                <table id="workOrderTable" class="work-order-table">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
-    <div id="controls">
-        <button id="play-pause-btn">Play</button>
+    <!-- Barra de Control Maestra (siempre visible) -->
+    <footer id="controls" class="master-controls">
+        <button id="play-pause-btn">
+            <span class="btn-icon">▶</span>
+            <span class="btn-label">Play</span>
+        </button>
         <span class="time-display" id="current-time">00:00</span>
         <input type="range" id="time-slider" min="0" max="100" value="0" step="0.1">
         <span class="time-display" id="max-time">00:00</span>
@@ -97,7 +65,7 @@
             <option value="5">5x</option>
             <option value="10">10x</option>
         </select>
-    </div>
+    </footer>
 
     <script src="app.js"></script>
 </body>

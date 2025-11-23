@@ -1,9 +1,16 @@
-// Constants
+// =============================================
+// Gemelo Digital - Web Simulator
+// Modular Architecture with Shared State
+// =============================================
+
+// ============================================
+//  CONSTANTS
+// ============================================
 const TILE_SIZE = 20; // Pixels per tile
 const AGENT_RADIUS = 8;
 const COLORS = {
     WALL: '#555555',
-    FLOOR: '#1a1f26', // Matches body background
+    FLOOR: '#1a1f26',
     ZONE_PICKING: 'rgba(0, 200, 100, 0.2)',
     ZONE_STAGING: 'rgba(200, 200, 50, 0.2)'
 };
@@ -26,7 +33,7 @@ const AGENT_COLORS = {
     }
 };
 
-// Unique color palette for each operator (matching desktop renderer.py)
+// Unique color palette for operators (matching desktop renderer)
 const OPERATOR_COLOR_PALETTE = [
     [255, 50, 50],      // Red
     [50, 255, 50],      // Green
@@ -42,511 +49,912 @@ const OPERATOR_COLOR_PALETTE = [
     [255, 150, 50]      // Orange-ish
 ];
 
-// Hash function to get unique color for each agent
-function getOperatorColor(agentId) {
-    // Simple hash function
-    let hash = 0;
-    for (let i = 0; i < agentId.length; i++) {
-        hash = ((hash << 5) - hash) + agentId.charCodeAt(i);
-        hash = hash & hash; // Convert to 32bit integer
+// Table column configuration (18 columns, matching PyQt6 Dashboard)
+const COLUMNS = [
+    { key: 'id', header: 'WO_ID', width: '110px' },
+    { key: 'order_id', header: 'ORDER ID', width: '100px' },
+    { key: 'tour_id', header: 'TOUR ID', width: '100px' },
+    { key: 'sku_id', header: 'SKU', width: '90px' },
+    { key: 'product', header: 'PRODUCT', width: '150px' },
+    { key: 'status', header: 'STATUS', width: '120px' },
+    { key: 'assigned_agent_id', header: 'AGENT', width: '140px' },
+    { key: 'priority', header: 'PRIORITY', width: '90px' },
+    { key: 'items', header: 'ITEMS', width: '70px' },
+    { key: 'total_qty', header: 'TOTAL QTY', width: '90px' },
+    { key: 'volume', header: 'VOLUME', width: '90px' },
+    { key: 'location', header: 'LOCATION', width: '120px' },
+    { key: 'staging', header: 'STAGING', width: '120px' },
+    { key: 'work_group', header: 'WORK GROUP', width: '110px' },
+    { key: 'work_area', header: 'WORK AREA', width: '110px' },
+    { key: 'executions', header: 'EXECUTIONS', width: '100px' },
+    { key: 'start_time', header: 'START TIME', width: '100px' },
+    { key: 'progress', header: 'PROGRESS', width: '100px' }
+];
+
+// ============================================
+//  APPSTATE SINGLETON (Single Source of Truth)
+// ============================================
+const AppState = {
+    // Timeline
+    currentTime: 0,
+    maxTime: 0,
+    isPlaying: false,
+    playbackSpeed: 1,
+
+    // Data
+    workOrders: new Map(),
+    agents: {},
+    layout: null,
+
+    // UI State
+    isTableVisible: false,
+    canvasHeightPercent: 65,
+    sortColumn: 'id',
+    sortDirection: 'asc',
+
+    // Listeners (Observer Pattern)
+    listeners: [],
+
+    // Subscribe to state changes
+    subscribe(callback) {
+        this.listeners.push(callback);
+        console.log('[AppState] Listener subscribed, total:', this.listeners.length);
+    },
+
+    // Notify all listeners
+    notify() {
+        this.listeners.forEach(cb => {
+            try {
+                cb(this);
+            } catch (error) {
+                console.error('[AppState] Error in listener:', error);
+            }
+        });
+    },
+
+    // Setters with automatic notification
+    setTime(time) {
+        this.currentTime = time;
+        this.notify();
+    },
+
+    setWorkOrders(wos) {
+        this.workOrders = new Map(Object.entries(wos || {}));
+        this.notify();
+    },
+
+    setAgents(agents) {
+        this.agents = agents || {};
+        this.notify();
+    },
+
+    setLayout(layout) {
+        this.layout = layout;
+        this.notify();
+    },
+
+    toggleTable() {
+        this.isTableVisible = !this.isTableVisible;
+        this.notify();
+    },
+
+    setSort(column, direction) {
+        this.sortColumn = column;
+        this.sortDirection = direction;
+        this.notify();
     }
-    const index = Math.abs(hash) % OPERATOR_COLOR_PALETTE.length;
-    const [r, g, b] = OPERATOR_COLOR_PALETTE[index];
-    return `rgb(${r}, ${g}, ${b})`;
-}
+};
 
+// ============================================
+//  TABLE MODULE (from Dashboard v10)
+// ============================================
+const TableModule = {
+    tableEl: null,
 
-// State
-let canvas, ctx;
-let layout = null;
-let isPlaying = false;
-let currentTime = 0;
-let maxTime = 100;
-let playbackSpeed = 1;
-let animationFrameId;
-let lastFrameTime = 0;
+    init() {
+        console.log('[TableModule] Initializing...');
+        this.tableEl = document.getElementById('workOrderTable');
 
-// Initialization
-document.addEventListener('DOMContentLoaded', async () => {
-    canvas = document.getElementById('simCanvas');
-    ctx = canvas.getContext('2d');
-
-    // Event Listeners
-    document.getElementById('play-pause-btn').addEventListener('click', togglePlay);
-    document.getElementById('time-slider').addEventListener('input', handleSeek);
-    document.getElementById('speed-select').addEventListener('change', (e) => playbackSpeed = parseFloat(e.target.value));
-
-    // Load Layout
-    await loadLayout();
-
-    // Start Loop
-    requestAnimationFrame(gameLoop);
-});
-
-async function loadLayout() {
-    try {
-        const response = await fetch('/api/layout');
-        layout = await response.json();
-
-        // Resize canvas
-        canvas.width = layout.width * TILE_SIZE;
-        canvas.height = layout.height * TILE_SIZE;
-
-        console.log("Layout loaded:", layout);
-        renderMap();
-    } catch (error) {
-        console.error("Error loading layout:", error);
-    }
-}
-
-async function fetchState(time) {
-    try {
-        const response = await fetch(`/api/state?t=${time}`);
-        const state = await response.json();
-
-        // Update Max Time
-        maxTime = state.max_time;
-        document.getElementById('time-slider').max = maxTime;
-        document.getElementById('max-time').textContent = formatTime(maxTime);
-
-        return state;
-    } catch (error) {
-        console.error("Error fetching state:", error);
-        return null;
-    }
-}
-
-async function fetchAndUpdateMetrics(time) {
-    try {
-        const response = await fetch(`/api/metrics?t=${time}`);
-        const metrics = await response.json();
-
-        // Update Work Orders metrics with exact state names
-        document.getElementById('metric-wo-total').textContent = metrics.work_orders.total;
-        document.getElementById('metric-wo-staged').textContent = metrics.work_orders.staged;
-        document.getElementById('metric-wo-picked').textContent = metrics.work_orders.picked;
-        document.getElementById('metric-wo-progress').textContent = metrics.work_orders.in_progress;
-        document.getElementById('metric-wo-assigned').textContent = metrics.work_orders.assigned;
-        document.getElementById('metric-wo-released').textContent = metrics.work_orders.released;
-
-        // Update Performance metrics
-        document.getElementById('metric-throughput').textContent = metrics.performance.throughput_per_minute.toFixed(2);
-        document.getElementById('metric-avg-time').textContent = metrics.performance.avg_time_per_wo.toFixed(2);
-
-        // Update Agents metrics
-        document.getElementById('metric-agents-active').textContent = metrics.agents.active;
-        document.getElementById('metric-agents-idle').textContent = metrics.agents.idle;
-    } catch (error) {
-        console.error("Error fetching metrics:", error);
-    }
-}
-
-function togglePlay() {
-    isPlaying = !isPlaying;
-    document.getElementById('play-pause-btn').textContent = isPlaying ? "Pause" : "Play";
-    lastFrameTime = performance.now();
-}
-
-function handleSeek(e) {
-    currentTime = parseFloat(e.target.value);
-    updateUI(currentTime);
-    // Force a render update immediately
-    fetchState(currentTime).then(state => {
-        if (state) {
-            renderScene(state);
-            updateSidebar(state);
+        if (!this.tableEl) {
+            console.error('[TableModule] Table element not found!');
+            return;
         }
-    });
-}
 
-function formatTime(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-}
+        // Setup headers
+        this.setupHeaders();
 
-function updateUI(time) {
-    document.getElementById('current-time').textContent = formatTime(time);
-    document.getElementById('time-slider').value = time;
-}
+        // Setup sorting
+        this.setupSorting();
 
-async function gameLoop(timestamp) {
-    const deltaTime = (timestamp - lastFrameTime) / 1000; // Seconds
-    lastFrameTime = timestamp;
+        // Subscribe to state changes
+        AppState.subscribe(state => this.render(state));
 
-    if (isPlaying) {
-        currentTime += deltaTime * playbackSpeed;
-        if (currentTime > maxTime) {
-            currentTime = maxTime;
-            isPlaying = false;
-            document.getElementById('play-pause-btn').textContent = "Play";
+        console.log('[TableModule] Ready');
+    },
+
+    setupHeaders() {
+        const thead = this.tableEl.querySelector('thead');
+        if (!thead) return;
+
+        thead.innerHTML = '<tr></tr>';
+        const tr = thead.querySelector('tr');
+
+        COLUMNS.forEach(col => {
+            const th = document.createElement('th');
+            th.textContent = col.header;
+            th.style.width = col.width;
+            th.dataset.column = col.key;
+            tr.appendChild(th);
+        });
+    },
+
+    setupSorting() {
+        const headers = this.tableEl.querySelectorAll('th');
+
+        headers.forEach((th, idx) => {
+            th.addEventListener('click', () => {
+                const column = COLUMNS[idx].key;
+
+                // Toggle direction if same column, else default to asc
+                let direction = 'asc';
+                if (AppState.sortColumn === column) {
+                    direction = AppState.sortDirection === 'asc' ? 'desc' : 'asc';
+                }
+
+                // Update state
+                AppState.setSort(column, direction);
+
+                // Update UI indicators
+                headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+                th.classList.add(`sort-${direction}`);
+            });
+        });
+    },
+
+    render(state) {
+        if (!state.isTableVisible) return; // Don't render if collapsed
+
+        const tbody = this.tableEl.querySelector('tbody');
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+
+        if (state.workOrders.size === 0) {
+            const tr = tbody.insertRow();
+            const td = tr.insertCell();
+            td.colSpan = COLUMNS.length;
+            td.textContent = 'No work orders available';
+            td.style.textAlign = 'center';
+            td.style.padding = '40px';
+            td.style.color = 'var(--color-text-secondary)';
+            return;
         }
-        updateUI(currentTime);
+
+        // Sort work orders
+        const sortedWOs = this.sortWorkOrders(Array.from(state.workOrders.values()), state);
+
+        // Render rows
+        sortedWOs.forEach(wo => {
+            const row = this.createRow(wo);
+            tbody.appendChild(row);
+        });
+    },
+
+    sortWorkOrders(wos, state) {
+        return wos.sort((a, b) => {
+            let aVal = a[state.sortColumn] ?? '';
+            let bVal = b[state.sortColumn] ?? '';
+
+            // Handle numeric sorting
+            if (typeof aVal === 'number' && typeof bVal === 'number') {
+                return state.sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+            }
+
+            // String sorting
+            aVal = String(aVal).toLowerCase();
+            bVal = String(bVal).toLowerCase();
+
+            if (state.sortDirection === 'asc') {
+                return aVal > bVal ? 1 : -1;
+            } else {
+                return aVal < bVal ? 1 : -1;
+            }
+        });
+    },
+
+    createRow(wo) {
+        const tr = document.createElement('tr');
+        tr.dataset.woId = wo.id;
+
+        // Apply status class for color coding (CRITICAL - matches PyQt6)
+        const status = wo.status || 'released';
+        tr.classList.add(`status-${status}`);
+
+        COLUMNS.forEach(col => {
+            const td = tr.insertCell();
+            let value = wo[col.key];
+
+            // Format specific fields
+            if (value === null || value === undefined) {
+                value = '';
+            } else if (col.key === 'location' || col.key === 'staging') {
+                // Format arrays as (x, y)
+                if (Array.isArray(value)) {
+                    value = `(${value.join(', ')})`;
+                }
+            } else if (col.key === 'volume' && typeof value === 'number') {
+                value = value.toFixed(2);
+            } else if (col.key === 'start_time' && typeof value === 'number') {
+                value = value.toFixed(2);
+            } else if (col.key === 'progress' && typeof value === 'number') {
+                value = (value * 100).toFixed(1) + '%';
+            }
+
+            td.textContent = value;
+            td.title = value; // Tooltip for overflow
+        });
+
+        return tr;
     }
+};
 
-    // Fetch state for current time
-    const state = await fetchState(currentTime);
+// ============================================
+//  CANVAS MODULE (Enhanced with state subscription)
+// ============================================
+const CanvasModule = {
+    canvas: null,
+    ctx: null,
 
-    if (state) {
-        renderScene(state);
-        updateSidebar(state);
-    }
+    init() {
+        console.log('[CanvasModule] Initializing...');
+        this.canvas = document.getElementById('simCanvas');
 
-    requestAnimationFrame(gameLoop);
-}
+        if (!this.canvas) {
+            console.error('[CanvasModule] Canvas element not found!');
+            return;
+        }
 
-function renderMap() {
-    if (!layout) return;
+        this.ctx = this.canvas.getContext('2d');
 
-    ctx.fillStyle = COLORS.FLOOR;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Subscribe to state changes
+        AppState.subscribe(state => this.render(state));
 
-    layout.layers.forEach(layer => {
-        if (layer.tiles) {
-            layer.tiles.forEach(tile => {
-                const x = tile.x * TILE_SIZE;
-                const y = tile.y * TILE_SIZE;
-                const gid = tile.gid;
+        console.log('[CanvasModule] Ready');
+    },
 
-                // GID mapping based on WH1.tmx:
-                // 1 = floor, 2 = racks, 3 = picking, 4 = parking, 5 = depot, 6 = inbound
+    render(state) {
+        if (!state.layout) return;
 
-                if (gid === 1) {
-                    // Floor - Concrete texture with grid lines
-                    ctx.fillStyle = '#2a2e35';
-                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+        // Resize canvas if needed
+        if (this.canvas.width !== state.layout.width * TILE_SIZE) {
+            this.canvas.width = state.layout.width * TILE_SIZE;
+            this.canvas.height = state.layout.height * TILE_SIZE;
+        }
 
-                    // Grid pattern
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-                    ctx.lineWidth = 0.5;
-                    ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+        // Clear and render map
+        this.renderMap(state.layout);
 
-                } else if (gid === 2) {
-                    // Racks - Metallic structure
-                    const gradient = ctx.createLinearGradient(x, y, x + TILE_SIZE, y + TILE_SIZE);
-                    gradient.addColorStop(0, '#4a4a4a');
-                    gradient.addColorStop(0.5, '#5a5a5a');
-                    gradient.addColorStop(1, '#3a3a3a');
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+        // Render picking nodes BEFORE agents
+        this.renderPickingNodes(state);
 
-                    // Rack shelves (horizontal lines)
-                    ctx.strokeStyle = '#6a6a6a';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(x, y + TILE_SIZE * 0.25);
-                    ctx.lineTo(x + TILE_SIZE, y + TILE_SIZE * 0.25);
-                    ctx.moveTo(x, y + TILE_SIZE * 0.5);
-                    ctx.lineTo(x + TILE_SIZE, y + TILE_SIZE * 0.5);
-                    ctx.moveTo(x, y + TILE_SIZE * 0.75);
-                    ctx.lineTo(x + TILE_SIZE, y + TILE_SIZE * 0.75);
-                    ctx.stroke();
+        // Render agents
+        this.renderAgents(state.agents);
+    },
 
-                    // Vertical supports
-                    ctx.strokeStyle = '#7a7a7a';
-                    ctx.lineWidth = 1.5;
-                    ctx.beginPath();
-                    ctx.moveTo(x + TILE_SIZE * 0.2, y);
-                    ctx.lineTo(x + TILE_SIZE * 0.2, y + TILE_SIZE);
-                    ctx.moveTo(x + TILE_SIZE * 0.8, y);
-                    ctx.lineTo(x + TILE_SIZE * 0.8, y + TILE_SIZE);
-                    ctx.stroke();
+    renderMap(layout) {
+        // Existing renderMap logic (preserved)
+        this.ctx.fillStyle = COLORS.FLOOR;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-                    // Shadow for depth
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-                    ctx.fillRect(x + TILE_SIZE - 3, y + 2, 3, TILE_SIZE - 2);
+        layout.layers.forEach(layer => {
+            if (layer.tiles) {
+                layer.tiles.forEach(tile => {
+                    const x = tile.x * TILE_SIZE;
+                    const y = tile.y * TILE_SIZE;
+                    const gid = tile.gid;
 
-                } else if (gid === 3) {
-                    // Picking locations - Yellow striped zone
-                    ctx.fillStyle = '#2a2e35';
-                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    // GID mapping (from original code)
+                    if (gid === 1) {
+                        // Floor
+                        this.ctx.fillStyle = '#2a2e35';
+                        this.ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+                        this.ctx.lineWidth = 0.5;
+                        this.ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+                    } else if (gid === 2) {
+                        // Racks
+                        const gradient = this.ctx.createLinearGradient(x, y, x + TILE_SIZE, y + TILE_SIZE);
+                        gradient.addColorStop(0, '#4a4a4a');
+                        gradient.addColorStop(0.5, '#5a5a5a');
+                        gradient.addColorStop(1, '#3a3a3a');
+                        this.ctx.fillStyle = gradient;
+                        this.ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 
-                    // Yellow warning stripes
-                    ctx.fillStyle = 'rgba(255, 200, 0, 0.25)';
-                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        this.ctx.strokeStyle = '#6a6a6a';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(x, y + TILE_SIZE * 0.25);
+                        this.ctx.lineTo(x + TILE_SIZE, y + TILE_SIZE * 0.25);
+                        this.ctx.moveTo(x, y + TILE_SIZE * 0.5);
+                        this.ctx.lineTo(x + TILE_SIZE, y + TILE_SIZE * 0.5);
+                        this.ctx.moveTo(x, y + TILE_SIZE * 0.75);
+                        this.ctx.lineTo(x + TILE_SIZE, y + TILE_SIZE * 0.75);
+                        this.ctx.stroke();
 
-                    // Diagonal stripes
-                    ctx.strokeStyle = 'rgba(255, 200, 0, 0.4)';
-                    ctx.lineWidth = 2;
-                    for (let i = -TILE_SIZE; i < TILE_SIZE * 2; i += 6) {
-                        ctx.beginPath();
-                        ctx.moveTo(x + i, y);
-                        ctx.lineTo(x + i + TILE_SIZE, y + TILE_SIZE);
-                        ctx.stroke();
-                    }
+                        this.ctx.strokeStyle = '#7a7a7a';
+                        this.ctx.lineWidth = 1.5;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(x + TILE_SIZE * 0.2, y);
+                        this.ctx.lineTo(x + TILE_SIZE * 0.2, y + TILE_SIZE);
+                        this.ctx.moveTo(x + TILE_SIZE * 0.8, y);
+                        this.ctx.lineTo(x + TILE_SIZE * 0.8, y + TILE_SIZE);
+                        this.ctx.stroke();
 
-                    // Border
-                    ctx.strokeStyle = 'rgba(255, 200, 0, 0.6)';
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+                        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                        this.ctx.fillRect(x + TILE_SIZE - 3, y + 2, 3, TILE_SIZE - 2);
+                    } else if (gid === 3) {
+                        // Picking locations
+                        this.ctx.fillStyle = '#2a2e35';
+                        this.ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        this.ctx.fillStyle = 'rgba(255, 200, 0, 0.25)';
+                        this.ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 
-                } else if (gid === 4) {
-                    // Parking/Start - Blue zone with grid
-                    ctx.fillStyle = '#1e2530';
-                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        this.ctx.strokeStyle = 'rgba(255, 200, 0, 0.4)';
+                        this.ctx.lineWidth = 2;
+                        for (let i = -TILE_SIZE; i < TILE_SIZE * 2; i += 6) {
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(x + i, y);
+                            this.ctx.lineTo(x + i + TILE_SIZE, y + TILE_SIZE);
+                            this.ctx.stroke();
+                        }
 
-                    ctx.fillStyle = 'rgba(100, 150, 255, 0.2)';
-                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        this.ctx.strokeStyle = 'rgba(255, 200, 0, 0.6)';
+                        this.ctx.lineWidth = 1;
+                        this.ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+                    } else if (gid === 4) {
+                        // Parking/Start
+                        this.ctx.fillStyle = '#1e2530';
+                        this.ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        this.ctx.fillStyle = 'rgba(100, 150, 255, 0.2)';
+                        this.ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 
-                    // Parking grid
-                    ctx.strokeStyle = 'rgba(100, 150, 255, 0.4)';
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                        this.ctx.strokeStyle = 'rgba(100, 150, 255, 0.4)';
+                        this.ctx.lineWidth = 1;
+                        this.ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
 
-                    // Dashed center line
-                    ctx.setLineDash([3, 3]);
-                    ctx.beginPath();
-                    ctx.moveTo(x + TILE_SIZE / 2, y);
-                    ctx.lineTo(x + TILE_SIZE / 2, y + TILE_SIZE);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
+                        this.ctx.setLineDash([3, 3]);
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(x + TILE_SIZE / 2, y);
+                        this.ctx.lineTo(x + TILE_SIZE / 2, y + TILE_SIZE);
+                        this.ctx.stroke();
+                        this.ctx.setLineDash([]);
+                    } else if (gid === 5) {
+                        // Depot/Outbound
+                        this.ctx.fillStyle = '#1e2e25';
+                        this.ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        this.ctx.fillStyle = 'rgba(0, 200, 100, 0.2)';
+                        this.ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 
-                } else if (gid === 5) {
-                    // Depot/Outbound - Green staging area
-                    ctx.fillStyle = '#1e2e25';
-                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-
-                    ctx.fillStyle = 'rgba(0, 200, 100, 0.2)';
-                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-
-                    // Checkered pattern for staging
-                    const checkerSize = TILE_SIZE / 4;
-                    for (let cy = 0; cy < 4; cy++) {
-                        for (let cx = 0; cx < 4; cx++) {
-                            if ((cx + cy) % 2 === 0) {
-                                ctx.fillStyle = 'rgba(0, 200, 100, 0.1)';
-                                ctx.fillRect(x + cx * checkerSize, y + cy * checkerSize, checkerSize, checkerSize);
+                        const checkerSize = TILE_SIZE / 4;
+                        for (let cy = 0; cy < 4; cy++) {
+                            for (let cx = 0; cx < 4; cx++) {
+                                if ((cx + cy) % 2 === 0) {
+                                    this.ctx.fillStyle = 'rgba(0, 200, 100, 0.1)';
+                                    this.ctx.fillRect(x + cx * checkerSize, y + cy * checkerSize, checkerSize, checkerSize);
+                                }
                             }
                         }
+
+                        this.ctx.strokeStyle = 'rgba(0, 200, 100, 0.5)';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+                    } else if (gid === 6) {
+                        // Inbound
+                        this.ctx.fillStyle = '#2e2520';
+                        this.ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        this.ctx.fillStyle = 'rgba(255, 150, 50, 0.2)';
+                        this.ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+                        this.ctx.strokeStyle = 'rgba(255, 150, 50, 0.4)';
+                        this.ctx.lineWidth = 2;
+                        for (let i = 0; i < TILE_SIZE; i += 5) {
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(x, y + i);
+                            this.ctx.lineTo(x + TILE_SIZE, y + i);
+                            this.ctx.stroke();
+                        }
+
+                        this.ctx.strokeStyle = 'rgba(255, 150, 50, 0.6)';
+                        this.ctx.lineWidth = 1.5;
+                        this.ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
                     }
+                });
+            }
+        });
+    },
 
-                    // Border
-                    ctx.strokeStyle = 'rgba(0, 200, 100, 0.5)';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+    renderPickingNodes(state) {
+        // Existing logic (preserved)
+        if (!state || !state.agents) return;
 
-                } else if (gid === 6) {
-                    // Inbound - Orange receiving area
-                    ctx.fillStyle = '#2e2520';
-                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+        Object.entries(state.agents).forEach(([agentId, agent]) => {
+            const assignedWOs = agent.work_orders_asignadas || [];
 
-                    ctx.fillStyle = 'rgba(255, 150, 50, 0.2)';
-                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+            if (assignedWOs.length === 0) return;
 
-                    // Loading dock stripes
-                    ctx.strokeStyle = 'rgba(255, 150, 50, 0.4)';
-                    ctx.lineWidth = 2;
-                    for (let i = 0; i < TILE_SIZE; i += 5) {
-                        ctx.beginPath();
-                        ctx.moveTo(x, y + i);
-                        ctx.lineTo(x + TILE_SIZE, y + i);
-                        ctx.stroke();
-                    }
+            const status = agent.status || 'idle';
+            if (status === 'idle' || status === 'completed') return;
 
-                    // Border
-                    ctx.strokeStyle = 'rgba(255, 150, 50, 0.6)';
-                    ctx.lineWidth = 1.5;
-                    ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+            const locationMap = new Map();
+
+            assignedWOs.forEach((wo, idx) => {
+                const location = wo.location;
+                if (!location || location.length !== 2) return;
+
+                const [gridX, gridY] = location;
+                const pixelX = gridX * TILE_SIZE + TILE_SIZE / 2;
+                const pixelY = gridY * TILE_SIZE + TILE_SIZE / 2;
+                const locKey = `${pixelX},${pixelY}`;
+
+                if (!locationMap.has(locKey)) {
+                    locationMap.set(locKey, {
+                        pos: [pixelX, pixelY],
+                        woCount: 0,
+                        minSequence: wo.pick_sequence || idx
+                    });
                 }
+
+                locationMap.get(locKey).woCount++;
             });
-        }
-    });
-}
 
+            const locations = Array.from(locationMap.values())
+                .sort((a, b) => a.minSequence - b.minSequence);
 
-function renderPickingNodes(state) {
-    /**
-     * Renders picking location nodes for each operator's tour.
-     * Shows accumulated WO count at each location.
-     * Matching desktop implementation from renderer.py renderizar_rutas_tours
-     */
-    if (!state || !state.agents) return;
-
-    Object.entries(state.agents).forEach(([agentId, agent]) => {
-        const assignedWOs = agent.work_orders_asignadas || [];
-
-        // Skip if no assigned work orders
-        if (assignedWOs.length === 0) return;
-
-        // Skip if agent is idle (not actively working on tour)
-        const status = agent.status || 'idle';
-        if (status === 'idle' || status === 'completed') return;
-
-        // Group WOs by location and calculate accumulated counts
-        const locationMap = new Map();
-
-        assignedWOs.forEach((wo, idx) => {
-            const location = wo.location;
-            if (!location || location.length !== 2) return;
-
-            const [gridX, gridY] = location;
-            const pixelX = gridX * TILE_SIZE + TILE_SIZE / 2;
-            const pixelY = gridY * TILE_SIZE + TILE_SIZE / 2;
-            const locKey = `${pixelX},${pixelY}`;
-
-            if (!locationMap.has(locKey)) {
-                locationMap.set(locKey, {
-                    pos: [pixelX, pixelY],
-                    woCount: 0,
-                    minSequence: wo.pick_sequence || idx
+            const locationsWithAccumulated = [];
+            for (let i = 0; i < locations.length; i++) {
+                const accumulated = locations.slice(0, i + 1)
+                    .reduce((sum, loc) => sum + loc.woCount, 0);
+                locationsWithAccumulated.push({
+                    ...locations[i],
+                    accumulated
                 });
             }
 
-            locationMap.get(locKey).woCount++;
+            const operatorColor = this.getOperatorColor(agentId);
+
+            locationsWithAccumulated.forEach((location, idx) => {
+                const [px, py] = location.pos;
+                const woCount = location.accumulated;
+                const isCurrent = idx < 2;
+                const radius = 7;
+
+                let nodeColor = operatorColor;
+                if (isCurrent) {
+                    const rgb = operatorColor.match(/\d+/g).map(Number);
+                    nodeColor = `rgb(${Math.min(255, rgb[0] + 50)}, ${Math.min(255, rgb[1] + 50)}, ${Math.min(255, rgb[2] + 50)})`;
+                }
+
+                this.ctx.beginPath();
+                this.ctx.arc(px, py, radius, 0, Math.PI * 2);
+                this.ctx.fillStyle = nodeColor;
+                this.ctx.fill();
+
+                this.ctx.strokeStyle = '#000';
+                this.ctx.lineWidth = isCurrent ? 2 : 1;
+                this.ctx.stroke();
+
+                this.ctx.fillStyle = '#fff';
+                this.ctx.font = 'bold 10px Inter, sans-serif';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+
+                this.ctx.strokeText(woCount.toString(), px, py);
+                this.ctx.fillText(woCount.toString(), px, py);
+            });
         });
+    },
 
-        // Convert to array and sort by pick sequence
-        const locations = Array.from(locationMap.values())
-            .sort((a, b) => a.minSequence - b.minSequence);
+    renderAgents(agents) {
+        // Existing logic with person icon (preserved)
+        Object.entries(agents).forEach(([id, agent]) => {
+            const [gridX, gridY] = agent.position;
+            const screenX = gridX * TILE_SIZE + TILE_SIZE / 2;
+            const screenY = gridY * TILE_SIZE + TILE_SIZE / 2;
 
-        // Calculate accumulated counts (from current location forward)
-        const locationsWithAccumulated = [];
-        for (let i = 0; i < locations.length; i++) {
-            const accumulated = locations.slice(0, i + 1)
-                .reduce((sum, loc) => sum + loc.woCount, 0);
-            locationsWithAccumulated.push({
-                ...locations[i],
-                accumulated
+            const agentType = agent.type.includes('Forklift') ? 'Forklift' : 'GroundOperator';
+            const colorScheme = AGENT_COLORS[agentType];
+            const agentColor = colorScheme[agent.status] || colorScheme.base;
+
+            this.ctx.save();
+            this.ctx.translate(screenX, screenY);
+
+            // Head (Circle)
+            this.ctx.beginPath();
+            this.ctx.arc(0, -7, 5, 0, Math.PI * 2);
+            this.ctx.fillStyle = agentColor;
+            this.ctx.fill();
+            this.ctx.strokeStyle = '#fff';
+            this.ctx.lineWidth = 1;
+            this.ctx.stroke();
+
+            // Body (Rounded shape)
+            this.ctx.beginPath();
+            this.ctx.arc(0, 7, 8, Math.PI, 0);
+            this.ctx.lineTo(8, 7);
+            this.ctx.fillStyle = agentColor;
+            this.ctx.fill();
+            this.ctx.stroke();
+
+            this.ctx.restore();
+
+            // Agent ID Label
+            this.ctx.fillStyle = '#fff';
+            this.ctx.font = 'bold 11px Inter, sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'top';
+
+            const label = id.split('-').pop();
+            const metrics = this.ctx.measureText(label);
+            const padding = 3;
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            this.ctx.fillRect(
+                screenX - metrics.width / 2 - padding,
+                screenY + 16,
+                metrics.width + padding * 2,
+                14
+            );
+
+            this.ctx.fillStyle = '#fff';
+            this.ctx.fillText(label, screenX, screenY + 18);
+        });
+    },
+
+    getOperatorColor(agentId) {
+        // Hash function to get unique color
+        let hash = 0;
+        for (let i = 0; i < agentId.length; i++) {
+            hash = ((hash << 5) - hash) + agentId.charCodeAt(i);
+            hash = hash & hash;
+        }
+        const index = Math.abs(hash) % OPERATOR_COLOR_PALETTE.length;
+        const [r, g, b] = OPERATOR_COLOR_PALETTE[index];
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+};
+
+// ============================================
+//  CONTROLS MODULE (Unified Timeline)
+// ============================================
+const ControlsModule = {
+    playInterval: null,
+
+    init() {
+        console.log('[ControlsModule] Initializing...');
+
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const timeSlider = document.getElementById('time-slider');
+        const speedSelect = document.getElementById('speed-select');
+
+        if (playPauseBtn) {
+            playPauseBtn.addEventListener('click', () => this.togglePlay());
+        }
+
+        if (timeSlider) {
+            timeSlider.addEventListener('input', (e) => this.handleSeek(e));
+        }
+
+        if (speedSelect) {
+            speedSelect.addEventListener('change', (e) => {
+                AppState.playbackSpeed = parseFloat(e.target.value);
+                console.log('[ControlsModule] Speed changed to:', AppState.playbackSpeed);
             });
         }
 
-        // Get unique color for this operator
-        const operatorColor = getOperatorColor(agentId);
+        // Subscribe to state changes
+        AppState.subscribe(state => this.updateUI(state));
 
-        // Draw picking nodes
-        locationsWithAccumulated.forEach((location, idx) => {
-            const [px, py] = location.pos;
-            const woCount = location.accumulated;
+        console.log('[ControlsModule] Ready');
+    },
 
-            // Determine if current node (first few are more prominent)
-            const isCurrent = idx < 2;
+    togglePlay() {
+        if (AppState.isPlaying) {
+            this.stop();
+        } else {
+            this.play();
+        }
+    },
 
-            // Fixed radius as requested (very small)
-            const radius = 7;
+    play() {
+        AppState.isPlaying = true;
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        if (playPauseBtn) {
+            playPauseBtn.querySelector('.btn-icon').textContent = '⏸';
+            playPauseBtn.querySelector('.btn-label').textContent = 'Pause';
+        }
 
-            // Adjust color brightness for current node
-            let nodeColor = operatorColor;
-            if (isCurrent) {
-                // Make brighter for current node
-                const rgb = operatorColor.match(/\d+/g).map(Number);
-                nodeColor = `rgb(${Math.min(255, rgb[0] + 50)}, ${Math.min(255, rgb[1] + 50)}, ${Math.min(255, rgb[2] + 50)})`;
+        let lastTime = Date.now();
+
+        this.playInterval = setInterval(() => {
+            const now = Date.now();
+            const deltaMs = now - lastTime;
+            lastTime = now;
+
+            const deltaTime = (deltaMs / 1000) * AppState.playbackSpeed;
+            let newTime = AppState.currentTime + deltaTime;
+
+            if (newTime >= AppState.maxTime) {
+                newTime = AppState.maxTime;
+                this.stop();
             }
 
-            // Draw circle
-            ctx.beginPath();
-            ctx.arc(px, py, radius, 0, Math.PI * 2);
-            ctx.fillStyle = nodeColor;
-            ctx.fill();
+            this.seekTo(newTime);
+        }, 100);
 
-            // Border
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = isCurrent ? 2 : 1;
-            ctx.stroke();
+        console.log('[ControlsModule] Playback started');
+    },
 
-            // Draw WO count text
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 10px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+    stop() {
+        AppState.isPlaying = false;
+        clearInterval(this.playInterval);
 
-            // No background box for very small nodes to keep it clean
-            // Draw text directly
-            ctx.strokeText(woCount.toString(), px, py); // Small stroke for contrast
-            ctx.fillText(woCount.toString(), px, py);
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        if (playPauseBtn) {
+            playPauseBtn.querySelector('.btn-icon').textContent = '▶';
+            playPauseBtn.querySelector('.btn-label').textContent = 'Play';
+        }
+
+        console.log('[ControlsModule] Playback stopped');
+    },
+
+    handleSeek(e) {
+        const targetTime = parseFloat(e.target.value);
+
+        if (AppState.isPlaying) {
+            this.stop();
+        }
+
+        this.seekTo(targetTime);
+    },
+
+    async seekTo(time) {
+        try {
+            const response = await fetch(`/api/state?t=${time}`);
+            const data = await response.json();
+
+            // Update AppState (will notify all subscribers)
+            AppState.setTime(time);
+            AppState.maxTime = data.max_time;
+            AppState.setWorkOrders(data.work_orders);
+            AppState.setAgents(data.agents);
+
+            // Update metrics separately
+            await this.updateMetrics(time);
+        } catch (error) {
+            console.error('[ControlsModule] Error seeking:', error);
+        }
+    },
+
+    async updateMetrics(time) {
+        try {
+            const response = await fetch(`/api/metrics?t=${time}`);
+            const metrics = await response.json();
+
+            if (!metrics) return;
+
+            const woMetrics = metrics.work_orders || {};
+
+            // Update compact metrics in panel header
+            this.setMetricValue('metric-total', woMetrics.total || 0);
+            this.setMetricValue('metric-released', woMetrics.released || 0);
+            this.setMetricValue('metric-assigned', woMetrics.assigned || 0);
+            this.setMetricValue('metric-in-progress', woMetrics.in_progress || 0);
+            this.setMetricValue('metric-staged', woMetrics.staged || 0);
+        } catch (error) {
+            console.error('[ControlsModule] Error fetching metrics:', error);
+        }
+    },
+
+    setMetricValue(elementId, value) {
+        const el = document.getElementById(elementId);
+        if (el) {
+            el.textContent = value;
+        }
+    },
+
+    updateUI(state) {
+        // Update time displays and slider
+        const currentTimeEl = document.getElementById('current-time');
+        const maxTimeEl = document.getElementById('max-time');
+        const timeSlider = document.getElementById('time-slider');
+
+        if (currentTimeEl) {
+            currentTimeEl.textContent = this.formatTime(state.currentTime);
+        }
+
+        if (maxTimeEl && state.maxTime > 0) {
+            maxTimeEl.textContent = this.formatTime(state.maxTime);
+        }
+
+        if (timeSlider) {
+            timeSlider.max = state.maxTime;
+            timeSlider.value = state.currentTime;
+        }
+    },
+
+    formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+};
+
+// ============================================
+//  RESIZE MODULE (Draggable Handle)
+// ============================================
+const ResizeModule = {
+    isDragging: false,
+
+    init() {
+        console.log('[ResizeModule] Initializing...');
+
+        const handle = document.getElementById('resize-handle');
+
+        if (!handle) {
+            console.error('[ResizeModule] Resize handle not found!');
+            return;
+        }
+
+        handle.addEventListener('mousedown', (e) => this.startDrag(e));
+        document.addEventListener('mousemove', (e) => this.drag(e));
+        document.addEventListener('mouseup', () => this.stopDrag());
+
+        // Load saved preference
+        const saved = localStorage.getItem('canvasHeightPercent');
+        if (saved) {
+            const percent = parseFloat(saved);
+            document.getElementById('canvas-section').style.flexBasis = `${percent}%`;
+            AppState.canvasHeightPercent = percent;
+        }
+
+        console.log('[ResizeModule] Ready');
+    },
+
+    startDrag(e) {
+        this.isDragging = true;
+        e.preventDefault();
+        console.log('[ResizeModule] Drag started');
+    },
+
+    drag(e) {
+        if (!this.isDragging) return;
+
+        const mainLayout = document.getElementById('main-layout');
+        if (!mainLayout) return;
+
+        const rect = mainLayout.getBoundingClientRect();
+        const offsetY = e.clientY - rect.top;
+        const percent = (offsetY / rect.height) * 100;
+
+        // Clamp between 30% and 85%
+        const clamped = Math.max(30, Math.min(85, percent));
+
+        document.getElementById('canvas-section').style.flexBasis = `${clamped}%`;
+        AppState.canvasHeightPercent = clamped;
+    },
+
+    stopDrag() {
+        if (!this.isDragging) return;
+
+        this.isDragging = false;
+
+        // Save preference
+        localStorage.setItem('canvasHeightPercent', AppState.canvasHeightPercent);
+        console.log('[ResizeModule] Drag stopped, saved:', AppState.canvasHeightPercent);
+    }
+};
+
+// ============================================
+//  PANEL MODULE (Toggle Bottom Panel)
+// ============================================
+const PanelModule = {
+    init() {
+        console.log('[PanelModule] Initializing...');
+
+        const toggleBtn = document.getElementById('toggleTableBtn');
+        const panel = document.getElementById('bottom-panel');
+
+        if (!toggleBtn || !panel) {
+            console.error('[PanelModule] Toggle button or panel not found!');
+            return;
+        }
+
+        toggleBtn.addEventListener('click', () => {
+            AppState.toggleTable();
         });
-    });
-}
 
+        // Subscribe to state changes
+        AppState.subscribe(state => {
+            if (state.isTableVisible) {
+                panel.classList.remove('collapsed');
+                console.log('[PanelModule] Panel expanded');
+            } else {
+                panel.classList.add('collapsed');
+                console.log('[PanelModule] Panel collapsed');
+            }
+        });
 
-function renderScene(state) {
-    renderMap();
+        console.log('[PanelModule] Ready');
+    }
+};
 
-    // Draw picking nodes BEFORE agents so agents appear on top
-    renderPickingNodes(state);
+// ============================================
+//  METRICS MODULE (Compact Metrics in Panel Header)
+// ============================================
+const MetricsModule = {
+    init() {
+        console.log('[MetricsModule] Initializing...');
 
-    // Draw Agents as Person Icons (User Requested Style)
-    Object.entries(state.agents).forEach(([id, agent]) => {
-        const [gridX, gridY] = agent.position;
-        const screenX = gridX * TILE_SIZE + TILE_SIZE / 2;
-        const screenY = gridY * TILE_SIZE + TILE_SIZE / 2;
+        const metricsBar = document.getElementById('metricsBar');
 
-        // Get agent color based on type and status
-        const agentType = agent.type.includes('Forklift') ? 'Forklift' : 'GroundOperator';
-        const colorScheme = AGENT_COLORS[agentType];
-        const agentColor = colorScheme[agent.status] || colorScheme.base;
+        if (!metricsBar) {
+            console.error('[MetricsModule] Metrics bar not found!');
+            return;
+        }
 
-        ctx.save();
-        ctx.translate(screenX, screenY);
+        // Create metric elements
+        const metrics = [
+            { id: 'metric-total', label: 'Total', class: '' },
+            { id: 'metric-released', label: 'Released', class: 'released' },
+            { id: 'metric-assigned', label: 'Assigned', class: 'assigned' },
+            { id: 'metric-in-progress', label: 'In Progress', class: 'in-progress' },
+            { id: 'metric-staged', label: 'Staged', class: 'staged' }
+        ];
 
-        // Draw Person Icon (Head + Body)
-        // Head (Circle)
-        ctx.beginPath();
-        ctx.arc(0, -7, 5, 0, Math.PI * 2);
-        ctx.fillStyle = agentColor;
-        ctx.fill();
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 1;
-        ctx.stroke();
+        metricsBar.innerHTML = '';
 
-        // Body (Rounded shape/Shoulders)
-        ctx.beginPath();
-        // Draw a semi-circle for the body
-        ctx.arc(0, 7, 8, Math.PI, 0);
-        ctx.lineTo(8, 7); // Close the shape
-        ctx.fillStyle = agentColor;
-        ctx.fill();
-        ctx.stroke();
+        metrics.forEach(m => {
+            const div = document.createElement('div');
+            div.className = `metric-compact ${m.class}`;
+            div.innerHTML = `
+                <div class="label">${m.label}</div>
+                <div class="value" id="${m.id}">0</div>
+            `;
+            metricsBar.appendChild(div);
+        });
 
-        ctx.restore();
+        console.log('[MetricsModule] Ready');
+    }
+};
 
-        // Agent ID Label
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 11px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
+// ============================================
+//  INITIALIZATION
+// ============================================
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('===========================================');
+    console.log('  Gemelo Digital - Web Simulator v2.0');
+    console.log('  Modular Architecture Initialized');
+    console.log('===========================================');
 
-        // Background for label
-        const label = id.split('-').pop();
-        const metrics = ctx.measureText(label);
-        const padding = 3;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-        ctx.fillRect(
-            screenX - metrics.width / 2 - padding,
-            screenY + 16,
-            metrics.width + padding * 2,
-            14
-        );
+    // Initialize all modules
+    TableModule.init();
+    CanvasModule.init();
+    ControlsModule.init();
+    ResizeModule.init();
+    PanelModule.init();
+    MetricsModule.init();
 
-        // Label text
-        ctx.fillStyle = '#fff';
-        ctx.fillText(label, screenX, screenY + 18);
-    });
-}
+    // Load layout
+    try {
+        const response = await fetch('/api/layout');
+        const layout = await response.json();
+        AppState.setLayout(layout);
+        console.log('[Main] Layout loaded:', layout);
+    } catch (error) {
+        console.error('[Main] Error loading layout:', error);
+    }
 
-function updateSidebar(state) {
-    const list = document.getElementById('agents-list');
-    list.innerHTML = '';
+    // Load initial state at t=0
+    await ControlsModule.seekTo(0);
 
-    Object.entries(state.agents).forEach(([id, agent]) => {
-        const div = document.createElement('div');
-        div.className = 'agent-list-item';
-
-        const statusClass = agent.status === 'idle' ? 'status-idle' :
-            agent.status === 'moving' ? 'status-moving' :
-                agent.status === 'picking' ? 'status-picking' :
-                    agent.status === 'unloading' ? 'status-unloading' : 'status-idle';
-
-        div.innerHTML = `
-            <span class="agent-status ${statusClass}"></span>
-            <div class="agent-info">
-                <div class="agent-name">${id.split('-').pop()}</div>
-                <div class="agent-details">${agent.status} · (${Math.round(agent.position[0])}, ${Math.round(agent.position[1])})</div>
-            </div>
-        `;
-        list.appendChild(div);
-    });
-
-    // Fetch and update metrics
-    fetchAndUpdateMetrics(currentTime);
-}
-
+    console.log('[Main] System ready');
+});
