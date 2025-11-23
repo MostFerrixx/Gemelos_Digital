@@ -304,6 +304,8 @@ const TableModule = {
 const CanvasModule = {
     canvas: null,
     ctx: null,
+    scale: 1.0, // Current scale factor (1.0 = 100%, 0.5 = 50%, etc.)
+    resizeRAF: null, // RequestAnimationFrame ID for throttling
 
     init() {
         console.log('[CanvasModule] Initializing...');
@@ -316,19 +318,88 @@ const CanvasModule = {
 
         this.ctx = this.canvas.getContext('2d');
 
+        // Observar cambios de tamaño del contenedor con throttling
+        const container = document.getElementById('canvas-section');
+        if (container) {
+            const resizeObserver = new ResizeObserver(() => {
+                // Performance: Usar RAF para evitar redibujados excesivos durante drag
+                if (this.resizeRAF) {
+                    cancelAnimationFrame(this.resizeRAF);
+                }
+                this.resizeRAF = requestAnimationFrame(() => {
+                    this.resize();
+                });
+            });
+            resizeObserver.observe(container);
+            console.log('[CanvasModule] ResizeObserver attached to canvas-section');
+        }
+
         // Subscribe to state changes
         AppState.subscribe(state => this.render(state));
 
         console.log('[CanvasModule] Ready');
     },
 
+    /**
+     * Redimensiona el canvas para que quepa en el contenedor disponible
+     * manteniendo la relación de aspecto del layout original.
+     */
+    resize() {
+        if (!this.canvas || !AppState.layout) return;
+
+        const container = document.getElementById('canvas-section');
+        if (!container) return;
+
+        // Obtener dimensiones del contenedor (restando márgenes)
+        const containerRect = container.getBoundingClientRect();
+        const availableWidth = containerRect.width - 40; // Considerar márgenes
+        const availableHeight = containerRect.height - 40;
+
+        // Dimensiones originales del layout en píxeles
+        const layoutWidth = AppState.layout.width * TILE_SIZE;
+        const layoutHeight = AppState.layout.height * TILE_SIZE;
+
+        // Calcular escala para que quepa todo (usar la menor para mantener aspect ratio)
+        const scaleX = availableWidth / layoutWidth;
+        const scaleY = availableHeight / layoutHeight;
+        const newScale = Math.min(scaleX, scaleY, 1.0); // No agrandar más allá del 100%
+
+        // Aplicar nuevo tamaño al canvas
+        this.canvas.width = layoutWidth * newScale;
+        this.canvas.height = layoutHeight * newScale;
+
+        // Guardar escala actual
+        // IMPORTANTE: Este valor será necesario para mouse mapping en el futuro.
+        // Si necesitas detectar clics sobre agentes, deberás dividir las coordenadas
+        // del mouse por esta escala: logicalX = mouseX / scale, logicalY = mouseY / scale
+        this.scale = newScale;
+
+        console.log(`[CanvasModule] Resized to ${this.canvas.width}x${this.canvas.height} (scale: ${newScale.toFixed(3)})`);
+
+        // Re-renderizar con la nueva escala
+        this.render(AppState);
+    },
+
+    /**
+     * Obtiene la escala actual del canvas.
+     * @returns {number} Factor de escala actual (1.0 = tamaño original)
+     * 
+     * FUTURO: Usar este método para convertir coordenadas del mouse a coordenadas lógicas:
+     * const scale = CanvasModule.getScale();
+     * const logicalX = mouseEvent.offsetX / scale;
+     * const logicalY = mouseEvent.offsetY / scale;
+     */
+    getScale() {
+        return this.scale;
+    },
+
     render(state) {
         if (!state.layout) return;
 
-        // Resize canvas if needed
-        if (this.canvas.width !== state.layout.width * TILE_SIZE) {
-            this.canvas.width = state.layout.width * TILE_SIZE;
-            this.canvas.height = state.layout.height * TILE_SIZE;
+        // Aplicar transformación de escala si es necesaria
+        if (this.scale && this.scale !== 1.0) {
+            this.ctx.save();
+            this.ctx.scale(this.scale, this.scale);
         }
 
         // Clear and render map
@@ -339,6 +410,11 @@ const CanvasModule = {
 
         // Render agents
         this.renderAgents(state.agents);
+
+        // Restaurar contexto si se aplicó escala
+        if (this.scale && this.scale !== 1.0) {
+            this.ctx.restore();
+        }
     },
 
     renderMap(layout) {
@@ -949,6 +1025,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const layout = await response.json();
         AppState.setLayout(layout);
         console.log('[Main] Layout loaded:', layout);
+
+        // Redimensionar canvas inicial para que se ajuste al contenedor
+        // Pequeño delay para asegurar que el DOM esté completamente renderizado
+        setTimeout(() => {
+            CanvasModule.resize();
+            console.log('[Main] Initial canvas resize completed');
+        }, 100);
     } catch (error) {
         console.error('[Main] Error loading layout:', error);
     }
