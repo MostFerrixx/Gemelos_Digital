@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Twin Warehouse - Dashboard v10</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Dashboard Container -->
+    <div class="dashboard-container">
+        <!-- Header con métricas generales -->
+        <header class="dashboard-header">
+            <h1>Digital Twin Warehouse - Dashboard v10</h1>
+            <div class="metrics-bar" id="metricsBar">
+                <div class="metric">
+                    <span class="metric-label">Total:</span>
+                    <span class="metric-value" id="metricTotal">0</span>
+                </div>
+                <div class="metric metric-released">
+                    <span class="metric-label">Released:</span>
+                    <span class="metric-value" id="metricReleased">0</span>
+                </div>
+                <div class="metric metric-assigned">
+                    <span class="metric-label">Assigned:</span>
+                    <span class="metric-value" id="metricAssigned">0</span>
+                </div>
+                <div class="metric metric-in-progress">
+                    <span class="metric-label">In Progress:</span>
+                    <span class="metric-value" id="metricInProgress">0</span>
+                </div>
+                <div class="metric metric-staged">
+                    <span class="metric-label">Staged:</span>
+                    <span class="metric-value" id="metricStaged">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Throughput:</span>
+                    <span class="metric-value" id="metricThroughput">0.00</span>
+                    <span class="metric-unit">WOs/min</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Tabla principal de Work Orders -->
+        <div class="table-container">
+            <table id="workOrderTable" class="work-order-table">
+                <thead>
+                    <tr>
+                        <!-- Headers se generan dinámicamente via JavaScript -->
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Filas se generan dinámicamente via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Scrubber de tiempo (replay controls) -->
+        <footer class="replay-controls">
+            <div class="time-display">
+                <span class="time-label">Time:</span>
+                <span id="currentTime" class="time-value">0.00s</span>
+                <span class="time-separator">/</span>
+                <span id="maxTime" class="time-value">0.00s</span>
+            </div>
+            <input type="range" id="timeSlider" class="time-slider" min="0" max="1000" value="0" step="0.1">
+            <div class="playback-controls">
+                <button id="playBtn" class="control-btn">
+                    <span class="btn-icon">▶</span>
+                    <span class="btn-label">Play</span>
+                </button>
+                <button id="pauseBtn" class="control-btn" disabled>
+                    <span class="btn-icon">⏸</span>
+                    <span class="btn-label">Pause</span>
+                </button>
+                <div class="speed-control">
+                    <label for="speedSelect">Speed:</label>
+                    <select id="speedSelect" class="speed-select">
+                        <option value="0.5">0.5x</option>
+                        <option value="1" selected>1x</option>
+                        <option value="2">2x</option>
+                        <option value="5">5x</option>
+                        <option value="10">10x</option>
+                    </select>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading replay data...</div>
+    </div>
+
+    <!-- Connection Status -->
+    <div id="connectionStatus" class="connection-status">
+        <span class="status-indicator"></span>
+        <span class="status-text">Disconnected</span>
+    </div>
+
+    <!-- Main JavaScript -->
+    <script src="app.js"></script>
+</body>
+
+</html>
