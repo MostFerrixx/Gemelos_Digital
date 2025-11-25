@@ -38,8 +38,14 @@ class ReplayData:
         self.precompute_snapshots()
 
     def precompute_snapshots(self):
-        """Pre-computes state snapshots at regular intervals to speed up seeking."""
-        print(f"Pre-computing snapshots every {self.snapshot_interval}s...")
+        """
+        Pre-computes state snapshots at PROGRESSIVE intervals to speed up seeking.
+        Intervals decrease as simulation progresses to handle more events efficiently:
+        - 0-5min: 60s intervals
+        - 5-30min: 30s intervals  
+        - 30min+: 15s intervals
+        """
+        print(f"Pre-computing progressive snapshots...")
         if not self.events:
             return
 
@@ -49,8 +55,17 @@ class ReplayData:
             "work_orders": {}
         }
         
+        # Helper to determine next snapshot time based on current time
+        def get_next_snapshot_time(current_t):
+            if current_t < 300:  # 0-5 minutes
+                return 60.0
+            elif current_t < 1800:  # 5-30 minutes
+                return 30.0
+            else:  # 30+ minutes
+                return 15.0
+        
         # Process all events in order and save snapshots
-        next_snapshot_time = self.snapshot_interval  # First interval snapshot at 60s
+        next_snapshot_time = 60.0  # First snapshot at 60s
         prev_time = None
         
         # We need to process events sequentially to build state
@@ -70,7 +85,11 @@ class ReplayData:
                 # Deep copy current state for the snapshot
                 import copy
                 self.snapshots[next_snapshot_time] = copy.deepcopy(current_state)
-                next_snapshot_time += self.snapshot_interval
+                print(f"  Snapshot at t={next_snapshot_time}s")
+                
+                # Calculate next interval based on current position
+                interval = get_next_snapshot_time(next_snapshot_time)
+                next_snapshot_time += interval
             
             prev_time = t
         
@@ -79,7 +98,8 @@ class ReplayData:
             import copy
             self.snapshots[0.0] = copy.deepcopy(current_state)
             
-        print(f"Created {len(self.snapshots)} snapshots.")
+        print(f"Created {len(self.snapshots)} progressive snapshots.")
+
 
     def _apply_event_to_state(self, event, state):
         """Helper to apply a single event to a state dict."""
@@ -202,6 +222,129 @@ def get_layout():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/snapshot")
+def get_snapshot(t: float):
+    """
+    UNIFIED ENDPOINT: Returns both state and metrics in a single request.
+    This reduces HTTP traffic by 50% compared to separate /api/state + /api/metrics calls.
+    """
+    # OPTIMIZATION: Use nearest snapshot
+    snapshot_times = [st for st in replay_data.snapshots.keys() if st <= t]
+    
+    if snapshot_times:
+        base_time = max(snapshot_times)
+        # Deep copy to avoid modifying the snapshot
+        import copy
+        current_state = copy.deepcopy(replay_data.snapshots[base_time])
+        # Only process events AFTER the snapshot
+        relevant_events = [e for e in replay_data.events if base_time < e.get('timestamp', 0) <= t]
+    else:
+        current_state = {
+            "agents": {},
+            "work_orders": {}
+        }
+        relevant_events = [e for e in replay_data.events if e.get('timestamp', 0) <= t]
+    
+    for event in relevant_events:
+        replay_data._apply_event_to_state(event, current_state)
+    
+    # Compute work_orders_asignadas for each agent
+    # Based on desktop implementation in replay_engine.py
+    for agent_id in current_state['agents']:
+        assigned_wos = []
+        for wo_id, wo in current_state['work_orders'].items():
+            # Check if WO is assigned to this agent
+            wo_agent = wo.get('assigned_agent_id') or wo.get('agent_id')
+            wo_status = wo.get('status', 'released')
+            
+            # Normalize agent ID matching - WO agents are like "Forklift_Forklift-01" 
+            # but state agents are "Forklift-01"
+            # Extract the last part after underscore if present
+            if wo_agent:
+                if '_' in wo_agent:
+                    wo_agent_short = wo_agent.split('_')[-1]
+                else:
+                    wo_agent_short = wo_agent
+            else:
+                wo_agent_short = None
+            
+            # Only include WOs that are PENDING (not picked or staged)
+            # picked = completed picking, staged = delivered to staging
+            pending_statuses = ['assigned', 'in_progress']
+            if wo_agent_short == agent_id and wo_status in pending_statuses:
+                assigned_wos.append({
+                    'id': wo_id,
+                    'location': wo.get('location') or wo.get('ubicacion', [0, 0]),
+                    'status': wo_status,
+                    'pick_sequence': wo.get('pick_sequence', 0)
+                })
+        
+        # Sort by pick_sequence to maintain tour order
+        assigned_wos.sort(key=lambda x: x['pick_sequence'])
+        current_state['agents'][agent_id]['work_orders_asignadas'] = assigned_wos
+
+    # Compute metrics (integrated from get_metrics)
+    work_orders = current_state['work_orders']
+    agents = current_state['agents']
+    
+    # Helper lambdas for status checks
+    get_status = lambda wo: wo.get('status', 'released')
+    is_released = lambda wo: get_status(wo) == 'released' or (get_status(wo) == 'assigned' and not wo.get('assigned_agent_id'))
+    is_assigned = lambda wo: get_status(wo) == 'assigned' and wo.get('assigned_agent_id')
+    
+    # Count work orders by status
+    wo_total = len(work_orders)
+    wo_completed = sum(1 for wo in work_orders.values() if wo.get('status') == 'staged')
+    
+    # Count agents by status
+    agent_total = len(agents)
+    agent_active = sum(1 for agent in agents.values() if agent.get('status') in ['moving', 'picking', 'unloading'])
+    agent_idle = sum(1 for agent in agents.values() if agent.get('status') == 'idle')
+    
+    # Calculate throughput (WOs per minute)
+    if t > 0:
+        throughput = (wo_completed / t) * 60.0
+    else:
+        throughput = 0.0
+    
+    # Count by agent type
+    ground_operators = sum(1 for agent in agents.values() if 'Ground' in agent.get('type', ''))
+    forklifts = sum(1 for agent in agents.values() if 'Forklift' in agent.get('type', ''))
+
+    # Return unified response with both state and metrics
+    return {
+        "timestamp": t,
+        "max_time": replay_data.max_time,
+        "state": {
+            "agents": current_state['agents'],
+            "work_orders": current_state['work_orders']
+        },
+        "metrics": {
+            "simulation_time": t,
+            "work_orders": {
+                "total": wo_total,
+                "staged": wo_completed,
+                "picked": sum(1 for wo in work_orders.values() if get_status(wo) == 'picked'),
+                "in_progress": sum(1 for wo in work_orders.values() if get_status(wo) == 'in_progress'),
+                "assigned": sum(1 for wo in work_orders.values() if is_assigned(wo)),
+                "released": sum(1 for wo in work_orders.values() if is_released(wo)),
+                "completion_rate": (wo_completed / wo_total * 100) if wo_total > 0 else 0
+            },
+            "agents": {
+                "total": agent_total,
+                "active": agent_active,
+                "idle": agent_idle,
+                "ground_operators": ground_operators,
+                "forklifts": forklifts
+            },
+            "performance": {
+                "throughput_per_minute": round(throughput, 2),
+                "avg_time_per_wo": round(t / wo_completed, 2) if wo_completed > 0 else 0
+            }
+        }
+    }
 
 @app.get("/api/state")
 def get_state(t: float):

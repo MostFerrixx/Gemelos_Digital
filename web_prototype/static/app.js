@@ -706,6 +706,8 @@ const ControlsModule = {
     seekDebounceTimer: null,
     currentAbortController: null,
     loadingTimeoutId: null,
+    lastServerUpdateTime: 0,
+    serverUpdateInterval: 250, // Request server update every 250ms during playback (4 req/s)
 
     init() {
         console.log('[ControlsModule] Initializing...');
@@ -752,7 +754,9 @@ const ControlsModule = {
         }
 
         let lastTime = Date.now();
+        this.lastServerUpdateTime = AppState.currentTime;
 
+        // OPTIMIZATION: Update UI at 60fps, but fetch from server every 250ms
         this.playInterval = setInterval(() => {
             const now = Date.now();
             const deltaMs = now - lastTime;
@@ -766,8 +770,17 @@ const ControlsModule = {
                 this.stop();
             }
 
-            this.seekTo(newTime);
-        }, 100);
+            // Update local time immediately for smooth UI
+            AppState.currentTime = newTime;
+            this.updateUI(AppState);
+
+            // Only fetch from server every 250ms to reduce traffic
+            const timeSinceLastUpdate = newTime - this.lastServerUpdateTime;
+            if (timeSinceLastUpdate >= this.serverUpdateInterval / 1000) {
+                this.lastServerUpdateTime = newTime;
+                this.seekTo(newTime, true); // true = isPlaybackRequest
+            }
+        }, 100); // Keep 100ms interval for smooth UI updates
 
         console.log('[ControlsModule] Playback started');
     },
@@ -808,7 +821,7 @@ const ControlsModule = {
         }, 100);
     },
 
-    async seekTo(time) {
+    async seekTo(time, isPlaybackRequest = false) {
         // AGGRESSIVE CANCELLATION: Abort any pending request immediately
         if (this.currentAbortController) {
             this.currentAbortController.abort();
@@ -818,13 +831,17 @@ const ControlsModule = {
         // Create new abort controller for this request
         this.currentAbortController = new AbortController();
 
-        // Show loading indicator if request takes longer than 200ms
+        // OPTIMIZATION 5: Adjusted loading threshold based on context
+        // - Playback: 2000ms (avoid flickering during normal play)
+        // - Manual seek: 300ms (quick feedback)
+        const loadingThreshold = isPlaybackRequest ? 2000 : 300;
         this.loadingTimeoutId = setTimeout(() => {
             this.setLoadingState(true);
-        }, 200);
+        }, loadingThreshold);
 
         try {
-            const response = await fetch(`/api/state?t=${time}`, {
+            // OPTIMIZATION 2: Use unified /api/snapshot endpoint (state + metrics in one request)
+            const response = await fetch(`/api/snapshot?t=${time}`, {
                 signal: this.currentAbortController.signal
             });
             const data = await response.json();
@@ -836,11 +853,11 @@ const ControlsModule = {
             // Update AppState (will notify all subscribers)
             AppState.setTime(time);
             AppState.maxTime = data.max_time;
-            AppState.setWorkOrders(data.work_orders);
-            AppState.setAgents(data.agents);
+            AppState.setWorkOrders(data.state.work_orders);
+            AppState.setAgents(data.state.agents);
 
-            // Update metrics separately
-            await this.updateMetrics(time);
+            // Update metrics from unified response (no separate request needed!)
+            this.updateMetricsFromData(data.metrics);
 
             // Clear controller reference
             this.currentAbortController = null;
@@ -865,24 +882,19 @@ const ControlsModule = {
         }
     },
 
-    async updateMetrics(time) {
-        try {
-            const response = await fetch(`/api/metrics?t=${time}`);
-            const metrics = await response.json();
+    updateMetricsFromData(metrics) {
+        // Helper function to update metrics from unified snapshot response
+        // No network request needed since metrics come with state
+        if (!metrics) return;
 
-            if (!metrics) return;
+        const woMetrics = metrics.work_orders || {};
 
-            const woMetrics = metrics.work_orders || {};
-
-            // Update compact metrics in panel header
-            this.setMetricValue('metric-total', woMetrics.total || 0);
-            this.setMetricValue('metric-released', woMetrics.released || 0);
-            this.setMetricValue('metric-assigned', woMetrics.assigned || 0);
-            this.setMetricValue('metric-in-progress', woMetrics.in_progress || 0);
-            this.setMetricValue('metric-staged', woMetrics.staged || 0);
-        } catch (error) {
-            console.error('[ControlsModule] Error fetching metrics:', error);
-        }
+        // Update compact metrics in panel header
+        this.setMetricValue('metric-total', woMetrics.total || 0);
+        this.setMetricValue('metric-released', woMetrics.released || 0);
+        this.setMetricValue('metric-assigned', woMetrics.assigned || 0);
+        this.setMetricValue('metric-in-progress', woMetrics.in_progress || 0);
+        this.setMetricValue('metric-staged', woMetrics.staged || 0);
     },
 
     setMetricValue(elementId, value) {
