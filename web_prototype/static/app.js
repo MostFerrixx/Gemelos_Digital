@@ -943,7 +943,7 @@ const ResizeModule = {
         const saved = localStorage.getItem('canvasHeightPercent');
         if (saved) {
             const percent = parseFloat(saved);
-            document.getElementById('canvas-section').style.flexBasis = `${percent}%`;
+            document.getElementById('top-section').style.flexBasis = `${percent}%`;
             AppState.canvasHeightPercent = percent;
         }
 
@@ -959,17 +959,17 @@ const ResizeModule = {
     drag(e) {
         if (!this.isDragging) return;
 
-        const mainLayout = document.getElementById('main-layout');
-        if (!mainLayout) return;
+        const appContainer = document.getElementById('app-container');
+        if (!appContainer) return;
 
-        const rect = mainLayout.getBoundingClientRect();
+        const rect = appContainer.getBoundingClientRect();
         const offsetY = e.clientY - rect.top;
         const percent = (offsetY / rect.height) * 100;
 
         // Clamp between 30% and 85%
         const clamped = Math.max(30, Math.min(85, percent));
 
-        document.getElementById('canvas-section').style.flexBasis = `${clamped}%`;
+        document.getElementById('top-section').style.flexBasis = `${clamped}%`;
         AppState.canvasHeightPercent = clamped;
 
         // CRITICAL: Trigger canvas resize to scale content when container changes
