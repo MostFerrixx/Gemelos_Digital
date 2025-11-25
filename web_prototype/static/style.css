@@ -96,89 +96,123 @@ body {
 }
 
 /* ============================================
-   HEADER
+   APP CONTAINER & LAYOUT
    ============================================ */
-header {
+#app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+}
+
+/* Top Section: Sidebar + Canvas in a row */
+#top-section {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    overflow: hidden;
+    transition: flex var(--transition-slow);
+}
+
+/* ============================================
+   VERTICAL SIDEBAR
+   ============================================ */
+#vertical-sidebar {
+    width: 55px;
     background: var(--glass-bg);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--glass-border);
-    padding: var(--spacing-md) var(--spacing-xl);
+    border-right: 1px solid var(--glass-border);
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     align-items: center;
+    padding: var(--spacing-lg) 0;
     box-shadow: var(--shadow-md);
-    z-index: 100;
-    flex-shrink: 0;
+    transition: all var(--transition-slow);
+    z-index: 50;
 }
 
-h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--color-accent-blue) 0%, var(--color-accent-purple) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -0.02em;
-}
-
-/* Header Actions (Toggle Button) */
-.header-actions {
+.sidebar-content {
     display: flex;
-    gap: var(--spacing-md);
+    flex-direction: column;
     align-items: center;
+    gap: var(--spacing-xl);
+    width: 100%;
 }
 
-.toggle-table-btn {
+/* Sidebar Logo */
+.sidebar-logo {
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-lg);
+    justify-content: center;
+    color: var(--color-accent-blue);
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.sidebar-logo:hover {
+    color: var(--color-accent-blue-hover);
+    transform: scale(1.1);
+}
+
+.sidebar-logo svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Sidebar Title */
+.sidebar-title {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    user-select: none;
+}
+
+/* Sidebar Toggle Button */
+.sidebar-toggle-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: all var(--transition-base);
-    font-family: inherit;
-    font-size: 0.875rem;
-    font-weight: 600;
+    font-size: 1.25rem;
     color: var(--color-text-primary);
 }
 
-.toggle-table-btn:hover {
+.sidebar-toggle-btn:hover {
     background: var(--color-surface-hover);
     border-color: var(--color-accent-blue);
-    transform: translateY(-1px);
+    transform: scale(1.05);
     box-shadow: var(--shadow-md);
 }
 
-.toggle-table-btn .icon {
-    font-size: 1.125rem;
+.sidebar-toggle-btn.active {
+    background: var(--color-accent-blue);
+    border-color: var(--color-accent-blue);
 }
 
-.toggle-table-btn .label {
-    font-size: 0.875rem;
-    font-weight: 600;
-}
-
-.connection-status {
+/* Sidebar Connection Status */
+.sidebar-connection {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--color-accent-green);
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: rgba(63, 185, 80, 0.1);
-    border: 1px solid rgba(63, 185, 80, 0.2);
-    border-radius: var(--radius-md);
-    transition: all var(--transition-base);
+    justify-content: center;
+    padding: var(--spacing-sm);
 }
 
-.connection-status::before {
-    content: '';
-    width: 8px;
-    height: 8px;
+.connection-dot {
+    width: 10px;
+    height: 10px;
     background: var(--color-accent-green);
     border-radius: 50%;
     box-shadow: 0 0 10px rgba(63, 185, 80, 0.6);
@@ -186,13 +220,10 @@ h1 {
 }
 
 @keyframes pulse {
-
-    0%,
-    100% {
+    0%, 100% {
         opacity: 1;
         transform: scale(1);
     }
-
     50% {
         opacity: 0.7;
         transform: scale(0.95);
@@ -224,6 +255,7 @@ h1 {
     background: var(--color-bg-secondary);
     border-radius: var(--radius-xl);
     margin: var(--spacing-lg);
+    margin-left: 0;
     margin-bottom: 0;
     overflow: hidden;
     transition: flex-basis 0.3s cubic-bezier(0.4, 0, 0.2, 1);
