@@ -109,11 +109,9 @@ body {
 #top-section {
     display: flex;
     flex-direction: row;
-    flex: 0 0 65%; /* Changed from flex: 1 to allow resize */
+    flex: 1; /* Full height by default, changes to flex-basis when dashboard opens */
     overflow: hidden;
     transition: flex var(--transition-slow);
-    min-height: 30%;
-    max-height: 85%;
 }
 
 /* ============================================
@@ -249,22 +247,21 @@ body {
 #canvas-section {
     flex: 0 0 65%;
     /* Altura inicial 65% */
-    min-height: 30%;
     /* Mínimo 30% */
-    max-height: 85%;
     /* Máximo 85% */
     position: relative;
     background: var(--color-bg-secondary);
-    border-radius: var(--radius-xl);
-    margin: var(--spacing-lg);
-    margin-left: 0;
-    margin-bottom: 0;
+    /* border-radius removed for edge-to-edge layout */
+    margin: 0; /* No margins - canvas goes edge to edge */
     overflow: hidden;
     transition: flex-basis 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     justify-content: center;
     align-items: center;
-    border: 1px solid var(--color-border);
+    border-top: 1px solid var(--color-border);
+    border-left: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    /* No border-bottom to connect with footer */
     box-shadow: var(--shadow-lg);
 }
 
@@ -283,10 +280,16 @@ canvas {
     background: transparent;
     position: relative;
     z-index: 50;
-    display: flex;
+    display: none; /* Hidden by default, shown when dashboard opens */
     align-items: center;
     justify-content: center;
     margin: 0 var(--spacing-lg);
+    transition: all var(--transition-base);
+}
+
+/* Show resize handle when dashboard is visible */
+.resize-handle.visible {
+    display: flex;
 }
 
 .resize-handle:hover .resize-indicator {
@@ -325,6 +328,7 @@ canvas {
 }
 
 .bottom-panel.collapsed {
+    flex: 0; /* Don't take up any space when collapsed */
     transform: translateY(100%);
     opacity: 0;
     pointer-events: none;
@@ -753,7 +757,7 @@ select:focus {
     justify-content: center;
     gap: var(--spacing-md);
     z-index: 1000;
-    border-radius: var(--radius-xl);
+    /* border-radius removed for edge-to-edge layout */
 }
 
 #loading-overlay span {

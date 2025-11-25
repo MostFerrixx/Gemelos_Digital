@@ -999,6 +999,8 @@ const PanelModule = {
 
         const toggleBtn = document.getElementById('toggleTableBtn');
         const panel = document.getElementById('bottom-panel');
+        const resizeHandle = document.getElementById('resize-handle');
+        const topSection = document.getElementById('top-section');
 
         if (!toggleBtn || !panel) {
             console.error('[PanelModule] Toggle button or panel not found!');
@@ -1012,10 +1014,40 @@ const PanelModule = {
         // Subscribe to state changes
         AppState.subscribe(state => {
             if (state.isTableVisible) {
+                // Dashboard opening
                 panel.classList.remove('collapsed');
+
+                // Show resize handle
+                if (resizeHandle) {
+                    resizeHandle.classList.add('visible');
+                }
+
+                // Change top-section to fixed height with resize capability
+                if (topSection) {
+                    const savedHeight = localStorage.getItem('canvasHeightPercent');
+                    const height = savedHeight ? parseFloat(savedHeight) : 65;
+                    topSection.style.flex = `0 0 ${height}%`;
+                    topSection.style.minHeight = '30%';
+                    topSection.style.maxHeight = '85%';
+                }
+
                 console.log('[PanelModule] Panel expanded');
             } else {
+                // Dashboard closing
                 panel.classList.add('collapsed');
+
+                // Hide resize handle
+                if (resizeHandle) {
+                    resizeHandle.classList.remove('visible');
+                }
+
+                // Return top-section to full height
+                if (topSection) {
+                    topSection.style.flex = '1';
+                    topSection.style.minHeight = '';
+                    topSection.style.maxHeight = '';
+                }
+
                 console.log('[PanelModule] Panel collapsed');
             }
         });
