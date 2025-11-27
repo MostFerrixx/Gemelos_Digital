@@ -9,11 +9,11 @@
 </head>
 
 <body>
-    <!-- Main Layout: Sidebar + Canvas Row, then Dashboard Panel below -->
+    <!-- Main Layout: Sidebar + Canvas + Right Dashboard in top, Table below -->
     <div id="app-container">
-        <!-- Top Section: Sidebar + Canvas -->
+        <!-- Top Section: Sidebar + Canvas + Right Dashboard (Flexbox row) -->
         <div id="top-section">
-            <!-- Vertical Sidebar (only next to canvas) -->
+            <!-- Vertical Sidebar -->
             <aside id="vertical-sidebar">
                 <div class="sidebar-content">
                     <div class="sidebar-logo" title="Gemelo Digital">
@@ -43,6 +43,35 @@
                     <span>Loading...</span>
                 </div>
             </div>
+
+            <!-- Right Metrics Dashboard (NEW - fixed width, no shrink) -->
+            <aside id="right-dashboard" class="right-dashboard">
+                <div class="dashboard-header">
+                    <h3>Metrics</h3>
+                </div>
+                <div class="dashboard-content">
+                    <div class="metric-card metric-card-total">
+                        <span class="metric-label">TOTAL</span>
+                        <span class="metric-value" id="metric-total-lg">0</span>
+                    </div>
+                    <div class="metric-card metric-card-released">
+                        <span class="metric-label">RELEASED</span>
+                        <span class="metric-value" id="metric-released-lg">0</span>
+                    </div>
+                    <div class="metric-card metric-card-assigned">
+                        <span class="metric-label">ASSIGNED</span>
+                        <span class="metric-value" id="metric-assigned-lg">0</span>
+                    </div>
+                    <div class="metric-card metric-card-in-progress">
+                        <span class="metric-label">IN PROGRESS</span>
+                        <span class="metric-value" id="metric-in-progress-lg">0</span>
+                    </div>
+                    <div class="metric-card metric-card-staged">
+                        <span class="metric-label">STAGED</span>
+                        <span class="metric-value" id="metric-staged-lg">0</span>
+                    </div>
+                </div>
+            </aside>
         </div>
 
         <!-- Resize Handle (arrastrable) -->
@@ -86,6 +115,7 @@
     </div>
 
     <script src="app.js"></script>
+    <script src="right-dashboard.js"></script>
 </body>
 
 </html>

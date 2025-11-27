@@ -781,3 +781,98 @@ select:focus {
         transform: rotate(360deg);
     }
 }
+
+/* ============================================
+   RIGHT METRICS DASHBOARD (Flexbox Compatible)
+   ============================================ */
+.right-dashboard {
+    width: 280px;
+    flex-shrink: 0;  /* CRÍTICO: No dejar que flexbox lo aplaste */
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    overflow-y: auto;
+}
+
+.dashboard-header {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    background: rgba(15, 20, 25, 0.6);
+    border-bottom: 1px solid var(--glass-border);
+    flex-shrink: 0;
+}
+
+.dashboard-header h3 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.dashboard-content {
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    flex: 1;
+}
+
+.metric-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    transition: all var(--transition-base);
+}
+
+.metric-card:hover {
+    background: var(--color-surface-hover);
+    border-color: var(--color-border-strong);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    font-feature-settings: 'tnum';
+    line-height: 1;
+}
+
+/* Status-specific colors */
+.metric-card-total .metric-value {
+    color: var(--color-text-primary);
+}
+
+.metric-card-released .metric-value {
+    color: var(--status-released);
+}
+
+.metric-card-assigned .metric-value {
+    color: var(--status-assigned);
+}
+
+.metric-card-in-progress .metric-value {
+    color: var(--status-in-progress);
+}
+
+.metric-card-staged .metric-value {
+    color: var(--status-staged);
+}
