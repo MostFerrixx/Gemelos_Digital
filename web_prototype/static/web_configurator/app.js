@@ -36,10 +36,82 @@ class WebConfigurator {
         document.getElementById('btn-default').addEventListener('click', () => configStorage.loadDefault());
         document.getElementById('btn-use').addEventListener('click', () => configStorage.useConfiguration());
 
+        // Import functionality
+        const fileInput = document.getElementById('file-import-input');
+        const importBtn = document.getElementById('btn-import');
+
+        if (importBtn && fileInput) {
+            importBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => this.handleFileImport(e));
+        }
+
         // Layout & Data buttons
         document.getElementById('btn-generate-template').addEventListener('click', () => this.generateTemplate());
         document.getElementById('btn-populate-skus').addEventListener('click', () => this.populateSKUs());
         document.getElementById('btn-load-work-areas').addEventListener('click', () => this.loadWorkAreas());
+    }
+
+    async handleFileImport(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        try {
+            this.showLoading('Leyendo archivo...');
+
+            const reader = new FileReader();
+
+            reader.onload = async (e) => {
+                try {
+                    const content = e.target.result;
+                    const config = JSON.parse(content);
+
+                    // Handle both direct config object and preset format (wrapped in 'configuration')
+                    const configToLoad = config.configuration || config;
+
+                    // If config has sequence_file, try to load work areas first
+                    if (configToLoad.sequence_file) {
+                        try {
+                            const response = await fetch(`/api/configurator/work-areas?sequence_file=${encodeURIComponent(configToLoad.sequence_file)}`);
+                            const result = await response.json();
+
+                            if (result.success) {
+                                this.workAreas = result.work_areas;
+                                this.fleetManager.setWorkAreas(this.workAreas);
+                                console.log('[IMPORT] Work areas loaded:', this.workAreas);
+                            }
+                        } catch (waError) {
+                            console.warn('[IMPORT] Could not load work areas:', waError);
+                            // Continue anyway - work areas might be set manually later
+                        }
+                    }
+
+                    // Now load the configuration to form
+                    this.loadConfigToForm(configToLoad);
+                    this.hideLoading();
+                    this.showNotification(`✓ Configuración importada desde ${file.name}`, 'success');
+
+                    // Reset input so same file can be selected again
+                    event.target.value = '';
+
+                } catch (parseError) {
+                    this.hideLoading();
+                    console.error('JSON Parse Error:', parseError);
+                    this.showNotification('Error: El archivo no es un JSON válido', 'error');
+                }
+            };
+
+            reader.onerror = () => {
+                this.hideLoading();
+                this.showNotification('Error al leer el archivo', 'error');
+            };
+
+            reader.readAsText(file);
+
+        } catch (error) {
+            this.hideLoading();
+            console.error('Import Error:', error);
+            this.showNotification('Error inesperado al importar', 'error');
+        }
     }
 
     setupTabNavigation() {
@@ -176,8 +248,18 @@ class WebConfigurator {
         document.getElementById('capacidad-carro').value = config.capacidad_carro || 150;
 
         // Tab 2: Estrategias
-        document.getElementById('dispatch-strategy').value = config.dispatch_strategy || 'Optimizacion Global';
-        document.getElementById('tour-type').value = config.tour_type || 'Tour Mixto (Multi-Destino)';
+        // Normalize strings to match HTML options (remove accents if present in JSON)
+        const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+
+        const strategy = config.dispatch_strategy || 'Optimizacion Global';
+        const tour = config.tour_type || 'Tour Mixto (Multi-Destino)';
+
+        // Try exact match first, then normalized match
+        const strategySelect = document.getElementById('dispatch-strategy');
+        const tourSelect = document.getElementById('tour-type');
+
+        this.setSelectValue(strategySelect, strategy, normalize);
+        this.setSelectValue(tourSelect, tour, normalize);
 
         // Tab 3: Flota de Agentes
         if (config.agent_types && config.agent_types.length > 0) {
@@ -332,6 +414,30 @@ class WebConfigurator {
             '- Cantidades aleatorias',
             'info'
         );
+    }
+
+    setSelectValue(selectElement, value, normalizeFn) {
+        if (!selectElement) return;
+
+        // Try exact match
+        for (let i = 0; i < selectElement.options.length; i++) {
+            if (selectElement.options[i].value === value) {
+                selectElement.value = value;
+                return;
+            }
+        }
+
+        // Try normalized match
+        const normalizedValue = normalizeFn(value);
+        for (let i = 0; i < selectElement.options.length; i++) {
+            if (normalizeFn(selectElement.options[i].value) === normalizedValue) {
+                selectElement.value = selectElement.options[i].value;
+                return;
+            }
+        }
+
+        // Fallback: log warning
+        console.warn(`[WEB_CONFIGURATOR] Could not match value '${value}' for select '${selectElement.id}'`);
     }
 
     // Utility methods

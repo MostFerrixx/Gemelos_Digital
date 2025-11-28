@@ -63,8 +63,12 @@
                         <span class="icon">↺</span> Default
                     </button>
                     <div class="divider"></div>
+                    <input type="file" id="file-import-input" accept=".json" style="display: none;">
+                    <button id="btn-import" class="btn-secondary" title="Importar desde archivo local">
+                        <span class="icon">📂</span> Importar
+                    </button>
                     <button id="btn-manage" class="btn-secondary">
-                        <span class="icon">📂</span> Gestionar
+                        <span class="icon">📋</span> Gestionar
                     </button>
                     <button id="btn-load" class="btn-secondary">
                         <span class="icon">📥</span> Cargar
@@ -156,7 +160,8 @@
                                 <label>Estrategia de Asignación</label>
                                 <select id="dispatch-strategy">
                                     <option value="Optimizacion Global">Optimización Global (Recomendado)</option>
-                                    <option value="Ejecucion de Plan">Ejecución de Plan (Filtro por Prioridad)</option>
+                                    <option value="Ejecucion de Plan">Ejecución de Plan (Filtro por Prioridad)
+                                    </option>
                                 </select>
                                 <span class="help-text">Define cómo se asignan las tareas a los agentes
                                     disponibles.</span>
@@ -202,7 +207,8 @@
                     <div class="fleet-section">
                         <div class="section-header">
                             <h3>Montacargas</h3>
-                            <button class="btn-small btn-add-group" data-agent-type="Forklift">+ Añadir Grupo</button>
+                            <button class="btn-small btn-add-group" data-agent-type="Forklift">+ Añadir
+                                Grupo</button>
                         </div>
                         <div id="forklifts-container" class="fleet-container">
                             <!-- Groups added dynamically -->
@@ -264,7 +270,8 @@
                             <span id="validation-staging" class="badge badge-success">✓ 100%</span>
                         </div>
                         <div class="card-body">
-                            <p class="description-text">Defina el porcentaje de órdenes que van a cada zona de salida.
+                            <p class="description-text">Defina el porcentaje de órdenes que van a cada zona de
+                                salida.
                             </p>
                             <div class="staging-grid">
                                 <div class="staging-item">
