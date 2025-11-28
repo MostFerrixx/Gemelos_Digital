@@ -49,16 +49,19 @@ class EventGenerator:
     - Dashboard en tiempo real
     """
     
-    def __init__(self, headless_mode=True):
+    def __init__(self, headless_mode=True, config_path=None, output_metrics_path=None):
         """
         Inicializa el generador de eventos
         
         Args:
             headless_mode: Siempre True (sin UI)
+            config_path: Path opcional a archivo config.json personalizado
+            output_metrics_path: Path opcional para exportar métricas de optimización
         """
+        self.output_metrics_path = output_metrics_path
         # Cargar configuracion
         try:
-            self.config_manager = ConfigurationManager()
+            self.config_manager = ConfigurationManager(config_path=config_path)
             self.config_manager.validate_configuration()
             self.configuracion = self.config_manager.configuration
             print("[EVENT-GENERATOR] Configuracion cargada exitosamente")
@@ -245,6 +248,13 @@ class EventGenerator:
             
             print(f"[EVENT-GENERATOR] Archivo generado: {output_file}")
             print(f"[EVENT-GENERATOR] Eventos capturados: {len(self.replay_buffer)}")
+            
+            # Exportar métricas de optimización si se solicitó
+            if self.output_metrics_path:
+                print("[EVENT-GENERATOR] Exportando métricas de optimización...")
+                self.export_optimization_metrics(self.output_metrics_path)
+                print(f"[EVENT-GENERATOR] Métricas exportadas: {self.output_metrics_path}")
+            
             print("="*60)
             print("GENERACION COMPLETADA")
             print(f"Archivos en: {self.session_output_dir}")
@@ -261,6 +271,58 @@ class EventGenerator:
             import traceback
             traceback.print_exc()
             return False
+    
+    def export_optimization_metrics(self, output_path: str):
+        """
+        Exporta métricas clave para optimización automática.
+        
+        Genera un archivo JSON con métricas esenciales que el optimizador
+        utilizará para calcular el score de la configuración actual.
+        
+        Args:
+            output_path: Path completo donde guardar el archivo JSON de métricas
+        """
+        import json
+        
+        # Obtener estadísticas del dispatcher
+        stats = self.almacen.dispatcher.obtener_estadisticas()
+        
+        # Calcular métricas derivadas
+        total_completed = stats['completados']
+        total_wo = stats['total']
+        total_failed = total_wo - total_completed
+        simulation_time = self.env.now
+        
+        # Calcular tiempo promedio de completación (si hay WOs completadas)
+        avg_completion_time = simulation_time / max(total_completed, 1)
+        
+        # Extraer configuración de recursos
+        ground_operators = self.configuracion.get('num_operarios_terrestres', 0)
+        forklifts = self.configuracion.get('num_montacargas', 0)
+        dispatch_strategy = self.configuracion.get('dispatch_strategy', 'unknown')
+        
+        # Construir objeto de métricas
+        metrics = {
+            "total_workorders_completed": total_completed,
+            "total_workorders_failed": total_failed,
+            "total_workorders": total_wo,
+            "avg_completion_time_seconds": avg_completion_time,
+            "total_simulation_time_seconds": simulation_time,
+            "resource_costs": {
+                "ground_operators": ground_operators,
+                "forklifts": forklifts
+            },
+            "dispatch_strategy": dispatch_strategy,
+            "timestamp": self.session_timestamp,
+            "session_output_dir": self.session_output_dir
+        }
+        
+        # Asegurar que el directorio existe
+        os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
+        
+        # Escribir JSON
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(metrics, f, indent=2, ensure_ascii=False)
 
 
 # Export

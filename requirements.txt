@@ -18,3 +18,7 @@ python-i18n>=0.3.6
 # Development dependencies (optional)
 pytest>=6.0.0
 PyQt6
+
+# Optimization framework (V11)
+optuna>=3.0.0
+optuna-dashboard>=0.9.0  # opcional, para visualizacion web de estudios

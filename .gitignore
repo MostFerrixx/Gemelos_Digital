@@ -585,3 +585,13 @@ dashboard_tprf_*.log
 *_tprf_validation*.log
 *_communication_test*.py
 phase3_integration_*.log
+
+# Archivos temporales de optimizacion automatica (Optuna V11)
+temp_configs/
+temp_metrics/
+optimized_configs/
+optuna_study.db
+optuna_study.db-shm
+optuna_study.db-wal
+optimization_*.log
+*_optimization_*.log
