@@ -6,11 +6,34 @@ from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import uvicorn
 import pytmx
 
 # Add project root to path to import existing modules if needed
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# Import configuration manager
+from web_prototype.config_manager import WebConfigurationManager
+
+# Initialize configuration manager
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+config_manager = WebConfigurationManager(PROJECT_ROOT)
+
+
+# --- PYDANTIC MODELS ---
+
+class ConfigData(BaseModel):
+    """Model for configuration data"""
+    config: Dict[str, Any]
+
+class SaveConfigurationRequest(BaseModel):
+    """Model for saving a configuration preset"""
+    name: str
+    description: str = ""
+    config: Dict[str, Any]
+    is_default: bool = False
+
 
 app = FastAPI()
 
@@ -184,6 +207,140 @@ class ReplayData:
 replay_data = ReplayData()
 
 # --- API ENDPOINTS ---
+
+# ========================================================================
+# CONFIGURATOR ENDPOINTS
+# ========================================================================
+
+@app.get("/api/configurator/config")
+def get_config():
+    """Load current config.json"""
+    try:
+        config = config_manager.load_config()
+        return {"success": True, "config": config}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/configurator/config")
+def save_config(data: ConfigData):
+    """Save/update config.json"""
+    try:
+        success, errors = config_manager.save_config(data.config)
+        
+        if success:
+            return {"success": True, "message": "Configuration saved successfully"}
+        else:
+            return {"success": False, "errors": errors}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/configurator/work-areas")
+def get_work_areas(sequence_file: str):
+    """Extract work areas from sequence file"""
+    try:
+        work_areas = config_manager.extract_work_areas(sequence_file)
+        return {"success": True, "work_areas": work_areas}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/configurator/configurations")
+def list_configurations():
+    """List all saved configuration presets"""
+    try:
+        configs = config_manager.list_configurations()
+        return {"success": True, "configurations": configs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/configurator/configurations")
+def save_configuration(request: SaveConfigurationRequest):
+    """Save a new configuration preset"""
+    try:
+        success, config_id, errors = config_manager.save_configuration(
+            request.name,
+            request.description,
+            request.config,
+            request.is_default
+        )
+        
+        if success:
+            return {
+                "success": True,
+                "config_id": config_id,
+                "message": f"Configuration '{request.name}' saved successfully"
+            }
+        else:
+            return {"success": False, "errors": errors}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/configurator/configurations/{config_id}")
+def get_configuration(config_id: str):
+    """Load a specific configuration preset"""
+    try:
+        config = config_manager.load_configuration(config_id)
+        
+        if config is None:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+        
+        return {"success": True, "config": config}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/configurator/configurations/{config_id}")
+def delete_configuration(config_id: str):
+    """Delete a configuration preset"""
+    try:
+        success, errors = config_manager.delete_configuration(config_id)
+        
+        if success:
+            return {"success": True, "message": "Configuration deleted successfully"}
+        else:
+            return {"success": False, "errors": errors}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/configurator/configurations/{config_id}/set-default")
+def set_default_configuration(config_id: str):
+    """Set a configuration as the default"""
+    try:
+        success, errors = config_manager.set_default_configuration(config_id)
+        
+        if success:
+            return {"success": True, "message": "Default configuration set successfully"}
+        else:
+            return {"success": False, "errors": errors}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/configurator/default")
+def get_default_configuration():
+    """Get the default configuration"""
+    try:
+        config = config_manager.get_default_configuration()
+        
+        if config is None:
+            # Return hardcoded default if no default is set
+            config = config_manager._get_default_config()
+        
+        return {"success": True, "config": config}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ========================================================================
+# SIMULATION/REPLAY ENDPOINTS
+# ========================================================================
 
 @app.get("/api/layout")
 def get_layout():

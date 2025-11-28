@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración | Gemelo Digital</title>
+    <!-- Corrected paths: relative to this file -->
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-icon">⚙️</div>
+                <h1>Configuración</h1>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-tab="carga">
+                    <span class="nav-icon">📦</span>
+                    <span class="nav-text">Carga de Trabajo</span>
+                </button>
+                <button class="nav-item" data-tab="estrategias">
+                    <span class="nav-icon">🎯</span>
+                    <span class="nav-text">Estrategias</span>
+                </button>
+                <button class="nav-item" data-tab="flota">
+                    <span class="nav-icon">🚜</span>
+                    <span class="nav-text">Flota de Agentes</span>
+                </button>
+                <button class="nav-item" data-tab="layout-datos">
+                    <span class="nav-icon">🗺️</span>
+                    <span class="nav-text">Layout y Datos</span>
+                </button>
+                <button class="nav-item" data-tab="staging">
+                    <span class="nav-icon">🚛</span>
+                    <span class="nav-text">Outbound Staging</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="theme-toggle" class="theme-toggle" title="Cambiar Tema">
+                    🌙
+                </button>
+                <div class="version-info">v1.0.0</div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Toolbar -->
+            <header class="top-bar">
+                <div class="top-bar-title">
+                    <h2 id="current-tab-title">Carga de Trabajo</h2>
+                    <p id="current-tab-subtitle">Configure el volumen y distribución de órdenes</p>
+                </div>
+                <div class="config-actions">
+                    <button id="btn-default" class="btn-text" title="Restaurar valores por defecto">
+                        <span class="icon">↺</span> Default
+                    </button>
+                    <div class="divider"></div>
+                    <button id="btn-manage" class="btn-secondary">
+                        <span class="icon">📂</span> Gestionar
+                    </button>
+                    <button id="btn-load" class="btn-secondary">
+                        <span class="icon">📥</span> Cargar
+                    </button>
+                    <button id="btn-save" class="btn-secondary">
+                        <span class="icon">💾</span> Guardar
+                    </button>
+                    <button id="btn-use" class="btn-primary">
+                        <span class="icon">🚀</span> Aplicar Configuración
+                    </button>
+                </div>
+            </header>
+
+            <!-- Scrollable Content -->
+            <div class="content-scroll-area">
+
+                <!-- Tab 1: Carga de Trabajo -->
+                <div id="tab-carga" class="tab-content active">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Volumen General</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>Total de Órdenes</label>
+                                <input type="number" id="total-ordenes" value="300" min="1">
+                                <span class="help-text">Número total de órdenes a simular</span>
+                            </div>
+                            <div class="form-group">
+                                <label>Capacidad del Carro (L)</label>
+                                <input type="number" id="capacidad-carro" value="150" min="1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Distribución de Tipos</h3>
+                            <span id="validation-percentages" class="badge badge-success">✓ 100%</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="distribution-grid">
+                                <div class="dist-item">
+                                    <h4>Pequeño</h4>
+                                    <div class="form-group">
+                                        <label>% Distribución</label>
+                                        <input type="number" id="pct-pequeno" value="60" class="pct-input">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Volumen (L)</label>
+                                        <input type="number" id="vol-pequeno" value="5">
+                                    </div>
+                                </div>
+                                <div class="dist-item">
+                                    <h4>Mediano</h4>
+                                    <div class="form-group">
+                                        <label>% Distribución</label>
+                                        <input type="number" id="pct-mediano" value="30" class="pct-input">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Volumen (L)</label>
+                                        <input type="number" id="vol-mediano" value="25">
+                                    </div>
+                                </div>
+                                <div class="dist-item">
+                                    <h4>Grande</h4>
+                                    <div class="form-group">
+                                        <label>% Distribución</label>
+                                        <input type="number" id="pct-grande" value="10" class="pct-input">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Volumen (L)</label>
+                                        <input type="number" id="vol-grande" value="80">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Estrategias -->
+                <div id="tab-estrategias" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Lógica de Despacho</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>Estrategia de Asignación</label>
+                                <select id="dispatch-strategy">
+                                    <option value="Optimizacion Global">Optimización Global (Recomendado)</option>
+                                    <option value="Ejecucion de Plan">Ejecución de Plan (Filtro por Prioridad)</option>
+                                </select>
+                                <span class="help-text">Define cómo se asignan las tareas a los agentes
+                                    disponibles.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Configuración de Tours</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>Tipo de Tour</label>
+                                <select id="tour-type">
+                                    <option value="Tour Mixto (Multi-Destino)">Tour Mixto (Multi-Destino)</option>
+                                    <option value="Tour Simple (Un Destino)">Tour Simple (Un Destino)</option>
+                                </select>
+                                <span class="help-text">Multi-Destino permite recoger múltiples productos en un solo
+                                    viaje.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Flota de Agentes -->
+                <div id="tab-flota" class="tab-content">
+                    <div class="fleet-actions-bar">
+                        <button id="btn-generate-default-fleet" class="btn-text">Generar Flota por Defecto</button>
+                    </div>
+
+                    <div class="fleet-section">
+                        <div class="section-header">
+                            <h3>Operarios Terrestres</h3>
+                            <button class="btn-small btn-add-group" data-agent-type="GroundOperator">+ Añadir
+                                Grupo</button>
+                        </div>
+                        <div id="ground-operators-container" class="fleet-container">
+                            <!-- Groups added dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="fleet-section">
+                        <div class="section-header">
+                            <h3>Montacargas</h3>
+                            <button class="btn-small btn-add-group" data-agent-type="Forklift">+ Añadir Grupo</button>
+                        </div>
+                        <div id="forklifts-container" class="fleet-container">
+                            <!-- Groups added dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 4: Layout y Datos -->
+                <div id="tab-layout-datos" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Archivos de Configuración</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>Archivo Layout (.tmx)</label>
+                                <div class="input-group">
+                                    <input type="text" id="layout-file" value="layouts/WH1.tmx">
+                                    <button class="btn-secondary" id="btn-browse-tmx">Examinar</button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Archivo de Secuencia (.xlsx)</label>
+                                <div class="input-group">
+                                    <input type="text" id="sequence-file" value="layouts/Warehouse_Logic.xlsx">
+                                    <button class="btn-secondary" id="btn-browse-seq">Examinar</button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Escala del Mapa</label>
+                                <input type="number" id="map-scale" value="1.3" step="0.1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Acciones de Datos</h3>
+                        </div>
+                        <div class="card-body actions-grid">
+                            <button id="btn-generate-template" class="btn-action">
+                                <span class="icon">📄</span> Generar Plantilla TMX
+                            </button>
+                            <button id="btn-populate-skus" class="btn-action">
+                                <span class="icon">🔢</span> Poblar SKUs Aleatorios
+                            </button>
+                            <button id="btn-load-work-areas" class="btn-action">
+                                <span class="icon">🏗️</span> Cargar Work Areas
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 5: Outbound Staging -->
+                <div id="tab-staging" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Distribución por Zonas</h3>
+                            <span id="validation-staging" class="badge badge-success">✓ 100%</span>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Defina el porcentaje de órdenes que van a cada zona de salida.
+                            </p>
+                            <div class="staging-grid">
+                                <div class="staging-item">
+                                    <label>Staging 1</label>
+                                    <input type="number" id="staging-1" class="staging-input" value="100">
+                                </div>
+                                <div class="staging-item">
+                                    <label>Staging 2</label>
+                                    <input type="number" id="staging-2" class="staging-input" value="0">
+                                </div>
+                                <div class="staging-item">
+                                    <label>Staging 3</label>
+                                    <input type="number" id="staging-3" class="staging-input" value="0">
+                                </div>
+                                <div class="staging-item">
+                                    <label>Staging 4</label>
+                                    <input type="number" id="staging-4" class="staging-input" value="0">
+                                </div>
+                                <div class="staging-item">
+                                    <label>Staging 5</label>
+                                    <input type="number" id="staging-5" class="staging-input" value="0">
+                                </div>
+                                <div class="staging-item">
+                                    <label>Staging 6</label>
+                                    <input type="number" id="staging-6" class="staging-input" value="0">
+                                </div>
+                                <div class="staging-item">
+                                    <label>Staging 7</label>
+                                    <input type="number" id="staging-7" class="staging-input" value="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-save" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Guardar Configuración</h3>
+                <button class="modal-close">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="config-name" placeholder="Ej: Configuración Alta Demanda">
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea id="config-description" placeholder="Descripción opcional..."></textarea>
+                </div>
+                <div class="form-checkbox">
+                    <input type="checkbox" id="config-is-default">
+                    <label for="config-is-default">Establecer como predeterminada</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-text modal-close">Cancelar</button>
+                <button id="btn-save-config-confirm" class="btn-primary">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-load" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Cargar Configuración</h3>
+                <button class="modal-close">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="configs-list" class="configs-list">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-manage" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Gestionar Configuraciones</h3>
+                <button class="modal-close">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="manage-configs-list" class="configs-list">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <div id="loading-message">Cargando...</div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notification-toast" class="notification-toast hidden">
+        <span id="notification-message">Mensaje</span>
+    </div>
+
+    <!-- Scripts with CORRECTED PATHS -->
+    <script src="theme-manager.js"></script>
+    <script src="fleet-manager.js"></script>
+    <script src="config-storage.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
