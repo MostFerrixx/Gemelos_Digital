@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gemelo Digital | Web Viewer</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="dashboard-agentes.css">
 </head>
 
 <body>
@@ -44,31 +45,71 @@
                 </div>
             </div>
 
-            <!-- Right Metrics Dashboard (NEW - fixed width, no shrink) -->
+            <!-- Right Metrics Dashboard (Dashboard de Agentes) -->
             <aside id="right-dashboard" class="right-dashboard">
+                <!-- Header -->
                 <div class="dashboard-header">
-                    <h3>Metrics</h3>
+                    <h2 class="dashboard-title">Dashboard de Agentes</h2>
+                    <p class="dashboard-subtitle">Sistema de Monitoreo en Tiempo Real</p>
                 </div>
-                <div class="dashboard-content">
-                    <div class="metric-card metric-card-total">
-                        <span class="metric-label">TOTAL</span>
-                        <span class="metric-value" id="metric-total-lg">0</span>
+
+                <!-- Ticker Row (KPIs Rápidos) -->
+                <div class="ticker-row">
+                    <div class="ticker-item">
+                        <span class="ticker-label">Tiempo</span>
+                        <span class="ticker-value" id="ticker-tiempo">00:00:00</span>
                     </div>
-                    <div class="metric-card metric-card-released">
-                        <span class="metric-label">RELEASED</span>
-                        <span class="metric-value" id="metric-released-lg">0</span>
+                    <div class="ticker-item">
+                        <span class="ticker-label">WIP</span>
+                        <span class="ticker-value" id="ticker-wip">0/0</span>
                     </div>
-                    <div class="metric-card metric-card-assigned">
-                        <span class="metric-label">ASSIGNED</span>
-                        <span class="metric-value" id="metric-assigned-lg">0</span>
+                    <div class="ticker-item">
+                        <span class="ticker-label">Util</span>
+                        <span class="ticker-value" id="ticker-util">-</span>
                     </div>
-                    <div class="metric-card metric-card-in-progress">
-                        <span class="metric-label">IN PROGRESS</span>
-                        <span class="metric-value" id="metric-in-progress-lg">0</span>
+                    <div class="ticker-item">
+                        <span class="ticker-label">T/put</span>
+                        <span class="ticker-value" id="ticker-throughput">-</span>
                     </div>
-                    <div class="metric-card metric-card-staged">
-                        <span class="metric-label">STAGED</span>
-                        <span class="metric-value" id="metric-staged-lg">0</span>
+                </div>
+
+                <!-- Metrics Cards (2x2 Grid) -->
+                <div class="metrics-grid">
+                    <div class="metric-card" data-color="blue">
+                        <div class="card-icon">T</div>
+                        <div class="card-content">
+                            <span class="card-label">Tiempo</span>
+                            <span class="card-value" id="card-tiempo">00:00:00</span>
+                        </div>
+                    </div>
+                    <div class="metric-card" data-color="green">
+                        <div class="card-icon">W</div>
+                        <div class="card-content">
+                            <span class="card-label">WorkOrders</span>
+                            <span class="card-value" id="card-workorders">0 / 0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card" data-color="orange">
+                        <div class="card-icon">U</div>
+                        <div class="card-content">
+                            <span class="card-label">Tareas</span>
+                            <span class="card-value" id="card-tareas">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card" data-color="teal">
+                        <div class="card-icon">P</div>
+                        <div class="card-content">
+                            <span class="card-label">Progreso</span>
+                            <span class="card-value" id="card-progreso">0.0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Operarios Activos (Lista Scrollable) -->
+                <div class="operators-section">
+                    <h3 class="section-header">Operarios Activos</h3>
+                    <div class="operators-list" id="operators-list">
+                        <!-- Populated dynamically by MetricsModule -->
                     </div>
                 </div>
             </aside>

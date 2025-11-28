@@ -312,15 +312,60 @@ def get_snapshot(t: float):
     # Count by agent type
     ground_operators = sum(1 for agent in agents.values() if 'Ground' in agent.get('type', ''))
     forklifts = sum(1 for agent in agents.values() if 'Forklift' in agent.get('type', ''))
+    
+    # === NEW: Dashboard de Agentes Metrics ===
+    # Calculate utilizacion_promedio (% of agents not idle)
+    operarios_working = sum(1 for agent in agents.values() if agent.get('status') in ['working', 'picking', 'lifting', 'unloading'])
+    operarios_traveling = sum(1 for agent in agents.values() if agent.get('status') in ['moving', 'traveling'])
+    operarios_idle = sum(1 for agent in agents.values() if agent.get('status') in ['idle', 'Esperando tour'])
+    
+    if agent_total > 0:
+        utilizacion_promedio = ((operarios_working + operarios_traveling) / agent_total) * 100.0
+    else:
+        utilizacion_promedio = 0.0
+    
+    # Calculate WIP (Work In Progress = total - completed)
+    wip = max(wo_total - wo_completed, 0)
+    
+    # Calculate tareas_completadas (tasks completed = wo_completed * 3)
+    # Each WorkOrder has 3 tasks in the desktop version
+    tareas_completadas = wo_completed * 3
+    
+    # Add cargo_volume to each agent for load bar visualization
+    # Note: This would normally come from the event data, but we'll set a placeholder
+    for agent_id, agent_data in agents.items():
+        # If cargo_volume not already in agent data, initialize it
+        if 'cargo_volume' not in agent_data:
+            agent_data['cargo_volume'] = 0
+        # capacidad would also come from agent config, set default
+        if 'capacidad' not in agent_data:
+            # Default capacity: GroundOperator = 100, Forklift = 200
+            agent_type = agent_data.get('type', '')
+            agent_data['capacidad'] = 200 if 'Forklift' in agent_type else 100
 
     # Return unified response with both state and metrics
     return {
         "timestamp": t,
         "max_time": replay_data.max_time,
         "state": {
-            "agents": current_state['agents'],
+            "agents": agents,  # Now includes cargo_volume and capacidad
             "work_orders": current_state['work_orders']
         },
+        "metricas": {
+            # Core metrics (matching desktop estado_visual["metricas"])
+            "tiempo": t,
+            "workorders_completadas": wo_completed,
+            "total_wos": wo_total,
+            "tareas_completadas": tareas_completadas,
+            "operarios_idle": operarios_idle,
+            "operarios_working": operarios_working,
+            "operarios_traveling": operarios_traveling,
+            "utilizacion_promedio": round(utilizacion_promedio, 1),
+            "wip": wip,
+            # Throughput (WOs per minute) - CRITICAL: Division by zero protection
+            "throughput_min": round(throughput, 2) if t > 0 else 0.0,
+        },
+        # Legacy metrics structure (keep for backward compatibility)
         "metrics": {
             "simulation_time": t,
             "work_orders": {
@@ -345,6 +390,7 @@ def get_snapshot(t: float):
             }
         }
     }
+
 
 @app.get("/api/state")
 def get_state(t: float):
