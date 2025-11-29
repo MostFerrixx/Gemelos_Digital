@@ -9,6 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 import pytmx
+import shutil
+from pathlib import Path
+from fastapi import FastAPI, HTTPException, UploadFile, File
 
 # Add project root to path to import existing modules if needed
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -203,6 +206,28 @@ class ReplayData:
             print(f"Error loading replay data: {e}")
             import traceback
             traceback.print_exc()
+
+    def reload_data(self, new_file_path: str):
+        """
+        Reload replay data from a new JSONL file.
+        Clears existing events and snapshots, then loads new data.
+        """
+        print(f"Reloading data from {new_file_path}...")
+        
+        # Clear existing data
+        self.events = []
+        self.snapshots = {}
+        self.max_time = 0
+        
+        # Update file path
+        global REPLAY_FILE
+        REPLAY_FILE = new_file_path
+        
+        # Load new data
+        self.load_data()
+        self.precompute_snapshots()
+        
+        print(f"Reload complete. Loaded {len(self.events)} events, max time: {self.max_time}")
 
 replay_data = ReplayData()
 
@@ -685,6 +710,72 @@ def get_metrics(t: float):
     }
 
 
+
+
+# ========================================================================
+# UPLOAD & CLEANUP
+# ========================================================================
+
+@app.on_event("startup")
+async def startup_event():
+    """Clean up uploads directory on startup"""
+    uploads_dir = os.path.join(PROJECT_ROOT, "uploads")
+    if os.path.exists(uploads_dir):
+        print(f"Cleaning up uploads directory: {uploads_dir}")
+        try:
+            shutil.rmtree(uploads_dir)
+            os.makedirs(uploads_dir, exist_ok=True)
+            print("Uploads directory cleaned.")
+        except Exception as e:
+            print(f"Error cleaning uploads directory: {e}")
+
+@app.post("/api/upload_replay")
+async def upload_replay_file(file: UploadFile = File(...)):
+    """
+    Upload a new JSONL replay file and reload the simulation.
+    
+    Returns:
+        - success: bool
+        - message: str
+        - max_time: float (if successful)
+    """
+    try:
+        # Validate file extension
+        if not file.filename.endswith('.jsonl'):
+            raise HTTPException(
+                status_code=400, 
+                detail="Solo se permiten archivos .jsonl"
+            )
+        
+        # Create uploads directory if it doesn't exist
+        uploads_dir = os.path.join(PROJECT_ROOT, "uploads")
+        os.makedirs(uploads_dir, exist_ok=True)
+        
+        # Save file to uploads directory
+        file_path = os.path.join(uploads_dir, f"uploaded_{file.filename}")
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        print(f"File saved to: {file_path}")
+        
+        # Reload replay data with new file
+        replay_data.reload_data(file_path)
+        
+        return {
+            "success": True,
+            "message": f"Archivo '{file.filename}' cargado exitosamente",
+            "max_time": replay_data.max_time,
+            "event_count": len(replay_data.events)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error uploading file: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Serve static files (Frontend)

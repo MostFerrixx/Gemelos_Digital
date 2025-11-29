@@ -1108,6 +1108,111 @@ const MetricsModule = {
 };
 
 // ============================================
+//  IMPORT MODULE (JSONL File Upload)
+// ============================================
+const ImportModule = {
+    fileInput: null,
+    importBtn: null,
+
+    init() {
+        console.log('[ImportModule] Initializing...');
+
+        this.importBtn = document.getElementById('importJsonlBtn');
+        this.fileInput = document.getElementById('jsonlFileInput');
+
+        if (!this.importBtn || !this.fileInput) {
+            console.error('[ImportModule] Import button or file input not found!');
+            return;
+        }
+
+        // Click import button -> trigger file input
+        this.importBtn.addEventListener('click', () => {
+            this.fileInput.click();
+        });
+
+        // File selected -> upload
+        this.fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                this.uploadFile(file);
+            }
+        });
+
+        console.log('[ImportModule] Ready');
+    },
+
+    async uploadFile(file) {
+        // Validate file extension
+        if (!file.name.endsWith('.jsonl')) {
+            alert('Error: Solo se permiten archivos .jsonl');
+            return;
+        }
+
+        // Set loading state
+        this.setButtonState('loading');
+
+        try {
+            // Create FormData and append file
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Upload to server
+            const response = await fetch('/api/upload_replay', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || 'Error al cargar el archivo');
+            }
+
+            // Success! Flash green and reload
+            this.setButtonState('success');
+
+            console.log('[ImportModule] Upload successful, reloading page...');
+
+            // Reload page after brief delay to show success state
+            setTimeout(() => {
+                window.location.reload();
+            }, 800);
+
+        } catch (error) {
+            console.error('[ImportModule] Upload error:', error);
+            alert(`Error al importar archivo: ${error.message}`);
+            this.setButtonState('error');
+
+            // Reset to normal state after showing error
+            setTimeout(() => {
+                this.setButtonState('normal');
+            }, 2000);
+        }
+
+        // Reset file input
+        this.fileInput.value = '';
+    },
+
+    setButtonState(state) {
+        this.importBtn.classList.remove('loading', 'success', 'error');
+
+        if (state === 'loading') {
+            this.importBtn.classList.add('loading');
+            this.importBtn.querySelector('.icon').textContent = '⏳';
+        } else if (state === 'success') {
+            this.importBtn.classList.add('success');
+            this.importBtn.querySelector('.icon').textContent = '✓';
+        } else if (state === 'error') {
+            this.importBtn.classList.add('error');
+            this.importBtn.querySelector('.icon').textContent = '✗';
+        } else {
+            // normal state
+            this.importBtn.querySelector('.icon').textContent = '📁';
+        }
+    }
+};
+
+// ============================================
 //  INITIALIZATION
 // ============================================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1123,6 +1228,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ResizeModule.init();
     PanelModule.init();
     MetricsModule.init();
+    ImportModule.init();
 
     // Load layout
     try {
