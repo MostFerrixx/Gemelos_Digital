@@ -1213,6 +1213,66 @@ const ImportModule = {
 };
 
 // ============================================
+//  AUTOLOAD MODULE (Load Replay from URL)
+// ============================================
+const AutoloadModule = {
+    init() {
+        console.log('[AutoloadModule] Initializing...');
+        const urlParams = new URLSearchParams(window.location.search);
+        const autoloadPath = urlParams.get('autoload');
+
+        if (autoloadPath) {
+            console.log(`[AutoloadModule] Found autoload param: ${autoloadPath}`);
+            this.loadReplay(autoloadPath);
+        }
+    },
+
+    async loadReplay(path) {
+        // Show loading state
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingMessage = document.getElementById('loading-message');
+
+        if (loadingOverlay) {
+            loadingOverlay.classList.remove('hidden');
+            if (loadingMessage) loadingMessage.textContent = 'Loading Simulation...';
+        }
+
+        try {
+            // 1. Validate file exists
+            const validateResp = await fetch(`/api/validate-replay?file=${encodeURIComponent(path)}`);
+            if (!validateResp.ok) {
+                throw new Error('Replay file not found or invalid');
+            }
+
+            // 2. Load replay
+            const loadResp = await fetch(`/api/load_replay?file=${encodeURIComponent(path)}`, {
+                method: 'POST'
+            });
+            const result = await loadResp.json();
+
+            if (!loadResp.ok || !result.success) {
+                throw new Error(result.message || 'Failed to load replay');
+            }
+
+            console.log('[AutoloadModule] Replay loaded successfully');
+
+            // 3. Clean URL
+            const url = new URL(window.location);
+            url.searchParams.delete('autoload');
+            window.history.replaceState({}, '', url);
+
+            // 4. Reload page to refresh state
+            window.location.reload();
+
+        } catch (error) {
+            console.error('[AutoloadModule] Error:', error);
+            alert(`Error loading simulation: ${error.message}`);
+            if (loadingOverlay) loadingOverlay.classList.add('hidden');
+        }
+    }
+};
+
+// ============================================
 //  INITIALIZATION
 // ============================================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1229,6 +1289,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     PanelModule.init();
     MetricsModule.init();
     ImportModule.init();
+    AutoloadModule.init();
 
     // Load layout
     try {

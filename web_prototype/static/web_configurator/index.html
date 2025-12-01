@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configuración | Gemelo Digital</title>
-    <!-- Corrected paths: relative to this file -->
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -75,6 +74,10 @@
                     </button>
                     <button id="btn-save" class="btn-secondary">
                         <span class="icon">💾</span> Guardar
+                    </button>
+
+                    <button id="btn-run-simulation" class="btn-highlight">
+                        <span class="icon">▶</span> Run Simulation
                     </button>
                     <button id="btn-use" class="btn-primary">
                         <span class="icon">🚀</span> Aplicar Configuración
@@ -160,8 +163,7 @@
                                 <label>Estrategia de Asignación</label>
                                 <select id="dispatch-strategy">
                                     <option value="Optimizacion Global">Optimización Global (Recomendado)</option>
-                                    <option value="Ejecucion de Plan">Ejecución de Plan (Filtro por Prioridad)
-                                    </option>
+                                    <option value="Ejecucion de Plan">Ejecución de Plan (Filtro por Prioridad)</option>
                                 </select>
                                 <span class="help-text">Define cómo se asignan las tareas a los agentes
                                     disponibles.</span>
@@ -207,8 +209,7 @@
                     <div class="fleet-section">
                         <div class="section-header">
                             <h3>Montacargas</h3>
-                            <button class="btn-small btn-add-group" data-agent-type="Forklift">+ Añadir
-                                Grupo</button>
+                            <button class="btn-small btn-add-group" data-agent-type="Forklift">+ Añadir Grupo</button>
                         </div>
                         <div id="forklifts-container" class="fleet-container">
                             <!-- Groups added dynamically -->
@@ -270,8 +271,7 @@
                             <span id="validation-staging" class="badge badge-success">✓ 100%</span>
                         </div>
                         <div class="card-body">
-                            <p class="description-text">Defina el porcentaje de órdenes que van a cada zona de
-                                salida.
+                            <p class="description-text">Defina el porcentaje de órdenes que van a cada zona de salida.
                             </p>
                             <div class="staging-grid">
                                 <div class="staging-item">
@@ -378,11 +378,229 @@
         <span id="notification-message">Mensaje</span>
     </div>
 
-    <!-- Scripts with CORRECTED PATHS -->
+    <!-- Scripts -->
     <script src="theme-manager.js"></script>
     <script src="fleet-manager.js"></script>
     <script src="config-storage.js"></script>
     <script src="app.js"></script>
+
+    <!-- Simulation Runner Modal -->
+    <div id="sim-runner-modal-v2" class="modal hidden">
+        <div class="modal-overlay" id="modal-overlay-sim"></div>
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h2>🚀 Simulation Runner</h2>
+                <button class="modal-close" id="sim-modal-close">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="simulation-terminal" id="sim-terminal"></div>
+                <div class="simulation-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="sim-progress"></div>
+                    </div>
+                    <span id="sim-status">Initializing...</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-watch-replay" class="btn-primary hidden">
+                    👁️ Watch Replay
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Simulation Runner Modal Manager
+         * Handles WebSocket communication and UI for the live simulation runner.
+         */
+        class SimulationRunnerModal {
+            constructor() {
+                this.ws = null;
+                this.isRunning = false;
+                this.replayFile = null;
+
+                // DOM Elements
+                this.modal = document.getElementById('sim-runner-modal-v2');
+                this.terminal = document.getElementById('sim-terminal');
+                this.statusText = document.getElementById('sim-status');
+                this.progressBar = document.getElementById('sim-progress');
+                this.btnWatch = document.getElementById('btn-watch-replay');
+                this.btnClose = document.getElementById('sim-modal-close');
+
+                // Bind events
+                if (this.btnClose) this.btnClose.addEventListener('click', () => this.close());
+                if (this.btnWatch) this.btnWatch.addEventListener('click', () => this.watchReplay());
+
+                // Bind global trigger
+                const btnRun = document.getElementById('btn-run-simulation');
+                if (btnRun) {
+                    btnRun.addEventListener('click', () => this.open());
+                    console.log('SimulationRunner: Button bound successfully');
+                } else {
+                    console.error('SimulationRunner: Button not found');
+                }
+            }
+
+            open() {
+                console.log('SimulationRunner: Opening modal...');
+                this.modal.classList.remove('hidden');
+                this.resetUI();
+                this.connectWebSocket();
+            }
+
+            close() {
+                if (this.isRunning) {
+                    if (!confirm('Simulation is still running. Are you sure you want to cancel?')) {
+                        return;
+                    }
+                }
+
+                this.disconnectWebSocket();
+                this.modal.classList.add('hidden');
+            }
+
+            resetUI() {
+                this.terminal.innerHTML = '';
+                this.statusText.textContent = 'Initializing...';
+                this.progressBar.style.width = '0%';
+                this.progressBar.classList.remove('error', 'success');
+                this.btnWatch.classList.add('hidden');
+                this.replayFile = null;
+                this.isRunning = false;
+            }
+
+            connectWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const host = window.location.host;
+                const wsUrl = `${protocol}//${host}/ws/simulation-runner`;
+
+                this.appendLog(`Connecting to ${wsUrl}...`, 'info');
+
+                try {
+                    this.ws = new WebSocket(wsUrl);
+
+                    this.ws.onopen = () => {
+                        this.appendLog('Connected to server.', 'success');
+                        this.startSimulation();
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            this.handleMessage(data);
+                        } catch (e) {
+                            console.error('Error parsing WS message:', e);
+                        }
+                    };
+
+                    this.ws.onclose = () => {
+                        if (this.isRunning) {
+                            this.appendLog('Connection closed unexpectedly.', 'error');
+                            this.setStatus('Connection lost', 'error');
+                            this.isRunning = false;
+                        }
+                    };
+
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        this.appendLog('WebSocket connection error.', 'error');
+                        this.setStatus('Connection Error', 'error');
+                    };
+
+                } catch (e) {
+                    this.appendLog(`Connection failed: ${e.message}`, 'error');
+                }
+            }
+
+            disconnectWebSocket() {
+                if (this.ws) {
+                    this.ws.close();
+                    this.ws = null;
+                }
+            }
+
+            startSimulation() {
+                if (!this.ws) return;
+
+                this.isRunning = true;
+                this.ws.send(JSON.stringify({ command: 'START' }));
+                this.setStatus('Running...', 'active');
+                this.progressBar.style.width = '10%';
+            }
+
+            handleMessage(data) {
+                console.log('Received message:', data);
+                switch (data.type) {
+                    case 'log':
+                        this.appendLog(data.content, data.level || 'info');
+                        break;
+
+                    case 'status':
+                        this.setStatus(data.message, 'active');
+                        if (data.status === 'running') {
+                            this.progressBar.style.width = '30%';
+                        }
+                        break;
+
+                    case 'error':
+                        this.appendLog(data.message, 'error');
+                        this.setStatus('Failed', 'error');
+                        this.isRunning = false;
+                        this.progressBar.classList.add('error');
+                        break;
+
+                    case 'complete':
+                        this.appendLog(data.message, 'success');
+                        this.setStatus('Completed', 'success');
+                        this.isRunning = false;
+                        this.progressBar.style.width = '100%';
+                        this.progressBar.classList.add('success');
+
+                        if (data.file) {
+                            this.replayFile = data.file;
+                            this.btnWatch.classList.remove('hidden');
+                            this.appendLog(`Replay file generated: ${data.file}`, 'success');
+                        }
+                        break;
+                }
+            }
+
+            appendLog(message, level = 'info') {
+                const line = document.createElement('div');
+                line.className = `log-line ${level}`;
+                line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                this.terminal.appendChild(line);
+
+                // Auto-scroll
+                this.terminal.scrollTop = this.terminal.scrollHeight;
+            }
+
+            setStatus(text, type) {
+                this.statusText.textContent = text;
+                this.statusText.className = type;
+            }
+
+            watchReplay() {
+                if (!this.replayFile) return;
+
+                const baseUrl = window.location.origin;
+                window.location.href = `${baseUrl}/?autoload=${encodeURIComponent(this.replayFile)}`;
+            }
+        }
+
+        // Initialize when DOM is ready
+        window.addEventListener('load', () => {
+            console.log('SimulationRunner: Window loaded, initializing...');
+            if (document.getElementById('sim-runner-modal-v2')) {
+                window.simulationRunner = new SimulationRunnerModal();
+                console.log('SimulationRunner: Initialized successfully');
+            } else {
+                console.warn('Simulation runner modal elements not found');
+                console.log('Available IDs:', Array.from(document.querySelectorAll('[id]')).map(el => el.id));
+            }
+        });
+    </script>
 </body>
 
 </html>

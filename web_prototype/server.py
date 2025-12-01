@@ -11,13 +11,14 @@ import uvicorn
 import pytmx
 import shutil
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect
 
 # Add project root to path to import existing modules if needed
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import configuration manager
 from web_prototype.config_manager import WebConfigurationManager
+from web_prototype.simulation_runner import SimulationRunner
 
 # Initialize configuration manager
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -775,6 +776,116 @@ async def upload_replay_file(file: UploadFile = File(...)):
         print(f"Error uploading file: {e}")
         import traceback
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# ========================================================================
+# SIMULATION RUNNER ENDPOINTS
+# ========================================================================
+
+@app.websocket("/ws/simulation-runner")
+async def websocket_simulation_runner(websocket: WebSocket):
+    await websocket.accept()
+    runner = SimulationRunner()
+    
+    try:
+        # Check if simulation is already running
+        if runner.is_running():
+            await websocket.send_json({
+                "type": "error",
+                "message": "System busy: A simulation is already running"
+            })
+            return
+        
+        # Wait for START command
+        data = await websocket.receive_json()
+        if data.get("command") != "START":
+            await websocket.send_json({
+                "type": "error", 
+                "message": "Invalid command. Expected START."
+            })
+            return
+        
+        # Run simulation and stream events
+        async for event in runner.run_simulation_async():
+            await websocket.send_json(event)
+            
+    except WebSocketDisconnect:
+        print("Client disconnected, cancelling simulation...")
+        runner.cancel_current_simulation()
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "message": f"Internal server error: {str(e)}"
+            })
+        except:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except:
+            pass
+
+
+@app.get("/api/simulation-status")
+def get_simulation_status():
+    """Check if a simulation is currently running"""
+    runner = SimulationRunner()
+    return {
+        "running": runner.is_running()
+    }
+
+
+@app.get("/api/validate-replay")
+def validate_replay_file(file: str):
+    """Validate that a replay file exists and is readable"""
+    # Security check: prevent path traversal
+    if ".." in file or file.startswith("/") or file.startswith("\\"):
+         # Allow relative paths but ensure they are within project root
+         pass
+         
+    file_path = os.path.join(PROJECT_ROOT, file)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Replay file not found")
+    
+    if not file.endswith('.jsonl'):
+        raise HTTPException(status_code=400, detail="Invalid file format")
+    
+    return {"valid": True, "path": file}
+
+
+@app.post("/api/load_replay")
+def load_replay_file(file: str):
+    """Load an existing replay file from the server"""
+    # Security check: prevent path traversal
+    if ".." in file or file.startswith("/") or file.startswith("\\"):
+         # Allow relative paths but ensure they are within project root
+         pass
+         
+    file_path = os.path.join(PROJECT_ROOT, file)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Replay file not found")
+    
+    if not file.endswith('.jsonl'):
+        raise HTTPException(status_code=400, detail="Invalid file format")
+        
+    try:
+        print(f"Loading replay file: {file_path}")
+        replay_data.reload_data(file_path)
+        
+        return {
+            "success": True,
+            "message": f"Archivo '{file}' cargado exitosamente",
+            "max_time": replay_data.max_time,
+            "event_count": len(replay_data.events)
+        }
+    except Exception as e:
+        print(f"Error loading file: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
