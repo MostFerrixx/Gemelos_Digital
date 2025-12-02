@@ -380,8 +380,8 @@
 
     <!-- Scripts -->
     <script src="theme-manager.js"></script>
-    <script src="fleet-manager.js"></script>
     <script src="config-storage.js"></script>
+    <script src="fleet-manager.js"></script>
     <script src="app.js"></script>
 
     <!-- Simulation Runner Modal -->
@@ -446,7 +446,8 @@
                 console.log('SimulationRunner: Opening modal...');
                 this.modal.classList.remove('hidden');
                 this.resetUI();
-                this.connectWebSocket();
+                // Don't connect immediately, wait for startSimulation which handles saving first
+                this.startSimulation();
             }
 
             close() {
@@ -482,7 +483,9 @@
 
                     this.ws.onopen = () => {
                         this.appendLog('Connected to server.', 'success');
-                        this.startSimulation();
+                        // WebSocket is open, now we can send START
+                        this.ws.send(JSON.stringify({ command: 'START' }));
+                        this.setStatus('Simulation starting...', 'info');
                     };
 
                     this.ws.onmessage = (event) => {
@@ -520,13 +523,43 @@
                 }
             }
 
-            startSimulation() {
-                if (!this.ws) return;
+            async startSimulation() {
+                // STEP 1: Save current configuration
+                this.setStatus('Auto-saving configuration...', 'info');
+                this.appendLog('[INFO] Auto-saving configuration...', 'info');
 
-                this.isRunning = true;
-                this.ws.send(JSON.stringify({ command: 'START' }));
-                this.setStatus('Running...', 'active');
-                this.progressBar.style.width = '10%';
+                try {
+                    if (window.configurator) {
+                        const config = window.configurator.serializeConfig();
+                        const saveResponse = await fetch('/api/configurator/config', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ config: config })
+                        });
+
+                        if (!saveResponse.ok) {
+                            throw new Error('Failed to save configuration');
+                        }
+
+                        this.appendLog('[INFO] Configuration saved successfully', 'success');
+                    } else {
+                        console.warn('Configurator instance not found, skipping auto-save');
+                    }
+                } catch (error) {
+                    this.setStatus('Error saving configuration', 'error');
+                    this.appendLog(`[ERROR] Could not save config: ${error.message}`, 'error');
+                    return;  // Abort simulation
+                }
+
+                // STEP 2: Connect and Start
+                // We connect here, and the onopen handler will send the START command
+                if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+                    this.connectWebSocket();
+                } else {
+                    // Already connected
+                    this.ws.send(JSON.stringify({ command: 'START' }));
+                    this.setStatus('Simulation starting...', 'info');
+                }
             }
 
             handleMessage(data) {
@@ -534,6 +567,14 @@
                 switch (data.type) {
                     case 'log':
                         this.appendLog(data.content, data.level || 'info');
+                        break;
+
+                    case 'log_batch':
+                        if (data.content && Array.isArray(data.content)) {
+                            data.content.forEach(log => {
+                                this.appendLog(log.content, log.level || 'info');
+                            });
+                        }
                         break;
 
                     case 'status':

@@ -66,6 +66,10 @@ class SimulationRunner:
             script_path = os.path.join(self.PROJECT_ROOT, "entry_points", "run_generate_replay.py")
             cmd = [self.PYTHON_EXECUTABLE, script_path]
             
+            # Prepare environment
+            env = os.environ.copy()
+            env['PYTHONUNBUFFERED'] = '1'
+
             # Start process
             process = await asyncio.get_event_loop().run_in_executor(
                 self._executor,
@@ -77,7 +81,8 @@ class SimulationRunner:
                     bufsize=1,  # Line buffered
                     cwd=self.PROJECT_ROOT,
                     encoding='utf-8',
-                    errors='replace' # Handle potential encoding issues gracefully
+                    errors='replace', # Handle potential encoding issues gracefully
+                    env=env
                 )
             )
             
@@ -90,14 +95,20 @@ class SimulationRunner:
                 "timestamp": time.time()
             }
 
-            # Stream output
+            # Stream output with batching
             start_time = time.time()
             generated_file = None
+            log_buffer = []
+            last_flush_time = time.time()
+            BATCH_SIZE = 1000
+            FLUSH_INTERVAL = 0.5  # seconds
             
-            # We need to read stdout in a non-blocking way or use a thread
-            # Since we are in an async generator, we can use run_in_executor for reading lines
-            # But simpler approach for line-by-line streaming from subprocess in asyncio:
-            
+            # Helper to schedule a read
+            def read_line_task():
+                return process.stdout.readline()
+
+            pending_read = None
+
             while True:
                 # Check for timeout
                 if time.time() - start_time > self.TIMEOUT_SECONDS:
@@ -109,54 +120,69 @@ class SimulationRunner:
                     }
                     break
 
-                # Read line (non-blocking check)
-                # Note: readline() is blocking, so we run it in executor
-                line = await asyncio.get_event_loop().run_in_executor(
-                    self._executor, 
-                    process.stdout.readline
-                )
-                
-                if line:
-                    # Clean line
-                    clean_line = line.strip()
-                    
-                    # Try to detect JSONL output file path from logs
-                    # Convention: "Exito: Archivos generados en output/" or similar
-                    # Or we can look for specific log pattern if added to run_live_simulation
-                    # For now, we stream everything
-                    
-                    yield {
-                        "type": "log", 
-                        "content": clean_line,
-                        "level": "info", # Default level
-                        "timestamp": time.time()
-                    }
-                    
-                    # Simple heuristic for file detection if printed to stdout
-                    if ".jsonl" in clean_line and "output" in clean_line:
-                        # Try to extract path if it looks like a path
-                        parts = clean_line.split()
-                        for part in parts:
-                            if part.endswith(".jsonl") and ("/" in part or "\\" in part):
-                                generated_file = part
-                                break
-
-                # Check if process finished
-                if process.poll() is not None:
-                    # Read remaining output
-                    rest = await asyncio.get_event_loop().run_in_executor(
+                # Ensure we have a pending read task
+                if pending_read is None:
+                    pending_read = asyncio.get_event_loop().run_in_executor(
                         self._executor, 
-                        process.stdout.read
+                        read_line_task
                     )
-                    if rest:
-                        for l in rest.splitlines():
-                            yield {
-                                "type": "log", 
-                                "content": l.strip(),
-                                "level": "info",
-                                "timestamp": time.time()
-                            }
-                    break
+
+                # Wait for read OR timeout
+                try:
+                    # Wait for the EXISTING future
+                    line = await asyncio.wait_for(asyncio.shield(pending_read), timeout=0.05)
+                    # If we get here, the read completed
+                    pending_read = None # Clear so we schedule a new one next time
+                except asyncio.TimeoutError:
+                    line = None # Read not done yet, keep waiting for same future
+
+                if line:
+                    clean_line = line.strip()
+                    if clean_line:
+                        # Add to buffer
+                        log_buffer.append({
+                            "content": clean_line,
+                            "level": "info"
+                        })
+                        
+                        # File detection logic
+                        if ".jsonl" in clean_line and "output" in clean_line:
+                            parts = clean_line.split()
+                            for part in parts:
+                                if part.endswith(".jsonl") and ("/" in part or "\\" in part):
+                                    generated_file = part
+                                    break
+                elif line == '': # EOF - stdout closed
+                     break
+
+                # Flush buffer if full or time elapsed
+                current_time = time.time()
+                if log_buffer and (len(log_buffer) >= BATCH_SIZE or (current_time - last_flush_time) >= FLUSH_INTERVAL):
+                    yield {
+                        "type": "log_batch",
+                        "content": log_buffer,
+                        "timestamp": current_time
+                    }
+                    log_buffer = []
+                    last_flush_time = current_time
+
+            # Flush any remaining logs in buffer
+            if log_buffer:
+                yield {
+                    "type": "log_batch",
+                    "content": log_buffer,
+                    "timestamp": time.time()
+                }
+
+            # CRITICAL: Wait for process to fully terminate before reading returncode
+            # If we just saw EOF, process might still be alive doing cleanup
+            if process.poll() is None:
+                # Process still running, wait for it
+                await asyncio.get_event_loop().run_in_executor(
+                    self._executor,
+                    process.wait
+                )
+
             
             return_code = process.returncode
             
