@@ -13,6 +13,15 @@ class WebConfigurator {
     async init() {
         console.log('[WEB_CONFIGURATOR] Initializing...');
 
+        // Disable Run Simulation button during initialization
+        const btnRunSim = document.getElementById('btn-run-simulation');
+        if (btnRunSim) {
+            btnRunSim.disabled = true;
+            btnRunSim.style.opacity = '0.5';
+            btnRunSim.style.cursor = 'not-allowed';
+            btnRunSim.title = 'Waiting for configuration to load...';
+        }
+
         // Initialize modules
         this.fleetManager = new FleetManager(this);
         configStorage = new ConfigurationStorage(this);
@@ -24,6 +33,14 @@ class WebConfigurator {
 
         // Load initial configuration
         await this.loadConfiguration();
+
+        // Re-enable Run Simulation button after configuration is loaded
+        if (btnRunSim) {
+            btnRunSim.disabled = false;
+            btnRunSim.style.opacity = '1';
+            btnRunSim.style.cursor = 'pointer';
+            btnRunSim.title = 'Run Simulation';
+        }
 
         console.log('[WEB_CONFIGURATOR] Initialization complete');
     }
@@ -216,13 +233,23 @@ class WebConfigurator {
             const response = await fetch('/api/configurator/config');
             const result = await response.json();
 
-            this.hideLoading();
-
             if (result.success) {
                 this.currentConfig = result.config;
+
+                // CRITICAL: Load work areas BEFORE loading config to form
+                // This ensures WA dropdowns are populated before fleet reconstruction
+                if (result.config.sequence_file) {
+                    console.log('[WEB_CONFIGURATOR] Auto-loading work areas from sequence file...');
+                    await this.loadWorkAreas(true); // true = silent mode (no notification)
+                }
+
+                // Now load config to form (including fleet with WA priorities)
                 this.loadConfigToForm(result.config);
+
+                this.hideLoading();
                 console.log('[WEB_CONFIGURATOR] Configuration loaded successfully');
             } else {
+                this.hideLoading();
                 this.showNotification('Error loading configuration', 'error');
             }
         } catch (error) {
@@ -358,40 +385,61 @@ class WebConfigurator {
         return config;
     }
 
-    async loadWorkAreas() {
+    async loadWorkAreas(silent = false) {
         try {
             const sequenceFile = document.getElementById('sequence-file').value;
 
             if (!sequenceFile) {
-                this.showNotification('Por favor especifique un archivo de secuencia', 'error');
+                if (!silent) {
+                    this.showNotification('Por favor especifique un archivo de secuencia', 'error');
+                }
                 return;
             }
 
-            this.showLoading('Cargando Work Areas...');
+            if (!silent) {
+                this.showLoading('Cargando Work Areas...');
+            }
 
             const response = await fetch(`/api/configurator/work-areas?sequence_file=${encodeURIComponent(sequenceFile)}`);
             const result = await response.json();
 
-            this.hideLoading();
+            if (!silent) {
+                this.hideLoading();
+            }
 
-            if (result.success) {
+            if (result.success && result.work_areas && result.work_areas.length > 0) {
                 this.workAreas = result.work_areas;
                 this.fleetManager.setWorkAreas(this.workAreas);
 
                 const count = this.workAreas.length;
                 const areasList = this.workAreas.join(', ');
 
-                this.showNotification(
-                    `✓ ${count} Work Areas cargadas: ${areasList}`,
-                    'success'
-                );
+                console.log(`[WEB_CONFIGURATOR] ${count} Work Areas loaded: ${areasList}`);
+
+                if (!silent) {
+                    this.showNotification(
+                        `✓ ${count} Work Areas cargadas: ${areasList}`,
+                        'success'
+                    );
+                }
             } else {
-                this.showNotification('Error loading work areas', 'error');
+                console.warn('[WEB_CONFIGURATOR] No work areas found in file, using defaults');
+                this.workAreas = ['Area_Ground', 'Area_Rack', 'Area_Piso_L1'];
+                this.fleetManager.setWorkAreas(this.workAreas);
+
+                if (!silent) {
+                    this.showNotification('⚠ Usando Work Areas por defecto', 'warning');
+                }
             }
         } catch (error) {
-            this.hideLoading();
+            if (!silent) {
+                this.hideLoading();
+            }
             console.error('[WEB_CONFIGURATOR] Error loading work areas:', error);
-            this.showNotification('Error: ' + error.message, 'error');
+
+            if (!silent) {
+                this.showNotification('Error: ' + error.message, 'error');
+            }
         }
     }
 

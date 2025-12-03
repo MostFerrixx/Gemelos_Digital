@@ -75,13 +75,13 @@ class DispatcherV11:
 
         # Dispatch Strategy (from config.json)
         print(f"[DISPATCHER DEBUG] Configuración recibida: {configuracion}")
-        print(f"[DISPATCHER DEBUG] dispatch_strategy en config: '{configuracion.get('dispatch_strategy', 'NO ENCONTRADO')}'")
+        # print(f"[DISPATCHER DEBUG] dispatch_strategy en config: '{configuracion.get('dispatch_strategy', 'NO ENCONTRADO')}'")
         self.estrategia = configuracion.get('dispatch_strategy', 'Optimizacion Global')
-        print(f"[DISPATCHER DEBUG] Estrategia asignada: '{self.estrategia}'")
+        # print(f"[DISPATCHER DEBUG] Estrategia asignada: '{self.estrategia}'")
         
         # Tour Type (from config.json)
         self.tour_type = configuracion.get('tour_type', 'Tour Mixto (Multi-Destino)')
-        print(f"[DISPATCHER DEBUG] Tour type: '{self.tour_type}'")
+        # print(f"[DISPATCHER DEBUG] Tour type: '{self.tour_type}'")
 
         # Statistics
         self.total_asignaciones = 0
@@ -197,7 +197,7 @@ class DispatcherV11:
             operator_key = f"{operator.type}_{operator.id}"
             last_log_time = self._last_no_candidates_log.get(operator_key, 0)
             
-            if self.env.now - last_log_time >= 10.0:
+            if self.env.now - last_log_time >= 60.0:
                 print(f"[DISPATCHER] No hay candidatos viables para {operator.type}_{operator.id}")
                 self._last_no_candidates_log[operator_key] = self.env.now
             
@@ -312,6 +312,11 @@ class DispatcherV11:
                                  if operator.can_handle_work_area(wo.work_area)]
         
         if not candidatos_compatibles:
+            # Debug log to understand why no WOs are compatible
+            if self.env.now % 60 == 0:  # Only log periodically
+                pass
+                # print(f"[DISPATCHER DEBUG] {operator.type}_{operator.id}: 0/{len(self.work_orders_pendientes)} WOs compatibles. "
+                #       f"Areas op: {operator.work_area_priorities.keys()}")
             return []
         
         # Paso 2: FILTRAR al área de MAYOR PRIORIDAD del operario (respeto estricto de WA)
@@ -320,7 +325,7 @@ class DispatcherV11:
             return []
 
         # Paso 3: Usar AssignmentCostCalculator para encontrar la MEJOR primera WO dentro del área prioritaria
-        print(f"[DISPATCHER DEBUG] [Optimización Global] Evaluando mejor primera WO (area prioritaria) entre {len(candidatos_area_prioridad)} candidatos")
+        # print(f"[DISPATCHER DEBUG] [Optimización Global] Evaluando mejor primera WO (area prioritaria) entre {len(candidatos_area_prioridad)} candidatos")
         best_first_wo = self._encontrar_mejor_primera_wo(operator, candidatos_area_prioridad)
         if not best_first_wo:
             print(f"[DISPATCHER DEBUG] No se encontró mejor primera WO")
@@ -360,10 +365,10 @@ class DispatcherV11:
             return []
         
         # Paso 3: Seleccionar la primera WO con el pick_sequence más pequeño (SIN AssignmentCostCalculator)
-        print(f"[DISPATCHER DEBUG] Ejecucion de Plan: Buscando WO con menor pick_sequence entre {len(candidatos_area_prioridad)} candidatos")
+        # print(f"[DISPATCHER DEBUG] Ejecucion de Plan: Buscando WO con menor pick_sequence entre {len(candidatos_area_prioridad)} candidatos")
         primera_wo = min(candidatos_area_prioridad, key=lambda wo: wo.pick_sequence)
         
-        print(f"[DISPATCHER DEBUG] Ejecucion de Plan: Primera WO seleccionada: {primera_wo.id} con pick_sequence={primera_wo.pick_sequence}")
+        # print(f"[DISPATCHER DEBUG] Ejecucion de Plan: Primera WO seleccionada: {primera_wo.id} con pick_sequence={primera_wo.pick_sequence}")
         
         # Paso 4: Construir tour siguiendo pick_sequence desde la primera WO (igual que Optimización Global)
         # IMPORTANTE: Pasar candidatos_compatibles (todas las áreas) para que el doble barrido
@@ -450,7 +455,7 @@ class DispatcherV11:
         
         if best_group:
             staging_id = best_group[0].staging_id
-            print(f"[DISPATCHER DEBUG] Tour Simple: Seleccionado grupo de {len(best_group)} WOs para staging {staging_id}")
+            # print(f"[DISPATCHER DEBUG] Tour Simple: Seleccionado grupo de {len(best_group)} WOs para staging {staging_id}")
         
         return best_group
 
@@ -476,7 +481,7 @@ class DispatcherV11:
             staging_locs = self.data_manager.get_outbound_staging_locations()
             current_pos = staging_locs.get(1, (3, 29))  # Staging 1 como depot default
         
-        print(f"[DISPATCHER DEBUG] Calculando costos desde posición: {current_pos}")
+        # print(f"[DISPATCHER DEBUG] Calculando costos desde posición: {current_pos}")
         for wo in candidatos:
             cost_result = self.assignment_calculator.calculate_cost(operator, wo, current_pos)
             costos.append((wo, cost_result))

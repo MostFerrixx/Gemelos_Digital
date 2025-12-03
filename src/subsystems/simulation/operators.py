@@ -296,7 +296,7 @@ class GroundOperator(BaseOperator):
                     print(f"[{self.id}] Simulacion finalizada, saliendo...")
                     break
                 
-                yield self.env.timeout(1.0)
+                yield self.env.timeout(5.0)
                 continue
 
             tour_start_time = self.env.now
@@ -658,7 +658,7 @@ class Forklift(BaseOperator):
                     print(f"[{self.id}] Simulacion finalizada, saliendo...")
                     break
                 
-                yield self.env.timeout(1.0)
+                yield self.env.timeout(5.0)
                 continue
 
             tour_start_time = self.env.now

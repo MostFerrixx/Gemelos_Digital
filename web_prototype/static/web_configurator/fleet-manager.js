@@ -221,11 +221,37 @@ class FleetManager {
 
         // Add default GroundOperator group
         this.addGroup('GroundOperator');
+        this.addDefaultPriorities('GroundOperator', 0, ['Area_Ground', 'Area_Piso_L1']);
 
         // Add default Forklift group
         this.addGroup('Forklift');
+        this.addDefaultPriorities('Forklift', 0, ['Area_Rack']);
 
         this.configurator.showNotification('Flota por defecto generada exitosamente', 'success');
+    }
+
+    addDefaultPriorities(agentType, groupIndex, workAreas) {
+        const container = agentType === 'GroundOperator'
+            ? document.getElementById('ground-operators-container')
+            : document.getElementById('forklifts-container');
+
+        const groupElement = container.querySelector(`[data-agent-type="${agentType}"][data-index="${groupIndex}"]`);
+        if (!groupElement) return;
+
+        workAreas.forEach(wa => {
+            // Add a priority row
+            this.addWorkAreaPriority(agentType, groupIndex);
+
+            // Find the last added row and set its value
+            const prioritiesList = groupElement.querySelector('.work-area-priorities-list');
+            const rows = prioritiesList.querySelectorAll('.work-area-priority-row');
+            const lastRow = rows[rows.length - 1];
+
+            if (lastRow) {
+                const select = lastRow.querySelector('.work-area-select');
+                select.value = wa;
+            }
+        });
     }
 
     clearAllGroups() {
@@ -319,6 +345,9 @@ class FleetManager {
         // Clear existing fleet
         this.clearAllGroups();
 
+        console.log(`[FLEET_MANAGER] Loading fleet with ${agentTypes.length} agents`);
+        console.log('[FLEET_MANAGER] Available work areas:', this.workAreas);
+
         // Group agents by type and config
         const grouped = {};
 
@@ -367,11 +396,23 @@ class FleetManager {
                     const lastRow = rows[rows.length - 1];
 
                     if (lastRow) {
-                        lastRow.querySelector('.work-area-select').value = wa;
-                        lastRow.querySelector('.input-priority').value = priority;
+                        const waSelect = lastRow.querySelector('.work-area-select');
+
+                        // Check if WA exists in available work areas
+                        if (this.workAreas.includes(wa)) {
+                            waSelect.value = wa;
+                            lastRow.querySelector('.input-priority').value = priority;
+                        } else {
+                            console.warn(`[FLEET_MANAGER] Work Area "${wa}" not found in available work areas. Current WAs:`, this.workAreas);
+                            // Still set the value - it will show in the dropdown even if not in the list
+                            waSelect.value = wa;
+                            lastRow.querySelector('.input-priority').value = priority;
+                        }
                     }
                 });
             }
         });
+
+        console.log('[FLEET_MANAGER] Fleet loading complete');
     }
 }

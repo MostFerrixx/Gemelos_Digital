@@ -567,6 +567,7 @@
                 switch (data.type) {
                     case 'log':
                         this.appendLog(data.content, data.level || 'info');
+                        this.updateProgress();
                         break;
 
                     case 'log_batch':
@@ -574,6 +575,7 @@
                             data.content.forEach(log => {
                                 this.appendLog(log.content, log.level || 'info');
                             });
+                            this.updateProgress();
                         }
                         break;
 
@@ -620,6 +622,17 @@
             setStatus(text, type) {
                 this.statusText.textContent = text;
                 this.statusText.className = type;
+            }
+
+            updateProgress() {
+                const targetCap = 95;
+                let currentWidth = parseFloat(this.progressBar.style.width) || 0;
+                if (currentWidth < targetCap) {
+                    const increment = (targetCap - currentWidth) * 0.05; 
+                    const finalIncrement = Math.max(increment, 0.5); 
+                    const newWidth = Math.min(currentWidth + finalIncrement, targetCap);
+                    this.progressBar.style.width = `${newWidth}%`;
+                }
             }
 
             watchReplay() {

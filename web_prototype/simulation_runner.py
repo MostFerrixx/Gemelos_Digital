@@ -109,7 +109,17 @@ class SimulationRunner:
 
             pending_read = None
 
+            # Define log filters
+            IGNORE_PATTERNS = ["Paso", "t=", "Forklift", "GroundOperator", "Agente", "Battery"]
+            CRITICAL_PATTERNS = ["[ALMACEN]", "[DISPATCHER]", "[ERROR]", "Traceback", "Exception", "Completed", "Error", "output", ".jsonl"]
+
             while True:
+                # Fast-track: Check if process finished
+                if process.poll() is not None:
+                    # Process finished, try to read remaining lines quickly without waiting
+                    # But if we have a pending read, we must await it or cancel it
+                    pass 
+                    
                 # Check for timeout
                 if time.time() - start_time > self.TIMEOUT_SECONDS:
                     process.terminate()
@@ -130,22 +140,38 @@ class SimulationRunner:
                 # Wait for read OR timeout
                 try:
                     # Wait for the EXISTING future
-                    line = await asyncio.wait_for(asyncio.shield(pending_read), timeout=0.05)
+                    # Reduced timeout for better responsiveness
+                    line = await asyncio.wait_for(asyncio.shield(pending_read), timeout=0.01)
                     # If we get here, the read completed
                     pending_read = None # Clear so we schedule a new one next time
                 except asyncio.TimeoutError:
                     line = None # Read not done yet, keep waiting for same future
+                    
+                    # If process is done and we are just waiting for read, maybe we can break if it takes too long?
+                    # But we want to drain the pipe.
+                    if process.poll() is not None:
+                        # Process finished. If we are stuck waiting for a line, it might mean there is no more data?
+                        # Usually readline returns '' at EOF.
+                        pass
 
                 if line:
                     clean_line = line.strip()
                     if clean_line:
-                        # Add to buffer
-                        log_buffer.append({
-                            "content": clean_line,
-                            "level": "info"
-                        })
+                        # LOG FILTERING LOGIC
+                        is_critical = any(k in clean_line for k in CRITICAL_PATTERNS)
+                        should_ignore = any(k in clean_line for k in IGNORE_PATTERNS)
+
+                        if not is_critical and should_ignore:
+                            # Skip high volume logs
+                            pass
+                        else:
+                            # Add to buffer
+                            log_buffer.append({
+                                "content": clean_line,
+                                "level": "info"
+                            })
                         
-                        # File detection logic
+                        # File detection logic (always run this even if ignored, just in case)
                         if ".jsonl" in clean_line and "output" in clean_line:
                             parts = clean_line.split()
                             for part in parts:
@@ -165,6 +191,13 @@ class SimulationRunner:
                     }
                     log_buffer = []
                     last_flush_time = current_time
+                
+                # Fast exit if process is done and buffer is empty-ish
+                if process.poll() is not None and not log_buffer and line is None:
+                     # Process finished and no immediate line available. 
+                     # We should probably continue to ensure we hit EOF, but if readline blocks...
+                     # For now, let's rely on EOF.
+                     pass
 
             # Flush any remaining logs in buffer
             if log_buffer:
