@@ -1,49 +1,95 @@
 @echo off
-REM =========================================================================
-REM Script: start_server.bat
-REM Descripcion: Inicia el servidor web en segundo plano sin ventana terminal
-REM =========================================================================
-
-setlocal enabledelayedexpansion
+setlocal EnableDelayedExpansion
 
 REM Configuracion
 set "SERVER_SCRIPT=web_prototype\server.py"
-set "PID_FILE=server.pid"
 set "LOG_DIR=logs"
 set "SERVER_LOG=%LOG_DIR%\server.log"
 set "ERROR_LOG=%LOG_DIR%\server_errors.log"
-set "SERVER_PORT=8000"
-set "SERVER_URL=http://localhost:%SERVER_PORT%"
+set "PID_FILE=server.pid"
+set "SERVER_URL=http://localhost:8000"
+
+REM Titulo de la ventana
+title Gemelos Digital - Iniciar Servidor Web
 
 echo ========================================================================
 echo  GEMELOS DIGITAL - Iniciar Servidor Web
 echo ========================================================================
 echo.
 
-REM Verificar si Python esta instalado
-python --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ERROR] Python no esta instalado o no esta en el PATH
-    echo Por favor, instala Python desde https://www.python.org/
-    pause
-    exit /b 1
-)
+REM ============================================================
+REM DETECCION ROBUSTA DE INSTANCIAS DUPLICADAS
+REM ============================================================
 
-REM Verificar si el servidor ya esta ejecutandose
+set "SERVER_ALIVE=0"
+
+REM Paso 1: Verificar si existe archivo PID
 if exist "%PID_FILE%" (
     set /p EXISTING_PID=<"%PID_FILE%"
-    tasklist /FI "PID eq !EXISTING_PID!" 2>nul | find "!EXISTING_PID!" >nul
-    if !errorlevel! equ 0 (
-        echo [ADVERTENCIA] El servidor ya esta ejecutandose (PID: !EXISTING_PID!)
-        echo Para detenerlo, ejecuta: stop_server.bat
-        echo.
-        pause
-        exit /b 0
+    
+    REM Paso 2: Verificar si el PID corresponde a python.exe (validacion estricta)
+    set "IS_PYTHON=0"
+    for /f "tokens=1" %%a in ('tasklist /FI "PID eq !EXISTING_PID!" /FI "IMAGENAME eq python.exe" /NH 2^>nul ^| find "python.exe"') do (
+        set "IS_PYTHON=1"
+    )
+    
+    REM Paso 3: Verificar si el puerto 8000 esta en LISTENING (source of truth)
+    set "PORT_LISTENING=0"
+    netstat -ano 2>nul | findstr ":8000.*LISTENING" >nul
+    if !errorlevel! equ 0 set "PORT_LISTENING=1"
+    
+    REM Paso 4: Logica de Auto-Healing
+    if "!IS_PYTHON!"=="1" if "!PORT_LISTENING!"=="1" (
+        REM Escenario B: Servidor VIVO (python.exe + puerto ocupado)
+        set "SERVER_ALIVE=1"
     ) else (
-        echo [INFO] Limpiando archivo PID antiguo...
+        REM Escenario A: PID es basura (no es python.exe O puerto libre)
+        echo [INFO] Limpiando archivo PID obsoleto...
         del "%PID_FILE%" >nul 2>&1
     )
 )
+
+REM Paso 5: Si no hay PID file, verificar puerto por si acaso
+if "!SERVER_ALIVE!"=="0" (
+    netstat -ano 2>nul | findstr ":8000.*LISTENING" >nul
+    if !errorlevel! equ 0 (
+        echo [ADVERTENCIA] El puerto 8000 ya esta en uso por otro proceso.
+        echo Use stop_server.bat o cierre manualmente el proceso que ocupa el puerto.
+        pause
+        exit /b 1
+    )
+)
+
+REM Paso 6: Mostrar menu SOLO si el servidor esta realmente vivo
+if "!SERVER_ALIVE!"=="1" (
+    echo [ADVERTENCIA] Ya hay un servidor corriendo con PID !EXISTING_PID!
+    echo.
+    echo Opciones:
+    echo   1. Reiniciar (detener el actual e iniciar uno nuevo^)
+    echo   2. Salir (dejar el servidor actual^)
+    echo.
+    set /p CHOICE="Seleccione opcion (1/2): "
+    
+    if "!CHOICE!"=="1" (
+        echo [INFO] Deteniendo servidor existente...
+        taskkill /F /PID !EXISTING_PID! >nul 2>&1
+        timeout /t 2 /nobreak >nul
+        del "%PID_FILE%" >nul 2>&1
+        echo [INFO] Servidor detenido. Continuando con inicio...
+    ) else if "!CHOICE!"=="2" (
+        echo [INFO] Operacion cancelada. El servidor sigue corriendo.
+        echo   URL: %SERVER_URL%
+        echo   PID: !EXISTING_PID!
+        pause
+        exit /b 0
+    ) else (
+        echo [ERROR] Opcion invalida. Saliendo...
+        pause
+        exit /b 1
+    )
+)
+
+REM ============================================================
 
 REM Crear directorio de logs si no existe
 if not exist "%LOG_DIR%" (
@@ -51,57 +97,60 @@ if not exist "%LOG_DIR%" (
     mkdir "%LOG_DIR%"
 )
 
-REM Iniciar el servidor en segundo plano usando pythonw.exe
-echo [INFO] Iniciando servidor en segundo plano...
-echo [INFO] Auto-reload: ACTIVADO (Reinicia al guardar cambios)
-echo [INFO] Script: %SERVER_SCRIPT%
+REM Limpiar logs de sesion anterior
+if exist "%LOG_DIR%" (
+    echo [INFO] Limpiando logs de sesion anterior...
+    del /Q "%LOG_DIR%\*.log" >nul 2>&1
+)
+
+echo [INFO] Iniciando servidor en segundo plano (invisible)...
+echo [INFO] Auto-reload: ACTIVADO
 echo [INFO] Logs: %SERVER_LOG%
 echo.
 
-REM Usar pythonw.exe para ejecutar sin ventana de consola
-start /B pythonw.exe "%SERVER_SCRIPT%" > "%SERVER_LOG%" 2> "%ERROR_LOG%"
+REM Ejecutar el lanzador Python (invisible)
+REM start_hidden.py usa CREATE_NO_WINDOW y redirige logs
+pythonw.exe start_hidden.py
 
-REM Esperar un momento para que el proceso inicie
-timeout /t 2 /nobreak >nul
+REM Esperar a que el proceso inicie
+echo [INFO] Esperando inicializacion (3s)...
+timeout /t 3 /nobreak >nul
 
-REM Obtener el PID del proceso Python mas reciente
-for /f "tokens=2" %%i in ('tasklist /FI "IMAGENAME eq pythonw.exe" /NH 2^>nul ^| find "pythonw.exe"') do (
+REM Capturar PID del proceso python.exe (hijo) mas reciente
+set "SERVER_PID="
+for /f "tokens=2" %%i in ('tasklist /FI "IMAGENAME eq python.exe" /NH 2^>nul ^| find "python.exe"') do (
     set "SERVER_PID=%%i"
-    goto :found_pid
 )
 
-:found_pid
 if defined SERVER_PID (
     echo %SERVER_PID% > "%PID_FILE%"
-    echo [EXITO] Servidor iniciado exitosamente!
-    echo.
-    echo   PID:        %SERVER_PID%
-    echo   URL:        %SERVER_URL%
-    echo   Logs:       %SERVER_LOG%
-    echo   Errores:    %ERROR_LOG%
-    echo.
-    echo ========================================================================
-    echo  El servidor esta ejecutandose en segundo plano
-    echo ========================================================================
-    echo.
-    echo  Para detener el servidor: stop_server.bat
-    echo  Para ver el estado:        status_server.bat
-    echo  Para reiniciar:            restart_server.bat
-    echo.
+    echo [EXITO] Servidor iniciado en segundo plano
+    echo   PID: %SERVER_PID%
+    echo   URL: %SERVER_URL%
     
-    REM Preguntar si desea abrir el navegador
-    set /p OPEN_BROWSER="Desea abrir el navegador ahora? (S/N): "
-    if /i "!OPEN_BROWSER!"=="S" (
-        echo [INFO] Abriendo navegador...
-        start "" "%SERVER_URL%/web_configurator/"
+    REM Validar que los logs tengan contenido
+    for %%A in ("%SERVER_LOG%") do if %%~zA==0 (
+        echo [ADVERTENCIA] El log esta vacio. Verifique %ERROR_LOG% si falla.
     )
 ) else (
-    echo [ERROR] No se pudo obtener el PID del servidor
-    echo Verifica los logs en: %ERROR_LOG%
+    echo [ERROR] No se pudo capturar el PID. El servidor pudo haber fallado al iniciar.
+    echo Revise %ERROR_LOG% para mas detalles.
     pause
     exit /b 1
 )
 
 echo.
-pause
-exit /b 0
+echo ========================================================================
+echo  El servidor esta ejecutandose en segundo plano
+echo ========================================================================
+echo.
+echo  Para detener el servidor: stop_server.bat
+echo  Para ver el estado:        status_server.bat
+echo  Para reiniciar:            restart_server.bat
+echo.
+
+REM Preguntar si abrir el navegador
+set /p OPEN_BROWSER="Desea abrir el navegador ahora? (S/N): "
+if /i "%OPEN_BROWSER%"=="S" (
+    start %SERVER_URL%
+)

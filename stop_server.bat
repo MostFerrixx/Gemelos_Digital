@@ -16,8 +16,22 @@ echo.
 
 REM Verificar si existe el archivo PID
 if not exist "%PID_FILE%" (
-    echo [INFO] No hay servidor ejecutandose
-    echo El archivo PID no existe: %PID_FILE%
+    echo [INFO] Archivo PID no existe. Buscando servidor por puerto...
+    
+    REM Buscar TODOS los procesos que ocupan el puerto 8000 y matarlos
+    set "FOUND_ANY=0"
+    for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":8000.*LISTENING"') do (
+        set "FOUND_ANY=1"
+        echo [INFO] Encontrado proceso en puerto 8000: PID %%a
+        echo [INFO] Deteniendo proceso %%a...
+        taskkill /PID %%a /F /T >nul 2>&1
+    )
+    
+    if "!FOUND_ANY!"=="1" (
+        echo [EXITO] Todos los procesos del puerto 8000 han sido detenidos
+    ) else (
+        echo [INFO] No hay servidor ejecutandose en puerto 8000
+    )
     echo.
     pause
     exit /b 0

@@ -932,7 +932,7 @@ app.mount("/", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "st
 
 if __name__ == "__main__":
     uvicorn.run(
-        app, 
+        "web_prototype.server:app", 
         host="0.0.0.0", 
         port=8000,
         reload=True,  # Enable auto-reload for development
