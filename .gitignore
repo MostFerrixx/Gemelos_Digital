@@ -595,3 +595,10 @@ optuna_study.db-shm
 optuna_study.db-wal
 optimization_*.log
 *_optimization_*.log
+
+# Server management (V12)
+server.pid
+logs/
+
+# User config presets (local data)
+data/config_presets/
