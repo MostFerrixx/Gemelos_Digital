@@ -2,6 +2,7 @@ import sys
 import os
 import json
 import math
+import time
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -889,8 +890,51 @@ def load_replay_file(file: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ========================================================================
+# SYSTEM CONTROL ENDPOINTS
+# ========================================================================
+
+@app.post("/api/system/restart")
+def restart_server():
+    """
+    Trigger server restart by touching the server file.
+    Requires reload=True in uvicorn.run() to work.
+    """
+    try:
+        # Touch this file to trigger Uvicorn reload
+        server_file = __file__
+        os.utime(server_file, None)
+        
+        return {
+            "success": True,
+            "message": "Server restart triggered. Reloading...",
+            "estimated_time": 3  # seconds
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trigger restart: {str(e)}")
+
+
+@app.get("/api/system/health")
+def health_check():
+    """
+    Health check endpoint to verify server is responsive.
+    Used by frontend to detect when server has restarted.
+    """
+    return {
+        "status": "ok",
+        "timestamp": time.time(),
+        "uptime": time.time() - replay_data.events[0].get('timestamp', 0) if replay_data.events else 0
+    }
+
+
 # Serve static files (Frontend)
 app.mount("/", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static"), html=True), name="static")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=8000,
+        reload=True,  # Enable auto-reload for development
+        reload_dirs=[PROJECT_ROOT]  # Watch project directory for changes
+    )

@@ -9,23 +9,47 @@
 
 ## 🚀 Inicio Rapido
 
-### 1. Generar Simulacion (Headless)
+### 1. Servidor Web (Click-and-Run) 🆕
+```bash
+# Windows - Modo Produccion
+start_server.bat         # Iniciar servidor en segundo plano
+stop_server.bat          # Detener servidor
+restart_server.bat       # Reiniciar servidor
+status_server.bat        # Ver estado del servidor
+
+# Modo Desarrollo (con terminal)
+python web_prototype/server.py
+
+# Python Manager (Avanzado)
+python server_manager.py start --browser  # Iniciar y abrir navegador
+python server_manager.py status           # Ver estado
+python server_manager.py logs --follow    # Ver logs en tiempo real
+```
+**URL:** `http://localhost:8000/web_configurator/`
+
+### Características Web 🆕
+- **Reinicio Remoto**: Botón "↻ Restart Server" en la interfaz web.
+- **Auto-reload**: El servidor se reinicia automáticamente al guardar cambios en el código.
+- **Health Check**: Verificación automática de disponibilidad.
+
+### 2. Generar Simulacion (Headless)
 ```bash
 python entry_points/run_generate_replay.py
 ```
 **Genera:** Archivo `.jsonl` + Reportes Excel + Analytics + Heatmap
 
-### 2. Visualizar Replay
+### 3. Visualizar Replay
 ```bash
 python entry_points/run_replay_viewer.py output/simulation_*/replay_*.jsonl
 ```
 **Muestra:** Visualizacion interactiva con Pygame
 
-### 3. Configurar Simulacion
+### 4. Configurar Simulacion
 ```bash
 python configurator.py
 ```
 **Permite:** Ajustar parametros (operarios, ordenes, estrategias)
+
 
 ---
 
