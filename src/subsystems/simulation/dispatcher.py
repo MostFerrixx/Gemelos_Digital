@@ -1079,6 +1079,95 @@ class DispatcherV11:
               f"en {tiempo_total:.2f}s simulados. "
               f"Total completados: {len(self.work_orders_completados)}/{len(self.lista_maestra_work_orders)}")
 
+    def notificar_completado_individual(self, operator: Any, work_order: Any) -> None:
+        """
+        Callback when operator finishes a SINGLE WorkOrder (granular staging).
+        
+        NEW in V12: Support for granular discharge where each WO is staged
+        individually with its own timeout and event emission.
+        
+        Args:
+            operator: Operator instance
+            work_order: Single WorkOrder that was completed
+        """
+        operator_id = f"{operator.type}_{operator.id}"
+        wo = work_order
+        
+        # Remove from assigned list
+        if operator_id in self.work_orders_asignados:
+            if wo in self.work_orders_asignados[operator_id]:
+                self.work_orders_asignados[operator_id].remove(wo)
+        
+        # Remove from in_progress if it was there
+        if operator_id in self.work_orders_en_progreso:
+            if self.work_orders_en_progreso[operator_id] == wo:
+                del self.work_orders_en_progreso[operator_id]
+        
+        # Add to completed
+        if wo not in self.work_orders_completados:
+            self.work_orders_completados.append(wo)
+        
+        # Update WorkOrder state
+        wo.status = "staged"
+        wo.tiempo_fin = self.env.now
+        
+        # Emit work_order_update event for visualization
+        self.almacen.registrar_evento('work_order_update', {
+            'id': wo.id,
+            'order_id': wo.order_id,
+            'tour_id': getattr(wo, 'tour_id', None),
+            'sku_id': wo.sku_id,
+            'product': wo.sku_name,
+            'status': 'staged',
+            'assigned_agent_id': wo.assigned_agent_id,
+            'priority': getattr(wo, 'priority', 99),
+            'items': getattr(wo, 'items', 1),
+            'total_qty': wo.cantidad_total,
+            'volume': getattr(wo, 'volume', wo.volumen_restante),
+            'location': wo.ubicacion,
+            'pick_sequence': getattr(wo, 'pick_sequence', None),
+            'staging': wo.staging_id,
+            'work_group': wo.work_group,
+            'work_area': wo.work_area,
+            'executions': getattr(wo, 'picking_executions', 0),
+            'start_time': getattr(wo, 'tiempo_inicio', None),
+            'progress': 100,
+            'tiempo_fin': wo.tiempo_fin
+        })
+        
+        # Emit work_order_completed event for analytics
+        self.almacen.registrar_evento('work_order_completed', {
+            'agent_id': operator_id,
+            'work_order_id': wo.id,
+            'data': {
+                'duration': wo.tiempo_fin - wo.tiempo_inicio if wo.tiempo_inicio else 0
+            }
+        })
+        
+        # Increment counter
+        self.almacen.incrementar_contador_workorders()
+        
+        print(f"[DISPATCHER] {self.env.now:.2f} - {operator_id} staged WO {wo.id} "
+              f"({len(self.work_orders_completados)}/{len(self.lista_maestra_work_orders)})")
+
+    def finalizar_tour(self, operator: Any) -> None:
+        """
+        Mark operator as available after completing all staging.
+        
+        Called after all WOs have been individually staged.
+        
+        Args:
+            operator: Operator instance
+        """
+        operator_id = f"{operator.type}_{operator.id}"
+        
+        # Operator back to available
+        if operator_id in self.operadores_activos:
+            del self.operadores_activos[operator_id]
+        
+        if operator not in self.operadores_disponibles:
+            self.operadores_disponibles.append(operator)
+
     def obtener_estadisticas(self) -> Dict[str, Any]:
         """
         Return current dispatcher statistics

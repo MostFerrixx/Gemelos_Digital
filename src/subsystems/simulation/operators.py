@@ -296,7 +296,7 @@ class GroundOperator(BaseOperator):
                     print(f"[{self.id}] Simulacion finalizada, saliendo...")
                     break
                 
-                yield self.env.timeout(5.0)
+                yield self.env.timeout(0.5)  # V12: Reduced for fast termination detection
                 continue
 
             tour_start_time = self.env.now
@@ -517,7 +517,7 @@ class GroundOperator(BaseOperator):
                         print(f"[{self.id}] ERROR en pathfinding a staging {staging_id}: {e}")
                         self.current_position = staging_location
                 
-                # DESCARGAR en este staging
+                # DESCARGAR GRANULAR en este staging (V12: Progreso visible por WO)
                 self.status = "unloading"
                 
                 self.almacen.registrar_evento('estado_agente', {
@@ -529,24 +529,35 @@ class GroundOperator(BaseOperator):
                     'cargo_volume': self.cargo_volume
                 })
                 
-                print(f"[{self.id}] t={self.env.now:.1f} Descargando en staging {staging_id}")
-                discharge_duration = self.discharge_time * len(staging_wos)
-                yield self.env.timeout(discharge_duration)
+                print(f"[{self.id}] t={self.env.now:.1f} Iniciando descarga granular en staging {staging_id} "
+                      f"({len(staging_wos)} WOs)")
                 
-                # Actualizar cargo_volume PARCIALMENTE (solo lo descargado)
-                self.cargo_volume -= volumen_staging
-                print(f"[{self.id}] t={self.env.now:.1f} Descargados {volumen_staging}L en staging {staging_id}, "
-                      f"cargo restante: {self.cargo_volume}L")
-                
-                # Registrar evento de descarga parcial
-                self.almacen.registrar_evento('partial_discharge', {
-                    'agent_id': self.id,
-                    'staging_id': staging_id,
-                    'wos_descargadas': [wo.id for wo in staging_wos],
-                    'volumen_descargado': volumen_staging,
-                    'cargo_restante': self.cargo_volume,
-                    'timestamp': self.env.now
-                })
+                # V12 GRANULAR DISCHARGE: Descargar cada WO individualmente
+                for wo_idx, wo in enumerate(staging_wos, 1):
+                    # Calcular volumen de esta WO específica
+                    wo_volume = wo.cantidad_inicial * wo.sku.volumen
+                    
+                    # Timeout individual por WO
+                    yield self.env.timeout(self.discharge_time)
+                    
+                    # Actualizar cargo parcialmente
+                    self.cargo_volume -= wo_volume
+                    
+                    # Registrar evento de estado actualizado
+                    self.almacen.registrar_evento('estado_agente', {
+                        'agent_id': self.id,
+                        'agent_type': self.type,
+                        'position': self.current_position,
+                        'status': self.status,
+                        'current_task': wo.id,
+                        'cargo_volume': self.cargo_volume
+                    })
+                    
+                    # Notificar completion individual - esto emite work_order_update con status='staged'
+                    self.almacen.dispatcher.notificar_completado_individual(self, wo)
+                    
+                    print(f"[{self.id}] t={self.env.now:.1f} [{wo_idx}/{len(staging_wos)}] "
+                          f"WO {wo.id} staged (-{wo_volume}L, cargo: {self.cargo_volume}L)")
 
             # PASO 5: Limpiar cargo final (por seguridad)
             self.cargo_volume = 0
@@ -561,7 +572,7 @@ class GroundOperator(BaseOperator):
                 'cargo_volume': self.cargo_volume
             })
 
-            # PASO 6: Notificar completado
+            # PASO 6: Finalizar tour (ya no usamos notificar_completado batch)
             tour_duration = self.env.now - tour_start_time
             self.almacen.registrar_evento('trip_completed', {
                 'agent_id': self.id,
@@ -570,7 +581,9 @@ class GroundOperator(BaseOperator):
                     'num_work_orders': len(work_orders)
                 }
             })
-            self.almacen.dispatcher.notificar_completado(self, work_orders)
+            
+            # V12: Usar finalizar_tour en lugar de notificar_completado batch
+            self.almacen.dispatcher.finalizar_tour(self)
             self.tasks_completed += len(work_orders)
 
             print(f"[{self.id}] t={self.env.now:.1f} Tour completado, "
@@ -658,7 +671,7 @@ class Forklift(BaseOperator):
                     print(f"[{self.id}] Simulacion finalizada, saliendo...")
                     break
                 
-                yield self.env.timeout(5.0)
+                yield self.env.timeout(0.5)  # V12: Reduced for fast termination detection
                 continue
 
             tour_start_time = self.env.now
@@ -898,7 +911,7 @@ class Forklift(BaseOperator):
                         print(f"[{self.id}] ERROR en pathfinding a staging {staging_id}: {e}")
                         self.current_position = staging_location
                 
-                # DESCARGAR en este staging
+                # DESCARGAR GRANULAR en este staging (V12: Progreso visible por WO)
                 self.status = "unloading"
                 
                 self.almacen.registrar_evento('estado_agente', {
@@ -910,24 +923,35 @@ class Forklift(BaseOperator):
                     'cargo_volume': self.cargo_volume
                 })
                 
-                print(f"[{self.id}] t={self.env.now:.1f} Descargando en staging {staging_id}")
-                discharge_duration = self.discharge_time * len(staging_wos)
-                yield self.env.timeout(discharge_duration)
+                print(f"[{self.id}] t={self.env.now:.1f} Iniciando descarga granular en staging {staging_id} "
+                      f"({len(staging_wos)} WOs)")
                 
-                # Actualizar cargo_volume PARCIALMENTE (solo lo descargado)
-                self.cargo_volume -= volumen_staging
-                print(f"[{self.id}] t={self.env.now:.1f} Descargados {volumen_staging}L en staging {staging_id}, "
-                      f"cargo restante: {self.cargo_volume}L")
-                
-                # Registrar evento de descarga parcial
-                self.almacen.registrar_evento('partial_discharge', {
-                    'agent_id': self.id,
-                    'staging_id': staging_id,
-                    'wos_descargadas': [wo.id for wo in staging_wos],
-                    'volumen_descargado': volumen_staging,
-                    'cargo_restante': self.cargo_volume,
-                    'timestamp': self.env.now
-                })
+                # V12 GRANULAR DISCHARGE: Descargar cada WO individualmente
+                for wo_idx, wo in enumerate(staging_wos, 1):
+                    # Calcular volumen de esta WO específica
+                    wo_volume = wo.cantidad_inicial * wo.sku.volumen
+                    
+                    # Timeout individual por WO
+                    yield self.env.timeout(self.discharge_time)
+                    
+                    # Actualizar cargo parcialmente
+                    self.cargo_volume -= wo_volume
+                    
+                    # Registrar evento de estado actualizado
+                    self.almacen.registrar_evento('estado_agente', {
+                        'agent_id': self.id,
+                        'agent_type': self.type,
+                        'position': self.current_position,
+                        'status': self.status,
+                        'current_task': wo.id,
+                        'cargo_volume': self.cargo_volume
+                    })
+                    
+                    # Notificar completion individual - esto emite work_order_update con status='staged'
+                    self.almacen.dispatcher.notificar_completado_individual(self, wo)
+                    
+                    print(f"[{self.id}] t={self.env.now:.1f} [{wo_idx}/{len(staging_wos)}] "
+                          f"WO {wo.id} staged (-{wo_volume}L, cargo: {self.cargo_volume}L)")
 
             # PASO 5: Limpiar cargo final (por seguridad)
             self.cargo_volume = 0
@@ -942,7 +966,7 @@ class Forklift(BaseOperator):
                 'cargo_volume': self.cargo_volume
             })
 
-            # PASO 6: Notificar completado
+            # PASO 6: Finalizar tour (ya no usamos notificar_completado batch)
             tour_duration = self.env.now - tour_start_time
             self.almacen.registrar_evento('trip_completed', {
                 'agent_id': self.id,
@@ -951,7 +975,9 @@ class Forklift(BaseOperator):
                     'num_work_orders': len(work_orders)
                 }
             })
-            self.almacen.dispatcher.notificar_completado(self, work_orders)
+            
+            # V12: Usar finalizar_tour en lugar de notificar_completado batch
+            self.almacen.dispatcher.finalizar_tour(self)
             self.tasks_completed += len(work_orders)
 
             print(f"[{self.id}] t={self.env.now:.1f} Tour completado, "
