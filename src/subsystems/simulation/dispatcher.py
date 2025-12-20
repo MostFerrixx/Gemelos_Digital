@@ -940,6 +940,8 @@ class DispatcherV11:
                 'priority': getattr(wo, 'priority', 99),
                 'items': getattr(wo, 'items', 1),
                 'total_qty': wo.cantidad_total,
+                'qty_requested': wo.cantidad_inicial,
+                'qty_picked': wo.cantidad_inicial - wo.cantidad_restante,
                 'volume': getattr(wo, 'volume', wo.volumen_restante),
                 'location': wo.ubicacion,
                 'pick_sequence': getattr(wo, 'pick_sequence', None),
@@ -988,6 +990,8 @@ class DispatcherV11:
             'priority': getattr(work_order, 'priority', 99),
             'items': getattr(work_order, 'items', 1),
             'total_qty': work_order.cantidad_total,
+            'qty_requested': work_order.cantidad_inicial,
+            'qty_picked': work_order.cantidad_inicial - work_order.cantidad_restante,
             'volume': getattr(work_order, 'volume', work_order.volumen_restante),
             'location': work_order.ubicacion,
                 'pick_sequence': getattr(work_order, 'pick_sequence', None),
@@ -1044,6 +1048,8 @@ class DispatcherV11:
                 'priority': getattr(wo, 'priority', 99),
                 'items': getattr(wo, 'items', 1),
                 'total_qty': wo.cantidad_total,
+                'qty_requested': wo.cantidad_inicial,
+                'qty_picked': wo.cantidad_inicial - wo.cantidad_restante,
                 'volume': getattr(wo, 'volume', wo.volumen_restante),
                 'location': wo.ubicacion,
                 'pick_sequence': getattr(wo, 'pick_sequence', None),
@@ -1123,6 +1129,8 @@ class DispatcherV11:
             'priority': getattr(wo, 'priority', 99),
             'items': getattr(wo, 'items', 1),
             'total_qty': wo.cantidad_total,
+            'qty_requested': wo.cantidad_inicial,
+            'qty_picked': wo.cantidad_inicial - wo.cantidad_restante,
             'volume': getattr(wo, 'volume', wo.volumen_restante),
             'location': wo.ubicacion,
             'pick_sequence': getattr(wo, 'pick_sequence', None),
@@ -1229,15 +1237,29 @@ class DispatcherV11:
 
     def simulacion_ha_terminado(self) -> bool:
         """
-        Check if all WorkOrders have been completed
+        Check if simulation is truly complete.
+        
+        V12 FIX: Now verifies BOTH conditions to prevent race condition:
+        1. All WorkOrders have been completed (staged)
+        2. No operators are actively working (all idle)
+        
+        This prevents premature termination when an operator still has cargo
+        but the WO counter has already reached the target.
 
         Returns:
-            True if all WOs are completed, False otherwise
+            True if all WOs are completed AND no operators are active
         """
         if not self.lista_maestra_work_orders:
             return False
-
-        return len(self.work_orders_completados) >= len(self.lista_maestra_work_orders)
+        
+        # Condition 1: All WOs completed
+        wos_complete = len(self.work_orders_completados) >= len(self.lista_maestra_work_orders)
+        
+        # Condition 2: No active operators (all have finished their tours)
+        operators_idle = len(self.operadores_activos) == 0
+        
+        # Must satisfy BOTH conditions
+        return wos_complete and operators_idle
 
     def dispatcher_process(self, operarios: List[Any]):
         """

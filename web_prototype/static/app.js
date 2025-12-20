@@ -61,6 +61,8 @@ const COLUMNS = [
     { key: 'priority', header: 'PRIORITY', width: '90px' },
     { key: 'items', header: 'ITEMS', width: '70px' },
     { key: 'total_qty', header: 'TOTAL QTY', width: '90px' },
+    { key: 'qty_requested', header: 'QTY REQ', width: '80px' },
+    { key: 'qty_picked', header: 'QTY PICK', width: '80px' },
     { key: 'volume', header: 'VOLUME', width: '90px' },
     { key: 'location', header: 'LOCATION', width: '120px' },
     { key: 'staging', header: 'STAGING', width: '120px' },
@@ -287,7 +289,8 @@ const TableModule = {
             } else if (col.key === 'start_time' && typeof value === 'number') {
                 value = value.toFixed(2);
             } else if (col.key === 'progress' && typeof value === 'number') {
-                value = (value * 100).toFixed(1) + '%';
+                // V12 FIX: Backend already sends percentage (0-100), no need to multiply
+                value = value.toFixed(1) + '%';
             }
 
             td.textContent = value;
