@@ -233,10 +233,71 @@ class AlmacenMejorado:
             print(f"  - Fulfillment Policy: {policy}")
 
     def _crear_catalogo_y_stock(self):
-        """Create SKU catalog and initialize inventory"""
+        """
+        Create SKU catalog and initialize inventory.
+        
+        V12 UPGRADE: Now loads from SQLite database via data_manager instead of
+        generating synthetic SKUs. Falls back to legacy synthetic generation
+        only if data_manager is not available.
+        """
         print("[ALMACEN] Creando catalogo de SKUs y stock inicial...")
-
-        # Create SKUs based on distribution types
+        
+        # Try loading from data_manager (SQLite-backed)
+        if self.data_manager and hasattr(self.data_manager, 'sku_catalog'):
+            self._load_catalog_from_data_manager()
+        else:
+            # LEGACY FALLBACK: Generate synthetic SKUs
+            print("[ALMACEN WARNING] No data_manager, using synthetic catalog")
+            self._create_synthetic_catalog()
+    
+    def _load_catalog_from_data_manager(self):
+        """
+        Load SKU catalog and inventory from data_manager (SQLite).
+        
+        Uses real SKU codes (e.g., 'SKU029') and actual quantities from database.
+        """
+        print("[ALMACEN] Loading catalog from SQLite via data_manager...")
+        
+        # Load SKU catalog
+        sku_catalog = self.data_manager.sku_catalog
+        for sku_code, sku_info in sku_catalog.items():
+            # Map volume from m3 to integer (multiply by 100 for internal use)
+            volume_m3 = sku_info.get('volume_m3', 0.01)
+            volumen_int = max(1, int(volume_m3 * 100))  # Convert to internal units
+            
+            # Create SKU object with real data
+            sku = SKU(
+                sku_id=sku_code,
+                volumen=volumen_int,
+                descripcion=sku_info.get('description', f'SKU {sku_code}')
+            )
+            self.catalogo_skus[sku_code] = sku
+        
+        # Load inventory from picking points
+        picking_points = self.data_manager.get_picking_points()
+        for punto in picking_points:
+            sku_code = punto.get('sku_initial', '')
+            qty = punto.get('qty_initial', 0)
+            
+            if sku_code:
+                # Sum quantities per SKU (multiple locations may have same SKU)
+                current_qty = self.inventario.get(sku_code, 0)
+                self.inventario[sku_code] = current_qty + qty
+        
+        print(f"[ALMACEN] Catalogo SQLite cargado: {len(self.catalogo_skus)} SKUs")
+        print(f"[ALMACEN] Inventario real: {sum(self.inventario.values())} unidades")
+        
+        # Log sample for verification
+        sample_skus = list(self.catalogo_skus.keys())[:5]
+        print(f"[ALMACEN] Sample SKUs: {sample_skus}")
+    
+    def _create_synthetic_catalog(self):
+        """
+        LEGACY FALLBACK: Create synthetic SKU catalog.
+        
+        Only used when data_manager is not available (backward compatibility).
+        Generates SKUs like 'SKU-PEQ-001', 'SKU-MED-002', etc.
+        """
         sku_counter = 1
         for tipo, config in self.distribucion_tipos.items():
             volumen = config['volumen']
@@ -245,11 +306,10 @@ class AlmacenMejorado:
                 sku_id = f"SKU-{tipo[:3].upper()}-{sku_counter:03d}"
                 sku = SKU(sku_id, volumen, f"Producto {tipo} #{i+1}")
                 self.catalogo_skus[sku_id] = sku
-                self.inventario[sku_id] = 1000  # Initial stock
+                self.inventario[sku_id] = 1000  # Default stock
                 sku_counter += 1
 
-        print(f"[ALMACEN] Catalogo creado: {len(self.catalogo_skus)} SKUs")
-        print(f"[ALMACEN] Inventario inicial: {sum(self.inventario.values())} unidades")
+        print(f"[ALMACEN] Catalogo sintetico: {len(self.catalogo_skus)} SKUs")
 
     def _validar_y_ajustar_cantidad(self, sku: SKU, cantidad_original: int,
                                      work_area: str) -> List[int]:

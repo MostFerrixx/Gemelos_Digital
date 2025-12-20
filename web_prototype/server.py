@@ -486,25 +486,50 @@ async def upload_orders_file(
         with open(saved_file_path, 'wb') as f:
             f.write(content)
         
-        # Load current catalog to validate SKUs
+        # Load current catalog to validate SKUs - NOW USES SQLite!
+        catalog_skus = set()
         try:
-            config = config_manager.load_config()
-            distribucion_tipos = config.get('distribucion_tipos', {
-                'pequeno': {'porcentaje': 60, 'volumen': 5},
-                'mediano': {'porcentaje': 30, 'volumen': 25},
-                'grande': {'porcentaje': 10, 'volumen': 80}
-            })
+            import sqlite3
+            db_path = os.path.join(PROJECT_ROOT, 'warehouse.db')
             
-            # Generate SKU catalog (same logic as warehouse.py)
-            catalog_skus = set()
-            sku_counter = 1
-            for tipo, cfg in distribucion_tipos.items():
-                for i in range(5):
-                    sku_id = f"SKU-{tipo[:3].upper()}-{sku_counter:03d}"
-                    catalog_skus.add(sku_id)
-                    sku_counter += 1
-        except:
-            catalog_skus = set()
+            if os.path.exists(db_path):
+                # USE SQLITE - Fast and uses real SKUs
+                conn = sqlite3.connect(db_path)
+                cursor = conn.execute("SELECT sku_code FROM sku_catalog")
+                catalog_skus = set(row[0] for row in cursor.fetchall())
+                conn.close()
+                print(f"[UPLOAD-ORDERS] Loaded {len(catalog_skus)} SKUs from SQLite")
+            else:
+                # FALLBACK: Read from Excel (legacy)
+                print("[UPLOAD-ORDERS] No SQLite DB, using Excel fallback for SKU validation")
+                try:
+                    import openpyxl
+                    config = config_manager.load_config()
+                    sequence_file = config.get('sequence_file', 'layouts/Warehouse_Logic.xlsx')
+                    excel_path = os.path.join(PROJECT_ROOT, sequence_file)
+                    
+                    if os.path.exists(excel_path):
+                        wb = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
+                        if 'PickingLocations' in wb.sheetnames:
+                            sheet = wb['PickingLocations']
+                            # Find sku_initial column
+                            headers = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
+                            sku_col = None
+                            for i, h in enumerate(headers):
+                                if h and 'sku' in str(h).lower():
+                                    sku_col = i
+                                    break
+                            
+                            if sku_col is not None:
+                                for row in sheet.iter_rows(min_row=2, values_only=True):
+                                    if row and sku_col < len(row) and row[sku_col]:
+                                        catalog_skus.add(str(row[sku_col]))
+                        wb.close()
+                        print(f"[UPLOAD-ORDERS] Loaded {len(catalog_skus)} SKUs from Excel")
+                except Exception as excel_err:
+                    print(f"[UPLOAD-ORDERS] Excel fallback failed: {excel_err}")
+        except Exception as db_err:
+            print(f"[UPLOAD-ORDERS] SKU catalog load error: {db_err}")
         
         # Validate orders against catalog
         valid_orders = 0

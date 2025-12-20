@@ -661,15 +661,16 @@ class DispatcherV11:
                   f"{wos_agregadas_barrido1} WOs, {volumen_barrido1}L")
             
             # ==================== BARRIDO 2: SECUNDARIO (CIRCULAR / LLENADO) ====================
+            # Inicializar variables ANTES del condicional (BUGFIX: UnboundLocalError)
+            wos_agregadas_barrido2 = 0
+            volumen_barrido2 = 0
+            
             # Solo ejecutar si queda capacidad
             capacidad_restante = operator.capacity - volume_acumulado
             
             if capacidad_restante > 0 and len(tour_wos) < self.max_wos_por_tour:
                 print(f"[DISPATCHER] [{area}] --- BARRIDO SECUNDARIO (seq < {min_seq}) ---")
                 print(f"[DISPATCHER] [{area}] Capacidad restante: {capacidad_restante}L")
-                
-                wos_agregadas_barrido2 = 0
-                volumen_barrido2 = 0
                 
                 for wo in area_wos_sorted:
                     # Verificar límites

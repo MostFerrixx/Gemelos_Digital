@@ -4,17 +4,17 @@ Data Manager Module - Central Data Loading for Warehouse Simulation
 Digital Twin Warehouse Simulator
 
 Responsibilities:
-- Load Warehouse_Logic.xlsx (picking locations, staging areas)
+- Load warehouse data from SQLite (preferred) or Excel (fallback)
 - Create and configure LayoutManager
-- Validate data consistency between Excel and TMX
+- Validate data consistency between data source and TMX
 - Expose processed data to simulation components
 
 Author: Digital Twin Warehouse Team
-Version: V11 - Migration Phase 3
+Version: V12 - SQLite Dual-Mode Support
 """
 
 import os
-import openpyxl
+import sqlite3
 from typing import List, Dict, Tuple, Optional, Any
 from .layout_manager import LayoutManager
 
@@ -28,11 +28,15 @@ class DataManager:
     """
     Central data loader for warehouse simulation
 
-    Loads Excel data (Warehouse_Logic.xlsx) and TMX layout,
+    Loads data from SQLite database (preferred) or Excel file (fallback),
     validates consistency, and exposes processed data.
 
     This class acts as the single source of truth for all
     warehouse static data (picking points, staging areas, layout).
+    
+    V12 UPGRADE: Now supports dual-mode loading:
+    - If warehouse.db exists -> Load from SQLite (fast, validated)
+    - If not -> Fallback to Excel loading (legacy compatibility)
     """
 
     def __init__(self, tmx_file_path: str, excel_file_path: str,
@@ -42,7 +46,7 @@ class DataManager:
 
         Args:
             tmx_file_path: Path to TMX map file (e.g., 'layouts/WH1.tmx')
-            excel_file_path: Path to Warehouse_Logic.xlsx
+            excel_file_path: Path to Warehouse_Logic.xlsx (used as fallback)
             configuracion: Optional configuration dict (for future extensions)
 
         Raises:
@@ -50,18 +54,19 @@ class DataManager:
             FileNotFoundError: If required files don't exist
         """
         print(f"[DATA-MANAGER] Iniciando carga de TMX '{tmx_file_path}' "
-              f"y archivo de secuencia '{excel_file_path}'...")
+              f"y datos de warehouse...")
 
         self.tmx_file_path = tmx_file_path
-
-        # BUGFIX V11: Resolver ruta relativa del archivo Excel desde raiz del proyecto
-        if not os.path.isabs(excel_file_path):
-            # Obtener raiz del proyecto (3 niveles arriba desde src/subsystems/simulation/)
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-            excel_file_path = os.path.join(project_root, excel_file_path)
-
-        self.excel_file_path = os.path.abspath(excel_file_path)
         self.configuracion = configuracion or {}
+
+        # Resolve project root for database path
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+        self.db_path = os.path.join(project_root, 'warehouse.db')
+
+        # Resolve Excel path (for fallback)
+        if not os.path.isabs(excel_file_path):
+            excel_file_path = os.path.join(project_root, excel_file_path)
+        self.excel_file_path = os.path.abspath(excel_file_path)
 
         # Create LayoutManager first (needed for validation)
         try:
@@ -72,11 +77,17 @@ class DataManager:
         # Initialize data structures
         self.puntos_de_picking_ordenados: List[Dict[str, Any]] = []
         self.outbound_staging_locations: Dict[int, Tuple[int, int]] = {}
+        self.sku_catalog: Dict[str, Dict[str, Any]] = {}  # NEW: SKU catalog cache
 
-        # Load Excel data
-        self._load_excel_data()
+        # Load data from SQLite (preferred) or Excel (fallback)
+        if os.path.exists(self.db_path):
+            print(f"[DATA-MANAGER] SQLite database found: {self.db_path}")
+            self._load_from_database()
+        else:
+            print(f"[DATA-MANAGER] No SQLite database found, using Excel fallback")
+            self._load_excel_data()
 
-        # Validate consistency between Excel and TMX
+        # Validate consistency with TMX
         self._validate_data_consistency()
 
         print(f"[DATA-MANAGER] Plan maestro cargado y ordenado con "
@@ -105,6 +116,7 @@ class DataManager:
         - qty_initial: Initial quantity
         - WorkGroup: Work group identifier (e.g., 'WG_A')
         - WorkArea: Work area identifier (e.g., 'Area_Ground')
+        - location_id: Logical location identifier (NEW in V12)
 
         Returns:
             List of dicts, sorted by pick_sequence
@@ -147,13 +159,180 @@ class DataManager:
             )
         return self.layout_manager.pathfinder
 
+    def get_all_skus(self) -> List[str]:
+        """
+        Return list of all known SKU codes.
+        
+        NEW in V12: Used for order validation.
+        
+        Returns:
+            List of SKU code strings
+        """
+        return list(self.sku_catalog.keys())
+
+    def get_sku_info(self, sku_code: str) -> Optional[Dict[str, Any]]:
+        """
+        Get information about a specific SKU.
+        
+        Args:
+            sku_code: The SKU code to look up
+            
+        Returns:
+            Dict with SKU info or None if not found
+        """
+        return self.sku_catalog.get(sku_code)
+
+    def sku_exists(self, sku_code: str) -> bool:
+        """
+        Check if a SKU exists in the catalog.
+        
+        Args:
+            sku_code: The SKU code to check
+            
+        Returns:
+            True if SKU exists, False otherwise
+        """
+        return sku_code in self.sku_catalog
+
     # ========================================================================
-    # PRIVATE METHODS - Data Loading
+    # PRIVATE METHODS - SQLite Data Loading (V12 NEW)
+    # ========================================================================
+
+    def _load_from_database(self):
+        """
+        Load warehouse data from SQLite database.
+        
+        Uses the v_picking_sequence view for efficient data retrieval.
+        Falls back to direct table queries if view doesn't exist.
+        """
+        print(f"[DATA-MANAGER] Loading from SQLite: {self.db_path}")
+        
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            
+            # Load SKU catalog
+            self._load_sku_catalog(conn)
+            
+            # Load picking locations with inventory
+            self._load_picking_locations_from_db(conn)
+            
+            # Load staging areas
+            self._load_staging_areas_from_db(conn)
+            
+            conn.close()
+            
+            print(f"[DATA-MANAGER] SQLite loading complete:")
+            print(f"  - SKUs loaded: {len(self.sku_catalog)}")
+            print(f"  - Picking locations: {len(self.puntos_de_picking_ordenados)}")
+            print(f"  - Staging areas: {len(self.outbound_staging_locations)}")
+            
+        except sqlite3.Error as e:
+            conn.close() if 'conn' in locals() else None
+            raise DataManagerError(f"SQLite error: {e}")
+
+    def _load_sku_catalog(self, conn: sqlite3.Connection):
+        """Load SKU catalog from database."""
+        cursor = conn.execute("""
+            SELECT sku_code, description, volume_m3, weight_kg, 
+                   category, equipment_required
+            FROM sku_catalog
+        """)
+        
+        for row in cursor:
+            self.sku_catalog[row['sku_code']] = {
+                'sku_code': row['sku_code'],
+                'description': row['description'],
+                'volume_m3': row['volume_m3'] or 0.01,
+                'weight_kg': row['weight_kg'],
+                'category': row['category'] or 'GENERAL',
+                'equipment_required': row['equipment_required'] or 'GroundOperator'
+            }
+
+    def _load_picking_locations_from_db(self, conn: sqlite3.Connection):
+        """Load picking locations with inventory from database."""
+        # Try using the view first (more efficient)
+        try:
+            cursor = conn.execute("""
+                SELECT 
+                    location_id,
+                    pick_sequence,
+                    work_area,
+                    work_group,
+                    equipment_required,
+                    legacy_x,
+                    legacy_y,
+                    sku_code,
+                    qty_available
+                FROM v_picking_sequence
+                ORDER BY pick_sequence
+            """)
+        except sqlite3.OperationalError:
+            # View doesn't exist, use direct join
+            cursor = conn.execute("""
+                SELECT 
+                    l.location_id,
+                    l.pick_sequence,
+                    l.work_area,
+                    l.work_group,
+                    l.equipment_required,
+                    l.legacy_x,
+                    l.legacy_y,
+                    i.sku_code,
+                    i.qty_available
+                FROM locations l
+                LEFT JOIN inventory i ON l.location_id = i.location_id
+                WHERE l.location_type = 'PICKING'
+                ORDER BY l.pick_sequence
+            """)
+        
+        for row in cursor:
+            x = row['legacy_x'] or 0
+            y = row['legacy_y'] or 0
+            
+            punto = {
+                'x': x,
+                'y': y,
+                'ubicacion_grilla': (x, y),
+                'pick_sequence': row['pick_sequence'] or 0,
+                'equipment_required': row['equipment_required'] or 'GroundOperator',
+                'sku_initial': row['sku_code'] or 'SKU000',
+                'qty_initial': row['qty_available'] or 1,
+                'WorkGroup': row['work_group'] or 'WG_Default',
+                'WorkArea': row['work_area'] or 'Area_Ground',
+                'location_id': row['location_id']  # NEW: Include location_id
+            }
+            
+            self.puntos_de_picking_ordenados.append(punto)
+
+    def _load_staging_areas_from_db(self, conn: sqlite3.Connection):
+        """Load staging areas from database."""
+        cursor = conn.execute("""
+            SELECT staging_id, legacy_x, legacy_y
+            FROM staging_areas
+            WHERE staging_type = 'OUTBOUND'
+        """)
+        
+        for row in cursor:
+            staging_id = row['staging_id']
+            x = row['legacy_x'] or 0
+            y = row['legacy_y'] or 0
+            
+            if staging_id > 0:
+                self.outbound_staging_locations[staging_id] = (x, y)
+        
+        # Generate defaults if none found
+        if not self.outbound_staging_locations:
+            print("[DATA-MANAGER] No staging areas in DB, generating defaults")
+            self._generate_default_staging_locations()
+
+    # ========================================================================
+    # PRIVATE METHODS - Excel Data Loading (Legacy Fallback)
     # ========================================================================
 
     def _load_excel_data(self):
         """
-        Load and parse Warehouse_Logic.xlsx
+        Load and parse Warehouse_Logic.xlsx (LEGACY FALLBACK)
 
         Expects two sheets:
         - PickingLocations: x, y, pick_sequence, WorkArea, etc.
@@ -162,6 +341,8 @@ class DataManager:
         Raises:
             DataManagerError: If Excel loading fails
         """
+        import openpyxl
+        
         print(f"[DATA-MANAGER] Leyendo archivo Excel: {self.excel_file_path}")
 
         try:
@@ -194,6 +375,21 @@ class DataManager:
             self._generate_default_staging_locations()
 
         workbook.close()
+        
+        # Build SKU catalog from Excel data
+        self._build_sku_catalog_from_picking_points()
+
+    def _build_sku_catalog_from_picking_points(self):
+        """Build SKU catalog from loaded picking points (Excel fallback)."""
+        for punto in self.puntos_de_picking_ordenados:
+            sku_code = punto.get('sku_initial', '')
+            if sku_code and sku_code not in self.sku_catalog:
+                self.sku_catalog[sku_code] = {
+                    'sku_code': sku_code,
+                    'description': f'SKU {sku_code}',
+                    'volume_m3': 0.01,
+                    'equipment_required': punto.get('equipment_required', 'GroundOperator')
+                }
 
     def _process_picking_locations(self, sheet):
         """
@@ -249,15 +445,18 @@ class DataManager:
         # Convert to standardized format
         for row_data in data_rows:
             try:
+                pick_seq = int(row_data.get('pick_sequence', 0))
+                
                 punto = {
                     'x': int(row_data.get('x', 0)),
                     'y': int(row_data.get('y', 0)),
-                    'pick_sequence': int(row_data.get('pick_sequence', 0)),
+                    'pick_sequence': pick_seq,
                     'equipment_required': str(row_data.get('equipment_required', 'GroundOperator')),
                     'sku_initial': str(row_data.get('sku_initial', 'SKU000')),
                     'qty_initial': int(row_data.get('qty_initial', 1)),
                     'WorkGroup': str(row_data.get('WorkGroup', 'WG_Default')),
                     'WorkArea': str(row_data.get('WorkArea', 'Area_Ground')),
+                    'location_id': f"LOC-{pick_seq:03d}"  # Generate location_id
                 }
 
                 # Add grid location tuple for convenience
@@ -364,7 +563,7 @@ class DataManager:
 
     def _validate_data_consistency(self):
         """
-        Validate that Excel coordinates are within TMX grid bounds
+        Validate that coordinates are within TMX grid bounds
 
         Checks:
         - All picking points are within grid
@@ -408,9 +607,11 @@ class DataManager:
         print(f"[DATA-MANAGER] Validacion completada:")
         print(f"  - {len(self.puntos_de_picking_ordenados)} picking points validados")
         print(f"  - {len(self.outbound_staging_locations)} staging areas validadas")
+        print(f"  - {len(self.sku_catalog)} SKUs en catalogo")
         print(f"  - Grid bounds: {grid_w}x{grid_h}")
 
     def __repr__(self):
         return (f"DataManager(picking_points={len(self.puntos_de_picking_ordenados)}, "
                 f"staging_areas={len(self.outbound_staging_locations)}, "
+                f"skus={len(self.sku_catalog)}, "
                 f"grid={self.layout_manager.grid_width}x{self.layout_manager.grid_height})")
