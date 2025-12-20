@@ -30,6 +30,7 @@ class WebConfigurator {
         this.setupEventListeners();
         this.setupTabNavigation();
         this.setupValidations();
+        this.setupOrderGenerationMode(); // NEW: Setup order mode toggle
 
         // Load initial configuration
         await this.loadConfiguration();
@@ -226,6 +227,180 @@ class WebConfigurator {
         return total === 100;
     }
 
+    /**
+     * Setup Order Generation Mode toggle and file upload handlers
+     * Implements dynamic UI for stochastic vs deterministic mode selection
+     */
+    setupOrderGenerationMode() {
+        // Mode toggle radios
+        const modeRadios = document.querySelectorAll('input[name="order-generation-mode"]');
+        const stochasticOptions = document.getElementById('stochastic-options');
+        const deterministicOptions = document.getElementById('deterministic-options');
+        const modeBadge = document.getElementById('order-mode-badge');
+        const policySelect = document.getElementById('fulfillment-policy');
+
+        // Initialize state
+        this.uploadedOrderFilePath = '';
+
+        // Mode toggle handler
+        modeRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                const mode = document.querySelector('input[name="order-generation-mode"]:checked').value;
+
+                if (mode === 'deterministic') {
+                    // Show deterministic options, hide stochastic
+                    if (stochasticOptions) stochasticOptions.classList.add('hidden');
+                    if (deterministicOptions) deterministicOptions.classList.remove('hidden');
+                    if (modeBadge) {
+                        modeBadge.textContent = 'Determinista';
+                        modeBadge.className = 'badge badge-success';
+                    }
+                    // Enable policy selector
+                    if (policySelect) policySelect.disabled = false;
+                } else {
+                    // Show stochastic options, hide deterministic
+                    if (stochasticOptions) stochasticOptions.classList.remove('hidden');
+                    if (deterministicOptions) deterministicOptions.classList.add('hidden');
+                    if (modeBadge) {
+                        modeBadge.textContent = 'Estocástico';
+                        modeBadge.className = 'badge badge-info';
+                    }
+                    // Disable policy selector
+                    if (policySelect) policySelect.disabled = true;
+                }
+            });
+        });
+
+        // File dropzone setup
+        const dropzone = document.getElementById('orders-dropzone');
+        const fileInput = document.getElementById('orders-file-input');
+
+        if (dropzone && fileInput) {
+            // Click to upload
+            dropzone.addEventListener('click', () => fileInput.click());
+
+            // Drag and drop events
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('drag-over');
+            });
+
+            dropzone.addEventListener('dragleave', () => {
+                dropzone.classList.remove('drag-over');
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('drag-over');
+
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    this.handleOrderFileUpload(files[0]);
+                }
+            });
+
+            // File input change
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    this.handleOrderFileUpload(e.target.files[0]);
+                }
+            });
+        }
+    }
+
+    /**
+     * Handle order file upload - sends to API and displays validation preview
+     */
+    async handleOrderFileUpload(file) {
+        const dropzone = document.getElementById('orders-dropzone');
+        const dropzoneContent = dropzone.querySelector('.dropzone-content');
+        const validationPreview = document.getElementById('orders-validation-preview');
+        const policySelect = document.getElementById('fulfillment-policy');
+
+        // Validate file extension
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (!['json', 'csv'].includes(ext)) {
+            this.showNotification('Solo se permiten archivos .json o .csv', 'error');
+            return;
+        }
+
+        try {
+            this.showLoading('Procesando archivo de órdenes...');
+
+            // Create form data
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('fulfillment_policy', policySelect?.value || 'ship_partial');
+
+            // Upload to API
+            const response = await fetch('/api/upload-orders', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            this.hideLoading();
+
+            if (result.success) {
+                // Store file path for config serialization
+                this.uploadedOrderFilePath = result.file_path;
+
+                // Update dropzone appearance
+                dropzone.classList.add('has-file');
+                dropzoneContent.innerHTML = `
+                    <span class="dropzone-icon">✅</span>
+                    <p><strong>${file.name}</strong></p>
+                    <small>Clic para cambiar archivo</small>
+                `;
+
+                // Show validation preview
+                this.showValidationPreview(result.summary, result.exclusions);
+
+                this.showNotification(`✓ ${file.name} procesado exitosamente`, 'success');
+            } else {
+                throw new Error(result.detail || 'Error procesando archivo');
+            }
+
+        } catch (error) {
+            this.hideLoading();
+            console.error('Order file upload error:', error);
+            this.showNotification(`Error: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Display validation preview with statistics and exclusions
+     */
+    showValidationPreview(summary, exclusions) {
+        const preview = document.getElementById('orders-validation-preview');
+        if (!preview) return;
+
+        // Update stats
+        document.getElementById('preview-orders').textContent = summary.total_orders_output || 0;
+        document.getElementById('preview-items').textContent = summary.total_items_output || 0;
+        document.getElementById('preview-skus').textContent = summary.skus_found || 0;
+        document.getElementById('preview-missing').textContent = (summary.skus_missing || []).length;
+
+        // Show exclusions if any
+        const exclusionsList = document.getElementById('exclusions-list');
+        const exclusionsItems = document.getElementById('exclusions-items');
+
+        if (exclusions && exclusions.length > 0) {
+            exclusionsList.classList.remove('hidden');
+            exclusionsItems.innerHTML = exclusions.slice(0, 10).map(e =>
+                `<li>Orden ${e.order_id}: ${e.reason}</li>`
+            ).join('');
+
+            if (exclusions.length > 10) {
+                exclusionsItems.innerHTML += `<li>... y ${exclusions.length - 10} más</li>`;
+            }
+        } else {
+            exclusionsList.classList.add('hidden');
+        }
+
+        preview.classList.remove('hidden');
+    }
+
     async loadConfiguration() {
         try {
             this.showLoading('Cargando configuración...');
@@ -311,8 +486,17 @@ class WebConfigurator {
     }
 
     serializeConfig() {
+        // Get order generation mode
+        const orderModeRadio = document.querySelector('input[name="order-generation-mode"]:checked');
+        const orderMode = orderModeRadio ? orderModeRadio.value : 'stochastic';
+
         // Tab 1: Carga de Trabajo
         const config = {
+            // NEW: Order generation mode settings
+            order_generation_mode: orderMode,
+            fulfillment_policy: document.getElementById('fulfillment-policy')?.value || 'ship_partial',
+            order_file_path: this.uploadedOrderFilePath || '',
+
             total_ordenes: parseInt(document.getElementById('total-ordenes').value),
             distribucion_tipos: {
                 pequeno: {

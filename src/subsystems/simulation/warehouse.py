@@ -7,6 +7,7 @@ Digital Twin Warehouse Simulator
 import simpy
 import random
 from typing import Optional, List, Dict, Any
+from .order_strategies import create_order_strategy, OrderGenerationStrategy
 
 
 class SKU:
@@ -222,6 +223,15 @@ class AlmacenMejorado:
         print(f"  - Capacidades por work area: {self.operator_capacities}")
         print(f"  - Capacidad maxima global: {self.max_operator_capacity}")
 
+        # ORDER GENERATION STRATEGY: Create based on configuration
+        # Supports 'stochastic' (random) and 'deterministic' (file-based) modes
+        self.order_strategy: OrderGenerationStrategy = create_order_strategy(configuracion)
+        order_mode = configuracion.get('order_generation_mode', 'stochastic')
+        print(f"  - Order Generation Mode: {order_mode.upper()}")
+        if order_mode == 'deterministic':
+            policy = configuracion.get('fulfillment_policy', 'ship_partial')
+            print(f"  - Fulfillment Policy: {policy}")
+
     def _crear_catalogo_y_stock(self):
         """Create SKU catalog and initialize inventory"""
         print("[ALMACEN] Creando catalogo de SKUs y stock inicial...")
@@ -350,107 +360,27 @@ class AlmacenMejorado:
         return staging_ids[0]
 
     def _generar_flujo_ordenes(self):
-        """Generate work orders flow based on configuration"""
-        # print(f"[ALMACEN] Generando {self.total_ordenes} ordenes de trabajo...")
-
-        # Get picking points from data manager
-        if not self.data_manager or not self.data_manager.puntos_de_picking_ordenados:
-            print("[ALMACEN WARNING] No hay puntos de picking disponibles - usando ubicaciones dummy")
-            picking_points = [(10, 10), (15, 15), (20, 20)]
-            work_areas = ["Area_Ground", "Area_High", "Area_Special"]
-        else:
-            # Mix picking points randomly to ensure fair distribution across areas
-            import random
-            mixed_points = self.data_manager.puntos_de_picking_ordenados.copy()
-            random.shuffle(mixed_points)
-            
-            picking_points = [pp['ubicacion_grilla'] for pp in mixed_points]
-            work_areas = [pp.get('WorkArea', 'Area_Ground') for pp in mixed_points]
-
-        # Generate work orders (collect all first, then add in batch)
-        wo_counter = 0
-        order_counter = 1
-        all_work_orders = []  # BUGFIX FASE 2: Collect all WOs for batch add
-        wo_adjusted_count = 0  # BUGFIX CAPACITY VALIDATION: Track adjustments
-
-        for order_num in range(1, self.total_ordenes + 1):
-            # Determine order type based on distribution
-            rand = random.random() * 100
-            cumulative = 0
-            tipo_seleccionado = 'pequeno'
-
-            for tipo, config in self.distribucion_tipos.items():
-                cumulative += config['porcentaje']
-                if rand <= cumulative:
-                    tipo_seleccionado = tipo
-                    break
-
-            # Select SKU of chosen type
-            skus_tipo = [sku for sku in self.catalogo_skus.values()
-                        if tipo_seleccionado[:3].upper() in sku.id]
-            if not skus_tipo:
-                skus_tipo = list(self.catalogo_skus.values())
-
-            sku = random.choice(skus_tipo)
-
-            # Generate 1-3 work orders per order
-            num_wos = random.randint(1, 3)
-
-            for wo_num in range(num_wos):
-                # Select picking location - ORIGINAL METHOD RESTORED
-                # Use order_counter instead of wo_counter for pick_idx to avoid bias
-                pick_idx = order_counter % len(picking_points)
-                ubicacion = picking_points[pick_idx]
-                work_area = work_areas[pick_idx] if pick_idx < len(work_areas) else "Area_Ground"
-
-                # BUGFIX WO DIVISION: Validate and potentially divide quantity
-                cantidad_solicitada = random.randint(1, 5)
-                cantidades = self._validar_y_ajustar_cantidad(
-                    sku=sku,
-                    cantidad_original=cantidad_solicitada,
-                    work_area=work_area
-                )
-
-                # Track adjustments (when divided into multiple WOs)
-                if len(cantidades) > 1:
-                    wo_adjusted_count += 1
-
-                # Select staging ID based on distribution
-                staging_id = self._seleccionar_staging_id()
-                
-                # Create one work order for each quantity (may be 1 or multiple)
-                for cantidad in cantidades:
-                    wo_counter += 1
-                    work_order = WorkOrder(
-                        work_order_id=f"WO-{wo_counter:04d}",
-                        order_id=f"ORD-{order_counter:04d}",
-                        tour_id=f"TOUR-{order_counter:04d}",
-                        sku=sku,
-                        cantidad=cantidad,  # BUGFIX WO DIVISION: Each WO has its own quantity
-                        ubicacion=ubicacion,
-                        work_area=work_area,
-                        pick_sequence=self._obtener_pick_sequence_real(ubicacion, work_area),
-                        staging_id=staging_id
-                    )
-
-                    all_work_orders.append(work_order)
-
-            order_counter += 1
-
-        # BUGFIX FASE 2: Add all work orders in one batch (DispatcherV11 uses plural method)
+        """
+        Generate work orders flow using configured strategy.
+        
+        Delegates to either StochasticOrderStrategy (random) or
+        DeterministicOrderStrategy (file-based) based on configuration.
+        """
+        # Delegate to strategy pattern
+        all_work_orders = self.order_strategy.generate_work_orders(self)
+        
+        # Add work orders to dispatcher
         if all_work_orders:
             self.dispatcher.agregar_work_orders(all_work_orders)
-
-        # print(f"[ALMACEN] Generadas {len(self.dispatcher.lista_maestra_work_orders)} WorkOrders")
+        
         print(f"[ALMACEN] Distribucion por tipo: {self.distribucion_tipos}")
-
-        # BUGFIX CAPACITY VALIDATION: Report statistics
-        if wo_adjusted_count > 0:
-            adjustment_percentage = (wo_adjusted_count / len(all_work_orders)) * 100
-            print(f"[ALMACEN] {wo_adjusted_count} WorkOrders ajustadas por capacidad "
-                  f"({adjustment_percentage:.1f}%)")
-        else:
-            print(f"[ALMACEN] Todas las WorkOrders caben dentro de capacidad de operarios")
+        
+        # Store validation result for API access (deterministic mode only)
+        self._last_validation_result = self.order_strategy.get_validation_result()
+    
+    def get_order_validation_result(self):
+        """Get validation result from last order generation (deterministic mode only)"""
+        return getattr(self, '_last_validation_result', None)
 
     def adelantar_tiempo(self, tiempo: float):
         """

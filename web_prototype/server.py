@@ -366,6 +366,208 @@ def get_default_configuration():
 
 
 # ========================================================================
+# DETERMINISTIC ORDER FILE UPLOAD
+# ========================================================================
+
+class OrderFileUploadResponse(BaseModel):
+    """Response model for order file upload"""
+    success: bool
+    message: str
+    summary: Dict[str, Any] = {}
+    exclusions: List[Dict[str, Any]] = []
+    file_path: str = ""
+
+@app.post("/api/upload-orders")
+async def upload_orders_file(
+    file: UploadFile = File(...),
+    fulfillment_policy: str = "ship_partial"
+):
+    """
+    Upload an order file (JSON or CSV) for deterministic simulation mode.
+    
+    Args:
+        file: Order file (JSON or CSV format)
+        fulfillment_policy: "ship_partial" or "fill_or_kill"
+        
+    Returns:
+        Validation report with summary and exclusions
+    """
+    import json
+    import csv
+    from io import StringIO
+    
+    try:
+        # Validate file extension
+        filename = file.filename.lower()
+        if not (filename.endswith('.json') or filename.endswith('.csv')):
+            raise HTTPException(
+                status_code=400,
+                detail="Solo se permiten archivos .json o .csv"
+            )
+        
+        # Read file content
+        content = await file.read()
+        content_str = content.decode('utf-8')
+        
+        # Parse based on file type
+        orders = []
+        total_items = 0
+        
+        if filename.endswith('.json'):
+            # Parse JSON
+            try:
+                data = json.loads(content_str)
+                orders_data = data.get('orders', data) if isinstance(data, dict) else data
+                
+                if not isinstance(orders_data, list):
+                    raise HTTPException(status_code=400, detail="JSON debe contener un array 'orders'")
+                
+                for order in orders_data:
+                    items = order.get('items', [])
+                    orders.append({
+                        'order_id': order.get('order_id', ''),
+                        'items': items,
+                        'staging_id': order.get('staging_id')
+                    })
+                    total_items += len(items)
+                    
+            except json.JSONDecodeError as e:
+                raise HTTPException(status_code=400, detail=f"Error parsing JSON: {str(e)}")
+                
+        else:  # CSV
+            # Parse CSV with smart grouping by order_id
+            try:
+                orders_dict = {}
+                reader = csv.DictReader(StringIO(content_str))
+                
+                for row in reader:
+                    order_id = row.get('order_id', '').strip()
+                    if not order_id:
+                        continue
+                    
+                    if order_id not in orders_dict:
+                        staging_id = row.get('staging_id', '').strip()
+                        orders_dict[order_id] = {
+                            'order_id': order_id,
+                            'items': [],
+                            'staging_id': int(staging_id) if staging_id else None
+                        }
+                    
+                    sku_id = row.get('sku_id', '').strip()
+                    quantity_str = row.get('quantity', '1').strip()
+                    
+                    if sku_id:
+                        try:
+                            quantity = int(quantity_str) if quantity_str else 1
+                        except ValueError:
+                            quantity = 1
+                        
+                        orders_dict[order_id]['items'].append({
+                            'sku_id': sku_id,
+                            'quantity': quantity,
+                            'work_area': row.get('work_area', '').strip() or None
+                        })
+                        total_items += 1
+                
+                orders = list(orders_dict.values())
+                
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Error parsing CSV: {str(e)}")
+        
+        # Validate orders exist
+        if not orders:
+            raise HTTPException(status_code=400, detail="No se encontraron ordenes válidas en el archivo")
+        
+        # Save file for later use by simulation
+        uploads_dir = os.path.join(PROJECT_ROOT, "uploads")
+        os.makedirs(uploads_dir, exist_ok=True)
+        
+        saved_file_path = os.path.join(uploads_dir, f"orders_{file.filename}")
+        with open(saved_file_path, 'wb') as f:
+            f.write(content)
+        
+        # Load current catalog to validate SKUs
+        try:
+            config = config_manager.load_config()
+            distribucion_tipos = config.get('distribucion_tipos', {
+                'pequeno': {'porcentaje': 60, 'volumen': 5},
+                'mediano': {'porcentaje': 30, 'volumen': 25},
+                'grande': {'porcentaje': 10, 'volumen': 80}
+            })
+            
+            # Generate SKU catalog (same logic as warehouse.py)
+            catalog_skus = set()
+            sku_counter = 1
+            for tipo, cfg in distribucion_tipos.items():
+                for i in range(5):
+                    sku_id = f"SKU-{tipo[:3].upper()}-{sku_counter:03d}"
+                    catalog_skus.add(sku_id)
+                    sku_counter += 1
+        except:
+            catalog_skus = set()
+        
+        # Validate orders against catalog
+        valid_orders = 0
+        valid_items = 0
+        exclusions = []
+        skus_found = set()
+        skus_missing = set()
+        
+        for order in orders:
+            order_has_valid_items = False
+            
+            for item in order['items']:
+                sku_id = item.get('sku_id', '')
+                
+                if catalog_skus and sku_id not in catalog_skus:
+                    skus_missing.add(sku_id)
+                    exclusions.append({
+                        'order_id': order['order_id'],
+                        'item_sku': sku_id,
+                        'reason': f"SKU '{sku_id}' no encontrado en catálogo",
+                        'action': 'excluded'
+                    })
+                else:
+                    skus_found.add(sku_id)
+                    valid_items += 1
+                    order_has_valid_items = True
+            
+            if order_has_valid_items or not catalog_skus:
+                valid_orders += 1
+        
+        # Apply policy logic for summary
+        if fulfillment_policy == 'fill_or_kill':
+            orders_with_exclusions = set(e['order_id'] for e in exclusions)
+            final_orders = valid_orders - len(orders_with_exclusions)
+        else:
+            final_orders = valid_orders
+        
+        return {
+            "success": True,
+            "message": f"Archivo '{file.filename}' procesado exitosamente",
+            "file_path": saved_file_path,
+            "summary": {
+                "total_orders_input": len(orders),
+                "total_items_input": total_items,
+                "total_orders_output": final_orders,
+                "total_items_output": valid_items,
+                "skus_found": len(skus_found),
+                "skus_missing": list(skus_missing),
+                "fulfillment_policy": fulfillment_policy
+            },
+            "exclusions": exclusions[:20]  # Limit to first 20 for UI
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error processing order file: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ========================================================================
 # SIMULATION/REPLAY ENDPOINTS
 # ========================================================================
 

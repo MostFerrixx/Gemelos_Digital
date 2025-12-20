@@ -1,4 +1,7 @@
 {
+    "order_generation_mode": "deterministic",
+    "fulfillment_policy": "ship_partial",
+    "order_file_path": "C:\\Users\\ferri\\OneDrive\\Escritorio\\Gemelos Digital\\uploads\\orders_Orders Test.json",
     "total_ordenes": 150,
     "distribucion_tipos": {
         "pequeno": {

@@ -91,61 +91,149 @@
 
                 <!-- Tab 1: Carga de Trabajo -->
                 <div id="tab-carga" class="tab-content active">
+                    <!-- NEW: Order Generation Mode Selection -->
                     <div class="card">
                         <div class="card-header">
-                            <h3>Volumen General</h3>
+                            <h3>Modo de Generación de Órdenes</h3>
+                            <span id="order-mode-badge" class="badge badge-info">Estocástico</span>
                         </div>
                         <div class="card-body">
-                            <div class="form-group">
-                                <label>Total de Órdenes</label>
-                                <input type="number" id="total-ordenes" value="300" min="1">
-                                <span class="help-text">Número total de órdenes a simular</span>
+                            <div class="mode-toggle-container">
+                                <label class="mode-option">
+                                    <input type="radio" name="order-generation-mode" value="stochastic" checked>
+                                    <span class="mode-label">
+                                        <span class="mode-icon">🎲</span>
+                                        <span class="mode-text">
+                                            <strong>Estocástico (Aleatorio)</strong>
+                                            <small>Generación basada en distribución de tipos</small>
+                                        </span>
+                                    </span>
+                                </label>
+                                <label class="mode-option">
+                                    <input type="radio" name="order-generation-mode" value="deterministic">
+                                    <span class="mode-label">
+                                        <span class="mode-icon">📁</span>
+                                        <span class="mode-text">
+                                            <strong>Determinista (Archivo)</strong>
+                                            <small>Carga de órdenes desde archivo JSON/CSV</small>
+                                        </span>
+                                    </span>
+                                </label>
                             </div>
-                            <div class="form-group">
-                                <label>Capacidad del Carro (L)</label>
-                                <input type="number" id="capacidad-carro" value="150" min="1">
+
+                            <!-- Deterministic Mode Options (hidden by default) -->
+                            <div id="deterministic-options" class="deterministic-options hidden">
+                                <!-- File Upload Dropzone -->
+                                <div class="file-dropzone" id="orders-dropzone">
+                                    <div class="dropzone-content">
+                                        <span class="dropzone-icon">📄</span>
+                                        <p>Arrastra un archivo aquí o <span class="link">haz clic para buscar</span></p>
+                                        <small>Formatos soportados: .json, .csv</small>
+                                    </div>
+                                    <input type="file" id="orders-file-input" accept=".json,.csv" hidden>
+                                </div>
+
+                                <!-- Fulfillment Policy Selector -->
+                                <div class="form-group">
+                                    <label>Política de Cumplimiento</label>
+                                    <select id="fulfillment-policy" disabled>
+                                        <option value="ship_partial">Envío Parcial (Ship Partial)</option>
+                                        <option value="fill_or_kill">Todo o Nada (Fill or Kill)</option>
+                                    </select>
+                                    <span class="help-text">
+                                        <strong>Ship Partial:</strong> Procesa items válidos, excluye inválidos.
+                                        <strong>Fill or Kill:</strong> Descarta toda la orden si algún item falla.
+                                    </span>
+                                </div>
+
+                                <!-- Validation Preview -->
+                                <div id="orders-validation-preview" class="validation-preview hidden">
+                                    <h4>📊 Vista Previa de Validación</h4>
+                                    <div class="validation-stats">
+                                        <div class="stat-item success">
+                                            <span class="stat-value" id="preview-orders">0</span>
+                                            <span class="stat-label">Órdenes</span>
+                                        </div>
+                                        <div class="stat-item success">
+                                            <span class="stat-value" id="preview-items">0</span>
+                                            <span class="stat-label">Items</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-value" id="preview-skus">0</span>
+                                            <span class="stat-label">SKUs</span>
+                                        </div>
+                                        <div class="stat-item warning">
+                                            <span class="stat-value" id="preview-missing">0</span>
+                                            <span class="stat-label">SKUs Faltantes</span>
+                                        </div>
+                                    </div>
+                                    <div id="exclusions-list" class="exclusions-list hidden">
+                                        <h5>⚠️ Exclusiones</h5>
+                                        <ul id="exclusions-items"></ul>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>Distribución de Tipos</h3>
-                            <span id="validation-percentages" class="badge badge-success">✓ 100%</span>
+                    <!-- Stochastic Mode Options (shown by default) -->
+                    <div id="stochastic-options">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Volumen General</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label>Total de Órdenes</label>
+                                    <input type="number" id="total-ordenes" value="300" min="1">
+                                    <span class="help-text">Número total de órdenes a simular</span>
+                                </div>
+                                <div class="form-group">
+                                    <label>Capacidad del Carro (L)</label>
+                                    <input type="number" id="capacidad-carro" value="150" min="1">
+                                </div>
+                            </div>
                         </div>
-                        <div class="card-body">
-                            <div class="distribution-grid">
-                                <div class="dist-item">
-                                    <h4>Pequeño</h4>
-                                    <div class="form-group">
-                                        <label>% Distribución</label>
-                                        <input type="number" id="pct-pequeno" value="60" class="pct-input">
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Distribución de Tipos</h3>
+                                <span id="validation-percentages" class="badge badge-success">✓ 100%</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="distribution-grid">
+                                    <div class="dist-item">
+                                        <h4>Pequeño</h4>
+                                        <div class="form-group">
+                                            <label>% Distribución</label>
+                                            <input type="number" id="pct-pequeno" value="60" class="pct-input">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Volumen (L)</label>
+                                            <input type="number" id="vol-pequeno" value="5">
+                                        </div>
                                     </div>
-                                    <div class="form-group">
-                                        <label>Volumen (L)</label>
-                                        <input type="number" id="vol-pequeno" value="5">
+                                    <div class="dist-item">
+                                        <h4>Mediano</h4>
+                                        <div class="form-group">
+                                            <label>% Distribución</label>
+                                            <input type="number" id="pct-mediano" value="30" class="pct-input">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Volumen (L)</label>
+                                            <input type="number" id="vol-mediano" value="25">
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="dist-item">
-                                    <h4>Mediano</h4>
-                                    <div class="form-group">
-                                        <label>% Distribución</label>
-                                        <input type="number" id="pct-mediano" value="30" class="pct-input">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Volumen (L)</label>
-                                        <input type="number" id="vol-mediano" value="25">
-                                    </div>
-                                </div>
-                                <div class="dist-item">
-                                    <h4>Grande</h4>
-                                    <div class="form-group">
-                                        <label>% Distribución</label>
-                                        <input type="number" id="pct-grande" value="10" class="pct-input">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Volumen (L)</label>
-                                        <input type="number" id="vol-grande" value="80">
+                                    <div class="dist-item">
+                                        <h4>Grande</h4>
+                                        <div class="form-group">
+                                            <label>% Distribución</label>
+                                            <input type="number" id="pct-grande" value="10" class="pct-input">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Volumen (L)</label>
+                                            <input type="number" id="vol-grande" value="80">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -630,8 +718,8 @@
                 const targetCap = 95;
                 let currentWidth = parseFloat(this.progressBar.style.width) || 0;
                 if (currentWidth < targetCap) {
-                    const increment = (targetCap - currentWidth) * 0.05; 
-                    const finalIncrement = Math.max(increment, 0.5); 
+                    const increment = (targetCap - currentWidth) * 0.05;
+                    const finalIncrement = Math.max(increment, 0.5);
                     const newWidth = Math.min(currentWidth + finalIncrement, targetCap);
                     this.progressBar.style.width = `${newWidth}%`;
                 }
