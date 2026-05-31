@@ -602,3 +602,12 @@ logs/
 
 # User config presets (local data)
 data/config_presets/
+
+# === Higiene post-auditoria (2026-05) ===
+# Datos y binarios de runtime que no deben versionarse
+warehouse.db
+*.db
+uploads/
+ordenes_prueba_real.json
+# Snapshots del optimizador en la raiz (los YA trackeados requieren 'git rm --cached')
+config_optimized_*.json
