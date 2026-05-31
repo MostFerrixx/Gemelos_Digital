@@ -55,6 +55,9 @@ class ValidationResult:
     total_items_output: int = 0
     skus_found: set = field(default_factory=set)
     skus_missing: set = field(default_factory=set)
+    # ALLOCATION LAYER (V12.1): Track stock-based allocation results
+    unfilled_demand: List[Dict[str, Any]] = field(default_factory=list)
+    allocation_summary: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -65,7 +68,8 @@ class ValidationResult:
                 'total_orders_output': self.total_orders_output,
                 'total_items_output': self.total_items_output,
                 'skus_found': len(self.skus_found),
-                'skus_missing': list(self.skus_missing)
+                'skus_missing': list(self.skus_missing),
+                'allocation': self.allocation_summary
             },
             'exclusions': [
                 {
@@ -75,7 +79,8 @@ class ValidationResult:
                     'action': e.action
                 }
                 for e in self.exclusions
-            ]
+            ],
+            'unfilled_demand': self.unfilled_demand
         }
 
 
@@ -348,6 +353,9 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
         """
         Generate work orders from loaded file data with fulfillment policy.
         
+        ALLOCATION LAYER (V12.1): Now checks stock availability before creating
+        WorkOrders. Uses FCFS (First-Come, First-Served) algorithm.
+        
         Validates orders against catalog and applies configured policy.
         """
         import random
@@ -361,6 +369,24 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
         
         all_work_orders = []
         wo_counter = 0
+        
+        # =====================================================================
+        # ALLOCATION LAYER: Load stock snapshot from SQLite
+        # =====================================================================
+        available_stock = {}
+        initial_stock_snapshot = {}
+        
+        if almacen.data_manager:
+            available_stock = almacen.data_manager.get_all_available_stock()
+            initial_stock_snapshot = available_stock.copy()  # Keep original for reporting
+            print(f"[ALLOCATION] Stock snapshot loaded: {len(available_stock)} SKUs")
+        else:
+            print("[ALLOCATION] WARNING: No data_manager - allocation disabled")
+        
+        # Track allocation statistics
+        total_qty_requested = 0
+        total_qty_allocated = 0
+        backorder_items_count = 0
         
         # Get picking points for location assignment
         picking_points_by_area = self._build_picking_points_index(almacen)
@@ -393,10 +419,43 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
                     ))
                     continue
             
-            # Generate work orders for valid items
+            # Generate work orders for valid items WITH ALLOCATION CHECK
             for item in valid_items:
                 sku = almacen.catalogo_skus[item.sku_id]
                 self.validation_result.skus_found.add(item.sku_id)
+                
+                # =====================================================================
+                # ALLOCATION LAYER: Check and decrement stock (FCFS)
+                # =====================================================================
+                requested_qty = item.quantity
+                total_qty_requested += requested_qty
+                
+                current_stock = available_stock.get(item.sku_id, 0)
+                qty_to_allocate = min(requested_qty, current_stock)
+                
+                # Decrement virtual stock
+                if qty_to_allocate > 0:
+                    available_stock[item.sku_id] = current_stock - qty_to_allocate
+                    total_qty_allocated += qty_to_allocate
+                
+                # Track unfilled demand (backorders)
+                if qty_to_allocate < requested_qty:
+                    unfilled_qty = requested_qty - qty_to_allocate
+                    backorder_items_count += 1
+                    
+                    self.validation_result.unfilled_demand.append({
+                        'order_id': order.order_id,
+                        'sku_id': item.sku_id,
+                        'qty_requested': requested_qty,
+                        'qty_allocated': qty_to_allocate,
+                        'qty_unfilled': unfilled_qty,
+                        'stock_at_time': initial_stock_snapshot.get(item.sku_id, 0),
+                        'reason': f"Insufficient stock (available: {current_stock})"
+                    })
+                
+                # Skip if no stock to allocate
+                if qty_to_allocate <= 0:
+                    continue
                 
                 # Determine work area (from item, catalog, or default)
                 work_area = item.work_area or self._get_default_work_area(sku, almacen)
@@ -404,17 +463,17 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
                 # Get location for this work area
                 ubicacion = self._get_location_for_area(work_area, picking_points_by_area, almacen)
                 
-                # Validate and adjust quantity for capacity
+                # Validate and adjust quantity for capacity (may split into multiple WOs)
                 cantidades = almacen._validar_y_ajustar_cantidad(
                     sku=sku,
-                    cantidad_original=item.quantity,
+                    cantidad_original=qty_to_allocate,
                     work_area=work_area
                 )
                 
                 # Determine staging ID
                 staging_id = order.staging_id or almacen._seleccionar_staging_id()
                 
-                # Create work orders
+                # Create work orders with allocation metadata
                 for cantidad in cantidades:
                     wo_counter += 1
                     work_order = WorkOrder(
@@ -426,13 +485,52 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
                         ubicacion=ubicacion,
                         work_area=work_area,
                         pick_sequence=almacen._obtener_pick_sequence_real(ubicacion, work_area),
-                        staging_id=staging_id
+                        staging_id=staging_id,
+                        qty_requested=requested_qty  # Original request for tracking
                     )
                     all_work_orders.append(work_order)
                 
                 self.validation_result.total_items_output += 1
             
             self.validation_result.total_orders_output += 1
+        
+        # =====================================================================
+        # ALLOCATION LAYER: Generate summary and console output
+        # =====================================================================
+        unfilled_total_qty = total_qty_requested - total_qty_allocated
+        
+        self.validation_result.allocation_summary = {
+            'total_qty_requested': total_qty_requested,
+            'total_qty_allocated': total_qty_allocated,
+            'total_qty_unfilled': unfilled_total_qty,
+            'backorder_items_count': backorder_items_count,
+            'allocation_rate': round((total_qty_allocated / total_qty_requested * 100), 1) if total_qty_requested > 0 else 100.0
+        }
+        
+        # Print clear allocation summary to console
+        print("\n" + "=" * 70)
+        print("[ALLOCATION] STOCK ALLOCATION SUMMARY")
+        print("=" * 70)
+        print(f"  Orders processed: {self.validation_result.total_orders_output}")
+        print(f"  Total qty requested: {total_qty_requested}")
+        print(f"  Total qty allocated: {total_qty_allocated}")
+        
+        if backorder_items_count > 0:
+            print(f"  [!] BACKORDERS DETECTED: {backorder_items_count} items ({unfilled_total_qty} units not allocated)")
+            print(f"  Allocation rate: {self.validation_result.allocation_summary['allocation_rate']}%")
+            
+            # Show first few backorder details
+            for i, backorder in enumerate(self.validation_result.unfilled_demand[:5]):
+                print(f"      - {backorder['order_id']}: SKU {backorder['sku_id']} "
+                      f"(req: {backorder['qty_requested']}, got: {backorder['qty_allocated']}, "
+                      f"unfilled: {backorder['qty_unfilled']})")
+            
+            if len(self.validation_result.unfilled_demand) > 5:
+                print(f"      ... and {len(self.validation_result.unfilled_demand) - 5} more")
+        else:
+            print("  [OK] All requested quantities fully allocated!")
+        
+        print("=" * 70 + "\n")
         
         # Log exclusion report
         self._log_exclusion_report()

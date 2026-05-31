@@ -27,7 +27,8 @@ class WorkOrder:
 
     def __init__(self, work_order_id: str, order_id: str, tour_id: str,
                  sku: SKU, cantidad: int, ubicacion: tuple,
-                 work_area: str, pick_sequence: int, staging_id: int = 1):
+                 work_area: str, pick_sequence: int, staging_id: int = 1,
+                 qty_requested: int = None):
         self.id = work_order_id
         self.order_id = order_id
         self.tour_id = tour_id
@@ -42,6 +43,14 @@ class WorkOrder:
         self.assigned_agent_id = None
         self.tiempo_inicio = None
         self.tiempo_fin = None
+        
+        # ALLOCATION LAYER (V12.1): Track original request vs actual allocation
+        # qty_requested: Original quantity from order file
+        # qty_allocated: Actual quantity assigned (limited by stock availability)
+        # is_partial: True if qty_allocated < qty_requested (stock was insufficient)
+        self.qty_requested = qty_requested if qty_requested is not None else cantidad
+        self.qty_allocated = cantidad
+        self.is_partial = (self.qty_allocated < self.qty_requested)
 
     @property
     def sku_id(self) -> str:
@@ -100,6 +109,10 @@ class WorkOrder:
             'assigned_agent_id': self.assigned_agent_id,
             'tiempo_inicio': self.tiempo_inicio,
             'tiempo_fin': self.tiempo_fin,
+            # ALLOCATION LAYER (V12.1)
+            'qty_requested': self.qty_requested,
+            'qty_allocated': self.qty_allocated,
+            'is_partial': self.is_partial,
         }
 
     def __repr__(self):

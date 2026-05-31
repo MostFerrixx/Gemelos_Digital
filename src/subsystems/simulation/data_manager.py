@@ -610,6 +610,70 @@ class DataManager:
         print(f"  - {len(self.sku_catalog)} SKUs en catalogo")
         print(f"  - Grid bounds: {grid_w}x{grid_h}")
 
+    # ========================================================================
+    # ALLOCATION LAYER - Stock Availability Methods (V12.1)
+    # ========================================================================
+
+    def get_available_stock(self, sku_code: str) -> int:
+        """
+        Get total available stock for a SKU across all locations.
+        
+        Used by allocation layer to check stock before creating WorkOrders.
+        
+        Args:
+            sku_code: The SKU code to look up
+            
+        Returns:
+            Total qty_available (summed across all locations), 0 if not found
+        """
+        if not os.path.exists(self.db_path):
+            return 0
+        
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.execute("""
+                SELECT COALESCE(SUM(qty_available), 0) 
+                FROM inventory 
+                WHERE sku_code = ?
+            """, (sku_code,))
+            result = cursor.fetchone()[0]
+            conn.close()
+            return result
+        except sqlite3.Error as e:
+            print(f"[DATA-MANAGER] Error querying stock for {sku_code}: {e}")
+            return 0
+
+    def get_all_available_stock(self) -> Dict[str, int]:
+        """
+        Get available stock for ALL SKUs in a single efficient query.
+        
+        Used by DeterministicOrderStrategy for FCFS allocation.
+        Returns snapshot of stock at query time.
+        
+        Returns:
+            Dict mapping sku_code -> total_available quantity
+        """
+        if not os.path.exists(self.db_path):
+            print("[DATA-MANAGER] No database found for stock query")
+            return {}
+        
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.execute("""
+                SELECT sku_code, COALESCE(SUM(qty_available), 0) as total
+                FROM inventory 
+                GROUP BY sku_code
+            """)
+            result = {row[0]: row[1] for row in cursor.fetchall()}
+            conn.close()
+            
+            total_units = sum(result.values())
+            print(f"[DATA-MANAGER] Stock snapshot loaded: {len(result)} SKUs, {total_units} total units")
+            return result
+        except sqlite3.Error as e:
+            print(f"[DATA-MANAGER] Error querying all stock: {e}")
+            return {}
+
     def __repr__(self):
         return (f"DataManager(picking_points={len(self.puntos_de_picking_ordenados)}, "
                 f"staging_areas={len(self.outbound_staging_locations)}, "
