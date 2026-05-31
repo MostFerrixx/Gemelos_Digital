@@ -1,0 +1,481 @@
+/* =============================================
+   Digital Twin Warehouse - Dashboard Web
+   Style matching PyQt6 WorkOrder Dashboard
+   ============================================= */
+
+/* === CSS Variables (Design System) === */
+:root {
+    /* Status Colors - Matching PyQt6 exactly */
+    --status-released: #FFC107;
+    /* Amber/Yellow (released) */
+    --status-assigned: #007BFF;
+    /* Blue (assigned to agent) */
+    --status-in-progress: #FF5722;
+    /* Orange (in picking) */
+    --status-staged: #28A745;
+    /* Green (completed/staged) */
+
+    /* Background Colors - Dark Theme */
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --bg-tertiary: #3a3a3a;
+    --bg-header: #0f0f0f;
+
+    /* Text Colors */
+    --text-primary: #ffffff;
+    --text-secondary: #b0b0b0;
+    --text-muted: #707070;
+
+    /* Border Colors */
+    --border-color: #404040;
+    --border-focus: #007BFF;
+
+    /* Other Colors */
+    --shadow-color: rgba(0, 0, 0, 0.5);
+}
+
+/* === Global Styles === */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    overflow: hidden;
+    height: 100vh;
+}
+
+/* === Dashboard Container === */
+.dashboard-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+}
+
+/* === Header Section === */
+.dashboard-header {
+    background-color: var(--bg-header);
+    border-bottom: 2px solid var(--border-color);
+    padding: 16px 24px;
+    flex-shrink: 0;
+}
+
+.dashboard-header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+}
+
+.metrics-bar {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.metric {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background-color: var(--bg-secondary);
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.metric-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.metric-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Metric Color Indicators */
+.metric-released .metric-value {
+    color: var(--status-released);
+}
+
+.metric-assigned .metric-value {
+    color: var(--status-assigned);
+}
+
+.metric-in-progress .metric-value {
+    color: var(--status-in-progress);
+}
+
+.metric-staged .metric-value {
+    color: var(--status-staged);
+}
+
+/* === Table Container === */
+.table-container {
+    flex: 1;
+    overflow: auto;
+    background-color: var(--bg-primary);
+}
+
+/* === Work Order Table === */
+.work-order-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    table-layout: fixed;
+}
+
+/* Table Header */
+.work-order-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: var(--bg-header);
+}
+
+.work-order-table th {
+    padding: 12px 10px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
+    color: var(--text-primary);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    background-color: var(--bg-header);
+    transition: background-color 0.15s ease;
+}
+
+.work-order-table th:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.work-order-table th:last-child {
+    border-right: none;
+}
+
+/* Sort Indicators */
+.work-order-table th.sort-asc::after {
+    content: ' ▲';
+    font-size: 9px;
+    color: var(--status-assigned);
+}
+
+.work-order-table th.sort-desc::after {
+    content: ' ▼';
+    font-size: 9px;
+    color: var(--status-assigned);
+}
+
+/* Table Body */
+.work-order-table tbody tr {
+    background-color: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.1s ease;
+}
+
+/* Alternating Row Colors */
+.work-order-table tbody tr:nth-child(even) {
+    background-color: var(--bg-secondary);
+}
+
+.work-order-table tbody tr:hover {
+    background-color: var(--bg-tertiary) !important;
+}
+
+/* Table Cells */
+.work-order-table td {
+    padding: 8px 10px;
+    border-right: 1px solid var(--border-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.work-order-table td:last-child {
+    border-right: none;
+}
+
+/* === Status Row Colors (CRITICAL - Matching PyQt6) === */
+.work-order-table tbody tr.status-released {
+    background-color: var(--status-released) !important;
+    color: #000000 !important;
+}
+
+.work-order-table tbody tr.status-released td {
+    color: #000000 !important;
+}
+
+.work-order-table tbody tr.status-assigned {
+    background-color: var(--status-assigned) !important;
+    color: #ffffff !important;
+}
+
+.work-order-table tbody tr.status-assigned td {
+    color: #ffffff !important;
+}
+
+.work-order-table tbody tr.status-in_progress {
+    background-color: var(--status-in-progress) !important;
+    color: #ffffff !important;
+}
+
+.work-order-table tbody tr.status-in_progress td {
+    color: #ffffff !important;
+}
+
+.work-order-table tbody tr.status-staged {
+    background-color: var(--status-staged) !important;
+    color: #ffffff !important;
+}
+
+.work-order-table tbody tr.status-staged td {
+    color: #ffffff !important;
+}
+
+/* === Replay Controls (Footer) === */
+.replay-controls {
+    background-color: var(--bg-header);
+    border-top: 2px solid var(--border-color);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+}
+
+.time-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 180px;
+}
+
+.time-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.time-display {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Time Slider */
+.time-slider {
+    flex: 1;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border-color);
+    outline: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.time-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--status-assigned);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.time-slider::-webkit-slider-thumb:hover {
+    background: #0056b3;
+}
+
+.time-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: var(--status-assigned);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.15s ease;
+}
+
+.time-slider::-moz-range-thumb:hover {
+    background: #0056b3;
+}
+
+/* Playback Controls */
+.playback-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.control-btn {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 8px 16px;
+    font-size: 16px;
+    font-family: inherit;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-width: 50px;
+}
+
+.control-btn:hover {
+    background-color: var(--bg-tertiary);
+    border-color: var(--border-focus);
+}
+
+.control-btn:active {
+    transform: scale(0.95);
+}
+
+.control-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Connection Status */
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background-color: var(--bg-secondary);
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    min-width: 140px;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #dc3545;
+    animation: pulse 2s infinite;
+}
+
+.status-dot.connected {
+    background-color: var(--status-staged);
+    animation: none;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.4;
+    }
+}
+
+#connectionText {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* === Responsive Design === */
+@media (max-width: 1400px) {
+    .work-order-table {
+        font-size: 11px;
+    }
+
+    .work-order-table th,
+    .work-order-table td {
+        padding: 6px 8px;
+    }
+
+    .dashboard-header h1 {
+        font-size: 18px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .replay-controls {
+        flex-wrap: wrap;
+    }
+
+    .metrics-bar {
+        gap: 12px;
+    }
+
+    .metric {
+        padding: 6px 10px;
+    }
+}
+
+/* === Custom Scrollbar === */
+.table-container::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+.table-container::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+.table-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 6px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: var(--bg-tertiary);
+}
+
+/* === Loading State === */
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    font-size: 16px;
+    color: var(--text-secondary);
+}
+
+.loading::after {
+    content: '...';
+    animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+
+    0%,
+    20% {
+        content: '';
+    }
+
+    40% {
+        content: '.';
+    }
+
+    60% {
+        content: '..';
+    }
+
+    80%,
+    100% {
+        content: '...';
+    }
+}

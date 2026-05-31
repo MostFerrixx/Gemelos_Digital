@@ -1,0 +1,165 @@
+# Lista de Archivos Temporales a Eliminar
+# Generado: generate_files_to_delete_list.py
+# Base directory: C:\Users\ferri\OneDrive\Escritorio\Gemelos Digital
+#
+# Esta lista contiene archivos relativos al directorio base.
+# Los archivos marcados con [MISSING] no existen actualmente.
+#
+
+# 1. Scripts de Debug (Root)
+# Total en categoría: 18
+debug_assigned_status.py
+debug_config_loading.py
+debug_config_loading_detailed.py
+debug_config_passing.py
+debug_dispatcher_config.py
+debug_dispatcher_init.py
+debug_estrategia.py
+debug_event_types.py
+debug_execution_flow.py
+debug_flujo_estrategia.py
+debug_inicializacion_dispatcher.py
+debug_initial_state.py
+debug_missing_status.py
+debug_t40.py
+debug_wo_asignadas.py
+debug_wo_assignments.py
+debug_wo_lifecycle.py
+debug_wo_status.py
+
+# 2. Scripts de Debug (debug/)
+# Total en categoría: 3
+debug/debug_O_key_press.py
+debug/debug_dashboard_state.py
+debug/debug_workorder_loading.py
+
+# 3. Scripts de Debug (tools/debug/)
+# Total en categoría: 11
+tools/debug/debug_activity_times.py
+tools/debug/debug_analytics.py
+tools/debug/debug_analytics_detailed.py
+tools/debug/debug_analytics_engine.py
+tools/debug/debug_calculations.py
+tools/debug/debug_event_structure.py
+tools/debug/debug_excel_generation.py
+tools/debug/debug_exporter.py
+tools/debug/debug_exporter_problem.py
+tools/debug/debug_normalization.py
+tools/debug/debug_null_agent.py
+
+# 4. Scripts de Inspección
+# Total en categoría: 3
+inspect_excel.py
+inspect_start_event.py
+inspect_tmx.py [MISSING]
+
+# 5. Scripts de Validación Temporal
+# Total en categoría: 5
+validacion_comportamiento_especifico.py
+validacion_estrategia_ejecucion_plan.py
+validacion_simple.py
+validate_fix_tours.py
+validate_multi_staging_discharge.py
+
+# 6. Scripts de Test Temporales (Root)
+# Total en categoría: 3
+test_volumen_visual.py [MISSING]
+test_wo_decrease.py
+reproduce_seek_bug.py
+
+# 7. Scripts de Aplicación de Cambios
+# Total en categoría: 3
+apply_all_fixes.py
+apply_css_changes.py
+apply_fullscreen_changes.py
+
+# 8. Scripts de Fix/Remove/Make/Verify
+# Total en categoría: 5
+fix_top_section.py
+remove_canvas_borders.py
+remove_canvas_margins.py
+make_resize_visible.py
+verify_replay_loading.py
+
+# 9. Archivos de Log
+# Total en categoría: 18
+debug_dispatcher_1760587745.log
+final_test.log
+og_run.log
+og_selector.log
+plan_run.log
+plan_run_2.log
+plan_run_confirm.log
+plan_selector.log
+replay_test.log
+server.log
+temp_output.log
+temp_output2.log
+test_final_run.log
+test_output.log
+test_output_debug.log
+test_output_headless.log
+validacion_estrategia.log
+validacion_estrategia_completa.log
+
+# 10. Archivos de Backup
+# Total en categoría: 4
+config.json.backup
+config.json.backup_debug
+configurator.py.backup
+web_prototype/static/style.css.backup
+
+# 11. Archivos de Texto Temporal
+# Total en categoría: 3
+diagnostico_tecla_o.txt
+refactored_test.txt
+replay_dashboard_test.txt
+
+# 12. Documentos Markdown Temporales
+# Total en categoría: 21
+ACTIVE_SESSION_STATE.md
+ANALISIS_PROBLEMA_DIVISION_WOS.md
+ANALISIS_PROBLEMA_TOURS_CORTOS.md
+ANALISIS_VOLUMEN_DASHBOARD.md
+AUDITORIA_DASHBOARD_KPIS.md
+BUGFIX_DASHBOARD_CARGO_VOLUME.md
+HANDOFF.md
+INSTRUCCIONES_PARA_SIGUIENTE_CHAT.md
+PLAN_DESCARGA_MULTIPLE_STAGINGS.md
+PLAN_TRABAJO_TOURS_CORTOS.md
+PROBLEMA_DIVISION_WORK_ORDERS.md
+PROBLEMA_VOLUMEN_ENCONTRADO.md
+RESUMEN_CORRECCION_DASHBOARD_KPIS.md
+RESUMEN_FINAL_DASHBOARD_FIX.md
+RESUMEN_SESION_ANALISIS_TOURS.md
+RESUMEN_SOLUCION_DIVISION_WOS.md
+RESUMEN_SOLUCION_VOLUMEN.md
+RESUMEN_VALIDACION_IMPLEMENTACION.md
+SOLUCION_VOLUMEN_IMPLEMENTADA.md
+VALIDACION_VISUAL_DIVISION_WOS.md
+test_visual_validation.md
+
+# 13. Archivos JSON Temporal
+# Total en categoría: 2
+raw_events_20250826_005756.json
+reporte_validacion_estrategia_20251016_005357.json
+
+# 14. Archivos Excel de Prueba
+# Total en categoría: 6
+test_after_cache_clear.xlsx
+test_excel_output.xlsx
+test_final_fix.xlsx
+test_fix_excel_output.xlsx
+test_fix_excel_output_v2.xlsx
+test_simulation_230010.xlsx
+
+#======================================================================
+# ESTADÍSTICAS
+# Total de archivos en lista: 105
+# Archivos existentes: 103
+# Archivos faltantes: 2
+#======================================================================
+
+# Archivos que no existen (ya eliminados o nunca creados):
+# - inspect_tmx.py
+# - test_volumen_visual.py
