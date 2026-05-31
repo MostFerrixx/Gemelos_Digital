@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" width="35" height="25" tilewidth="32" tileheight="32">
+ <properties>
+  <property name="layout_type" value="Almacen_Grande"/>
+  <property name="description" value="Almacén grande con múltiples zonas"/>
+ </properties>
+ <tileset firstgid="1" name="warehouse" tilewidth="32" tileheight="32">
+  <image source="warehouse_tileset.png" width="128" height="96"/>
+ </tileset>
+ <layer name="dummy" width="35" height="25">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+  </data>
+ </layer>
+</map>

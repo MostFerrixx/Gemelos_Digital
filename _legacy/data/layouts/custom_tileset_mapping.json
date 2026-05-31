@@ -1,0 +1,55 @@
+{
+  "tileset_name": "custom_warehouse_tileset",
+  "tile_size": 32,
+  "auto_generated": true,
+  "tiles": [
+    {
+      "id": 0,
+      "type": "floor",
+      "walkable": true,
+      "name": "Suelo navegable",
+      "description": "Suelo normal por donde pueden caminar los operarios",
+      "texture_file": "floor.png"
+    },
+    {
+      "id": 1,
+      "type": "rack",
+      "walkable": false,
+      "name": "Racks/Estantes",
+      "description": "Racks de almacén (obstáculos)",
+      "texture_file": "rack.png"
+    },
+    {
+      "id": 2,
+      "type": "picking",
+      "walkable": true,
+      "name": "Puntos de picking",
+      "description": "Ubicaciones de picking frente a racks",
+      "texture_file": "PickLocation.png"
+    },
+    {
+      "id": 3,
+      "type": "parking",
+      "walkable": true,
+      "name": "Zona estacionamiento/inicio",
+      "description": "Zona donde aparecen los operarios al inicio",
+      "texture_file": "ParckingLot.png"
+    },
+    {
+      "id": 4,
+      "type": "depot",
+      "walkable": true,
+      "name": "Zona depot/depósito",
+      "description": "Zona donde se depositan los productos pickeados",
+      "texture_file": "OutboundStage.png"
+    },
+    {
+      "id": 5,
+      "type": "inbound",
+      "walkable": true,
+      "name": "Zona entrada/recepción",
+      "description": "Zona de entrada de mercancía",
+      "texture_file": "InboundStage.png"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+[
+  {
+    "info": {
+      "name": "Almacen_Pequeño",
+      "width": 30,
+      "height": 30,
+      "tile_width": 32,
+      "tile_height": 32,
+      "description": "WH1 personalizado (pequeño)"
+    },
+    "pattern": "wh1_custom"
+  },
+  {
+    "info": {
+      "name": "Almacen_Grande",
+      "width": 30,
+      "height": 30,
+      "tile_width": 32,
+      "tile_height": 32,
+      "description": "WH1 personalizado (grande)"
+    },
+    "pattern": "wh1_custom"
+  },
+  {
+    "info": {
+      "name": "Layout_Corredor_Central",
+      "width": 30,
+      "height": 30,
+      "tile_width": 32,
+      "tile_height": 32,
+      "description": "WH1 personalizado (corredor)"
+    },
+    "pattern": "wh1_custom"
+  }
+]

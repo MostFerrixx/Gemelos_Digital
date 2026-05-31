@@ -1,0 +1,305 @@
+{
+    "default": {
+        "misc": {
+            "font": ["freesansbold.ttf", "arial.ttf"],
+            "font_size": 14,
+            "text_color": "#FFFFFF",
+            "text_shadow_color": "#000000",
+            "text_shadow_width": 1,
+            "text_shadow_height": 1
+        },
+        "panel": {
+            "normal": {
+                "shape": "rounded_rectangle",
+                "shape_corner_radius": 16,
+                "colours": {
+                    "normal_bg": "#0F0F23",
+                    "normal_border": "#2D2D44",
+                    "hovered_bg": "#1A1A2E",
+                    "hovered_border": "#3A3A5C",
+                    "selected_bg": "#16213E",
+                    "selected_border": "#4A4A6C",
+                    "active_bg": "#0F0F23",
+                    "active_border": "#2D2D44"
+                },
+                "border_width": 3
+            },
+            "#modern_metric_card": {
+                "shape": "rounded_rectangle",
+                "shape_corner_radius": 12,
+                "colours": {
+                    "normal_bg": "#313244",
+                    "normal_border": "#45475A"
+                },
+                "border_width": 2
+            },
+            "#modern_ticker_panel": {
+                "shape": "rounded_rectangle",
+                "shape_corner_radius": 10,
+                "colours": {
+                    "normal_bg": "#1E1E2E",
+                    "normal_border": "#313244"
+                },
+                "border_width": 1
+            }
+        },
+        "label": {
+            "normal": {
+                "shape": "rounded_rectangle",
+                "shape_corner_radius": 12,
+                "colours": {
+                    "normal_bg": "#0F0F23",
+                    "normal_border": "#2D2D44",
+                    "hovered_bg": "#1A1A2E",
+                    "hovered_border": "#3A3A5C"
+                },
+                "border_width": 2,
+                "font": ["freesansbold.ttf", "arial.ttf"],
+                "font_size": 14,
+                "text_color": "#E6E6FA",
+                "text_shadow_color": "#000000",
+                "text_shadow_width": 1,
+                "text_shadow_height": 1
+            },
+            "#modern_title": {
+                "font": ["freesansbold.ttf", "arial.ttf"],
+                "font_size": 20,
+                "text_color": "#CDD6F4"
+            },
+            "#modern_subtitle": {
+                "font": ["freesansbold.ttf", "arial.ttf"],
+                "font_size": 13,
+                "text_color": "#A6ADC8"
+            },
+            "#modern_metric_label": {
+                "font": ["freesansbold.ttf", "arial.ttf"],
+                "font_size": 11,
+                "text_color": "#BAC2DE",
+                "border_width": 0,
+                "colours": {
+                    "normal_bg": "#1E1E2E",
+                    "normal_border": "#1E1E2E"
+                }
+            },
+            "#modern_metric_value": {
+                "font": ["freesansbold.ttf", "arial.ttf"],
+                "font_size": 16,
+                "text_color": "#E6E6FA",
+                "border_width": 0,
+                "colours": {
+                    "normal_bg": "#313244",
+                    "normal_border": "#313244"
+                }
+            },
+            "#modern_operators_header": {
+                "font": ["freesansbold.ttf", "arial.ttf"],
+                "font_size": 14,
+                "text_color": "#CDD6F4"
+            },
+            "#modern_progress_header": {
+                "font": ["freesansbold.ttf", "arial.ttf"],
+                "font_size": 14,
+                "text_color": "#CDD6F4"
+            },
+            "#modern_progress_percent": {
+                "font": ["freesansbold.ttf", "arial.ttf"],
+                "font_size": 13,
+                "text_color": "#BAC2DE"
+            }
+        },
+        "progress_bar": {
+            "normal": {
+                "shape": "rounded_rectangle",
+                "shape_corner_radius": 15,
+                "colours": {
+                    "normal_bg": "#0A0A1A",
+                    "normal_border": "#2D2D44",
+                    "normal_fill_bar": "#00D4AA",
+                    "hovered_bg": "#0F0F23",
+                    "hovered_border": "#3A3A5C",
+                    "hovered_fill_bar": "#00E6BB"
+                },
+                "border_width": 3
+            }
+        },
+        "button": {
+            "normal": {
+                "shape": "rounded_rectangle",
+                "shape_corner_radius": 10,
+                "colours": {
+                    "normal_bg": "#313244",
+                    "normal_border": "#45475A",
+                    "hovered_bg": "#45475A",
+                    "hovered_border": "#585B70",
+                    "selected_bg": "#585B70",
+                    "selected_border": "#6C7086",
+                    "active_bg": "#45475A",
+                    "active_border": "#585B70"
+                },
+                "border_width": 2,
+                "font": ["freesansbold.ttf", "arial.ttf"],
+                "font_size": 13,
+                "text_color": "#CDD6F4"
+            }
+        },
+        "scrolling_container": {
+            "normal": {
+                "shape": "rounded_rectangle",
+                "shape_corner_radius": 10,
+                "colours": {
+                    "normal_bg": "#11111B",
+                    "normal_border": "#313244",
+                    "hovered_bg": "#181825",
+                    "hovered_border": "#45475A"
+                },
+                "border_width": 2
+            }
+        }
+    },
+    "modern_colors": {
+        "primary": {
+            "background": "#1E1E2E",
+            "surface": "#313244",
+            "accent": "#89B4FA",
+            "text": "#CDD6F4",
+            "text_secondary": "#BAC2DE"
+        },
+        "gradients": {
+            "primary_gradient": ["#89B4FA", "#94E2D5"],
+            "success_gradient": ["#A6E3A1", "#94E2D5"],
+            "warning_gradient": ["#F9E2AF", "#FAB387"],
+            "error_gradient": ["#F38BA8", "#EBA0AC"]
+        },
+        "cards": {
+            "metric_card": {
+                "background": "#313244",
+                "border": "#45475A",
+                "shadow": "#00000040"
+            },
+            "operator_card": {
+                "background": "#1E1E2E",
+                "border": "#313244",
+                "shadow": "#00000030"
+            }
+        }
+    },
+    "semantic_colors": {
+        "operator_states": {
+            "idle": {
+                "text_color": "#BAC2DE",
+                "bg_color": "#313244",
+                "border_color": "#45475A",
+                "icon": "⏸️"
+            },
+            "moving": {
+                "text_color": "#A6E3A1",
+                "bg_color": "#1E3A2E",
+                "border_color": "#2A4A3E",
+                "icon": "🚚"
+            },
+            "working": {
+                "text_color": "#FAB387",
+                "bg_color": "#3E2A1E",
+                "border_color": "#4A3A2E",
+                "icon": "⚡"
+            },
+            "discharging": {
+                "text_color": "#F38BA8",
+                "bg_color": "#3E1E2A",
+                "border_color": "#4A2A3E",
+                "icon": "📦"
+            },
+            "loading": {
+                "text_color": "#89B4FA",
+                "bg_color": "#1E2A3E",
+                "border_color": "#2A3A4E",
+                "icon": "📥"
+            },
+            "waiting": {
+                "text_color": "#CBA6F7",
+                "bg_color": "#2A1E3E",
+                "border_color": "#3A2A4E",
+                "icon": "⏳"
+            },
+            "error": {
+                "text_color": "#F38BA8",
+                "bg_color": "#3E1E1E",
+                "border_color": "#4A2A2A",
+                "icon": "❌"
+            },
+            "unknown": {
+                "text_color": "#CDD6F4",
+                "bg_color": "#313244",
+                "border_color": "#45475A",
+                "icon": "❓"
+            }
+        },
+        "metrics_types": {
+            "time": {
+                "text_color": "#89B4FA",
+                "bg_color": "#1E2A3E",
+                "border_color": "#2A3A4E",
+                "icon": "⏰"
+            },
+            "ratio": {
+                "text_color": "#A6E3A1",
+                "bg_color": "#1E3A2E",
+                "border_color": "#2A4A3E",
+                "icon": "📊"
+            },
+            "count": {
+                "text_color": "#FAB387",
+                "bg_color": "#3E2A1E",
+                "border_color": "#4A3A2E",
+                "icon": "🔢"
+            },
+            "percentage": {
+                "text_color": "#94E2D5",
+                "bg_color": "#1E3A3E",
+                "border_color": "#2A4A4E",
+                "icon": "📈"
+            }
+        },
+        "headers": {
+            "level_1": {
+                "text_color": "#CDD6F4",
+                "bg_color": "#1E1E2E",
+                "border_color": "#89B4FA",
+                "font_size": 28,
+                "icon": "🎯"
+            },
+            "level_2": {
+                "text_color": "#BAC2DE",
+                "bg_color": "#313244",
+                "border_color": "#45475A",
+                "font_size": 20,
+                "icon": "📋"
+            },
+            "level_3": {
+                "text_color": "#A6ADC8",
+                "bg_color": "#45475A",
+                "border_color": "#585B70",
+                "font_size": 16,
+                "icon": "📝"
+            }
+        }
+    },
+    "modern_effects": {
+        "shadows": {
+            "card_shadow": "0 4px 6px rgba(0, 0, 0, 0.3)",
+            "button_shadow": "0 2px 4px rgba(0, 0, 0, 0.2)",
+            "panel_shadow": "0 8px 16px rgba(0, 0, 0, 0.4)"
+        },
+        "animations": {
+            "hover_transition": "0.2s ease-in-out",
+            "fade_in": "0.3s ease-in-out",
+            "slide_in": "0.4s ease-out"
+        },
+        "borders": {
+            "radius_small": 6,
+            "radius_medium": 10,
+            "radius_large": 12,
+            "radius_xlarge": 16
+        }
+    }
+}

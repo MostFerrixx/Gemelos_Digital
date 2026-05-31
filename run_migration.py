@@ -32,9 +32,10 @@ from src.subsystems.database.importer import ExcelImporter, ImportResult
 
 def find_excel_file() -> str:
     """Find the default Warehouse_Logic.xlsx file."""
+    # Fuente unica de verdad = RAIZ. El arbol data/ fue una migracion abandonada
+    # y su copia divergente esta archivada en _legacy/data/ (ver _legacy/README.md).
     possible_paths = [
         PROJECT_ROOT / "layouts" / "Warehouse_Logic.xlsx",
-        PROJECT_ROOT / "data" / "layouts" / "Warehouse_Logic.xlsx",
         PROJECT_ROOT / "Warehouse_Logic.xlsx",
     ]
     
@@ -70,9 +71,8 @@ def run_migration(excel_path: str, db_path: str,
     # Validate Excel exists
     if not os.path.exists(excel_path):
         print(f"[ERROR] Excel file not found: {excel_path}")
-        print("\nPlease ensure Warehouse_Logic.xlsx exists in one of:")
-        print("  - layouts/Warehouse_Logic.xlsx")
-        print("  - data/layouts/Warehouse_Logic.xlsx")
+        print("\nPlease ensure Warehouse_Logic.xlsx exists at:")
+        print("  - layouts/Warehouse_Logic.xlsx  (fuente unica de verdad)")
         return False
     
     # Initialize database manager

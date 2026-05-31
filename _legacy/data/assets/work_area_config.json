@@ -1,0 +1,38 @@
+{
+  "GroundOperator_1": {
+    "Area_Ground": 1,
+    "Area_High": 99,
+    "Area_Special": 50,
+    "default_wa": 10
+  },
+  "GroundOperator_2": {
+    "Area_Ground": 1,
+    "Area_High": 99,
+    "Area_Special": 50,
+    "default_wa": 10
+  },
+  "Forklift_1": {
+    "Area_Ground": 10,
+    "Area_High": 1,
+    "Area_Special": 5,
+    "default_wa": 20
+  },
+  "Forklift_2": {
+    "Area_Ground": 10,
+    "Area_High": 1,
+    "Area_Special": 5,
+    "default_wa": 20
+  },
+  "Forklift_3": {
+    "Area_Ground": 15,
+    "Area_High": 1,
+    "Area_Special": 1,
+    "default_wa": 25
+  },
+  "Default": {
+    "Area_Ground": 50,
+    "Area_High": 50,
+    "Area_Special": 50,
+    "default_wa": 50
+  }
+}

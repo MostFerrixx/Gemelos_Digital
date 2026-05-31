@@ -1,0 +1,179 @@
+{
+  "tileset_info": {
+    "name": "warehouse_tileset",
+    "tile_size": 32,
+    "columns": 4,
+    "rows": 3,
+    "total_tiles": 12
+  },
+  "tiles": {
+    "0": {
+      "name": "Floor_Walkable",
+      "color": [
+        240,
+        240,
+        240
+      ],
+      "properties": {
+        "walkable": "true",
+        "type": "floor",
+        "speed_modifier": "1.0"
+      },
+      "description": "Suelo navegable normal"
+    },
+    "1": {
+      "name": "Rack_Obstacle",
+      "color": [
+        101,
+        67,
+        33
+      ],
+      "properties": {
+        "walkable": "false",
+        "type": "rack",
+        "height": "3"
+      },
+      "description": "Rack de almacén (obstáculo)"
+    },
+    "2": {
+      "name": "Picking_Point",
+      "color": [
+        0,
+        200,
+        0
+      ],
+      "properties": {
+        "walkable": "true",
+        "type": "picking",
+        "priority": "high"
+      },
+      "description": "Punto de picking"
+    },
+    "3": {
+      "name": "Depot_Zone",
+      "color": [
+        0,
+        100,
+        200
+      ],
+      "properties": {
+        "walkable": "true",
+        "type": "depot",
+        "capacity": "10"
+      },
+      "description": "Zona de depot/estacionamiento"
+    },
+    "4": {
+      "name": "Inbound_Zone",
+      "color": [
+        200,
+        100,
+        0
+      ],
+      "properties": {
+        "walkable": "true",
+        "type": "inbound",
+        "dock_count": "2"
+      },
+      "description": "Zona de entrada/inbound"
+    },
+    "5": {
+      "name": "Wall_Blocked",
+      "color": [
+        50,
+        50,
+        50
+      ],
+      "properties": {
+        "walkable": "false",
+        "type": "wall",
+        "blocking": "true"
+      },
+      "description": "Muro/zona prohibida"
+    },
+    "6": {
+      "name": "Corridor_Main",
+      "color": [
+        200,
+        200,
+        255
+      ],
+      "properties": {
+        "walkable": "true",
+        "type": "corridor",
+        "speed_modifier": "1.2"
+      },
+      "description": "Pasillo principal (más rápido)"
+    },
+    "7": {
+      "name": "Workstation",
+      "color": [
+        255,
+        200,
+        100
+      ],
+      "properties": {
+        "walkable": "true",
+        "type": "workstation",
+        "equipment": "scanner"
+      },
+      "description": "Estación de trabajo"
+    },
+    "8": {
+      "name": "Emergency_Exit",
+      "color": [
+        255,
+        0,
+        0
+      ],
+      "properties": {
+        "walkable": "true",
+        "type": "emergency",
+        "exit": "true"
+      },
+      "description": "Salida de emergencia"
+    },
+    "9": {
+      "name": "Loading_Dock",
+      "color": [
+        128,
+        0,
+        128
+      ],
+      "properties": {
+        "walkable": "true",
+        "type": "loading",
+        "truck_capacity": "1"
+      },
+      "description": "Muelle de carga"
+    },
+    "10": {
+      "name": "Office_Area",
+      "color": [
+        255,
+        255,
+        150
+      ],
+      "properties": {
+        "walkable": "false",
+        "type": "office",
+        "restricted": "true"
+      },
+      "description": "Área de oficinas"
+    },
+    "11": {
+      "name": "Reserved_Future",
+      "color": [
+        180,
+        180,
+        180
+      ],
+      "properties": {
+        "walkable": "false",
+        "type": "reserved",
+        "future_use": "true"
+      },
+      "description": "Reservado para uso futuro"
+    }
+  }
+}
