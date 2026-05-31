@@ -36,10 +36,10 @@ setup(
     # Entry points for command-line scripts
     entry_points={
         'console_scripts': [
-            'warehouse-sim=entry_points.run_simulation:main',
-            'warehouse-live=entry_points.run_live_simulation:main',
-            'warehouse-replay=entry_points.run_replay_viewer:main',
-            'warehouse-config=tools.configurator:main',
+            # GUI de escritorio deprecadas (visor/configurador) -> archivadas en _legacy/gui_escritorio/.
+            # La GUI vigente es la web (web_prototype). Comandos validos del backend headless:
+            'warehouse-sim=entry_points.run_generate_replay:main',
+            'warehouse-optimize=entry_points.run_optimization:main',
         ],
     },
 
