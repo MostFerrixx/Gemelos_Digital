@@ -1,3 +1,5 @@
+> ⚠️ Documento histórico V11; la referencia vigente es README.md.
+
 # INSTRUCCIONES TÉCNICAS DEL SISTEMA
 
 **Proyecto:** Simulador de Gemelo Digital de Almacén  
@@ -258,5 +260,4 @@ python entry_points/run_replay_viewer.py output/simulation_*/replay_events_*.jso
 
 ---
 
-**Última Actualización:** 2025-10-27  
-**Estado:** ✅ Sistema completamente funcional
+**Última Actua

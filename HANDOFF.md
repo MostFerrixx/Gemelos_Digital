@@ -1,3 +1,5 @@
+> ⚠️ Documento histórico V11; la referencia vigente es README.md.
+
 Sistema de simulacion de almacen completamente funcional con **Generador de Eventos Headless**, **Sistema de Slots de Configuracion**, **Replay Viewer** y **Analytics Engine** implementados al 100%.
 
 **CAMBIO ARQUITECTONICO IMPORTANTE (2025-10-27):**
@@ -442,6 +444,4 @@ Ground Operators realizaban tours muy cortos (1.75 WOs promedio) con baja utiliz
 
 ---
 
-**Última Actualización:** 2025-11-25  
-**Estado:** ✅ Sistema completamente funcional y limpiado
-```
+**Última Actualización:** 202

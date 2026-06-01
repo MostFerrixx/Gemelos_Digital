@@ -1,246 +1,255 @@
-# 🏭 Gemelo Digital - Simulador de Almacen
+# Gemelo Digital de Almacen
 
-**Version:** 11.0 Complete  
-**Estado:** ✅ Produccion  
-**Arquitectura:** Headless + Replay  
-**Fecha:** Octubre 2025
-
----
-
-## 🚀 Inicio Rapido
-
-### 1. Servidor Web (Click-and-Run) 🆕
-```bash
-# Windows - Modo Produccion
-start_server.bat         # Iniciar servidor en segundo plano
-stop_server.bat          # Detener servidor
-restart_server.bat       # Reiniciar servidor
-status_server.bat        # Ver estado del servidor
-
-# Modo Desarrollo (con terminal)
-python web_prototype/server.py
-
-# Python Manager (Avanzado)
-python server_manager.py start --browser  # Iniciar y abrir navegador
-python server_manager.py status           # Ver estado
-python server_manager.py logs --follow    # Ver logs en tiempo real
-```
-**URL:** `http://localhost:8000/web_configurator/`
-
-### Características Web 🆕
-- **Reinicio Remoto**: Botón "↻ Restart Server" en la interfaz web.
-- **Auto-reload**: El servidor se reinicia automáticamente al guardar cambios en el código.
-- **Health Check**: Verificación automática de disponibilidad.
-
-### 2. Generar Simulacion (Headless)
-```bash
-python entry_points/run_generate_replay.py
-```
-**Genera:** Archivo `.jsonl` + Reportes Excel + Analytics + Heatmap
-
-### 3. Visualizar Replay
-```bash
-python entry_points/run_replay_viewer.py output/simulation_*/replay_*.jsonl
-```
-**Muestra:** Visualizacion interactiva con Pygame
-
-### 4. Configurar Simulacion
-```bash
-python configurator.py
-```
-**Permite:** Ajustar parametros (operarios, ordenes, estrategias)
-
+**Version:** V12.1 (Allocation Layer)
+**Estado:** En desarrollo activo - rama `feature/allocation-layer-v12.1`
+**Arquitectura:** Headless (SimPy) + Replay + GUI web
+**Actualizado:** 2026-05
 
 ---
 
-## 📁 Estructura del Proyecto
+## 1. Que es
 
-```
-Gemelos Digital/
-├── entry_points/
-│   ├── run_generate_replay.py    # Generador headless
-│   └── run_replay_viewer.py      # Visualizador de replay
-│
-├── src/
-│   ├── engines/
-│   │   ├── event_generator.py    # Motor headless de eventos
-│   │   ├── analytics_engine.py   # Motor de analytics
-│   │   └── replay_engine.py      # Motor de replay
-│   │
-│   ├── subsystems/
-│   │   ├── simulation/           # Logica de simulacion
-│   │   └── visualization/        # Renderizado y UI
-│   │
-│   ├── core/                     # Configuracion y utilidades
-│   ├── analytics/                # Exportacion de reportes
-│   └── communication/            # IPC y comunicacion
-│
-├── data/
-│   ├── layouts/                  # Mapas TMX (Tiled)
-│   └── themes/                   # Temas de UI
-│
-├── output/                       # Resultados de simulaciones
-│   └── simulation_YYYYMMDD_HHMMSS/
-│       ├── replay_*.jsonl        # Eventos de replay
-│       ├── simulation_report_*.xlsx
-│       └── warehouse_heatmap_*.png
-│
-└── config.json                   # Configuracion principal
-```
+Simulador de operaciones logisticas de almacen (Warehouse Digital Twin). Reproduce
+el flujo de mercancias y agentes sobre un mapa fisico real (layouts TMX de Tiled)
+para detectar cuellos de botella y subir el throughput.
+
+La mecanica es una **simulacion de eventos discretos con SimPy**: el tiempo avanza
+por eventos, no por frames. El motor corre headless y persiste todo lo ocurrido en
+un archivo de eventos `.jsonl`, que luego se visualiza y analiza por separado.
+
+Entidades principales:
+
+- **Operarios**: `GroundOperator` (picking manual) y `Forklift` (carga pesada),
+  con velocidad, capacidad y prioridades de zona.
+- **WorkOrders**: mover un SKU de un rack a una zona de staging, con volumen,
+  prioridad y secuencia.
+- **Layout**: mapas TMX (Tiled) que definen racks, pasillos y zonas.
 
 ---
 
-## 🔧 Configuracion
+## 2. Allocation Layer V12.1
 
-### Archivo config.json
-```json
-{
-  "numero_ordenes": 30,
-  "ground_operators": 2,
-  "forklifts": 2,
-  "dispatch_strategy": "Ejecucion de Plan (Filtro por Prioridad)",
-  "tour_type": "Tour Simple (Un Destino)"
-}
+La novedad de esta version es una **capa de asignacion de stock real (FCFS,
+first-come-first-served)** que se ejecuta **antes** de crear las WorkOrders. En
+lugar de asumir stock infinito, el sistema reserva el stock disponible por orden
+de llegada y refleja faltantes.
+
+- `fulfillment_policy: "ship_partial"` permite cumplir parcialmente una orden
+  cuando no hay stock suficiente.
+- Cada WorkOrder distingue **cantidad solicitada vs cantidad asignada/recogida**
+  (`qty_requested` / `qty_allocated`, concepto **QTY REQ vs QTY PICK**). El
+  remanente no servido es un **backorder** (deuda) que se puede reportar.
+
+Por que importa: sin esta capa la simulacion sobreestima el throughput porque
+nunca se queda sin stock. La Allocation Layer hace que los resultados reflejen la
+realidad del inventario.
+
+Toca principalmente `data_manager.py` (`get_available_stock`), `warehouse.py`
+(campos de la WorkOrder), `order_strategies.py` y `config.json`.
+
+---
+
+## 3. Arquitectura
+
+Flujo central headless -> replay -> analitica:
+
+```
++----------------------------------+
+|  Motor headless (event_generator)|
+|  - SimPy puro                    |
+|  - Allocation Layer (FCFS)       |
+|  - Captura de eventos            |
++----------------+-----------------+
+                 |
+                 v
++----------------------------------+
+|  Archivos de salida              |
+|  - replay_*.jsonl  (eventos)     |
+|  - *.xlsx          (reportes)    |
+|  - *_heatmap_*.png (mapa calor)  |
++----------------+-----------------+
+                 |
+                 v
++----------------------------------+
+|  GUI web (web_prototype, :8000)  |
+|  - Configura la simulacion       |
+|  - Lanza el runner               |
+|  - Visualiza el replay           |
++----------------------------------+
 ```
 
-### Configurador Visual
-El configurador incluye:
-- ✅ Sistema de slots (multiples configuraciones)
-- ✅ Interfaz moderna con tema oscuro
-- ✅ Iconos vectoriales profesionales
-- ✅ Validacion de parametros
-- ✅ Importar/Exportar configuraciones
+La **simulacion en vivo (live) fue eliminada a proposito**; la separacion
+headless -> jsonl -> viewer es intencional y no debe reintroducirse.
+
+### Frontend unico: la GUI web
+
+La GUI vigente es la **web** (`web_prototype/`, FastAPI en
+`http://localhost:8000`). Es el unico frontend de visualizacion y configuracion.
+
+Las **3 GUI de escritorio** anteriores fueron **deprecadas y archivadas** en
+`_legacy/gui_escritorio/` (movidas con `git mv`, reversibles, nada se borro):
+
+- Visualizador de replay en **Pygame** (`run_replay_viewer.py` + `replay_engine`).
+- Dashboard de WorkOrders en **PyQt6** (IPC).
+- Configurador de escritorio en **Tkinter** (`configurator.py`).
+
+Nota: `pygame-ce` sigue siendo dependencia del **headless** porque
+`layout_manager.py` lo usa para leer el TMX; no es por las GUI deprecadas.
 
 ---
 
-## 📊 Salidas del Sistema
+## 4. Instalacion
 
-Cada simulacion genera:
-1. **`replay_*.jsonl`** - Eventos para replay (2 MB)
-2. **`simulation_report_*.xlsx`** - Reporte ejecutivo (43 KB)
-3. **`simulation_report_*.json`** - Datos analytics (350 KB)
-4. **`raw_events_*.json`** - Eventos sin procesar (1.6 MB)
-5. **`warehouse_heatmap_*.png`** - Mapa de calor (2.5 KB)
-6. **`simulacion_completada_*.json`** - Metadatos (112 bytes)
+Requiere **Python >= 3.9**.
 
----
-
-## 🏗️ Arquitectura
-
-### Flujo de Ejecucion
-```
-┌─────────────────────────────────┐
-│   EventGenerator (Headless)     │
-│   • SimPy puro                  │
-│   • Captura eventos             │
-│   • Genera analytics            │
-└───────────┬─────────────────────┘
-            │
-            ▼
-┌─────────────────────────────────┐
-│   Archivos de Salida            │
-│   • .jsonl (replay)             │
-│   • .xlsx (reportes)            │
-│   • .png (heatmap)              │
-└───────────┬─────────────────────┘
-            │
-            ▼
-┌─────────────────────────────────┐
-│   ReplayViewer                  │
-│   • Lee .jsonl                  │
-│   • Renderiza con Pygame        │
-│   • Navegacion temporal         │
-└─────────────────────────────────┘
-```
-
-### Ventajas de la Arquitectura
-- 🚀 **Velocidad:** Sin overhead de rendering en tiempo real
-- 🧹 **Simplicidad:** Sin multiproceso complejo
-- 🔍 **Debugging:** Eventos persistidos para analisis
-- 📊 **Analytics:** Siempre generados automaticamente
-
----
-
-## 📚 Documentacion
-
-### Archivos Principales
-- **`INSTRUCCIONES.md`** - Documentacion tecnica completa
-- **`HANDOFF.md`** - Estado del proyecto y changelog
-- **`ACTIVE_SESSION_STATE.md`** - Estado de sesion actual
-
-### Documentacion Archivada
-- **`archived/`** - Documentacion historica y auditorias
-
----
-
-## 🛠️ Requisitos
-
-### Python
 ```bash
 pip install -r requirements.txt
 ```
 
-### Dependencias Principales
-- `simpy` - Simulacion de eventos discretos
-- `pygame` - Renderizado y visualizacion
-- `openpyxl` - Generacion de reportes Excel
-- `pytmx` - Lectura de mapas Tiled
+Dependencias principales: `simpy` (motor), `pygame-ce` (lectura de layout en el
+headless), `pytmx` (mapas Tiled), `pandas` + `openpyxl` (reportes Excel),
+`optuna` (optimizacion) y `fastapi` + `uvicorn` + `pydantic` (servidor web).
 
 ---
 
-## 🎯 Caracteristicas
+## 5. Uso / Comandos
 
-### Simulacion
-- ✅ Motor SimPy de eventos discretos
-- ✅ Estrategias de despacho configurables
-- ✅ Operarios terrestres y montacargas
-- ✅ Pathfinding con A*
-- ✅ Gestion de WorkOrders
+Hay atajos en `Makefile` (Linux/macOS o `make` en Windows) y `run.bat` (Windows).
 
-### Analytics
-- ✅ Reportes Excel con KPIs
-- ✅ Heatmaps de actividad
-- ✅ Metricas de rendimiento
-- ✅ Exportacion JSON
+### Simulacion headless (genera replay + reportes)
 
-### Visualizacion
-- ✅ Replay interactivo
-- ✅ Dashboard world-class
-- ✅ Navegacion temporal
-- ✅ Controles de reproduccion
+```bash
+make sim
+# equivale a:
+python entry_points/run_generate_replay.py
 
----
+# opciones:
+python entry_points/run_generate_replay.py --config config_test.json
+python entry_points/run_generate_replay.py --output-metrics temp_metrics/output.json
+```
 
-## 🔄 Changelog
+En Windows: `run sim` (o `.\run sim` en PowerShell).
 
-### v11.0 Complete (Octubre 2025)
-- ✅ **BREAKING CHANGE:** Eliminada simulacion en tiempo real
-- ✅ Nueva arquitectura: Headless + Replay
-- ✅ EventGenerator optimizado
-- ✅ Sistema de documentacion mejorado
-- ✅ Limpieza de codigo y archivos
+### GUI web (configurador + runner + viewer)
 
-### v10.x (2025)
-- ✅ Sistema de slots de configuracion
-- ✅ Dashboard PyQt6 en tiempo real
-- ✅ Replay scrubber con navegacion temporal
-- ✅ Correccion de calculos de tiempo
+```bash
+make web
+# equivale a:
+python server_manager.py start --browser
+```
+
+En Windows tambien: `run web`, o los `.bat` directos
+`start_server.bat` / `stop_server.bat` / `restart_server.bat` / `status_server.bat`.
+URL: `http://localhost:8000`.
+
+### Optimizacion (Optuna)
+
+```bash
+python entry_points/run_optimization.py
+```
 
 ---
 
-## 📧 Contacto
+## 6. Estructura de directorios
 
-**Proyecto:** Gemelo Digital de Almacen  
-**Repository:** https://github.com/MostFerrixx/Gemelos_Digital  
-**Fecha:** Octubre 2025
+```
+Gemelos Digital/
+├── entry_points/
+│   ├── run_generate_replay.py    # Motor headless -> .jsonl + reportes
+│   └── run_optimization.py       # Optimizacion de parametros (Optuna)
+│
+├── src/
+│   ├── engines/
+│   │   ├── event_generator.py    # Motor headless de eventos (SimPy)
+│   │   └── analytics_engine.py   # Analitica de la simulacion
+│   ├── subsystems/
+│   │   ├── simulation/           # Nucleo: warehouse, dispatcher, operators,
+│   │   │                         #   order_strategies, data_manager,
+│   │   │                         #   pathfinder, route_calculator, layout_manager
+│   │   ├── database/             # Migracion Excel -> SQLite (warehouse.db)
+│   │   └── utils/                # Utilidades compartidas
+│   ├── core/                     # config_manager, replay_utils, config_utils
+│   ├── analytics/                # Exportacion de reportes (exporter, exporter_v2)
+│   └── tools/                    # optimizer (Optuna)
+│
+├── web_prototype/                # GUI web vigente (FastAPI, :8000)
+│   ├── server.py                 # App FastAPI (configurador + runner + viewer)
+│   ├── config_manager.py
+│   ├── simulation_runner.py
+│   └── static/                   # Frontend (web_configurator/, viewer, css/js)
+│
+├── layouts/                      # Datos canonicos: WH1.tmx, Warehouse_Logic.xlsx, ...
+├── output/                       # Resultados: simulation_YYYYMMDD_HHMMSS/
+├── config.json                   # Configuracion canonica del backend
+│
+├── simulation_buffer.py          # Buffer de eventos (lo usa event_generator) - VIVO
+├── visualizer.py                 # Genera el heatmap PNG por subprocess - VIVO
+├── server_manager.py             # Gestor del servidor web - VIVO
+│
+└── _legacy/                      # Codigo obsoleto archivado (git mv, reversible)
+    ├── gui_escritorio/           # Las 3 GUI de escritorio deprecadas (Pygame,
+    │                             #   PyQt6, Tkinter) + visualization/ + communication/
+    ├── legacy/                   # Carpeta *_OLD historica (0 imports vivos)
+    ├── src_shared/               # src/shared/ muerto (superado por simulation_buffer.py)
+    ├── utils_root/               # utils/ de la raiz (isla muerta)
+    ├── tools_duplicados/         # Duplicados de configurator/visualizer/inspector
+    ├── web_dashboard/            # App web huerfana (puerto 8001), revivible
+    ├── communication_raiz/       # communication/ huerfano de la raiz (roto)
+    └── data/                     # Arbol data/ duplicado, migracion abandonada
+```
+
+Regla de oro: si trabajas en el simulador, **ignora `_legacy/`**. Nada de ahi
+esta en las cadenas vivas (generar replay, optimizar, servidor web). Ver
+`_legacy/README.md` para el detalle de cada movimiento y como revertirlo.
 
 ---
 
-## 📜 Licencia
+## 7. Configuracion y datos
 
-Este proyecto es de uso interno y academico.
+`config.json` (en la **raiz**) es la **unica fuente de verdad** del backend: la
+web/UI solo lo edita y el motor solo lo lee. No se duplica configuracion en codigo.
+
+Parametros tipicos: `total_ordenes`, `agent_types` (operarios y montacargas con
+capacidad y prioridades de zona), `dispatch_strategy`, `tour_type`,
+`fulfillment_policy`, `layout_file`, `sequence_file`.
+
+Los **datos canonicos viven en la raiz**:
+
+- `layouts/WH1.tmx` - layout activo (mapa Tiled).
+- `layouts/Warehouse_Logic.xlsx` - logica/secuencia de racks y zonas.
+- `config.json` - configuracion de la simulacion.
+
+> **Bug conocido (pendiente):** existe un arbol `data/` con copias duplicadas de
+> layouts y datos. La simulacion lee `layouts/Warehouse_Logic.xlsx` (raiz) pero
+> `run_migration.py` lee `data/layouts/Warehouse_Logic.xlsx`, por lo que la base
+> de datos y la simulacion pueden divergir. Unificar en una sesion dedicada.
 
 ---
 
-**¡Listo para simular tu almacen! 🚀**
+## 8. Salidas del sistema
 
+Cada simulacion crea una carpeta `output/simulation_YYYYMMDD_HHMMSS/` con:
+
+- `replay_*.jsonl` - eventos para el viewer web.
+- `simulation_report_*.xlsx` - reporte ejecutivo con KPIs.
+- `warehouse_heatmap_*.png` - mapa de calor de actividad.
+- JSON de analytics y metadatos de la corrida.
+
+---
+
+## 9. Documentacion y repositorio
+
+- `CLAUDE.md` - manual operativo del proyecto (arquitectura real, vivo vs muerto, leyes).
+- `AUDITORIA.md` - diagnostico completo y plan de limpieza por fases.
+- `_legacy/README.md` - que se archivo, por que y como revertirlo.
+
+> Aviso: `INSTRUCCIONES.md` y `HANDOFF.md` son **documentos historicos (V11)** y
+> no reflejan el estado actual. La referencia vigente es este `README.md`.
+
+Repositorio: https://github.com/MostFerrixx/Gemelos_Digital
+
+---
+
+## 10. Licencia
+
+Proyecto de uso interno y academico.
