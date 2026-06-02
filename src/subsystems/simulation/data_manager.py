@@ -674,6 +674,261 @@ class DataManager:
             print(f"[DATA-MANAGER] Error querying all stock: {e}")
             return {}
 
+    def get_inventory_by_location(self) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Get per-LOCATION inventory snapshot, grouped by SKU (V12.1 - Initiative #1).
+
+        Unlike get_all_available_stock (which aggregates by SKU), this returns the
+        actual locations that physically hold each SKU, so the allocation layer can
+        assign WorkOrders to REAL picking locations instead of random ones.
+
+        Each location entry includes qty_free (= qty_available - qty_reserved) and
+        the real grid coordinates / pick_sequence / work_area from the locations
+        table. Locations are sorted by pick_sequence ASC (FCFS, reproducible).
+
+        Returns:
+            Dict mapping sku_code -> list of location dicts:
+            {
+                sku_code: [
+                    {location_id, x, y, pick_sequence, work_area,
+                     equipment_required, qty_available, qty_reserved, qty_free},
+                    ...  # ordered by pick_sequence ASC
+                ]
+            }
+        """
+        result: Dict[str, List[Dict[str, Any]]] = {}
+
+        if not os.path.exists(self.db_path):
+            print("[DATA-MANAGER] No database found for per-location inventory query")
+            return result
+
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("""
+                SELECT
+                    i.location_id,
+                    i.sku_code,
+                    i.qty_available,
+                    i.qty_reserved,
+                    l.pick_sequence,
+                    l.work_area,
+                    l.equipment_required,
+                    l.legacy_x,
+                    l.legacy_y
+                FROM inventory i
+                JOIN locations l ON i.location_id = l.location_id
+                WHERE l.location_type = 'PICKING'
+                ORDER BY i.sku_code, l.pick_sequence
+            """)
+
+            total_locs = 0
+            for row in cursor:
+                sku_code = row['sku_code']
+                qty_available = row['qty_available'] or 0
+                qty_reserved = row['qty_reserved'] or 0
+                entry = {
+                    'location_id': row['location_id'],
+                    'x': row['legacy_x'] or 0,
+                    'y': row['legacy_y'] or 0,
+                    'pick_sequence': row['pick_sequence'] or 0,
+                    'work_area': row['work_area'] or 'Area_Ground',
+                    'equipment_required': row['equipment_required'] or 'GroundOperator',
+                    'qty_available': qty_available,
+                    'qty_reserved': qty_reserved,
+                    'qty_free': max(0, qty_available - qty_reserved),
+                }
+                result.setdefault(sku_code, []).append(entry)
+                total_locs += 1
+
+            conn.close()
+            print(f"[DATA-MANAGER] Per-location inventory loaded: "
+                  f"{len(result)} SKUs across {total_locs} locations")
+            return result
+        except sqlite3.Error as e:
+            conn.close() if 'conn' in locals() else None
+            print(f"[DATA-MANAGER] Error querying inventory by location: {e}")
+            return {}
+
+    def commit_reservations(self, reservations: Dict[str, int]) -> bool:
+        """
+        Persist per-location reservations to inventory.qty_reserved (V12.1 - Init #1).
+
+        Idempotent by design: first resets ALL qty_reserved to 0, then sets the
+        absolute reserved quantity for each location in `reservations`. This way
+        re-running the simulation does NOT accumulate stale reservations; each run
+        leaves qty_reserved reflecting exactly the WorkOrders of that run.
+
+        Both operations run in a single transaction.
+
+        Args:
+            reservations: Dict mapping location_id -> reserved quantity (absolute)
+
+        Returns:
+            True on success, False on error.
+        """
+        if not os.path.exists(self.db_path):
+            print("[DATA-MANAGER] No database found - cannot commit reservations")
+            return False
+
+        try:
+            conn = sqlite3.connect(self.db_path)
+            try:
+                conn.execute("BEGIN")
+                conn.execute("UPDATE inventory SET qty_reserved = 0")
+                for location_id, qty in reservations.items():
+                    if qty and qty > 0:
+                        conn.execute(
+                            "UPDATE inventory SET qty_reserved = ? WHERE location_id = ?",
+                            (int(qty), location_id)
+                        )
+                conn.commit()
+            except sqlite3.Error:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+
+            total_reserved = sum(q for q in reservations.values() if q and q > 0)
+            print(f"[DATA-MANAGER] Reservations committed: "
+                  f"{len(reservations)} locations, {total_reserved} units reserved")
+            return True
+        except sqlite3.Error as e:
+            print(f"[DATA-MANAGER] Error committing reservations: {e}")
+            return False
+
+    def reset_reservations(self) -> bool:
+        """
+        Reset ALL qty_reserved to 0 (V12.1 - Init #1).
+
+        Standalone helper for callers that want to clear reservations without
+        committing new ones (commit_reservations already resets internally).
+
+        Returns:
+            True on success, False on error.
+        """
+        if not os.path.exists(self.db_path):
+            return False
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.execute("UPDATE inventory SET qty_reserved = 0")
+            conn.commit()
+            conn.close()
+            print("[DATA-MANAGER] All reservations reset to 0")
+            return True
+        except sqlite3.Error as e:
+            print(f"[DATA-MANAGER] Error resetting reservations: {e}")
+            return False
+
+    def consume_stock(self, location_id: str, qty: int,
+                      sim_now: Optional[float] = None) -> Optional[Tuple[int, int]]:
+        """
+        Consume stock at a location when an item is physically picked (Fase 2).
+
+        Decrements qty_available and releases the matching qty_reserved for the
+        given location, guarding against negatives. Called once per WorkOrder at
+        the pick moment during the simulation.
+
+        Args:
+            location_id: physical inventory location being picked.
+            qty: units picked (= WorkOrder.cantidad_inicial).
+            sim_now: optional SimPy timestamp to store in last_updated.
+
+        Returns:
+            (new_qty_available, new_qty_reserved) on success, None on error/no-op.
+        """
+        if not location_id or qty is None or qty <= 0:
+            return None
+        if not os.path.exists(self.db_path):
+            return None
+
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT qty_available, qty_reserved FROM inventory WHERE location_id = ?",
+                (location_id,)
+            ).fetchone()
+            if row is None:
+                conn.close()
+                print(f"[STOCK][WARN] location '{location_id}' not in inventory - skip consume")
+                return None
+
+            avail = row['qty_available'] or 0
+            reserved = row['qty_reserved'] or 0
+
+            if qty > avail:
+                print(f"[STOCK][WARN] pick {qty} > available {avail} at {location_id} "
+                      f"-> capping qty_available to 0")
+            new_avail = max(0, avail - qty)
+            new_reserved = max(0, reserved - qty)
+
+            conn.execute(
+                "UPDATE inventory SET qty_available = ?, qty_reserved = ?, last_updated = ? "
+                "WHERE location_id = ?",
+                (new_avail, new_reserved, sim_now, location_id)
+            )
+            conn.commit()
+            conn.close()
+            return (new_avail, new_reserved)
+        except sqlite3.Error as e:
+            conn.close() if 'conn' in locals() else None
+            print(f"[STOCK][ERROR] consume_stock failed for {location_id}: {e}")
+            return None
+
+    def restore_inventory_baseline(self) -> bool:
+        """
+        Restore qty_available from a baseline snapshot and reset reservations (Fase 2).
+
+        Makes each simulation run reproducible: the first time it runs it captures
+        the CURRENT qty_available into the auxiliary table inventory_baseline
+        (created with CREATE TABLE IF NOT EXISTS - the canonical schema is NOT
+        touched). On every run it restores qty_available from that baseline and
+        sets qty_reserved = 0, so the per-location allocation/ledger always starts
+        from full stock and the in-sim decrement does not accumulate across runs.
+
+        Returns:
+            True on success, False on error.
+        """
+        if not os.path.exists(self.db_path):
+            return False
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS inventory_baseline (
+                    location_id TEXT PRIMARY KEY,
+                    qty_baseline INTEGER NOT NULL
+                )
+            """)
+            # Lazy snapshot: populate baseline once from current qty_available
+            count = conn.execute("SELECT COUNT(*) FROM inventory_baseline").fetchone()[0]
+            if count == 0:
+                conn.execute("""
+                    INSERT INTO inventory_baseline (location_id, qty_baseline)
+                    SELECT location_id, qty_available FROM inventory
+                """)
+                print("[STOCK] inventory_baseline created from current qty_available")
+
+            # Restore qty_available from baseline; clear reservations
+            conn.execute("""
+                UPDATE inventory
+                SET qty_available = (
+                    SELECT b.qty_baseline FROM inventory_baseline b
+                    WHERE b.location_id = inventory.location_id
+                ),
+                qty_reserved = 0
+                WHERE location_id IN (SELECT location_id FROM inventory_baseline)
+            """)
+            conn.commit()
+            total = conn.execute("SELECT SUM(qty_available) FROM inventory").fetchone()[0]
+            conn.close()
+            print(f"[STOCK] Inventory restored to baseline ({total} units), reservations reset")
+            return True
+        except sqlite3.Error as e:
+            conn.close() if 'conn' in locals() else None
+            print(f"[STOCK][ERROR] restore_inventory_baseline failed: {e}")
+            return False
+
     def __repr__(self):
         return (f"DataManager(picking_points={len(self.puntos_de_picking_ordenados)}, "
                 f"staging_areas={len(self.outbound_staging_locations)}, "

@@ -431,6 +431,8 @@ class GroundOperator(BaseOperator):
                     self.cargo_volume += wo.calcular_volumen_restante()
                     wo.status = 'picked'
                     wo.cantidad_restante = 0
+                    # Fase 2: consume real stock at the picked location
+                    self.almacen.consumir_stock_picking(wo, self.env.now)
                     progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
                     self.almacen.registrar_evento('work_order_update', {
                         'id': wo.id,
@@ -829,6 +831,8 @@ class Forklift(BaseOperator):
 
                 if wo:
                     wo.status = 'picked'
+                    # Fase 2: consume real stock at the picked location
+                    self.almacen.consumir_stock_picking(wo, self.env.now)
                     progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
                     self.almacen.registrar_evento('work_order_update', {
                         'id': wo.id,

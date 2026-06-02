@@ -371,25 +371,38 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
         wo_counter = 0
         
         # =====================================================================
-        # ALLOCATION LAYER: Load stock snapshot from SQLite
+        # ALLOCATION LAYER (V12.1 - Init #1): per-LOCATION inventory ledger
+        # Instead of aggregating stock by SKU and picking a RANDOM location, we
+        # now allocate each item to the REAL locations that physically hold the
+        # SKU, consuming qty_free and reserving the committed quantity.
         # =====================================================================
-        available_stock = {}
-        initial_stock_snapshot = {}
-        
-        if almacen.data_manager:
-            available_stock = almacen.data_manager.get_all_available_stock()
-            initial_stock_snapshot = available_stock.copy()  # Keep original for reporting
-            print(f"[ALLOCATION] Stock snapshot loaded: {len(available_stock)} SKUs")
+        inventory_ledger = {}        # {sku_code: [loc dicts with mutable qty_free]}
+        initial_free_by_sku = {}     # {sku_code: total qty_free at snapshot} (reporting)
+
+        if almacen.data_manager and hasattr(almacen.data_manager, 'get_inventory_by_location'):
+            # Fase 2: restore qty_available from baseline and clear reservations so
+            # each run starts from full stock (reproducible; in-sim consumption does
+            # not accumulate across runs). Must run BEFORE reading the ledger.
+            if hasattr(almacen.data_manager, 'restore_inventory_baseline'):
+                almacen.data_manager.restore_inventory_baseline()
+            inventory_ledger = almacen.data_manager.get_inventory_by_location()
+            initial_free_by_sku = {
+                sku: sum(loc['qty_free'] for loc in locs)
+                for sku, locs in inventory_ledger.items()
+            }
+            total_skus = len(inventory_ledger)
+            total_locs = sum(len(v) for v in inventory_ledger.values())
+            print(f"[ALLOCATION] Per-location ledger loaded: {total_skus} SKUs, {total_locs} locations")
         else:
             print("[ALLOCATION] WARNING: No data_manager - allocation disabled")
-        
+
         # Track allocation statistics
         total_qty_requested = 0
         total_qty_allocated = 0
         backorder_items_count = 0
-        
-        # Get picking points for location assignment
-        picking_points_by_area = self._build_picking_points_index(almacen)
+
+        # Reservations to commit to inventory.qty_reserved {location_id: qty}
+        reservations = {}
         
         for order in self.parsed_orders:
             # Validate and filter items based on policy
@@ -425,71 +438,76 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
                 self.validation_result.skus_found.add(item.sku_id)
                 
                 # =====================================================================
-                # ALLOCATION LAYER: Check and decrement stock (FCFS)
+                # ALLOCATION LAYER (V12.1 - Init #1): allocate to REAL locations
+                # Walk the SKU's locations (FCFS by pick_sequence), consuming
+                # qty_free and reserving the taken quantity per location.
                 # =====================================================================
                 requested_qty = item.quantity
                 total_qty_requested += requested_qty
-                
-                current_stock = available_stock.get(item.sku_id, 0)
-                qty_to_allocate = min(requested_qty, current_stock)
-                
-                # Decrement virtual stock
-                if qty_to_allocate > 0:
-                    available_stock[item.sku_id] = current_stock - qty_to_allocate
-                    total_qty_allocated += qty_to_allocate
-                
+
+                sku_locations = inventory_ledger.get(item.sku_id, [])
+                allocations, qty_to_allocate = self._allocate_across_locations(
+                    sku_locations, requested_qty, item.work_area
+                )
+                total_qty_allocated += qty_to_allocate
+
                 # Track unfilled demand (backorders)
                 if qty_to_allocate < requested_qty:
                     unfilled_qty = requested_qty - qty_to_allocate
                     backorder_items_count += 1
-                    
+
                     self.validation_result.unfilled_demand.append({
                         'order_id': order.order_id,
                         'sku_id': item.sku_id,
                         'qty_requested': requested_qty,
                         'qty_allocated': qty_to_allocate,
                         'qty_unfilled': unfilled_qty,
-                        'stock_at_time': initial_stock_snapshot.get(item.sku_id, 0),
-                        'reason': f"Insufficient stock (available: {current_stock})"
+                        'stock_at_time': initial_free_by_sku.get(item.sku_id, 0),
+                        'reason': f"Insufficient physical stock (free: {initial_free_by_sku.get(item.sku_id, 0)})"
                     })
-                
-                # Skip if no stock to allocate
+
+                # Skip if no stock to allocate at any location
                 if qty_to_allocate <= 0:
                     continue
-                
-                # Determine work area (from item, catalog, or default)
-                work_area = item.work_area or self._get_default_work_area(sku, almacen)
-                
-                # Get location for this work area
-                ubicacion = self._get_location_for_area(work_area, picking_points_by_area, almacen)
-                
-                # Validate and adjust quantity for capacity (may split into multiple WOs)
-                cantidades = almacen._validar_y_ajustar_cantidad(
-                    sku=sku,
-                    cantidad_original=qty_to_allocate,
-                    work_area=work_area
-                )
-                
-                # Determine staging ID
+
+                # Determine staging ID (once per item)
                 staging_id = order.staging_id or almacen._seleccionar_staging_id()
-                
-                # Create work orders with allocation metadata
-                for cantidad in cantidades:
-                    wo_counter += 1
-                    work_order = WorkOrder(
-                        work_order_id=f"WO-{wo_counter:04d}",
-                        order_id=order.order_id,
-                        tour_id=f"TOUR-{order.order_id}",
+
+                # Create WorkOrders per allocated location (REAL coords / area /
+                # pick_sequence), each split further by operator capacity.
+                for loc, qty_chunk in allocations:
+                    location_id = loc['location_id']
+                    work_area = loc['work_area']           # REAL area of the location
+                    ubicacion = (loc['x'], loc['y'])       # REAL grid coords
+                    pick_sequence = loc['pick_sequence']   # REAL sequence
+
+                    # Reserve the taken quantity for this physical location
+                    reservations[location_id] = reservations.get(location_id, 0) + qty_chunk
+
+                    # Capacity split (may yield several WOs for this chunk)
+                    cantidades = almacen._validar_y_ajustar_cantidad(
                         sku=sku,
-                        cantidad=cantidad,
-                        ubicacion=ubicacion,
-                        work_area=work_area,
-                        pick_sequence=almacen._obtener_pick_sequence_real(ubicacion, work_area),
-                        staging_id=staging_id,
-                        qty_requested=requested_qty  # Original request for tracking
+                        cantidad_original=qty_chunk,
+                        work_area=work_area
                     )
-                    all_work_orders.append(work_order)
-                
+
+                    for cantidad in cantidades:
+                        wo_counter += 1
+                        work_order = WorkOrder(
+                            work_order_id=f"WO-{wo_counter:04d}",
+                            order_id=order.order_id,
+                            tour_id=f"TOUR-{order.order_id}",
+                            sku=sku,
+                            cantidad=cantidad,
+                            ubicacion=ubicacion,
+                            work_area=work_area,
+                            pick_sequence=pick_sequence,
+                            staging_id=staging_id,
+                            qty_requested=requested_qty,   # Original request for tracking
+                            location_id=location_id        # REAL inventory location
+                        )
+                        all_work_orders.append(work_order)
+
                 self.validation_result.total_items_output += 1
             
             self.validation_result.total_orders_output += 1
@@ -504,8 +522,13 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
             'total_qty_allocated': total_qty_allocated,
             'total_qty_unfilled': unfilled_total_qty,
             'backorder_items_count': backorder_items_count,
-            'allocation_rate': round((total_qty_allocated / total_qty_requested * 100), 1) if total_qty_requested > 0 else 100.0
+            'allocation_rate': round((total_qty_allocated / total_qty_requested * 100), 1) if total_qty_requested > 0 else 100.0,
+            'locations_reserved': len([q for q in reservations.values() if q > 0]),
+            'total_units_reserved': sum(reservations.values()),
         }
+
+        # Store reservations so they can be committed to the DB (see P5)
+        self._pending_reservations = reservations
         
         # Print clear allocation summary to console
         print("\n" + "=" * 70)
@@ -537,7 +560,23 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
         
         print(f"[DETERMINISTIC] Generated {len(all_work_orders)} WorkOrders "
               f"from {self.validation_result.total_orders_output} valid orders")
-        
+
+        # =====================================================================
+        # ALLOCATION LAYER (V12.1 - Init #1): commit reservations to the DB
+        # Idempotent: commit_reservations resets qty_reserved to 0 first, then
+        # writes the absolute reserved qty per location for THIS run.
+        # =====================================================================
+        if almacen.data_manager and hasattr(almacen.data_manager, 'commit_reservations'):
+            committed = almacen.data_manager.commit_reservations(reservations)
+            if committed:
+                print(f"[ALLOCATION] Reserved {sum(reservations.values())} units "
+                      f"across {len([q for q in reservations.values() if q > 0])} locations "
+                      f"(qty_reserved persisted).")
+            else:
+                print("[ALLOCATION] WARNING: failed to persist reservations to DB")
+        else:
+            print("[ALLOCATION] No data_manager - reservations NOT persisted")
+
         return all_work_orders
     
     def _validate_order(self, order: ParsedOrder, catalogo: Dict[str, 'SKU'],
@@ -576,7 +615,54 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
             valid_items.append(item)
         
         return valid_items, exclusions
-    
+
+    def _allocate_across_locations(self, sku_locations: List[Dict[str, Any]],
+                                   requested: int,
+                                   preferred_area: Optional[str] = None
+                                   ) -> Tuple[List[Tuple[Dict[str, Any], int]], int]:
+        """
+        Allocate `requested` units across the REAL locations holding a SKU (Init #1).
+
+        FCFS by pick_sequence (sku_locations already comes ordered ASC). Mutates
+        each location's 'qty_free' in place so subsequent items/orders see the
+        decremented availability (no two orders fight over the same stock).
+
+        If `preferred_area` is given, locations in that work_area are tried FIRST;
+        if they cannot satisfy the demand, the remaining locations are used as a
+        fallback (the WO's real area is always the chosen location's area).
+
+        Args:
+            sku_locations: list of mutable location dicts (with 'qty_free').
+            requested: units requested for this item.
+            preferred_area: optional work_area preference filter.
+
+        Returns:
+            (allocations, total_taken) where allocations is a list of
+            (location_dict, qty_taken) tuples.
+        """
+        allocations: List[Tuple[Dict[str, Any], int]] = []
+        remaining = requested
+
+        if preferred_area:
+            preferred = [l for l in sku_locations if l['work_area'] == preferred_area]
+            fallback = [l for l in sku_locations if l['work_area'] != preferred_area]
+            ordered = preferred + fallback
+        else:
+            ordered = sku_locations
+
+        for loc in ordered:
+            if remaining <= 0:
+                break
+            free = loc.get('qty_free', 0)
+            if free <= 0:
+                continue
+            take = min(remaining, free)
+            loc['qty_free'] = free - take
+            allocations.append((loc, take))
+            remaining -= take
+
+        return allocations, requested - remaining
+
     def _build_picking_points_index(self, almacen: 'AlmacenMejorado') -> Dict[str, List[tuple]]:
         """Build index of picking points by work area"""
         index = {}

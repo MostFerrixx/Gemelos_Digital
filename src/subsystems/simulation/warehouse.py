@@ -28,7 +28,7 @@ class WorkOrder:
     def __init__(self, work_order_id: str, order_id: str, tour_id: str,
                  sku: SKU, cantidad: int, ubicacion: tuple,
                  work_area: str, pick_sequence: int, staging_id: int = 1,
-                 qty_requested: int = None):
+                 qty_requested: int = None, location_id: str = None):
         self.id = work_order_id
         self.order_id = order_id
         self.tour_id = tour_id
@@ -51,6 +51,9 @@ class WorkOrder:
         self.qty_requested = qty_requested if qty_requested is not None else cantidad
         self.qty_allocated = cantidad
         self.is_partial = (self.qty_allocated < self.qty_requested)
+        # ALLOCATION LAYER (V12.1 - Init #1): real picking location for this WO
+        # (location_id from inventory; lets us trace/verify real-location picking)
+        self.location_id = location_id
 
     @property
     def sku_id(self) -> str:
@@ -113,6 +116,7 @@ class WorkOrder:
             'qty_requested': self.qty_requested,
             'qty_allocated': self.qty_allocated,
             'is_partial': self.is_partial,
+            'location_id': self.location_id,
         }
 
     def __repr__(self):
@@ -454,6 +458,34 @@ class AlmacenMejorado:
     def get_order_validation_result(self):
         """Get validation result from last order generation (deterministic mode only)"""
         return getattr(self, '_last_validation_result', None)
+
+    def consumir_stock_picking(self, wo, sim_now=None):
+        """
+        Consume real stock when an operator physically picks a WorkOrder (Fase 2).
+
+        Delegates to data_manager.consume_stock to decrement qty_available and
+        release the matching qty_reserved at the WO's real inventory location.
+
+        NO-OP when there is no data_manager, the WO has no location_id (stochastic
+        mode), or the picked quantity is not positive. ASCII-only logging (Ley 4).
+
+        Args:
+            wo: the WorkOrder being picked (uses wo.location_id and
+                wo.cantidad_inicial as the picked quantity).
+            sim_now: optional SimPy timestamp for inventory.last_updated.
+        """
+        if not self.data_manager or not hasattr(self.data_manager, 'consume_stock'):
+            return
+        location_id = getattr(wo, 'location_id', None)
+        qty = getattr(wo, 'cantidad_inicial', 0)
+        if not location_id or not qty or qty <= 0:
+            return  # stochastic WO (no real location) or nothing to consume
+
+        result = self.data_manager.consume_stock(location_id, qty, sim_now=sim_now)
+        if result is not None:
+            new_avail, new_reserved = result
+            print(f"[STOCK] Pick {wo.id}: {qty}u de {location_id} "
+                  f"({wo.sku_id}) -> avail={new_avail}, reserved={new_reserved}")
 
     def adelantar_tiempo(self, tiempo: float):
         """
