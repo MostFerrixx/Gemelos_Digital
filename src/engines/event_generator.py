@@ -162,7 +162,12 @@ class EventGenerator:
             pathfinder=self.pathfinder,
             layout_manager=self.layout_manager
         )
-        
+
+        # 7b. Iniciativa #2 / Fase 3: arrancar el watchdog de congestion (solo cell mode).
+        cm = getattr(self.almacen, 'congestion_manager', None)
+        if cm is not None and getattr(cm, 'cell_exclusion', False):
+            cm.start_watchdog(self.operarios)
+
         # 8. Inicializar almacen y crear ordenes
         self.almacen._crear_catalogo_y_stock()
         self.almacen._generar_flujo_ordenes()
@@ -248,6 +253,12 @@ class EventGenerator:
             
             print(f"[EVENT-GENERATOR] Archivo generado: {output_file}")
             print(f"[EVENT-GENERATOR] Eventos capturados: {len(self.replay_buffer)}")
+
+            # INICIATIVA #2 - Fase 1: reporte de instrumentacion de congestion (si activa).
+            # Se escribe a un JSON aparte para NO contaminar el replay .jsonl.
+            cm = getattr(self.almacen, 'congestion_manager', None)
+            if cm is not None and getattr(cm, 'active', False):
+                cm.write_report(self.session_output_dir, self.session_timestamp)
             
             # Exportar métricas de optimización si se solicitó
             if self.output_metrics_path:

@@ -1,83 +1,98 @@
 {
-    "order_generation_mode": "deterministic",
-    "fulfillment_policy": "ship_partial",
-    "order_file_path": "uploads/orders_ordenes_prueba_real.json",
-    "total_ordenes": 150,
-    "distribucion_tipos": {
-        "pequeno": {
-            "porcentaje": 60,
-            "volumen": 5
-        },
-        "mediano": {
-            "porcentaje": 30,
-            "volumen": 25
-        },
-        "grande": {
-            "porcentaje": 10,
-            "volumen": 80
-        }
+  "order_generation_mode": "deterministic",
+  "fulfillment_policy": "ship_partial",
+  "order_file_path": "uploads/orders_ordenes_prueba_real.json",
+  "total_ordenes": 150,
+  "distribucion_tipos": {
+    "pequeno": {
+      "porcentaje": 60,
+      "volumen": 5
     },
-    "capacidad_carro": 150,
-    "dispatch_strategy": "Optimizacion Global",
-    "tour_type": "Tour Mixto (Multi-Destino)",
-    "agent_types": [
-        {
-            "type": "GroundOperator",
-            "capacity": 250,
-            "discharge_time": 5,
-            "work_area_priorities": {
-                "Area_Ground": 1
-            }
-        },
-        {
-            "type": "GroundOperator",
-            "capacity": 250,
-            "discharge_time": 5,
-            "work_area_priorities": {
-                "Area_Ground": 1
-            }
-        },
-        {
-            "type": "Forklift",
-            "capacity": 200,
-            "discharge_time": 5,
-            "work_area_priorities": {
-                "Area_High": 1,
-                "Area_Special": 2
-            }
-        },
-        {
-            "type": "Forklift",
-            "capacity": 200,
-            "discharge_time": 5,
-            "work_area_priorities": {
-                "Area_High": 1,
-                "Area_Special": 2
-            }
-        }
-    ],
-    "layout_file": "layouts/WH1.tmx",
-    "sequence_file": "layouts/Warehouse_Logic.xlsx",
-    "map_scale": 1.3,
-    "outbound_staging_distribution": {
-        "1": 100,
-        "2": 0,
-        "3": 0,
-        "4": 0,
-        "5": 0,
-        "6": 0,
-        "7": 0
+    "mediano": {
+      "porcentaje": 30,
+      "volumen": 25
     },
-    "num_operarios_terrestres": 2,
-    "num_montacargas": 2,
-    "num_operarios_total": 4,
-    "capacidad_montacargas": 1000,
-    "tiempo_descarga_por_tarea": 5,
-    "assignment_rules": {
-        "GroundOperator": {},
-        "Forklift": {}
+    "grande": {
+      "porcentaje": 10,
+      "volumen": 80
+    }
+  },
+  "capacidad_carro": 150,
+  "dispatch_strategy": "Optimizacion Global",
+  "tour_type": "Tour Mixto (Multi-Destino)",
+  "agent_types": [
+    {
+      "type": "GroundOperator",
+      "capacity": 250,
+      "discharge_time": 5,
+      "work_area_priorities": {
+        "Area_Ground": 1
+      }
     },
-    "tareas_zona_a": 0,
-    "tareas_zona_b": 0,
-    "num_operarios": 4
+    {
+      "type": "GroundOperator",
+      "capacity": 250,
+      "discharge_time": 5,
+      "work_area_priorities": {
+        "Area_Ground": 1
+      }
+    },
+    {
+      "type": "Forklift",
+      "capacity": 200,
+      "discharge_time": 5,
+      "work_area_priorities": {
+        "Area_High": 1,
+        "Area_Special": 2
+      }
+    },
+    {
+      "type": "Forklift",
+      "capacity": 200,
+      "discharge_time": 5,
+      "work_area_priorities": {
+        "Area_High": 1,
+        "Area_Special": 2
+      }
+    }
+  ],
+  "layout_file": "layouts/WH1.tmx",
+  "sequence_file": "layouts/Warehouse_Logic.xlsx",
+  "map_scale": 1.3,
+  "outbound_staging_distribution": {
+    "1": 100,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0
+  },
+  "num_operarios_terrestres": 2,
+  "num_montacargas": 2,
+  "num_operarios_total": 4,
+  "capacidad_montacargas": 1000,
+  "tiempo_descarga_por_tarea": 5,
+  "assignment_rules": {
+    "GroundOperator": {},
+    "Forklift": {}
+  },
+  "tareas_zona_a": 0,
+  "tareas_zona_b": 0,
+  "num_operarios": 4,
+  "congestion": {
+    "enabled": false,
+    "mode": "off",
+    "wait_timeout": 0.5,
+    "wait_hard_cap": 30.0,
+    "backoff_base": 0.1,
+    "backoff_jitter": 0.1,
+    "max_repath": 3,
+    "repath_cost_factor": 2.0,
+    "spawn_offset": 0.3,
+    "watchdog_window": 5.0,
+    "allow_swap": false,
+    "aging_rate": 1.0,
+    "staggered_start": false
+  }
 }

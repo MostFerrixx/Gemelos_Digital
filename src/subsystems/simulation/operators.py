@@ -13,11 +13,11 @@ from typing import List, Dict, Any, Optional, Tuple
 def determinar_staging_destino(work_orders: List[Any], data_manager: Any) -> Tuple[int, Tuple[int, int]]:
     """
     Determina el staging correcto basado en las WorkOrders del tour
-    
+
     Args:
         work_orders: Lista de WorkOrders del tour
         data_manager: DataManager para obtener ubicaciones de staging
-        
+
     Returns:
         Tuple[int, Tuple[int, int]]: (staging_id, ubicacion)
     """
@@ -25,14 +25,14 @@ def determinar_staging_destino(work_orders: List[Any], data_manager: Any) -> Tup
         # Default to staging 1 if no work orders
         staging_locs = data_manager.get_outbound_staging_locations()
         return 1, staging_locs.get(1, (3, 29))
-    
+
     # Get staging_id from first work order (all should be same in Tour Simple)
     staging_id = work_orders[0].staging_id
-    
+
     # Get staging location from data_manager
     staging_locs = data_manager.get_outbound_staging_locations()
     ubicacion = staging_locs.get(staging_id, (3, 29))  # Default to staging 1 location
-    
+
     return staging_id, ubicacion
 
 
@@ -82,6 +82,11 @@ class BaseOperator:
         self.status = "idle"  # idle, moving, working
         self.cargo_volume = 0
         self.tasks_completed = 0
+
+        # Iniciativa #2 / Fase 2: indice de spawn (0-based) asignado por crear_operarios.
+        # Se usa para el arranque escalonado (stagger temporal) y la dispersion espacial
+        # (anden de salida distinto por agente). Default 0 => agente "ancla" en el depot.
+        self.spawn_index = 0
 
         # Performance metrics
         self.total_distance_traveled = 0
@@ -152,67 +157,268 @@ class BaseOperator:
     def _agrupar_wos_por_staging(self, work_orders: List[Any]) -> Dict[int, List[Any]]:
         """
         Agrupa WorkOrders por staging_id para descarga multiple
-        
+
         Args:
             work_orders: Lista de WorkOrders del tour
-            
+
         Returns:
             Dict[staging_id: int, wos: List[WorkOrder]]
         """
         from collections import defaultdict
         staging_groups = defaultdict(list)
-        
+
         for wo in work_orders:
             staging_id = wo.staging_id
             staging_groups[staging_id].append(wo)
-        
+
         return dict(staging_groups)
 
-    def _ordenar_stagings_por_distancia(self, staging_groups: Dict[int, List[Any]], 
+    def _ordenar_stagings_por_distancia(self, staging_groups: Dict[int, List[Any]],
                                          start_position: Tuple[int, int]) -> List[Tuple[int, List[Any]]]:
         """
         Ordena stagings por distancia desde posicion actual para minimizar desplazamientos
-        
+
         Args:
             staging_groups: Dict[staging_id -> List[WorkOrder]]
             start_position: Posicion actual del operador (x, y)
-            
+
         Returns:
             List[(staging_id, wos)] ordenada por distancia
         """
         staging_locs = self.almacen.data_manager.get_outbound_staging_locations()
-        
+
         # Calcular distancia a cada staging
         staging_distances = []
         for staging_id, wos in staging_groups.items():
             staging_pos = staging_locs.get(staging_id, (3, 29))
             distance = abs(staging_pos[0] - start_position[0]) + abs(staging_pos[1] - start_position[1])
             staging_distances.append((distance, staging_id, wos))
-        
+
         # Ordenar por distancia (mas cercano primero)
         staging_distances.sort(key=lambda x: x[0])
-        
+
         # Retornar sin la distancia
         return [(staging_id, wos) for _, staging_id, wos in staging_distances]
 
     def _get_current_work_area(self) -> Optional[str]:
         """
         Obtiene el work_area de la WorkOrder actual si existe.
-        
+
         Returns:
             str: Work area de la WO actual o None si no hay WO activa
         """
         if not self.current_task:
             return None
-            
+
         # Buscar la WorkOrder en el dispatcher
         if hasattr(self.almacen, 'dispatcher') and self.almacen.dispatcher:
             operator_id = f"{self.type}_{self.id}"
             current_wo = self.almacen.dispatcher.work_orders_en_progreso.get(operator_id)
             if current_wo and hasattr(current_wo, 'work_area'):
                 return current_wo.work_area
-        
+
         return None
+
+    # ------------------------------------------------------------------
+    # Iniciativa #2 / Fase 2: arranque escalonado + dispersion espacial
+    # (mata F1 = spawn-stacking). TODO gated por congestion.enabled +
+    # congestion.staggered_start. Con la capa apagada estos helpers son
+    # no-ops y el comportamiento es byte-identico al original.
+    # ------------------------------------------------------------------
+    def _f2_config(self) -> Dict[str, Any]:
+        return getattr(self.almacen, 'congestion_config', {}) or {}
+
+    def _f2_active(self) -> bool:
+        """True si el arranque escalonado/dispersion debe aplicarse."""
+        if not bool(getattr(self.almacen, 'congestion_enabled', False)):
+            return False
+        return bool(self._f2_config().get('staggered_start', False))
+
+    def _compute_departure_lanes(self, depot, k):
+        """
+        BFS cardinal DETERMINISTA desde `depot`. Devuelve hasta `k` celdas caminables
+        ordenadas por capa de distancia y, dentro de la capa, por (x,y). candidates[0]
+        es siempre el propio depot. Como el orden BFS no depende de k, el agente con
+        spawn_index=i recibe SIEMPRE la misma celda candidates[i] (anden distinto por
+        agente, determinista, conectado al depot). No muta collision_matrix.
+        """
+        from collections import deque
+        pf = self.pathfinder
+        if pf is None:
+            return [depot]
+        seen = {depot}
+        order = [depot]
+        q = deque([depot])
+        while q and len(order) < k:
+            cx, cy = q.popleft()
+            # vecinos cardinales en orden lexicografico fijo (determinismo, I5)
+            nbrs = sorted([(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)])
+            for nx, ny in nbrs:
+                if (nx, ny) in seen:
+                    continue
+                seen.add((nx, ny))
+                if pf.is_walkable(nx, ny):
+                    order.append((nx, ny))
+                    q.append((nx, ny))
+        return order
+
+    def _spawn_lane(self, depot):
+        """
+        Dispersion espacial: devuelve el anden de salida de ESTE agente. Si la capa F2
+        no esta activa, no hay pathfinder, o es el agente ancla (index 0), devuelve el
+        depot intacto (comportamiento original). Si no hay suficientes celdas libres,
+        cae al depot (el agente esperara su turno; nunca se congela: regla de oro 4.4).
+        """
+        if not self._f2_active() or self.spawn_index <= 0 or self.pathfinder is None:
+            return depot
+        candidates = self._compute_departure_lanes(depot, self.spawn_index + 1)
+        if self.spawn_index < len(candidates):
+            return candidates[self.spawn_index]
+        return depot
+
+    def _spawn_stagger(self):
+        """
+        Stagger temporal: el agente i espera `spawn_offset * i` antes de su primer
+        movimiento, para desincronizar el embudo de salida del depot. Generador SimPy
+        (usar con `yield from`). No-op si F2 inactiva o index 0.
+        """
+        if self._f2_active() and self.spawn_index > 0:
+            offset = float(self._f2_config().get('spawn_offset', 0.3))
+            if offset > 0:
+                yield self.env.timeout(offset * self.spawn_index)
+
+    def _set_pos(self, new_cell):
+        """
+        Choke point unico para cambiar la posicion del agente (Iniciativa #2).
+
+        Notifica a la capa de ocupacion (CongestionManager) el movimiento celda->celda
+        ANTES de actualizar current_position. Si la capa esta inactiva (enabled:false o
+        mode:off) NO hace nada salvo el seteo => comportamiento byte-identico al original.
+
+        En Fase 1 (instrument) la capa solo OBSERVA (cuenta co-ocupaciones); no bloquea ni
+        emite eventos al replay, asi que el .jsonl no cambia respecto al baseline.
+        """
+        cm = getattr(self.almacen, 'congestion_manager', None)
+        if cm is not None and cm.active:
+            cm.move(self.id, self.current_position, new_cell)
+        self.current_position = new_cell
+
+    def _claim_spawn(self, cell):
+        """
+        Fase 3 (cell mode): reservar la celda de spawn para sostener el invariante
+        'el agente posee su current_position' (asi el metrico I1 lee 0). No-op si la
+        exclusion no esta activa. La dispersion F2 garantiza celdas de spawn distintas.
+        """
+        cm = getattr(self.almacen, 'congestion_manager', None)
+        if cm is not None and getattr(cm, 'cell_exclusion', False):
+            cm.claim(self.id, cell)
+
+    def _jump_to(self, dest):
+        """
+        Fase 3 (cell mode): teletransporte I1-safe que sustituye los `_set_pos` directos
+        de los fallbacks (CB19). Suelta la celda actual, salta a `dest` y la reserva, de
+        modo que la exclusion se respeta aunque el tramo no se recorra celda a celda
+        (caso degenerado: find_path None/corto). Sin exclusion activa equivale a _set_pos.
+        """
+        cm = getattr(self.almacen, 'congestion_manager', None)
+        if cm is not None and getattr(cm, 'cell_exclusion', False):
+            prev = self.current_position
+            self._set_pos(dest)
+            cm.claim(self.id, dest)
+            if prev is not None and prev != dest:
+                cm.release(self.id, prev)
+        else:
+            self._set_pos(dest)
+
+    def _recorrer_tramo(self, segment_path, speed, on_before=None, on_after=None,
+                        time_per_cell: float = 0.1):
+        """
+        Helper compartido (Ground + Forklift) que recorre un tramo celda a celda.
+
+        Extraido en Iniciativa #2 / Fase 0 para tener UN solo lazo de movimiento donde
+        insertar despues la logica de congestion (sin duplicarla en dos agent_process).
+
+        Comportamiento F0 (SIN congestion): identico al lazo original. Por cada celda de
+        `segment_path[1:]`:
+          1. actualiza self.current_position
+          2. ejecuta on_before(step_idx, step_position) si se paso (emite eventos)
+          3. yield env.timeout(time_per_cell * speed)
+          4. ejecuta on_after(step_idx, step_position) si se paso (prints)
+
+        Args:
+            segment_path: lista de celdas [(x,y), ...]; se recorre desde el indice 1.
+            speed: multiplicador de velocidad del agente (Ground 1.0, Forklift 0.8).
+            on_before: callable(step_idx, step_position) -> None, ejecutado ANTES del timeout.
+            on_after: callable(step_idx, step_position) -> None, ejecutado DESPUES del timeout.
+            time_per_cell: segundos base por celda (default 0.1).
+
+        Es un generador SimPy: usar con `yield from self._recorrer_tramo(...)`.
+
+        Fase 3 (mode:cell): si la capa de exclusion esta activa, cada paso es ATOMICO:
+        se adquiere la celda siguiente ANTES de soltar la actual (anti-F10) y, si esta
+        ocupada, se ESPERA (yield release_event | timeout W) y se REINTENTA. Nunca se
+        congela ni aborta (regla de oro 4.4). Si la exclusion NO esta activa, el lazo es
+        identico al de las fases previas (byte-identico con flag off).
+        """
+        cm = getattr(self.almacen, 'congestion_manager', None)
+        cell_mode = cm is not None and getattr(cm, 'cell_exclusion', False)
+
+        if not cell_mode:
+            # --- Rama F0/F1/F2: comportamiento original (sin exclusion) ---
+            for step_idx, step_position in enumerate(segment_path[1:], 1):
+                self._set_pos(step_position)
+                if on_before is not None:
+                    on_before(step_idx, step_position)
+                yield self.env.timeout(time_per_cell * speed)
+                if on_after is not None:
+                    on_after(step_idx, step_position)
+            return
+
+        # --- Rama F3: paso atomico con exclusion por celda ---
+        cfg = self._f2_config()
+        W = float(cfg.get('wait_timeout', 0.5))
+        hard_cap = float(cfg.get('wait_hard_cap', 30.0))
+        for step_idx, step_position in enumerate(segment_path[1:], 1):
+            nxt = step_position
+            cur = self.current_position
+            if nxt == cur:
+                # mismo sitio: no hay contencion, solo emitir eventos/timeout.
+                if on_before is not None:
+                    on_before(step_idx, nxt)
+                yield self.env.timeout(time_per_cell * speed)
+                if on_after is not None:
+                    on_after(step_idx, nxt)
+                continue
+
+            # Adquirir la celda SIGUIENTE antes de soltar la ACTUAL (anti-F10).
+            # Si esta ocupada: ESPERAR y REINTENTAR. Nunca congelar (regla de oro).
+            waited = 0.0
+            entered_wait = False
+            while not cm.try_acquire(self.id, nxt):
+                if not entered_wait:
+                    cm.note_wait_episode()
+                    entered_wait = True
+                rel = cm.release_event(nxt)
+                t0 = self.env.now
+                yield rel | self.env.timeout(W)
+                dt = self.env.now - t0
+                waited += dt
+                if dt >= W:
+                    cm.note_wait_timeout()
+                if waited >= hard_cap:
+                    # Cota blanda: registrar incidente y SEGUIR esperando en ciclos
+                    # acotados. Jamas crash ni abort (I3). La cesion formal es Fase 5.
+                    cm.note_hardcap(self.id, nxt)
+                    waited = 0.0
+
+            # Celda siguiente adquirida: mover (metrico + posicion) y soltar la anterior.
+            self._set_pos(nxt)
+            if on_before is not None:
+                on_before(step_idx, nxt)
+            yield self.env.timeout(time_per_cell * speed)
+            if on_after is not None:
+                on_after(step_idx, nxt)
+            cm.release(self.id, cur)
 
     def __repr__(self):
         return f"{self.type}({self.id}, cargo={self.cargo_volume}/{self.capacity}, status={self.status})"
@@ -272,14 +478,21 @@ class GroundOperator(BaseOperator):
         # Inicializar posicion en depot
         staging_locs = self.almacen.data_manager.get_outbound_staging_locations()
         depot_location = staging_locs.get(1, (3, 29))  # Staging 1 como depot default
-        self.current_position = depot_location
+        # Iniciativa #2 / Fase 2: dispersion espacial (anden distinto por agente).
+        spawn_cell = self._spawn_lane(depot_location)
+        self._set_pos(spawn_cell)
+        # Fase 3 (cell mode): reservar la celda de spawn (invariante de exclusion).
+        self._claim_spawn(spawn_cell)
 
-        print(f"[{self.id}] Proceso iniciado en depot {depot_location}")
+        print(f"[{self.id}] Proceso iniciado en depot {spawn_cell}")
+
+        # Iniciativa #2 / Fase 2: arranque escalonado (stagger temporal).
+        yield from self._spawn_stagger()
 
         while True:
             # PASO 1: Solicitar asignacion de tour
             self.status = "idle"
-            
+
             self.almacen.registrar_evento('estado_agente', {
                 'agent_id': self.id,
                 'agent_type': self.type,
@@ -288,14 +501,14 @@ class GroundOperator(BaseOperator):
                 'current_task': None,
                 'cargo_volume': self.cargo_volume
             })
-            
+
             tour = self.almacen.dispatcher.solicitar_asignacion(self)
 
             if tour is None:
                 if self.almacen.simulacion_ha_terminado():
                     print(f"[{self.id}] Simulacion finalizada, saliendo...")
                     break
-                
+
                 yield self.env.timeout(0.5)  # V12: Reduced for fast termination detection
                 continue
 
@@ -323,7 +536,7 @@ class GroundOperator(BaseOperator):
 
                 if segment_path and len(segment_path) > 1:
                     self.status = "moving"
-                    
+
                     self.almacen.registrar_evento('estado_agente', {
                         'agent_id': self.id,
                         'agent_type': self.type,
@@ -333,13 +546,11 @@ class GroundOperator(BaseOperator):
                         'current_work_area': wo.work_area if wo else None,
                         'cargo_volume': self.cargo_volume
                     })
-                    
+
                     print(f"[{self.id}] t={self.env.now:.1f} Navegando a {wo.ubicacion} "
                           f"(path: {len(segment_path)} pasos)")
-                    
-                    for step_idx, step_position in enumerate(segment_path[1:], 1):
-                        self.current_position = step_position
-                        
+
+                    def _on_before(step_idx, step_position):
                         self.almacen.registrar_evento('estado_agente', {
                             'agent_id': self.id,
                             'agent_type': self.type,
@@ -349,7 +560,7 @@ class GroundOperator(BaseOperator):
                             'current_work_area': wo.work_area if wo else None,
                             'cargo_volume': self.cargo_volume
                         })
-                        
+
                         if wo:
                             progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
                             self.almacen.registrar_evento('work_order_update', {
@@ -375,12 +586,17 @@ class GroundOperator(BaseOperator):
                                 'progress': progress,
                                 'tiempo_fin': getattr(wo, 'tiempo_fin', None)
                             })
-                        
-                        yield self.env.timeout(TIME_PER_CELL * self.default_speed)
-                        
+
+                    def _on_after(step_idx, step_position):
                         print(f"[{self.id}] t={self.env.now:.1f} Paso {step_idx}/{len(segment_path)-1}: {step_position}")
+
+                    yield from self._recorrer_tramo(
+                        segment_path, self.default_speed,
+                        on_before=_on_before, on_after=_on_after,
+                        time_per_cell=TIME_PER_CELL
+                    )
                 else:
-                    self.current_position = wo.ubicacion
+                    self._jump_to(wo.ubicacion)
                     self.total_distance_traveled += segment_distance
 
                 self.almacen.registrar_evento('estado_agente', {
@@ -394,7 +610,7 @@ class GroundOperator(BaseOperator):
                 })
 
                 self.status = "picking"
-                
+
                 # Registrar evento con estado de picking
                 self.almacen.registrar_evento('estado_agente', {
                     'agent_id': self.id,
@@ -405,7 +621,7 @@ class GroundOperator(BaseOperator):
                     'current_work_area': wo.work_area if wo else None,
                     'cargo_volume': self.cargo_volume
                 })
-                
+
                 picking_duration = self.discharge_time
                 yield self.env.timeout(picking_duration)
 
@@ -424,7 +640,7 @@ class GroundOperator(BaseOperator):
                         'tiempo_picking': picking_duration
                     }
                 })
-                
+
                 # ACTUALIZAR CARGO_VOLUME ANTES de poner cantidad_restante = 0
                 if wo:
                     # Sumar el volumen ANTES de modificar cantidad_restante
@@ -472,20 +688,20 @@ class GroundOperator(BaseOperator):
                 staging_location = staging_locs.get(staging_id, (3, 29))
                 # IMPORTANTE: Usar cantidad_inicial * sku.volumen porque cantidad_restante ya es 0 despues del picking
                 volumen_staging = sum(wo.cantidad_inicial * wo.sku.volumen for wo in staging_wos)
-                
+
                 print(f"[{self.id}] [{idx}/{len(ordered_stagings)}] Navegando a staging {staging_id} "
                       f"en {staging_location} para descargar {len(staging_wos)} WOs ({volumen_staging}L)")
-                
+
                 # Navegar al staging
                 if hasattr(self.almacen, 'route_calculator') and self.almacen.route_calculator:
                     try:
                         return_path = self.almacen.route_calculator.pathfinder.find_path(
                             self.current_position, staging_location
                         )
-                        
+
                         if return_path and len(return_path) > 1:
                             self.status = "moving"
-                            
+
                             self.almacen.registrar_evento('estado_agente', {
                                 'agent_id': self.id,
                                 'agent_type': self.type,
@@ -494,13 +710,11 @@ class GroundOperator(BaseOperator):
                                 'current_task': None,
                                 'cargo_volume': self.cargo_volume
                             })
-                            
+
                             print(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
                                   f"(path: {len(return_path)} pasos)")
-                            
-                            for step_idx, step_position in enumerate(return_path[1:], 1):
-                                self.current_position = step_position
-                                
+
+                            def _on_before(step_idx, step_position):
                                 self.almacen.registrar_evento('estado_agente', {
                                     'agent_id': self.id,
                                     'agent_type': self.type,
@@ -509,23 +723,28 @@ class GroundOperator(BaseOperator):
                                     'current_task': None,
                                     'cargo_volume': self.cargo_volume
                                 })
-                                
-                                yield self.env.timeout(TIME_PER_CELL * self.default_speed)
-                                
+
+                            def _on_after(step_idx, step_position):
                                 if step_idx % 5 == 0:
                                     print(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
                                           f"paso {step_idx}/{len(return_path)-1}")
-                            
+
+                            yield from self._recorrer_tramo(
+                                return_path, self.default_speed,
+                                on_before=_on_before, on_after=_on_after,
+                                time_per_cell=TIME_PER_CELL
+                            )
+
                             self.total_distance_traveled += len(return_path) - 1
                         else:
-                            self.current_position = staging_location
+                            self._jump_to(staging_location)
                     except Exception as e:
                         print(f"[{self.id}] ERROR en pathfinding a staging {staging_id}: {e}")
-                        self.current_position = staging_location
-                
+                        self._jump_to(staging_location)
+
                 # DESCARGAR GRANULAR en este staging (V12: Progreso visible por WO)
                 self.status = "unloading"
-                
+
                 self.almacen.registrar_evento('estado_agente', {
                     'agent_id': self.id,
                     'agent_type': self.type,
@@ -534,21 +753,21 @@ class GroundOperator(BaseOperator):
                     'current_task': None,
                     'cargo_volume': self.cargo_volume
                 })
-                
+
                 print(f"[{self.id}] t={self.env.now:.1f} Iniciando descarga granular en staging {staging_id} "
                       f"({len(staging_wos)} WOs)")
-                
+
                 # V12 GRANULAR DISCHARGE: Descargar cada WO individualmente
                 for wo_idx, wo in enumerate(staging_wos, 1):
-                    # Calcular volumen de esta WO específica
+                    # Calcular volumen de esta WO especifica
                     wo_volume = wo.cantidad_inicial * wo.sku.volumen
-                    
+
                     # Timeout individual por WO
                     yield self.env.timeout(self.discharge_time)
-                    
+
                     # Actualizar cargo parcialmente
                     self.cargo_volume -= wo_volume
-                    
+
                     # Registrar evento de estado actualizado
                     self.almacen.registrar_evento('estado_agente', {
                         'agent_id': self.id,
@@ -558,17 +777,17 @@ class GroundOperator(BaseOperator):
                         'current_task': wo.id,
                         'cargo_volume': self.cargo_volume
                     })
-                    
+
                     # Notificar completion individual - esto emite work_order_update con status='staged'
                     self.almacen.dispatcher.notificar_completado_individual(self, wo)
-                    
+
                     print(f"[{self.id}] t={self.env.now:.1f} [{wo_idx}/{len(staging_wos)}] "
                           f"WO {wo.id} staged (-{wo_volume}L, cargo: {self.cargo_volume}L)")
 
             # PASO 5: Limpiar cargo final (por seguridad)
             self.cargo_volume = 0
             print(f"[{self.id}] t={self.env.now:.1f} Descarga completa en todos los stagings")
-            
+
             self.almacen.registrar_evento('estado_agente', {
                 'agent_id': self.id,
                 'agent_type': self.type,
@@ -587,7 +806,7 @@ class GroundOperator(BaseOperator):
                     'num_work_orders': len(work_orders)
                 }
             })
-            
+
             # V12: Usar finalizar_tour en lugar de notificar_completado batch
             self.almacen.dispatcher.finalizar_tour(self)
             self.tasks_completed += len(work_orders)
@@ -653,14 +872,21 @@ class Forklift(BaseOperator):
         # Inicializar posicion en depot
         staging_locs = self.almacen.data_manager.get_outbound_staging_locations()
         depot_location = staging_locs.get(1, (3, 29))  # Staging 1 como depot default
-        self.current_position = depot_location
+        # Iniciativa #2 / Fase 2: dispersion espacial (anden distinto por agente).
+        spawn_cell = self._spawn_lane(depot_location)
+        self._set_pos(spawn_cell)
+        # Fase 3 (cell mode): reservar la celda de spawn (invariante de exclusion).
+        self._claim_spawn(spawn_cell)
 
-        print(f"[{self.id}] Proceso iniciado en depot {depot_location}")
+        print(f"[{self.id}] Proceso iniciado en depot {spawn_cell}")
+
+        # Iniciativa #2 / Fase 2: arranque escalonado (stagger temporal).
+        yield from self._spawn_stagger()
 
         while True:
             # PASO 1: Solicitar asignacion de tour
             self.status = "idle"
-            
+
             self.almacen.registrar_evento('estado_agente', {
                 'agent_id': self.id,
                 'agent_type': self.type,
@@ -669,14 +895,14 @@ class Forklift(BaseOperator):
                 'current_task': None,
                 'cargo_volume': self.cargo_volume
             })
-            
+
             tour = self.almacen.dispatcher.solicitar_asignacion(self)
 
             if tour is None:
                 if self.almacen.simulacion_ha_terminado():
                     print(f"[{self.id}] Simulacion finalizada, saliendo...")
                     break
-                
+
                 yield self.env.timeout(0.5)  # V12: Reduced for fast termination detection
                 continue
 
@@ -704,7 +930,7 @@ class Forklift(BaseOperator):
 
                 if segment_path and len(segment_path) > 1:
                     self.status = "moving"
-                    
+
                     self.almacen.registrar_evento('estado_agente', {
                         'agent_id': self.id,
                         'agent_type': self.type,
@@ -714,13 +940,11 @@ class Forklift(BaseOperator):
                         'current_work_area': wo.work_area if wo else None,
                         'cargo_volume': self.cargo_volume
                     })
-                    
+
                     print(f"[{self.id}] t={self.env.now:.1f} Navegando a {wo.ubicacion} "
                           f"(path: {len(segment_path)} pasos)")
-                    
-                    for step_idx, step_position in enumerate(segment_path[1:], 1):
-                        self.current_position = step_position
-                        
+
+                    def _on_before(step_idx, step_position):
                         self.almacen.registrar_evento('estado_agente', {
                             'agent_id': self.id,
                             'agent_type': self.type,
@@ -756,17 +980,22 @@ class Forklift(BaseOperator):
                                 'progress': progress,
                                 'tiempo_fin': getattr(wo, 'tiempo_fin', None)
                             })
-                        
-                        yield self.env.timeout(TIME_PER_CELL * self.default_speed)
-                        
+
+                    def _on_after(step_idx, step_position):
                         print(f"[{self.id}] t={self.env.now:.1f} Paso {step_idx}/{len(segment_path)-1}: {step_position}")
+
+                    yield from self._recorrer_tramo(
+                        segment_path, self.default_speed,
+                        on_before=_on_before, on_after=_on_after,
+                        time_per_cell=TIME_PER_CELL
+                    )
                 else:
-                    self.current_position = wo.ubicacion
+                    self._jump_to(wo.ubicacion)
                     self.total_distance_traveled += segment_distance
 
                 self.status = "lifting"
                 print(f"[{self.id}] t={self.env.now:.1f} Elevando horquilla")
-                
+
                 # Registrar evento con estado de lifting
                 self.almacen.registrar_evento('estado_agente', {
                     'agent_id': self.id,
@@ -777,13 +1006,13 @@ class Forklift(BaseOperator):
                     'current_work_area': wo.work_area if wo else None,
                     'cargo_volume': self.cargo_volume
                 })
-                
+
                 yield self.env.timeout(LIFT_TIME)
                 self.set_lift_height(1)
 
                 self.status = "picking"
                 print(f"[{self.id}] t={self.env.now:.1f} Picking en {wo.ubicacion}")
-                
+
                 # Registrar evento con estado de picking
                 self.almacen.registrar_evento('estado_agente', {
                     'agent_id': self.id,
@@ -794,7 +1023,7 @@ class Forklift(BaseOperator):
                     'current_work_area': wo.work_area if wo else None,
                     'cargo_volume': self.cargo_volume
                 })
-                
+
                 picking_duration = self.discharge_time
                 yield self.env.timeout(picking_duration)
 
@@ -872,20 +1101,20 @@ class Forklift(BaseOperator):
                 staging_location = staging_locs.get(staging_id, (3, 29))
                 # IMPORTANTE: Usar cantidad_inicial * sku.volumen porque cantidad_restante ya es 0 despues del picking
                 volumen_staging = sum(wo.cantidad_inicial * wo.sku.volumen for wo in staging_wos)
-                
+
                 print(f"[{self.id}] [{idx}/{len(ordered_stagings)}] Navegando a staging {staging_id} "
                       f"en {staging_location} para descargar {len(staging_wos)} WOs ({volumen_staging}L)")
-                
+
                 # Navegar al staging
                 if hasattr(self.almacen, 'route_calculator') and self.almacen.route_calculator:
                     try:
                         return_path = self.almacen.route_calculator.pathfinder.find_path(
                             self.current_position, staging_location
                         )
-                        
+
                         if return_path and len(return_path) > 1:
                             self.status = "moving"
-                            
+
                             self.almacen.registrar_evento('estado_agente', {
                                 'agent_id': self.id,
                                 'agent_type': self.type,
@@ -894,13 +1123,11 @@ class Forklift(BaseOperator):
                                 'current_task': None,
                                 'cargo_volume': self.cargo_volume
                             })
-                            
+
                             print(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
                                   f"(path: {len(return_path)} pasos)")
-                            
-                            for step_idx, step_position in enumerate(return_path[1:], 1):
-                                self.current_position = step_position
-                                
+
+                            def _on_before(step_idx, step_position):
                                 self.almacen.registrar_evento('estado_agente', {
                                     'agent_id': self.id,
                                     'agent_type': self.type,
@@ -909,23 +1136,28 @@ class Forklift(BaseOperator):
                                     'current_task': None,
                                     'cargo_volume': self.cargo_volume
                                 })
-                                
-                                yield self.env.timeout(TIME_PER_CELL * self.default_speed)
-                                
+
+                            def _on_after(step_idx, step_position):
                                 if step_idx % 5 == 0:
                                     print(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
                                           f"paso {step_idx}/{len(return_path)-1}")
-                            
+
+                            yield from self._recorrer_tramo(
+                                return_path, self.default_speed,
+                                on_before=_on_before, on_after=_on_after,
+                                time_per_cell=TIME_PER_CELL
+                            )
+
                             self.total_distance_traveled += len(return_path) - 1
                         else:
-                            self.current_position = staging_location
+                            self._jump_to(staging_location)
                     except Exception as e:
                         print(f"[{self.id}] ERROR en pathfinding a staging {staging_id}: {e}")
-                        self.current_position = staging_location
-                
+                        self._jump_to(staging_location)
+
                 # DESCARGAR GRANULAR en este staging (V12: Progreso visible por WO)
                 self.status = "unloading"
-                
+
                 self.almacen.registrar_evento('estado_agente', {
                     'agent_id': self.id,
                     'agent_type': self.type,
@@ -934,21 +1166,21 @@ class Forklift(BaseOperator):
                     'current_task': None,
                     'cargo_volume': self.cargo_volume
                 })
-                
+
                 print(f"[{self.id}] t={self.env.now:.1f} Iniciando descarga granular en staging {staging_id} "
                       f"({len(staging_wos)} WOs)")
-                
+
                 # V12 GRANULAR DISCHARGE: Descargar cada WO individualmente
                 for wo_idx, wo in enumerate(staging_wos, 1):
-                    # Calcular volumen de esta WO específica
+                    # Calcular volumen de esta WO especifica
                     wo_volume = wo.cantidad_inicial * wo.sku.volumen
-                    
+
                     # Timeout individual por WO
                     yield self.env.timeout(self.discharge_time)
-                    
+
                     # Actualizar cargo parcialmente
                     self.cargo_volume -= wo_volume
-                    
+
                     # Registrar evento de estado actualizado
                     self.almacen.registrar_evento('estado_agente', {
                         'agent_id': self.id,
@@ -958,17 +1190,17 @@ class Forklift(BaseOperator):
                         'current_task': wo.id,
                         'cargo_volume': self.cargo_volume
                     })
-                    
+
                     # Notificar completion individual - esto emite work_order_update con status='staged'
                     self.almacen.dispatcher.notificar_completado_individual(self, wo)
-                    
+
                     print(f"[{self.id}] t={self.env.now:.1f} [{wo_idx}/{len(staging_wos)}] "
                           f"WO {wo.id} staged (-{wo_volume}L, cargo: {self.cargo_volume}L)")
 
             # PASO 5: Limpiar cargo final (por seguridad)
             self.cargo_volume = 0
             print(f"[{self.id}] t={self.env.now:.1f} Descarga completa en todos los stagings")
-            
+
             self.almacen.registrar_evento('estado_agente', {
                 'agent_id': self.id,
                 'agent_type': self.type,
@@ -987,14 +1219,13 @@ class Forklift(BaseOperator):
                     'num_work_orders': len(work_orders)
                 }
             })
-            
+
             # V12: Usar finalizar_tour en lugar de notificar_completado batch
             self.almacen.dispatcher.finalizar_tour(self)
             self.tasks_completed += len(work_orders)
 
             print(f"[{self.id}] t={self.env.now:.1f} Tour completado, "
                   f"total completadas: {self.tasks_completed}")
-
 
 
 def crear_operarios(env: simpy.Environment, almacen: Any,
@@ -1048,6 +1279,7 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
                 simulador=simulador
             )
             operarios.append(operator)
+            operator.spawn_index = len(operarios) - 1  # Iniciativa #2 / Fase 2
             proceso = env.process(operator.agent_process())
             procesos_operarios.append(proceso)
 
@@ -1067,6 +1299,7 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
                 simulador=simulador
             )
             operarios.append(forklift)
+            forklift.spawn_index = len(operarios) - 1  # Iniciativa #2 / Fase 2
             proceso = env.process(forklift.agent_process())
             procesos_operarios.append(proceso)
 
@@ -1099,6 +1332,7 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
                     simulador=simulador
                 )
                 operarios.append(operator)
+                operator.spawn_index = len(operarios) - 1  # Iniciativa #2 / Fase 2
                 proceso = env.process(operator.agent_process())
                 procesos_operarios.append(proceso)
 
@@ -1120,6 +1354,7 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
                     simulador=simulador
                 )
                 operarios.append(forklift)
+                forklift.spawn_index = len(operarios) - 1  # Iniciativa #2 / Fase 2
                 proceso = env.process(forklift.agent_process())
                 procesos_operarios.append(proceso)
 
@@ -1131,3 +1366,5 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
         print(f"  - {operario.id} ({operario.type}) - Capacidad: {operario.capacity}")
 
     return procesos_operarios, operarios
+
+# Iniciativa #2 / Fase 1: instrumentacion de congestion via CongestionManager.

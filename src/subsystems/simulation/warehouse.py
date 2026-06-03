@@ -185,6 +185,28 @@ class AlmacenMejorado:
             '1': 100, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0
         })
 
+        # ============================================================
+        # INICIATIVA #2 - CONGESTION (Fase 0)
+        # Se LEE el bloque de configuracion pero todavia NO se usa.
+        # Por defecto enabled:false / mode:off => comportamiento identico al actual
+        # (gate de no-regresion: .jsonl byte-identico al baseline).
+        # El motor solo lee; la web/UI solo edita (Ley #3: config.json fuente de verdad).
+        # ============================================================
+        self.congestion_config = configuracion.get('congestion', {
+            'enabled': False,
+            'mode': 'off'
+        })
+        self.congestion_enabled = bool(self.congestion_config.get('enabled', False))
+        self.congestion_mode = self.congestion_config.get('mode', 'off')
+        from .congestion_manager import CongestionManager
+        self.congestion_manager = CongestionManager(
+            env=env,
+            enabled=self.congestion_enabled,
+            mode=self.congestion_mode,
+            config=self.congestion_config,
+        )
+        print(f"[CONGESTION] {self.congestion_manager}")
+
         # Counters (dual system: WorkOrders and PickingTasks)
         self.workorders_completadas_count = 0  # Main KPI counter
         self.tareas_completadas_count = 0      # Legacy picking tasks counter
