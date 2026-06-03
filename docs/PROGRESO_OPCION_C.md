@@ -7,8 +7,8 @@
 
 ## Estado de fases
 - [x] F0 — Andamiaje y flag `mode: timewindow` (sin cambio de comportamiento) — HECHO
-- [ ] F1 — ReservationTable + A* espacio-temporal en modo SOMBRA (planifica, no ejecuta)
-- [ ] (F2+ — NO autorizado todavia)
+- [x] F1 — ReservationTable + A* espacio-temporal en modo SOMBRA — HECHO
+- [ ] (F2+ — NO autorizado todavia; requiere visto bueno del Director)
 
 ## Convenciones de validacion
 - No-regresion: flag off (y tambien `mode:timewindow` en sombra) => `.jsonl`
@@ -31,14 +31,32 @@
 - [x] `warehouse.py`: instanciacion gateada por `timewindow_active` (table+planner, reusa pathfinder).
 - [x] `operators.py::_recorrer_tramo`: hook gateado `_timewindow_shadow_plan` (F0 = stub no-op) antes del lazo estatico.
 - [x] Validacion no-regresion: off vs timewindow => cuerpo .jsonl byte-identico (md5 9d9d8544..., diff vacio). Solo difiere linea-1 (header/config). Ambas: 9685 eventos, sim_end_t=262, terminan, sin freeze.
-- [ ] Backup + commit local F0.
+- [x] Backup + commit local F0. Backup en `_backup_iniciativa2/opcionC_fase_0/` (gitignored).
+      **Commit F0 = `421b20f`** (10 files, +783/-3). Verificado (git cat-file OK).
 
 ### Fase 1 — Planner en sombra
-- [ ] `ReservationTable` completo (is_free, reserve+assert, swap, purga, invariante).
-- [ ] `SpaceTimePlanner.find_path_st` (A* continuo mover/esperar, octil reusada, cortes).
-- [ ] Inyeccion sombra en `operators` (planifica+reserva; ejecuta estatica).
-- [ ] Reporte shadow (`timewindow_shadow_report.json`) en `event_generator`.
-- [ ] Validacion: 0 solapes en planes, coste/ms reportado, sim real sin cambios.
+- [x] `ReservationTable` completo: is_free (con clearance), reserve (verifica invariante,
+      cuenta overlap_violations, NO inserta si pisa), can_swap (aristas dirigidas),
+      reserve_move, release_agent, purge_before. Intervalos ordenados por t_in (bisect).
+- [x] `SpaceTimePlanner.find_path_st`: A* espacio-temporal continuo (mover dur=0.1*speed /
+      esperar dt_wait), heuristica = octil del Pathfinder REUSADA convertida a cota
+      inferior de tiempo (admisible), estados cuantizados (round t), tie-break por heap,
+      corte por max_expansions, filtro cardinal/diagonal. + plan_and_reserve_shadow
+      (release+plan+reserve+metricas) + shadow_report.
+- [x] Inyeccion sombra en `operators._timewindow_shadow_plan` (PURO: sin yield/eventos;
+      planifica+reserva; la ejecucion sigue la ruta estatica) -> .jsonl no cambia.
+- [x] Reporte shadow (`timewindow_shadow_report_<ts>.json`) escrito en `event_generator`.
+- [x] VALIDACION (config_stress_tw.json, 20 agentes, layout real WH1, orders_test_sandbox):
+      * No-regresion: body .jsonl byte-identico al baseline (md5 9d9d8544...). Sim termina
+        t=262, sin freeze. SOMBRA no altera el movimiento (confirmado).
+      * Planner: 72 tramos, 70 planes hallados, 2 fallidos (artefacto de sombra: la
+        posicion real estatica del agente cae a veces dentro del intervalo PLANIFICADO de
+        otro agente -> is_free del start falla; inofensivo, solo se loguea). **0 solapes**
+        (table_overlap_violations=0, reserve_overlaps=0) => invariante de disjuncion OK.
+      * Coste planificacion: avg=12.0ms/plan, max=143.5ms; avg_expansiones=318, max=5497,
+        cap_hits=0; esperas insertadas=2.
+      * Determinismo: .jsonl identico en doble corrida; shadow_report identico en TODAS
+        las metricas logicas (solo varian los campos *_ms, que son wallclock).
 - [ ] Backup + commit local F1.
 
 ---
@@ -56,3 +74,8 @@
   instalados; harness corre (20 agentes, termina en sim_t=262, ~32s wallclock).
   Bug FUSE confirmado: `rm`/`unlink` da EPERM; `mv` (rename) SI funciona -> se usa
   para round-trip y para limpiar `index.lock` stale (git commitea OK).
+- [F0 HECHO] Andamiaje completo + no-regresion byte-identica. Commit `421b20f`.
+- [F1 HECHO] ReservationTable + SpaceTimePlanner en sombra. 0 solapes sobre layout real,
+  coste avg 12ms/plan, .jsonl byte-identico, determinista. Commit `<pendiente abajo>`.
+- [NOTA F2] NO iniciada (requiere visto bueno del Director). F2 cambiaria la EJECUCION
+  (_recorrer_tramo seguiria el plan en vez de la ruta estatica). El injerto ya existe.

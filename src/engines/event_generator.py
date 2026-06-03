@@ -259,7 +259,38 @@ class EventGenerator:
             cm = getattr(self.almacen, 'congestion_manager', None)
             if cm is not None and getattr(cm, 'active', False):
                 cm.write_report(self.session_output_dir, self.session_timestamp)
-            
+
+            # INICIATIVA #2 - OPCION C / Fase 1: reporte del planner espacio-temporal
+            # en modo SOMBRA (metricas de coste + validacion de disjuncion). JSON aparte.
+            planner = getattr(self.almacen, 'spacetime_planner', None)
+            if planner is not None and hasattr(planner, 'shadow_report'):
+                try:
+                    import json as _json
+                    rep = planner.shadow_report()
+                    suffix = f"_{self.session_timestamp}" if self.session_timestamp else ""
+                    tw_path = os.path.join(self.session_output_dir,
+                                           f"timewindow_shadow_report{suffix}.json")
+                    with open(tw_path, "w", encoding="utf-8") as _f:
+                        _json.dump(rep, _f, indent=2)
+                    print("\n" + "=" * 70)
+                    print("[TIMEWINDOW] REPORTE PLANNER ESPACIO-TEMPORAL (SOMBRA, Fase 1)")
+                    print("=" * 70)
+                    print(f"  Tramos planificados: {rep.get('segments_planned')}")
+                    print(f"  Planes encontrados: {rep.get('plans_found')} | "
+                          f"fallidos: {rep.get('plans_failed')}")
+                    print(f"  Solapes en reservas (DEBE ser 0): "
+                          f"{rep.get('table_overlap_violations')}")
+                    print(f"  Coste planificacion: avg={rep.get('avg_plan_ms')}ms, "
+                          f"max={round(rep.get('max_plan_ms', 0), 4)}ms")
+                    print(f"  Expansiones A*: avg={rep.get('avg_expansions')}, "
+                          f"max={rep.get('max_expansions_in_a_plan')}, "
+                          f"cap_hits={rep.get('expansion_cap_hits')}")
+                    print(f"  Esperas insertadas/plan: {rep.get('avg_waits_per_plan')}")
+                    print(f"  Reporte: {tw_path}")
+                    print("=" * 70)
+                except Exception as _e:
+                    print(f"[TIMEWINDOW][WARN] no se pudo escribir reporte sombra: {_e}")
+
             # Exportar métricas de optimización si se solicitó
             if self.output_metrics_path:
                 print("[EVENT-GENERATOR] Exportando métricas de optimización...")

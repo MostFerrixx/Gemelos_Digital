@@ -338,9 +338,24 @@ class BaseOperator:
         NO altera el movimiento real (la ejecucion sigue siendo la estatica). Asi se
         mide el coste del planner sobre el layout real sin riesgo de regresion.
 
-        Fase 0: stub no-op (el andamiaje existe; la logica llega en Fase 1).
+        Fase 1: planificacion+reserva real en sombra, delegada al SpaceTimePlanner.
+        Es PURO (sin yield / sin env.timeout / sin emision de eventos) => no avanza el
+        reloj de SimPy ni toca el replay => .jsonl byte-identico al baseline.
         """
-        return
+        planner = getattr(self.almacen, 'spacetime_planner', None)
+        if planner is None or not segment_path or len(segment_path) < 2:
+            return
+        try:
+            start = segment_path[0]
+            goal = segment_path[-1]
+            t0 = float(self.env.now)
+            planner.plan_and_reserve_shadow(
+                start=start, goal=goal, t0=t0, agent_id=self.id,
+                speed=speed, static_steps=len(segment_path),
+            )
+        except Exception as e:
+            # El modo sombra JAMAS debe romper la simulacion real (es un observador).
+            print(f"[TIMEWINDOW][SHADOW][WARN] plan fallo para {self.id}: {e}")
 
     def _recorrer_tramo(self, segment_path, speed, on_before=None, on_after=None,
                         time_per_cell: float = 0.1):

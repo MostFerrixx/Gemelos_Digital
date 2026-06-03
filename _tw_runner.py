@@ -43,9 +43,9 @@ print(f"RUNNER_DONE cfg={cfg} out={out} sim_end_t={gen.env.now:.2f} "
 # Reporte de planner en sombra (Opcion C), si existe.
 planner = getattr(gen.almacen, 'spacetime_planner', None)
 table = getattr(gen.almacen, 'reservation_table', None)
-if planner is not None:
-    m = getattr(planner, 'shadow_metrics', None)
-    print(f"SHADOW_PLANNER metrics={m}")
+if planner is not None and hasattr(planner, 'shadow_report'):
+    import json as _json
+    print("SHADOW_REPORT:" + _json.dumps(planner.shadow_report()))
 if table is not None:
     print(f"SHADOW_TABLE reserve_calls={getattr(table,'reserve_calls',None)} "
           f"overlap_violations={getattr(table,'overlap_violations',None)} "
