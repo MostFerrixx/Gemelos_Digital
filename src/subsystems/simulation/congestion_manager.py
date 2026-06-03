@@ -31,9 +31,14 @@ class CongestionManager:
     """
 
     # modos en los que la capa esta ACTIVA (observa). 'off' / disabled => inactiva.
-    ACTIVE_MODES = ("instrument", "cell", "cell+corridor")
-    # modos en los que ademas MEDIA la exclusion por celda (Fase 3+).
+    # 'timewindow' (Opcion C) tambien observa: REUSA la instrumentacion I1 como
+    # validador independiente (debe leer 0 co-ocupaciones cuando el plan ejecute).
+    ACTIVE_MODES = ("instrument", "cell", "cell+corridor", "timewindow")
+    # modos en los que ademas MEDIA la exclusion por celda (Fase 3+, enfoque viejo).
     EXCLUSION_MODES = ("cell", "cell+corridor")
+    # modo de ruteo por reserva espacio-temporal (Opcion C). NO usa el owner-dict de
+    # F3 ni la espera reactiva: usa ReservationTable + SpaceTimePlanner.
+    TIMEWINDOW_MODE = "timewindow"
 
     def __init__(self, env: Any, enabled: bool = False, mode: str = "off",
                  config: Optional[Dict[str, Any]] = None):
@@ -86,6 +91,15 @@ class CongestionManager:
     def cell_exclusion(self) -> bool:
         """True si ademas de observar, debe MEDIAR la exclusion por celda (Fase 3+)."""
         return self.enabled and self.mode in self.EXCLUSION_MODES
+
+    @property
+    def timewindow_active(self) -> bool:
+        """
+        True si el ruteo por reserva espacio-temporal (Opcion C) esta activo.
+        Gateado por `congestion.enabled` + `mode == 'timewindow'`. Mutuamente
+        excluyente con `cell_exclusion` (son enfoques distintos del mismo problema).
+        """
+        return self.enabled and self.mode == self.TIMEWINDOW_MODE
 
     # ------------------------------------------------------------------
     # API de ocupacion (gated: si no esta activa, no hace nada)

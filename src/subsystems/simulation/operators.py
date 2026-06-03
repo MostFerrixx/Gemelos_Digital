@@ -330,6 +330,18 @@ class BaseOperator:
         else:
             self._set_pos(dest)
 
+    def _timewindow_shadow_plan(self, segment_path, speed, time_per_cell):
+        """
+        OPCION C (time-window) - modo SOMBRA. Planifica una ruta espacio-temporal
+        libre de conflicto para `segment_path` contra la ReservationTable global y la
+        RESERVA, registrando metricas (longitud, esperas, expansiones, ms, solapes).
+        NO altera el movimiento real (la ejecucion sigue siendo la estatica). Asi se
+        mide el coste del planner sobre el layout real sin riesgo de regresion.
+
+        Fase 0: stub no-op (el andamiaje existe; la logica llega en Fase 1).
+        """
+        return
+
     def _recorrer_tramo(self, segment_path, speed, on_before=None, on_after=None,
                         time_per_cell: float = 0.1):
         """
@@ -365,6 +377,12 @@ class BaseOperator:
 
         if not cell_mode:
             # --- Rama F0/F1/F2: comportamiento original (sin exclusion) ---
+            # OPCION C (timewindow) - injerto gateado: en modo SOMBRA se PLANIFICA y
+            # se RESERVA la ruta espacio-temporal y se MIDE el coste, pero la EJECUCION
+            # sigue siendo la estatica de abajo (NO se altera el movimiento; el .jsonl
+            # no cambia). Fase 0: stub no-op. Fase 1: planificacion real en sombra.
+            if cm is not None and getattr(cm, 'timewindow_active', False):
+                self._timewindow_shadow_plan(segment_path, speed, time_per_cell)
             for step_idx, step_position in enumerate(segment_path[1:], 1):
                 self._set_pos(step_position)
                 if on_before is not None:

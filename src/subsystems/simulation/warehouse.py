@@ -207,6 +207,35 @@ class AlmacenMejorado:
         )
         print(f"[CONGESTION] {self.congestion_manager}")
 
+        # ============================================================
+        # INICIATIVA #2 - OPCION C (time-window routing) - Fase 0 (andamiaje)
+        # Se crean ReservationTable + SpaceTimePlanner SOLO si timewindow esta
+        # activo (enabled + mode:timewindow). Con el flag apagado quedan en None
+        # => ningun codigo nuevo se ejecuta => .jsonl byte-identico al baseline.
+        # El planner reusa el pathfinder estatico (Ley #6: respeta arquitectura).
+        # ============================================================
+        self.reservation_table = None
+        self.spacetime_planner = None
+        if getattr(self.congestion_manager, 'timewindow_active', False):
+            tw_cfg = dict(self.congestion_config.get('timewindow', {}))
+            from .reservation_table import ReservationTable
+            from .spacetime_planner import SpaceTimePlanner
+            self.reservation_table = ReservationTable(
+                clearance=float(tw_cfg.get('clearance', 0.0))
+            )
+            if pathfinder is not None:
+                self.spacetime_planner = SpaceTimePlanner(
+                    pathfinder=pathfinder,
+                    reservation_table=self.reservation_table,
+                    time_per_cell=0.1,
+                    dt_wait=float(tw_cfg.get('dt_wait', 0.1)),
+                    max_expansions=int(tw_cfg.get('max_expansions', 20000)),
+                    allow_diagonal=bool(tw_cfg.get('allow_diagonal', True)),
+                )
+            self.timewindow_shadow = bool(tw_cfg.get('shadow', True))
+            print(f"[TIMEWINDOW] OpcionC activo (shadow={self.timewindow_shadow}). "
+                  f"table={self.reservation_table}, planner={self.spacetime_planner}")
+
         # Counters (dual system: WorkOrders and PickingTasks)
         self.workorders_completadas_count = 0  # Main KPI counter
         self.tareas_completadas_count = 0      # Legacy picking tasks counter

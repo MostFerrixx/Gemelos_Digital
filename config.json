@@ -93,6 +93,14 @@
     "watchdog_window": 5.0,
     "allow_swap": false,
     "aging_rate": 1.0,
-    "staggered_start": false
+    "staggered_start": false,
+    "timewindow": {
+      "shadow": true,
+      "clearance": 0.0,
+      "dt_wait": 0.1,
+      "max_expansions": 20000,
+      "plan_horizon": 0.0,
+      "allow_diagonal": true
+    }
   }
 }
