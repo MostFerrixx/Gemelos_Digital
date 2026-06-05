@@ -132,6 +132,21 @@ class DataManager:
         """
         return self.outbound_staging_locations
 
+    def get_outbound_staging_zones(self) -> Dict[int, List[Tuple[int, int]]]:
+        """
+        INICIATIVA #3 (outbound) - accessor ADITIVO. Devuelve, por staging_id, la
+        LISTA de celdas que componen su zona de aforo (1 pallet por celda).
+
+        Fase 0: deriva las zonas desde outbound_staging_locations (la hoja tiene
+        hoy 1 celda por staging_id), asi que cada zona es [(x, y)]. En Fase 1 el
+        loader poblara varias celdas por staging_id desde la hoja Excel y este
+        accessor las devolvera tal cual. NO altera get_outbound_staging_locations.
+
+        Returns:
+            Dict {staging_id: [(x, y), ...]}
+        """
+        return {sid: [cell] for sid, cell in self.outbound_staging_locations.items()}
+
     def get_layout_manager(self) -> LayoutManager:
         """
         Return configured LayoutManager instance

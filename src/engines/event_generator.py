@@ -168,6 +168,14 @@ class EventGenerator:
         if cm is not None and getattr(cm, 'cell_exclusion', False):
             cm.start_watchdog(self.operarios)
 
+        # 7c. INICIATIVA #3 / Fase 0: arranque del proceso outbound (camion).
+        # Fase 0 = gate listo pero outbound_process es None (no se instancia el
+        # camion hasta Fase 2). Con el flag off la condicion es falsa => no-op =>
+        # .jsonl byte-identico al baseline.
+        if getattr(self.almacen, 'outbound_enabled', False) and \
+           getattr(self.almacen, 'outbound_process', None) is not None:
+            self.env.process(self.almacen.outbound_process.run())
+
         # 8. Inicializar almacen y crear ordenes
         self.almacen._crear_catalogo_y_stock()
         self.almacen._generar_flujo_ordenes()

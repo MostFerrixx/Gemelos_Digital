@@ -236,6 +236,28 @@ class AlmacenMejorado:
             print(f"[TIMEWINDOW] OpcionC activo (shadow={self.timewindow_shadow}). "
                   f"table={self.reservation_table}, planner={self.spacetime_planner}")
 
+        # ============================================================
+        # INICIATIVA #3 - OUTBOUND (aforo de staging + despacho) - Fase 0
+        # Se LEE el bloque config["outbound"] pero NO se usa con el flag off.
+        # Con enabled:false (default) => staging_zones vacio, outbound_process None
+        # => ningun codigo nuevo se ejecuta => .jsonl byte-identico al baseline.
+        # La logica activa (pallets persistentes, slots, camion) es Fase 1-2.
+        # ============================================================
+        self.outbound_config = configuracion.get('outbound', {'enabled': False})
+        self.outbound_enabled = bool(self.outbound_config.get('enabled', False))
+        self.staging_zones = {}       # {staging_id: StagingZone}; se puebla si enabled
+        self.outbound_process = None  # se instancia en Fase 2 (camion)
+        if self.outbound_enabled:
+            from .outbound import StagingZone
+            zones = (self.data_manager.get_outbound_staging_zones()
+                     if self.data_manager is not None else {})
+            self.staging_zones = {sid: StagingZone(sid, cells)
+                                  for sid, cells in zones.items()}
+            print(f"[OUTBOUND] Fase0 activo. zonas="
+                  f"{ {sid: z.capacity for sid, z in self.staging_zones.items()} }")
+        else:
+            print("[OUTBOUND] desactivado (enabled:false) - comportamiento actual.")
+
         # Counters (dual system: WorkOrders and PickingTasks)
         self.workorders_completadas_count = 0  # Main KPI counter
         self.tareas_completadas_count = 0      # Legacy picking tasks counter

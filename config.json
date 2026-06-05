@@ -102,5 +102,14 @@
       "plan_horizon": 0.0,
       "allow_diagonal": true
     }
+  },
+  "outbound": {
+    "enabled": false,
+    "dispatch_policy": "interval",
+    "truck_interval": 20.0,
+    "truck_capacity": 8,
+    "loading_time": 2.0,
+    "zone_capacity_default": 8,
+    "slot_wait_alert": 60.0
   }
 }
