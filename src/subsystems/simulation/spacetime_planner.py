@@ -21,6 +21,11 @@ sqrt(2) en diagonal es una fase posterior.
 Determinismo (plan 3.6/4.10): vecinos en orden fijo (Pathfinder.get_neighbors),
 tie-break del heap por contador incremental, estados cuantizados por redondeo de t.
 
+Fase 1 (SOMBRA): `plan_and_reserve_shadow` planifica+reserva+mide pero NO ejecuta.
+Fase 2 (EJECUCION): `plan_and_reserve` planifica+reserva+mide y DEVUELVE el plan
+para que el operario lo siga (la ejecucion sustituye a la ruta estatica). Ambas
+comparten el mismo core (`_plan_reserve_core`) => las metricas son identicas.
+
 Ley #4: ASCII puro en prints/logs.
 """
 
@@ -62,7 +67,8 @@ class SpaceTimePlanner:
         self.last_capped = False
         self.last_waits = 0
 
-        # Metricas agregadas del modo SOMBRA (Fase 1). Se vuelcan a un JSON al final.
+        # Metricas agregadas (Fase 1 sombra Y Fase 2 ejecucion comparten el mismo
+        # dict; el campo `exec_segments` distingue cuantos tramos se EJECUTARON).
         self.shadow_metrics: Dict[str, Any] = {
             "segments_planned": 0,
             "plans_found": 0,
@@ -77,6 +83,9 @@ class SpaceTimePlanner:
             "total_static_steps": 0,
             "reserve_attempts": 0,
             "reserve_overlaps": 0,
+            # Fase 2 (ejecucion real segun plan).
+            "exec_segments": 0,
+            "exec_fallbacks": 0,
         }
 
     # ------------------------------------------------------------------
@@ -206,16 +215,15 @@ class SpaceTimePlanner:
         return path
 
     # ------------------------------------------------------------------
-    # Modo SOMBRA (Fase 1): planifica + reserva + mide, SIN ejecutar
+    # Core compartido: planifica + reserva + mide (sombra Y ejecucion).
     # ------------------------------------------------------------------
-    def plan_and_reserve_shadow(self, start: Cell, goal: Cell, t0: float,
-                                agent_id: str, speed: float,
-                                static_steps: int = 0) -> Dict[str, Any]:
+    def _plan_reserve_core(self, start: Cell, goal: Cell, t0: float,
+                           agent_id: str, speed: float,
+                           static_steps: int = 0) -> Optional[List[PlanStep]]:
         """
         Para un tramo: libera las reservas previas del agente (re-planificacion),
         planifica una ruta espacio-temporal, la RESERVA en la tabla (vertices+aristas)
-        y actualiza las metricas de sombra. NO altera el movimiento real (la ejecucion
-        sigue la ruta estatica). Devuelve un resumen del tramo.
+        y actualiza las metricas. Devuelve el PLAN [(celda, t), ...] o None.
 
         El `release_agent` previo evita que el agente choque con su propio plan anterior
         y mantiene la tabla acotada (~1 plan por agente activo).
@@ -243,8 +251,7 @@ class SpaceTimePlanner:
 
         if plan is None:
             m["plans_failed"] += 1
-            return {"ok": False, "expansions": self.last_expansions,
-                    "ms": plan_ms, "capped": self.last_capped}
+            return None
 
         m["plans_found"] += 1
         m["total_plan_steps"] += len(plan)
@@ -264,9 +271,59 @@ class SpaceTimePlanner:
                 self.table.reserve_move(prev_cell, cell, prev_t, t, agent_id)
             prev_cell, prev_t = cell, t
 
+        return plan
+
+    def reserve_dwell(self, cell: Cell, t_in: float, dwell: float,
+                      agent_id: str) -> bool:
+        """
+        Fase 2: reserva la PERMANENCIA de un agente en `cell` durante [t_in, t_in+dwell]
+        (picking / descarga / lifting). Sin esto, otro agente podria planificar una ruta
+        que cruce la celda donde este agente esta fisicamente parado => co-ocupacion (I1).
+        Modela el destino-con-permanencia del plan (3.2 / 4.6) de forma uniforme.
+        Devuelve True si se reservo (False si pisaba otra reserva: se cuenta como overlap).
+        """
+        if dwell <= 0.0:
+            return True
+        ok = self.table.reserve(cell, t_in, t_in + float(dwell), agent_id)
+        if not ok:
+            self.shadow_metrics["reserve_overlaps"] += 1
+        return ok
+
+    # ------------------------------------------------------------------
+    # Fase 1 (SOMBRA): planifica + reserva + mide, SIN ejecutar.
+    # ------------------------------------------------------------------
+    def plan_and_reserve_shadow(self, start: Cell, goal: Cell, t0: float,
+                                agent_id: str, speed: float,
+                                static_steps: int = 0) -> Dict[str, Any]:
+        """
+        Modo SOMBRA: planifica+reserva+mide pero NO altera el movimiento (la ejecucion
+        sigue la ruta estatica). Devuelve un resumen del tramo (no se ejecuta).
+        Comparte el core con la ejecucion => metricas identicas a Fase 1.
+        """
+        plan = self._plan_reserve_core(start, goal, t0, agent_id, speed, static_steps)
+        if plan is None:
+            return {"ok": False, "expansions": self.last_expansions,
+                    "capped": self.last_capped}
         return {"ok": True, "steps": len(plan), "waits": self.last_waits,
-                "expansions": self.last_expansions, "ms": plan_ms,
+                "expansions": self.last_expansions,
                 "t_start": t0, "t_end": plan[-1][1]}
+
+    # ------------------------------------------------------------------
+    # Fase 2 (EJECUCION): planifica + reserva + mide y DEVUELVE el plan.
+    # ------------------------------------------------------------------
+    def plan_and_reserve(self, start: Cell, goal: Cell, t0: float,
+                         agent_id: str, speed: float,
+                         static_steps: int = 0) -> Optional[List[PlanStep]]:
+        """
+        Modo EJECUCION (Fase 2): igual que el core, pero devuelve el PLAN para que el
+        operario lo SIGA (la ejecucion sustituye a la ruta estatica). El reloj de SimPy
+        avanza segun los t_llegada del plan; las esperas son pasos explicitos (celda
+        repetida) ya reservados => sin espera reactiva.
+        """
+        plan = self._plan_reserve_core(start, goal, t0, agent_id, speed, static_steps)
+        if plan is not None:
+            self.shadow_metrics["exec_segments"] += 1
+        return plan
 
     def shadow_report(self) -> Dict[str, Any]:
         """Resumen agregado para volcar a JSON (metricas de coste y validacion)."""

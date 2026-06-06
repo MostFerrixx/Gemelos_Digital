@@ -357,6 +357,55 @@ class BaseOperator:
             # El modo sombra JAMAS debe romper la simulacion real (es un observador).
             print(f"[TIMEWINDOW][SHADOW][WARN] plan fallo para {self.id}: {e}")
 
+    def _timewindow_execute_plan(self, segment_path, speed, on_before, on_after,
+                                 time_per_cell):
+        """
+        OPCION C (time-window) - Fase 2: EJECUCION segun el plan espacio-temporal.
+        Planifica+reserva la ruta libre de conflicto y la SIGUE celda a celda,
+        avanzando el reloj de SimPy con env.timeout exacto entre llegadas. Las esperas
+        planificadas son pasos con celda REPETIDA (env.timeout en la celda segura): NO
+        hay espera reactiva ni adquisicion por cerrojo (la F3 queda jubilada en este
+        modo). Emite los mismos eventos que el lazo estatico (on_before tras mover,
+        on_after tras el timeout) => el viewer ve el movimiento ordenado.
+
+        Generador SimPy. Devuelve (via StopIteration value) True si EJECUTO el plan,
+        False si no habia plan: el llamador cae entonces a la ruta estatica (fallback
+        de seguridad 4.2, instrumentado en exec_fallbacks). Nunca congela ni aborta.
+        """
+        planner = getattr(self.almacen, 'spacetime_planner', None)
+        if planner is None or not segment_path or len(segment_path) < 2:
+            return False
+        start = segment_path[0]
+        goal = segment_path[-1]
+        t0 = float(self.env.now)
+        try:
+            plan = planner.plan_and_reserve(
+                start, goal, t0, self.id, speed, static_steps=len(segment_path))
+        except Exception as e:
+            print(f"[TIMEWINDOW][EXEC][WARN] plan fallo para {self.id}: {e}")
+            return False
+        if not plan or len(plan) < 2:
+            try:
+                planner.shadow_metrics["exec_fallbacks"] += 1
+            except Exception:
+                pass
+            return False
+
+        prev_t = float(plan[0][1])  # = t0; plan[0] == start == posicion actual
+        for step_idx, (cell, t) in enumerate(plan[1:], 1):
+            dt = float(t) - prev_t
+            if dt < 0.0:
+                dt = 0.0
+            self._set_pos(cell)  # mover (o re-entrar si es espera: cell == actual)
+            if on_before is not None:
+                on_before(step_idx, cell)
+            if dt > 0.0:
+                yield self.env.timeout(dt)
+            if on_after is not None:
+                on_after(step_idx, cell)
+            prev_t = float(t)
+        return True
+
     def _recorrer_tramo(self, segment_path, speed, on_before=None, on_after=None,
                         time_per_cell: float = 0.1):
         """
@@ -397,7 +446,17 @@ class BaseOperator:
             # sigue siendo la estatica de abajo (NO se altera el movimiento; el .jsonl
             # no cambia). Fase 0: stub no-op. Fase 1: planificacion real en sombra.
             if cm is not None and getattr(cm, 'timewindow_active', False):
-                self._timewindow_shadow_plan(segment_path, speed, time_per_cell)
+                shadow = bool(getattr(self.almacen, 'timewindow_shadow', True))
+                if shadow:
+                    # Fase 1: planifica+reserva en SOMBRA; ejecuta estatico abajo.
+                    self._timewindow_shadow_plan(segment_path, speed, time_per_cell)
+                else:
+                    # Fase 2: EJECUTA el plan espacio-temporal (sin espera reactiva).
+                    # Si hay plan, recorre y retorna; si no, cae al estatico (fallback).
+                    executed = yield from self._timewindow_execute_plan(
+                        segment_path, speed, on_before, on_after, time_per_cell)
+                    if executed:
+                        return
             for step_idx, step_position in enumerate(segment_path[1:], 1):
                 self._set_pos(step_position)
                 if on_before is not None:

@@ -993,4 +993,3 @@ Literatura (web, junio 2026):
 _Fin de la investigacion. Cerebellum sincronizado. Esperando decision del Director:
 MVP (Fase A) para desbloquear ya, o arranque del plan robusto COMBO B por fases._
 
- 
