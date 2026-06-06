@@ -169,4 +169,38 @@ bucle "V12 GRANULAR DISCHARGE" (~L852-877 Ground; equivalente en Forklift).
   zonas, por eso identico). Geometria staging1 = [(3,29),(2,29),(4,29),(2,28),(3,28),
   (4,28),(1,29),(5,29)] todas caminables. PROTOCOLO ANTI-FUSE aplicado (round-trip+
   py_compile tras cada edit; outbound.py y warehouse.py se truncaron y se restauraron).
-- [F1.1] Pendiente: commit. Luego F1.2 (pallet persistente + reserva slot + backpressure).
+- [F1.1 CERRADO] Commit `3380560`.
+
+## MICRO-PLAN F1.2 (siguiente; diseno antes de codear, Ley #1)
+Objetivo: al descargar, cada WO -> Pallet persistente que ocupa un DockSlot LIBRE de
+la zona, y la sim sigue TERMINANDO y baja I1. Riesgo: toca el camino de descarga
+(operators.py) y la reserva (ReservationTable) acoplada al planner Opcion C.
+
+Sub-pasos propuestos (cada uno compilable + validado + commit):
+- F1.2a (mecanica de aforo, SIN tocar el planner): en el bucle de descarga
+  (operators.py "V12 GRANULAR DISCHARGE", Ground ~L852 y el equivalente Forklift):
+  por cada WO, pedir `zone.free_slot()`; si hay -> crear Pallet, `slot.assign(pid)`,
+  registrar metrica; si NO hay -> BACKPRESSURE: `yield env.timeout(dt)` y reintentar
+  (espera por slot). SCAFFOLD de release (SOLO F1, marcar "reemplazar por camion en
+  Fase 2"): al ocupar, arrancar `env.process` que espera `dwell_scaffold` y libera el
+  slot (`slot.release()`), para que la zona rote y la sim termine. Metricas: ocupacion
+  pico por zona, backlog, esperas por slot. NO reservar celda aun.
+  Validar: OFF byte-identico; ON termina (gracias al scaffold), determinista; medir
+  ocupacion/backlog. I1 NO bajara aun (no hay reserva) -> esperado.
+- F1.2b (acople con el planner, la parte fina): reservar la celda del slot en la
+  ReservationTable como obstaculo: `reserve(cell, t_ocupa, BIG, "PALLET:<id>")` AL
+  PLANIFICAR (no al llegar tarde, leccion Fase 2b); liberar con
+  `release_agent("PALLET:<id>")` en el release. CUIDADO (riesgos Fase 2b):
+    * reservar un obstaculo permanente puede dejar al planner SIN ruta -> fallback
+      estatico que ATRAVIESA (regresion). Mitigar: garantizar conectividad de la zona
+      (no tapar el unico pasillo; las filas y=27,28 quedan libres por encima de y=29),
+      y que el agente que coloca el pallet no se auto-bloquee (placa en slot LIBRE en
+      la tabla en ese instante).
+    * subir `max_expansions` si el coste del A* sube.
+  Validar: I1 baja hacia 0 (objetivo F1), 0 plans_failed/fallbacks, termina,
+  determinista, OFF byte-identico.
+- F1.2 cierre: doc + backup _backup_iniciativa3/fase_1/ + commit.
+
+NOTA de alcance: F1.2 es un cambio de COMPORTAMIENTO en el camino delicado de la
+Opcion C. Conviene hacerlo en un pase enfocado. F0 y F1.1 quedan como base limpia y
+reversible (flag off => baseline byte-identico).
