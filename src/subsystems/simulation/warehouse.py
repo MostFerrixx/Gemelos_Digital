@@ -276,7 +276,13 @@ class AlmacenMejorado:
                     others = (all_anchors - {anchor}) | used
                     zcells = build_zone_cells(anchor, k, _walk, exclude=others,
                                               grid_w=gw, grid_h=gh)
-                self.staging_zones[sid] = StagingZone(sid, zcells)
+                zone = StagingZone(sid, zcells)
+                # F1.2b: la primera celda (ancla) es la de SERVICIO a donde navegan los
+                # operarios; se deja SIEMPRE libre (sin pallet ni reserva) para que el
+                # destino del ruteo sea alcanzable. Los pallets van al resto de celdas.
+                if zone.slots:
+                    zone.slots[0].assign("SERVICE")
+                self.staging_zones[sid] = zone
                 used.update(zcells)
             # INICIATIVA #3 / F1.2a: metricas del muelle (aforo).
             self.outbound_metrics = {

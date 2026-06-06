@@ -249,4 +249,26 @@ reversible (flag off => baseline byte-identico).
 - [DOC] Creado `docs/COMO_FUNCIONA_EL_PROGRAMA.md` con TODO lo aprendido por prueba
   y error (fuentes de datos BD vs Excel, interpretacion del TMX, trampas de Tiled,
   trampas FUSE/pyc, como correr/validar, estado del outbound). Referencia de retome.
-- [PENDIENTE] F1.2b: reservar la celda del pallet en ReservationTable -> I1 hacia 0.
+- [F1.2b HECHO] Reservar la celda del pallet como OBSTACULO en la ReservationTable.
+  Cambios: warehouse marca la celda-ancla de cada zona como "SERVICE" (siempre libre,
+  destino de navegacion alcanzable); operators `_outbound_place_pallet` reserva la
+  celda del pallet `reserve(cell, now, now+1e9, "PALLET:<id>")`; `_outbound_scaffold_
+  release` la libera con `release_agent`. Insight clave: el planner NO chequea la
+  celda de INICIO pero SI la de DESTINO -> si un pallet ocupa el ancla, los agentes
+  no pueden llegar (regresion Fase 2b). Por eso el ancla queda SERVICE.
+  VALIDADO (config_stress_tw_v2.json, determinista, doble corrida identica):
+    * 73 planes, **0 fallbacks, 0 reserve_overlaps, 0 cap_hits** -> SIN REGRESION
+      (los pallets son obstaculos reales que el planner esquiva; lo que fallo en 2b).
+    * termina (sim_end_t=280), 126 pallets, 0 esperas por slot (pico 18/20).
+    * I1 = 54 (era 56 sin reservar, 81 en mapa viejo de 1 celda).
+  HALLAZGO: I1 bajo POCO porque los pallets estan en las columnas de cajas, FUERA
+  del trafico principal, asi que rara vez estorbaban. El I1 residual (54) NO son
+  pallets: es el EMBUDO DEL UNICO PUNTO DE DESCARGA. Hotspots: (3,29)=ancla con
+  max_concurrent **8** (8 agentes apilados ahi) + el corredor de aproximacion
+  ((3,27),(2,28),(2,24),...). NINGUN hotspot en celdas de pallet => F1.2b OK.
+  CONCLUSION: el problema de "atravesar pallets" esta RESUELTO. Para bajar mas el I1
+  habria que repartir la DESCARGA en varias celdas de servicio (no 1 ancla compartida)
+  y/o reservar el dwell de descarga. Eso es una iniciativa aparte (embudo del depot).
+- [FASE 1 COMPLETA] F0 + F1.1 + F1.2a + F1.2b hechas y validadas. Pallets persistentes,
+  zona de aforo real (20/staging desde mapa v2), backpressure, y pallets como
+  obstaculos. Pendiente futuro: camion real (Fase 2) + embudo del punto de descarga.

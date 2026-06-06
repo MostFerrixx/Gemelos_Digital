@@ -563,6 +563,17 @@ class BaseOperator:
         pallet = Pallet(pid, wo.id, getattr(wo, 'order_id', ''), staging_id,
                         slot.cell, float(self.env.now), vol)
         slot.assign(pid)
+        # F1.2b: reservar la celda del pallet como OBSTACULO en la ReservationTable
+        # (de ahora hasta que el camion/scaffold lo retire) para que el planner de la
+        # Opcion C enrute a los demas agentes ESQUIVANDOLO. No-op si no hay tabla
+        # (modo != timewindow). La celda-ancla nunca llega aqui (es SERVICE).
+        rt = getattr(self.almacen, 'reservation_table', None)
+        if rt is not None:
+            try:
+                rt.reserve(slot.cell, float(self.env.now),
+                           float(self.env.now) + 1e9, pid)
+            except Exception:
+                pass
         m = getattr(self.almacen, 'outbound_metrics', None)
         zone = getattr(self.almacen, 'staging_zones', {}).get(staging_id)
         if m is not None:
@@ -578,6 +589,14 @@ class BaseOperator:
         """SCAFFOLD Fase 1 (proxy del camion): libera la posicion tras `dwell` seg."""
         yield self.env.timeout(dwell)
         slot.release()
+        # F1.2b: liberar la reserva-obstaculo de la celda del pallet (la celda vuelve
+        # a estar disponible para el ruteo).
+        rt = getattr(self.almacen, 'reservation_table', None)
+        if rt is not None:
+            try:
+                rt.release_agent("PALLET:" + str(pallet.wo_id))
+            except Exception:
+                pass
         pallet.status = "shipped"
         pallet.t_shipped = float(self.env.now)
         m = getattr(self.almacen, 'outbound_metrics', None)
