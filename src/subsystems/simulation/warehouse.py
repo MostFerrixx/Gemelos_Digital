@@ -268,9 +268,9 @@ class AlmacenMejorado:
                 if not cells:
                     continue
                 anchor = cells[0]
-                if len(cells) >= k:
-                    # la hoja Excel ya define la zona completa: usarla tal cual.
-                    zcells = [tuple(c) for c in cells[:k]]
+                if len(cells) > 1:
+                    # el Excel/BD ya define la zona completa (varias celdas): usarla tal cual.
+                    zcells = [tuple(c) for c in cells]
                 else:
                     # auto-expandir el ancla a k celdas caminables, sin solapar zonas.
                     others = (all_anchors - {anchor}) | used

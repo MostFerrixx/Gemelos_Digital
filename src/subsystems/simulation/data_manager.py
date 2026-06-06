@@ -77,6 +77,8 @@ class DataManager:
         # Initialize data structures
         self.puntos_de_picking_ordenados: List[Dict[str, Any]] = []
         self.outbound_staging_locations: Dict[int, Tuple[int, int]] = {}
+        # INICIATIVA #3: celdas COMPLETAS de cada zona de staging (varias por id).
+        self.outbound_staging_zone_cells: Dict[int, List[Tuple[int, int]]] = {}
         self.sku_catalog: Dict[str, Dict[str, Any]] = {}  # NEW: SKU catalog cache
 
         # Load data from SQLite (preferred) or Excel (fallback)
@@ -145,6 +147,8 @@ class DataManager:
         Returns:
             Dict {staging_id: [(x, y), ...]}
         """
+        if getattr(self, 'outbound_staging_zone_cells', None):
+            return self.outbound_staging_zone_cells
         return {sid: [cell] for sid, cell in self.outbound_staging_locations.items()}
 
     def get_layout_manager(self) -> LayoutManager:
@@ -328,14 +332,18 @@ class DataManager:
             WHERE staging_type = 'OUTBOUND'
         """)
         
+        zone_dict = {}
         for row in cursor:
             staging_id = row['staging_id']
             x = row['legacy_x'] or 0
             y = row['legacy_y'] or 0
-            
+
             if staging_id > 0:
-                self.outbound_staging_locations[staging_id] = (x, y)
-        
+                if staging_id not in self.outbound_staging_locations:
+                    self.outbound_staging_locations[staging_id] = (x, y)  # ancla (compat)
+                zone_dict.setdefault(staging_id, []).append((x, y))  # zona completa (I3)
+        self.outbound_staging_zone_cells = zone_dict
+
         # Generate defaults if none found
         if not self.outbound_staging_locations:
             print("[DATA-MANAGER] No staging areas in DB, generating defaults")
@@ -516,6 +524,7 @@ class DataManager:
 
         # Process staging locations
         staging_dict = {}
+        zone_dict = {}
         for row in sheet.iter_rows(min_row=header_row + 1, values_only=True):
             if not row or not row[0]:
                 continue
@@ -541,13 +550,16 @@ class DataManager:
                 y = int(row_dict.get('y', 0))
 
                 if staging_id > 0:  # Only add valid IDs
-                    staging_dict[staging_id] = (x, y)
+                    if staging_id not in staging_dict:
+                        staging_dict[staging_id] = (x, y)  # primera celda = ancla (compat)
+                    zone_dict.setdefault(staging_id, []).append((x, y))  # zona completa
 
             except (ValueError, TypeError, KeyError) as e:
                 print(f"[DATA-MANAGER WARNING] Skipping invalid staging row: {row_dict} - {e}")
                 continue
 
         self.outbound_staging_locations = staging_dict
+        self.outbound_staging_zone_cells = zone_dict
 
         print(f"[DATA-MANAGER] Hoja 'OutboundStaging' cargada con "
               f"{len(staging_dict)} registros")

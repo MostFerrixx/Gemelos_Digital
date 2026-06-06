@@ -227,5 +227,26 @@ reversible (flag off => baseline byte-identico).
   LECTURA: confirma empiricamente que con esta tasa de deposito y dwell=10s la zona
   de k=8 se SATURA (esperas de hasta 33s) -> dato para dimensionar despacho real.
   PROTOCOLO ANTI-FUSE aplicado (round-trip+py_compile; OFF byte-identico revalidado).
-- [F1.2a] Pendiente: commit. Luego F1.2b (reservar celda del pallet en ReservationTable
-  -> bajar I1 hacia 0; cuidado regresion Fase 2b: conectividad de zona + no fallback).
+- [F1.2a CERRADO] Commit `5f8e281`.
+- [CHECKPOINT opcionC-F2] Commit `b8402e2` (rollback de la Opcion C F2 sin validar).
+- [LAYOUT WH1 v2 CONECTADO] El Director rediseno el mapa: `layouts/WH1 v2.tmx`
+  (30x42), zona de carga abajo con 7 stagings de 20 celdas (pares de columnas,
+  y=29..38, pasillos entre medio => sin pallets atrapados). Pasos:
+  * Arreglado el TMX: Tiled lo dejaba con tileset EXTERNO (D:/Tiled o ../../Tiled)
+    => no cargaba. Se INCRUSTO el tileset (auto-contenido). Ver COMO_FUNCIONA #4.
+  * Excel nuevo `layouts/Warehouse_Logic_v2.xlsx` (OutboundStaging = 140 celdas,
+    20/staging; PickingLocations intacta).
+  * DESCUBRIMIENTO CLAVE: la sim lee de `warehouse.db`, NO del Excel (el Excel es
+    fallback). Se actualizo la tabla `staging_areas` de la BD (recreada SIN
+    PRIMARY KEY para admitir varias celdas/staging) con las 140 celdas. BD
+    respaldada en _backup_iniciativa3/warehouse.db.bak. Ver COMO_FUNCIONA #2.
+  * data_manager: lee varias celdas/staging (BD y Excel) -> outbound_staging_zone_cells.
+  * warehouse F1.1: si la zona trae varias celdas, usa TODAS (capacidad=len).
+  * config_stress_tw_v2.json: layout v2 + excel v2 + outbound.enabled=true.
+  VALIDADO (determinista, 20 agentes, 100% a staging1): termina (sim_end_t=280),
+  126 pallets, **0 esperas por slot** (pico 17/20), **I1=56** (bajo de 81 solo por
+  repartir en la zona de 20). Doble corrida identica.
+- [DOC] Creado `docs/COMO_FUNCIONA_EL_PROGRAMA.md` con TODO lo aprendido por prueba
+  y error (fuentes de datos BD vs Excel, interpretacion del TMX, trampas de Tiled,
+  trampas FUSE/pyc, como correr/validar, estado del outbound). Referencia de retome.
+- [PENDIENTE] F1.2b: reservar la celda del pallet en ReservationTable -> I1 hacia 0.
