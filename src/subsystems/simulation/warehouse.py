@@ -248,12 +248,37 @@ class AlmacenMejorado:
         self.staging_zones = {}       # {staging_id: StagingZone}; se puebla si enabled
         self.outbound_process = None  # se instancia en Fase 2 (camion)
         if self.outbound_enabled:
-            from .outbound import StagingZone
-            zones = (self.data_manager.get_outbound_staging_zones()
-                     if self.data_manager is not None else {})
-            self.staging_zones = {sid: StagingZone(sid, cells)
-                                  for sid, cells in zones.items()}
-            print(f"[OUTBOUND] Fase0 activo. zonas="
+            from .outbound import StagingZone, build_zone_cells
+            zones_raw = (self.data_manager.get_outbound_staging_zones()
+                         if self.data_manager is not None else {})
+            k = int(self.outbound_config.get('zone_capacity_default', 8))
+            lm = self.layout_manager
+            def _walk(x, y):
+                try:
+                    return bool(lm.collision_matrix[y][x])
+                except Exception:
+                    return False
+            gw = getattr(lm, 'grid_width', 10**9)
+            gh = getattr(lm, 'grid_height', 10**9)
+            all_anchors = set(cells[0] for cells in zones_raw.values() if cells)
+            used = set()
+            self.staging_zones = {}
+            for sid in sorted(zones_raw):
+                cells = zones_raw[sid]
+                if not cells:
+                    continue
+                anchor = cells[0]
+                if len(cells) >= k:
+                    # la hoja Excel ya define la zona completa: usarla tal cual.
+                    zcells = [tuple(c) for c in cells[:k]]
+                else:
+                    # auto-expandir el ancla a k celdas caminables, sin solapar zonas.
+                    others = (all_anchors - {anchor}) | used
+                    zcells = build_zone_cells(anchor, k, _walk, exclude=others,
+                                              grid_w=gw, grid_h=gh)
+                self.staging_zones[sid] = StagingZone(sid, zcells)
+                used.update(zcells)
+            print(f"[OUTBOUND] Fase1 zonas (k={k}): "
                   f"{ {sid: z.capacity for sid, z in self.staging_zones.items()} }")
         else:
             print("[OUTBOUND] desactivado (enabled:false) - comportamiento actual.")

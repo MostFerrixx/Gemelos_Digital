@@ -158,4 +158,15 @@ bucle "V12 GRANULAR DISCHARGE" (~L852-877 Ground; equivalente en Forklift).
 - [F0 VALIDADO] Con bytecode fresco: print "[OUTBOUND] desactivado" CONFIRMA que el
   codigo nuevo ejecuta. body md5 = `18502db7de9f33bdccf94db742c45dd8` == baseline
   (flag off). Smoke enabled:true => zonas {1:1..7:1}, termina, md5==baseline. F0 OK.
-- [F0] Pendiente: backup _backup_iniciativa3/fase_0/ + commit local. Luego FASE 1.
+- [F0 CERRADO] Backup en _backup_iniciativa3/fase_0/ + commit `69b917b`.
+- [F1.1 HECHO] Zona de aforo de k celdas. `build_zone_cells` en outbound.py
+  (anillos Chebyshev deterministas, banda del muelle primero, excluye anclas y
+  celdas ya usadas => zonas SIN solape). warehouse.py expande cada ancla a
+  k=zone_capacity_default usando collision_matrix del layout. NO se parsea Excel
+  multi-fila (la hoja tiene 1 fila/id); si en el futuro la hoja define varias
+  celdas por id, se usan tal cual (rama len(cells)>=k). VALIDADO: OFF byte-identico;
+  ON construye 7 zonas de 8, termina, md5==baseline (la descarga aun NO consume las
+  zonas, por eso identico). Geometria staging1 = [(3,29),(2,29),(4,29),(2,28),(3,28),
+  (4,28),(1,29),(5,29)] todas caminables. PROTOCOLO ANTI-FUSE aplicado (round-trip+
+  py_compile tras cada edit; outbound.py y warehouse.py se truncaron y se restauraron).
+- [F1.1] Pendiente: commit. Luego F1.2 (pallet persistente + reserva slot + backpressure).

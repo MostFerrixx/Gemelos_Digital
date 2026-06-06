@@ -126,6 +126,58 @@ class StagingZone:
                 f"{self.occupancy()}/{self.capacity})")
 
 
+def build_zone_cells(anchor: Tuple[int, int], k: int, is_walkable,
+                     exclude=None, grid_w: int = 10**9,
+                     grid_h: int = 10**9) -> List[Tuple[int, int]]:
+    """
+    INICIATIVA #3 / Fase 1: expande una celda ancla de staging a una ZONA de k
+    celdas caminables y contiguas (1 pallet por celda).
+
+    Algoritmo DETERMINISTA: anillos de Chebyshev crecientes alrededor del ancla;
+    dentro de cada anillo, orden por (-y, x) para preferir la banda del muelle
+    (filas inferiores, y mayor) y mantener reproducibilidad. Se descartan celdas
+    no caminables, fuera de grilla y las de `exclude` (anclas de otros staging y
+    celdas ya asignadas a otras zonas, para que NO se solapen).
+
+    Args:
+        anchor: celda ancla (x, y) del staging (de la hoja OutboundStaging).
+        k: numero de posiciones deseadas (zone_capacity_default).
+        is_walkable: fn(x, y) -> bool (usa collision_matrix del layout).
+        exclude: iterable de celdas a evitar (otras anclas / celdas ya usadas).
+        grid_w, grid_h: limites de la grilla.
+
+    Returns:
+        Lista de hasta k celdas (incluye el ancla primero si es caminable).
+    """
+    ax, ay = anchor
+    excl = set(tuple(c) for c in (exclude or ()))
+    excl.discard((ax, ay))  # el ancla siempre se intenta incluir
+    cells: List[Tuple[int, int]] = []
+    if 0 <= ax < grid_w and 0 <= ay < grid_h and is_walkable(ax, ay):
+        cells.append((ax, ay))
+    r = 1
+    max_r = max(grid_w, grid_h)
+    while len(cells) < k and r <= max_r:
+        ring = []
+        for dx in range(-r, r + 1):
+            for dy in range(-r, r + 1):
+                if max(abs(dx), abs(dy)) != r:
+                    continue
+                ring.append((ax + dx, ay + dy))
+        ring.sort(key=lambda c: (-c[1], c[0]))  # banda inferior primero, luego x
+        for (cx, cy) in ring:
+            if len(cells) >= k:
+                break
+            if not (0 <= cx < grid_w and 0 <= cy < grid_h):
+                continue
+            if (cx, cy) in excl or (cx, cy) in cells:
+                continue
+            if is_walkable(cx, cy):
+                cells.append((cx, cy))
+        r += 1
+    return cells[:k]
+
+
 class OutboundProcess:
     """
     Proceso de despacho/expedicion (camion). ESQUELETO en Fase 0.
