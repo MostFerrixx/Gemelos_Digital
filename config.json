@@ -110,6 +110,8 @@
     "truck_capacity": 8,
     "loading_time": 2.0,
     "zone_capacity_default": 8,
-    "slot_wait_alert": 60.0
+    "slot_wait_alert": 60.0,
+    "slot_poll_dt": 0.1,
+    "dwell_scaffold": 10.0
   }
 }

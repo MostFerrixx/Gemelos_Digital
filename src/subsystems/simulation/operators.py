@@ -515,6 +515,75 @@ class BaseOperator:
     def __repr__(self):
         return f"{self.type}({self.id}, cargo={self.cargo_volume}/{self.capacity}, status={self.status})"
 
+    # ====================================================================
+    # INICIATIVA #3 / Fase 1.2a - AFORO DE STAGING (mecanica, sin planner aun)
+    # Gateado por almacen.outbound_enabled. Con outbound off => no-op =>
+    # comportamiento byte-identico al baseline. La reserva de la celda del pallet
+    # en la ReservationTable (acople con el planner) es F1.2b.
+    # ====================================================================
+    def _outbound_wait_slot(self, staging_id, wo):
+        """
+        Backpressure: cede el reloj (yield) hasta que haya una posicion LIBRE en la
+        zona de aforo del staging, la reserva atomicamente (assign provisional) y la
+        devuelve. No-op (None) si outbound off o no hay zona. Generador: usar
+        `slot = yield from self._outbound_wait_slot(staging_id, wo)`.
+        """
+        if not getattr(self.almacen, 'outbound_enabled', False):
+            return None
+        zone = getattr(self.almacen, 'staging_zones', {}).get(staging_id)
+        if zone is None:
+            return None
+        dt = float(self.almacen.outbound_config.get('slot_poll_dt', 0.1))
+        waited = 0.0
+        slot = zone.free_slot()
+        while slot is None:
+            yield self.env.timeout(dt)
+            waited += dt
+            slot = zone.free_slot()
+        slot.assign("PENDING:" + str(self.id))  # reserva atomica (sin yield aqui)
+        m = getattr(self.almacen, 'outbound_metrics', None)
+        if m is not None and waited > 0:
+            m['slot_wait_events'] += 1
+            m['slot_wait_time'] += waited
+            if waited > m['max_slot_wait']:
+                m['max_slot_wait'] = waited
+        return slot
+
+    def _outbound_place_pallet(self, slot, wo, staging_id):
+        """
+        Convierte el WO depositado en un Pallet persistente que ocupa `slot`, y
+        arranca el SCAFFOLD de release (SOLO Fase 1: proxy del camion, se reemplaza
+        por OutboundProcess en Fase 2). No-op si slot None / outbound off.
+        """
+        if slot is None or not getattr(self.almacen, 'outbound_enabled', False):
+            return
+        from .outbound import Pallet
+        pid = "PALLET:" + str(wo.id)
+        vol = wo.cantidad_inicial * wo.sku.volumen if wo.sku else 0
+        pallet = Pallet(pid, wo.id, getattr(wo, 'order_id', ''), staging_id,
+                        slot.cell, float(self.env.now), vol)
+        slot.assign(pid)
+        m = getattr(self.almacen, 'outbound_metrics', None)
+        zone = getattr(self.almacen, 'staging_zones', {}).get(staging_id)
+        if m is not None:
+            m['pallets_staged'] += 1
+            if zone is not None:
+                occ = zone.occupancy()
+                if occ > m['peak_occupancy'].get(staging_id, 0):
+                    m['peak_occupancy'][staging_id] = occ
+        dwell = float(self.almacen.outbound_config.get('dwell_scaffold', 10.0))
+        self.env.process(self._outbound_scaffold_release(slot, pallet, dwell))
+
+    def _outbound_scaffold_release(self, slot, pallet, dwell):
+        """SCAFFOLD Fase 1 (proxy del camion): libera la posicion tras `dwell` seg."""
+        yield self.env.timeout(dwell)
+        slot.release()
+        pallet.status = "shipped"
+        pallet.t_shipped = float(self.env.now)
+        m = getattr(self.almacen, 'outbound_metrics', None)
+        if m is not None:
+            m['pallets_shipped'] += 1
+
 
 class GroundOperator(BaseOperator):
     """
@@ -854,6 +923,10 @@ class GroundOperator(BaseOperator):
                     # Calcular volumen de esta WO especifica
                     wo_volume = wo.cantidad_inicial * wo.sku.volumen
 
+                    # INICIATIVA #3 / F1.2a: backpressure - esperar una posicion
+                    # libre de la zona de aforo antes de depositar (no-op si off).
+                    _ob_slot = yield from self._outbound_wait_slot(staging_id, wo)
+
                     # Timeout individual por WO
                     yield self.env.timeout(self.discharge_time)
 
@@ -872,6 +945,10 @@ class GroundOperator(BaseOperator):
 
                     # Notificar completion individual - esto emite work_order_update con status='staged'
                     self.almacen.dispatcher.notificar_completado_individual(self, wo)
+
+                    # INICIATIVA #3 / F1.2a: el WO depositado se vuelve un Pallet
+                    # persistente que ocupa la posicion de aforo (no-op si off).
+                    self._outbound_place_pallet(_ob_slot, wo, staging_id)
 
                     print(f"[{self.id}] t={self.env.now:.1f} [{wo_idx}/{len(staging_wos)}] "
                           f"WO {wo.id} staged (-{wo_volume}L, cargo: {self.cargo_volume}L)")
@@ -1267,6 +1344,10 @@ class Forklift(BaseOperator):
                     # Calcular volumen de esta WO especifica
                     wo_volume = wo.cantidad_inicial * wo.sku.volumen
 
+                    # INICIATIVA #3 / F1.2a: backpressure - esperar una posicion
+                    # libre de la zona de aforo antes de depositar (no-op si off).
+                    _ob_slot = yield from self._outbound_wait_slot(staging_id, wo)
+
                     # Timeout individual por WO
                     yield self.env.timeout(self.discharge_time)
 
@@ -1285,6 +1366,10 @@ class Forklift(BaseOperator):
 
                     # Notificar completion individual - esto emite work_order_update con status='staged'
                     self.almacen.dispatcher.notificar_completado_individual(self, wo)
+
+                    # INICIATIVA #3 / F1.2a: el WO depositado se vuelve un Pallet
+                    # persistente que ocupa la posicion de aforo (no-op si off).
+                    self._outbound_place_pallet(_ob_slot, wo, staging_id)
 
                     print(f"[{self.id}] t={self.env.now:.1f} [{wo_idx}/{len(staging_wos)}] "
                           f"WO {wo.id} staged (-{wo_volume}L, cargo: {self.cargo_volume}L)")

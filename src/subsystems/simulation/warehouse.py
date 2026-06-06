@@ -278,6 +278,15 @@ class AlmacenMejorado:
                                               grid_w=gw, grid_h=gh)
                 self.staging_zones[sid] = StagingZone(sid, zcells)
                 used.update(zcells)
+            # INICIATIVA #3 / F1.2a: metricas del muelle (aforo).
+            self.outbound_metrics = {
+                'pallets_staged': 0,
+                'pallets_shipped': 0,
+                'slot_wait_events': 0,
+                'slot_wait_time': 0.0,
+                'max_slot_wait': 0.0,
+                'peak_occupancy': {},
+            }
             print(f"[OUTBOUND] Fase1 zonas (k={k}): "
                   f"{ {sid: z.capacity for sid, z in self.staging_zones.items()} }")
         else:

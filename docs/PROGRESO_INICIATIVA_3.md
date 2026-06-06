@@ -204,3 +204,28 @@ Sub-pasos propuestos (cada uno compilable + validado + commit):
 NOTA de alcance: F1.2 es un cambio de COMPORTAMIENTO en el camino delicado de la
 Opcion C. Conviene hacerlo en un pase enfocado. F0 y F1.1 quedan como base limpia y
 reversible (flag off => baseline byte-identico).
+
+## BITACORA F1.2
+- [CHECKPOINT opcionC-F2] Antes de F1.2 se commiteo el trabajo sin commitear de la
+  Opcion C (operators.py +61, spacetime_planner.py +77 + docs) como version
+  TRANSITORIA de rollback: commit `b8402e2`. operators.py quedo limpio vs HEAD.
+- [F1.2a HECHO] Mecanica de aforo (SIN tocar el planner). Helpers en BaseOperator
+  (operators.py): `_outbound_wait_slot` (backpressure: cede el reloj hasta haber slot
+  libre, reserva atomica), `_outbound_place_pallet` (crea Pallet persistente, ocupa
+  DockSlot, metricas), `_outbound_scaffold_release` (SCAFFOLD Fase 1 = proxy del
+  camion: libera el slot tras `dwell_scaffold` seg). Cableado en los 2 bucles de
+  descarga (Ground + Forklift, identicos) via replace_all. Metricas en warehouse
+  (`outbound_metrics`). Config: `slot_poll_dt`=0.1, `dwell_scaffold`=10.0.
+  VALIDADO (config_stress_tw_exec.json, 20 agentes):
+    * OFF: body md5 == baseline `18502db7...` (byte-identico; regresion cero).
+    * ON: TERMINA (sim_end_t=333 vs 268 baseline; +65s por backpressure), DETERMINISTA
+      (doble corrida identica). pallets_staged=126, peak_occupancy staging1=8 (zona
+      LLENA), slot_wait_events=56, slot_wait_time=267s, max_slot_wait=33.4s.
+    * I1=81 SIN CAMBIO -> ESPERADO: F1.2a no reserva la celda del pallet y el agente
+      sigue descargando en el ancla; los pallets son logicos. El I1=0 es objetivo de
+      F1.2b (reservar la celda del pallet para que el planner esquive).
+  LECTURA: confirma empiricamente que con esta tasa de deposito y dwell=10s la zona
+  de k=8 se SATURA (esperas de hasta 33s) -> dato para dimensionar despacho real.
+  PROTOCOLO ANTI-FUSE aplicado (round-trip+py_compile; OFF byte-identico revalidado).
+- [F1.2a] Pendiente: commit. Luego F1.2b (reservar celda del pallet en ReservationTable
+  -> bajar I1 hacia 0; cuidado regresion Fase 2b: conectividad de zona + no fallback).
