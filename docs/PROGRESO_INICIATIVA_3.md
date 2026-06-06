@@ -272,3 +272,21 @@ reversible (flag off => baseline byte-identico).
 - [FASE 1 COMPLETA] F0 + F1.1 + F1.2a + F1.2b hechas y validadas. Pallets persistentes,
   zona de aforo real (20/staging desde mapa v2), backpressure, y pallets como
   obstaculos. Pendiente futuro: camion real (Fase 2) + embudo del punto de descarga.
+- [EXPERIMENTO opcion-2 "repartir descarga en varias lozas" -> REGRESO -> REVERTIDO]
+  Idea: que cada operario navegue a la loza del slot a depositar (en vez de descargar
+  todos en la celda-ancla), para deshacer el embudo. Implementado: helper
+  `_outbound_nav_to` + navegar a `_ob_slot.cell` por cada WO antes de descargar.
+  RESULTADO: I1 SUBIO 54 -> **140** (PEOR), table_overlap_violations 0 -> 58,
+  exec_fallbacks 0 -> 1. Hotspots pasaron a las celdas de cajas ((4,29)=20,(3,30)=18..).
+  CAUSA RAIZ: meter a los agentes DENTRO de las columnas de cajas (2 de ancho) los
+  hace CRUZARSE ahi dentro; y el dwell de descarga en la loza NO se reserva, asi que
+  otros enrutan a traves del que descarga. Repartir en esta geometria estrecha mete
+  gente a pasillos angostos donde chocan MAS, no menos. REVERTIDO a F1.2b (git checkout
+  fallo por FUSE unlink; se deshizo a mano con Edit; verificado: diff vs HEAD vacio,
+  I1=54, 73 planes, 0 fallbacks). 
+  LECCION: "varias puertas" no ayuda si las puertas son lozas dentro de columnas
+  estrechas y la permanencia de descarga no se reserva. Para que funcione habria que:
+  (a) reservar el dwell de descarga en la loza al LLEGAR (no al terminar), y/o
+  (b) carriles de un solo sentido / celdas de servicio en pasillo ANCHO, no en la
+  columna de cajas. Y/o repartir las ordenes entre los 7 stagings (la otra opcion).
+  Por ahora se queda F1.2b como estado bueno.
