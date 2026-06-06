@@ -603,6 +603,103 @@ class BaseOperator:
         if m is not None:
             m['pallets_shipped'] += 1
 
+    def _outbound_nav_to(self, cell):
+        """Navega el agente a una celda concreta usando el movimiento normal (en
+        timewindow, ruteo que esquiva pallets reservados). Generador. No-op si ya esta."""
+        if cell is None or tuple(cell) == tuple(self.current_position):
+            return
+        rc = getattr(self.almacen, 'route_calculator', None)
+        path = None
+        if rc is not None and getattr(rc, 'pathfinder', None) is not None:
+            try:
+                path = rc.pathfinder.find_path(self.current_position, tuple(cell))
+            except Exception:
+                path = None
+        if path and len(path) > 1:
+            self.status = "moving"
+            yield from self._recorrer_tramo(
+                path, self.default_speed, on_before=None, on_after=None,
+                time_per_cell=0.1)
+        else:
+            self._jump_to(tuple(cell))
+
+    def _outbound_discharge_lanes(self, staging_id, staging_wos):
+        """
+        F1.3 - DESCARGA REALISTA POR CARRILES. Modelo pedido por el Director:
+        - Cada staging tiene 2 columnas = 2 carriles; como mucho UN gruero por columna.
+        - Si las 2 columnas estan ocupadas por un gruero, los demas ESPERAN FUERA hasta
+          que uno salga; entonces entra el siguiente.
+        - Los pallets se dejan de ATRAS hacia ADELANTE (celda libre mas al fondo).
+        Generador SimPy. Solo se usa con outbound habilitado (gate en el agent_process).
+        """
+        zone = getattr(self.almacen, 'staging_zones', {}).get(staging_id)
+        if zone is None:
+            # fallback de seguridad: descarga simple sin aforo
+            for wo in staging_wos:
+                yield self.env.timeout(self.discharge_time)
+                self.cargo_volume -= wo.cantidad_inicial * wo.sku.volumen
+                self.almacen.dispatcher.notificar_completado_individual(self, wo)
+            return
+
+        dt = float(self.almacen.outbound_config.get('slot_poll_dt', 0.1))
+        # 1) ESPERAR FUERA hasta conseguir un carril (columna) libre.
+        waited = 0.0
+        lane = zone.acquire_lane(self.id)
+        while lane is None:
+            self.status = "waiting"
+            yield self.env.timeout(dt)
+            waited += dt
+            lane = zone.acquire_lane(self.id)
+        if waited > 0:
+            mm = getattr(self.almacen, 'outbound_metrics', None)
+            if mm is not None:
+                mm['slot_wait_events'] += 1
+                mm['slot_wait_time'] += waited
+                if waited > mm['max_slot_wait']:
+                    mm['max_slot_wait'] = waited
+
+        # 2) Entrar y descargar de ATRAS hacia ADELANTE (un gruero solo en esta columna).
+        for wo in staging_wos:
+            slot = zone.deepest_empty_cell(lane)
+            if slot is None:
+                break  # columna llena (raro): deja de depositar en esta visita
+            yield from self._outbound_nav_to(slot.cell)
+            # F1.3: reservar la celda AL LLEGAR (la mantiene ocupada durante la descarga
+            # para que nadie enrute a traves del gruero que descarga). place_pallet luego
+            # consolida (Pallet + metricas + scaffold); la reserva duplicada del mismo id
+            # es inofensiva (is_free ignora el propio id; release elimina todas).
+            slot.assign("PALLET:" + str(wo.id))
+            _rt = getattr(self.almacen, 'reservation_table', None)
+            if _rt is not None:
+                try:
+                    # retener la celda con el id del PROPIO agente SOLO durante la
+                    # descarga (asi nadie enruta a traves; no choca con la reserva de
+                    # movimiento del agente, que comparte id). El pallet (obstaculo
+                    # persistente) lo reserva place_pallet despues, ya sin solape.
+                    _rt.reserve(slot.cell, float(self.env.now),
+                                float(self.env.now) + float(self.discharge_time), self.id)
+                except Exception:
+                    pass
+            self.status = "unloading"
+            self.almacen.registrar_evento('estado_agente', {
+                'agent_id': self.id, 'agent_type': self.type,
+                'position': self.current_position, 'status': self.status,
+                'current_task': wo.id, 'cargo_volume': self.cargo_volume,
+            })
+            yield self.env.timeout(self.discharge_time)
+            self.cargo_volume -= wo.cantidad_inicial * wo.sku.volumen
+            self.almacen.dispatcher.notificar_completado_individual(self, wo)
+            # crear el Pallet persistente + reservar la celda (obstaculo) + scaffold.
+            self._outbound_place_pallet(slot, wo, staging_id)
+
+        # 3) SALIR del staging ANTES de liberar el carril (columna sin gruero al soltar).
+        front = zone.columns.get(lane, [])
+        if front:
+            fcell = front[-1].cell  # celda de FRENTE de la columna (y menor)
+            exit_cell = (fcell[0], fcell[1] - 1)  # pasillo justo delante
+            yield from self._outbound_nav_to(exit_cell)
+        zone.release_lane(lane)
+
 
 class GroundOperator(BaseOperator):
     """
@@ -865,6 +962,11 @@ class GroundOperator(BaseOperator):
 
             # Visitar cada staging en orden
             for idx, (staging_id, staging_wos) in enumerate(ordered_stagings, 1):
+                if getattr(self.almacen, 'outbound_enabled', False):
+                    # F1.3: descarga realista por carriles (2 por staging, espera fuera,
+                    # llenado de atras hacia adelante). Reemplaza la descarga clasica.
+                    yield from self._outbound_discharge_lanes(staging_id, staging_wos)
+                    continue
                 staging_location = staging_locs.get(staging_id, (3, 29))
                 # IMPORTANTE: Usar cantidad_inicial * sku.volumen porque cantidad_restante ya es 0 despues del picking
                 volumen_staging = sum(wo.cantidad_inicial * wo.sku.volumen for wo in staging_wos)
@@ -1286,6 +1388,11 @@ class Forklift(BaseOperator):
 
             # Visitar cada staging en orden
             for idx, (staging_id, staging_wos) in enumerate(ordered_stagings, 1):
+                if getattr(self.almacen, 'outbound_enabled', False):
+                    # F1.3: descarga realista por carriles (2 por staging, espera fuera,
+                    # llenado de atras hacia adelante). Reemplaza la descarga clasica.
+                    yield from self._outbound_discharge_lanes(staging_id, staging_wos)
+                    continue
                 staging_location = staging_locs.get(staging_id, (3, 29))
                 # IMPORTANTE: Usar cantidad_inicial * sku.volumen porque cantidad_restante ya es 0 despues del picking
                 volumen_staging = sum(wo.cantidad_inicial * wo.sku.volumen for wo in staging_wos)

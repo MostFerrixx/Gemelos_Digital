@@ -290,3 +290,28 @@ reversible (flag off => baseline byte-identico).
   (b) carriles de un solo sentido / celdas de servicio en pasillo ANCHO, no en la
   columna de cajas. Y/o repartir las ordenes entre los 7 stagings (la otra opcion).
   Por ahora se queda F1.2b como estado bueno.
+- [F1.3 MODELO DE CARRILES - IMPLEMENTADO (pedido del Director)] Comportamiento real:
+  cada staging = 2 columnas = 2 CARRILES; como mucho UN gruero por columna; los demas
+  ESPERAN FUERA hasta que uno sale; los pallets se dejan de ATRAS hacia ADELANTE.
+  Cambios: `StagingZone` agrupa por columna (carriles) + acquire_lane/release_lane/
+  deepest_empty_cell (outbound.py); warehouse ya NO marca SERVICE; operators
+  `_outbound_discharge_lanes` (espera carril -> entra -> llena fondo->frente -> sale ->
+  libera carril) + `_outbound_nav_to`; gate al inicio del bucle de descarga (Ground+
+  Forklift) que usa el helper cuando outbound on. Reserva: al llegar se retiene la celda
+  con el id del agente durante la descarga; place_pallet pone el pallet-obstaculo.
+  RESULTADO (mapa v2): TERMINA, movimiento SIN choques (0 fallbacks, 0 reserve_overlaps),
+  se comporta como el modelo pedido. Reparte la descarga en columnas (se acabo el cruce
+  dentro de la columna que rompio el intento opcion-2).
+  MATIZ IMPORTANTE sobre el I1: SUBIO (54 -> ~65 con 100% a 1 staging, ~81 repartido).
+  NO es por choques (siguen 0). Es porque el modelo es MAS REALISTA: los grueros ahora
+  SE MUEVEN de verdad (entran a columnas, hacen cola, llenan al fondo) -> hay mas
+  recorrido -> mas eventos de "alguien paso por donde otro estaba parado". El I1 cuenta
+  co-ocupaciones incluyendo agentes PARADOS, asi que mas movimiento realista = mas I1.
+  El I1 NO es la metrica de exito de la realista; el comportamiento si lo es.
+  PENDIENTE menor: ~60 table_overlap_violations (algunos pallets no quedan reservados
+  como obstaculo porque la celda no esta libre al reservar) -> refinamiento futuro.
+  Con 100% a un staging la makespan sube (447) porque solo 2 grueros lo trabajan (real);
+  repartiendo entre los 7 (realista) baja (~299).
+  DECISION ABIERTA: mantener el modelo realista de carriles (recomendado, es lo pedido)
+  o volver a F1.2b (I1 menor pero descarga irreal teletransportada al ancla). Rollback
+  de F1.2b en commit 76c2b3b.

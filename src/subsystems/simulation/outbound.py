@@ -103,6 +103,38 @@ class StagingZone:
     def __init__(self, staging_id: int, cells: List[Tuple[int, int]]):
         self.staging_id = staging_id
         self.slots: List[DockSlot] = [DockSlot(tuple(c)) for c in cells]
+        # F1.2 (modelo realista de carriles): agrupar por COLUMNA (x). Dentro de cada
+        # columna, ordenar de FONDO (y mayor) a FRENTE (y menor) para llenar de atras
+        # hacia adelante. Cada columna es un "carril": como mucho UN gruero a la vez.
+        cols: Dict[int, List[DockSlot]] = {}
+        for s in self.slots:
+            cols.setdefault(s.cell[0], []).append(s)
+        for x in cols:
+            cols[x].sort(key=lambda s: -s.cell[1])  # fondo (y mayor) primero
+        self.columns: Dict[int, List[DockSlot]] = cols
+        self.lanes: Dict[int, Optional[str]] = {x: None for x in cols}  # x -> agent_id
+
+    def acquire_lane(self, agent_id: str) -> Optional[int]:
+        """Toma un carril (columna) LIBRE para `agent_id` y devuelve su x; None si las
+        columnas estan todas ocupadas por un gruero (=> el agente espera fuera)."""
+        for x in sorted(self.lanes):
+            if self.lanes[x] is None:
+                self.lanes[x] = agent_id
+                return x
+        return None
+
+    def release_lane(self, x: int) -> None:
+        """Libera el carril (el gruero sale del staging)."""
+        if x in self.lanes:
+            self.lanes[x] = None
+
+    def deepest_empty_cell(self, x: int) -> Optional["DockSlot"]:
+        """Devuelve el DockSlot LIBRE mas al fondo de la columna `x` (llenar de atras
+        hacia adelante), o None si la columna esta llena de pallets."""
+        for s in self.columns.get(x, []):
+            if s.is_free():
+                return s
+        return None
 
     @property
     def capacity(self) -> int:
