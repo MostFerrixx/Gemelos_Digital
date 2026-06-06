@@ -598,16 +598,29 @@ async def upload_orders_file(
 
 @app.get("/api/layout")
 def get_layout():
-    """Parses TMX file and returns geometry for rendering."""
-    if not os.path.exists(TMX_PATH):
-        # Fallback to old path if v2 doesn't exist, just in case
-        fallback_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "layouts", "WH1.tmx"))
-        if os.path.exists(fallback_path):
-             tm = pytmx.TiledMap(fallback_path)
-        else:
-             raise HTTPException(status_code=404, detail=f"TMX file not found at {TMX_PATH}")
-    else:
-        tm = pytmx.TiledMap(TMX_PATH)
+    """Parses TMX file and returns geometry for rendering.
+
+    FIX: resuelve el mapa desde la CONFIGURACION (config.json -> layout_file), que es
+    el MISMO mapa que usa la simulacion. Antes usaba una ruta fija
+    (data/layouts/layout_v2.tmx) que no existe -> caia al mapa viejo (30x30) y no
+    coincidia con la simulacion (el v2 es 30x42), por eso el visor "no se veia bien".
+    Orden: layout_file del config -> ruta historica -> WH1.tmx.
+    """
+    candidates = []
+    try:
+        cfg = config_manager.load_config()
+        layout_rel = cfg.get('layout_file')
+        if layout_rel:
+            candidates.append(os.path.join(PROJECT_ROOT, layout_rel))
+    except Exception as e:
+        print(f"[API/LAYOUT] No se pudo leer layout_file del config: {e}")
+    candidates.append(TMX_PATH)  # ruta historica (compat)
+    candidates.append(os.path.join(PROJECT_ROOT, "layouts", "WH1.tmx"))  # fallback final
+    tmx_file = next((p for p in candidates if p and os.path.exists(p)), None)
+    if tmx_file is None:
+        raise HTTPException(status_code=404, detail=f"TMX no encontrado. Probados: {candidates}")
+    print(f"[API/LAYOUT] Sirviendo mapa: {tmx_file}")
+    tm = pytmx.TiledMap(tmx_file)
 
     try:
         layers = []
