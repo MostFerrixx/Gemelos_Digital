@@ -180,4 +180,41 @@ reservar obstaculos puede dejar al planner sin ruta (regresion vista en Fase 2b)
 - Descarga: `operators.py` bucle "V12 GRANULAR DISCHARGE" (Ground ~L860, Forklift ~L1270).
 - Loop del motor: `event_generator.ejecutar` (~L211).
 
+---
+
+## 10. LA CAPA WEB (UI navegador) — verdades descubiertas
+
+- **El servidor corre OCULTO.** Se lanza con `start_server.bat` / `server_manager.py`
+  / `start_hidden.py` y NO deja ventana visible. Se gestiona por PID file (`server.pid`,
+  puerto 8000). **Reiniciar:** `stop_server.bat` + `start_server.bat`, o
+  `python server_manager.py restart`. (Comandos: start/stop/restart/status/logs.)
+- **El servidor hay que REINICIARLO para que tome cambios de `web_prototype/server.py`**
+  (el codigo vive en memoria del proceso). Editar el archivo no basta.
+- **`/api/layout`** (el endpoint que el visor usa para dibujar el mapa): ANTES tenia una
+  ruta FIJA mala (`data/layouts/layout_v2.tmx`, inexistente) y caia al mapa viejo
+  (WH1.tmx, 30x30), que NO coincidia con la simulacion -> el replay "no se veia bien".
+  ARREGLADO (commit 7d00c7a): ahora resuelve el mapa desde `config.json` (`layout_file`),
+  el mismo que usa la simulacion. Carga el TMX con pytmx (necesita poder leer la imagen;
+  si el .tmx referencia un tileset externo, falla/cuelga -> ver #4: incrustar tileset).
+- **TRAMPA IMPORTANTE — el configurador BORRA bloques al guardar.**
+  `web_prototype/config_manager.py::save_config` hace `json.dump(config_de_la_UI)`, es
+  decir **SOBRESCRIBE** `config.json` solo con los campos que la UI conoce. Los bloques
+  que la UI NO maneja (`congestion`/time-window y `outbound`/carriles) **se PIERDEN** en
+  cada guardado (y el guardado ocurre automaticamente al darle *Run Simulation*).
+  CONSECUENCIA en las corridas WEB: sin `congestion` los operarios se ATRAVIESAN; sin
+  `outbound` descargan en la PRIMERA loza (no usan carriles ni caminan al fondo).
+  FIX recomendado: que save_config FUSIONE con el config existente (preservar bloques no
+  manejados) en vez de sobrescribir. (PENDIENTE.)
+- **El visor (pagina `/`) auto-llama `/api/layout` al cargar.** Si ese endpoint se cuelga
+  (p.ej. tileset externo o mapa pesado), el visor queda en "Loading..." y, si se le
+  insiste, puede dejar el servidor sin responder (worker bloqueado) -> reiniciar.
+- **Flujo correcto de la UI:** `/web_configurator/` -> pestania "Layout y Datos" (poner
+  `layouts/WH1 v2.tmx` + `Warehouse_Logic_v2.xlsx`) -> "Outbound Staging" (distribucion)
+  -> "Run Simulation" (corre el motor headless, genera replay) -> "Watch Replay" (abre
+  el visor en `/`). El motor del run es el mismo headless (mis cambios aplican).
+- **Endpoints clave:** `/api/configurator/config` (GET/POST config.json),
+  `/api/layout` (mapa para el visor), `/api/snapshot?t=` (estado del replay),
+  `/api/upload-orders`, `/api/upload_replay`. El configurador usa `/api/configurator/*`
+  (NO depende de `/api/layout`).
+
 <!-- FIN_DOCUMENTO -->

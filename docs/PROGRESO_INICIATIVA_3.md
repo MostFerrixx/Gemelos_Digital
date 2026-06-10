@@ -315,3 +315,62 @@ reversible (flag off => baseline byte-identico).
   DECISION ABIERTA: mantener el modelo realista de carriles (recomendado, es lo pedido)
   o volver a F1.2b (I1 menor pero descarga irreal teletransportada al ancla). Rollback
   de F1.2b en commit 76c2b3b.
+
+---
+
+## ESTADO ACTUAL (resumen ejecutivo, al cierre de esta sesion)
+
+### Motor de simulacion (Iniciativa #3 / Fase 1) -> COMPLETA y validada (headless)
+- F0 andamiaje + flag `outbound.enabled` (off => baseline byte-identico).  commit 69b917b
+- F1.1 zona de aforo de k celdas.                                          commit 3380560
+- F1.2a pallets persistentes + slots + backpressure + scaffold.            commit 5f8e281
+- F1.2b pallets como OBSTACULOS reservados (planner los esquiva).          commit 76c2b3b
+- F1.3 MODELO DE CARRILES (2 columnas/staging, 1 gruero por columna, los
+  demas esperan fuera, llenado de ATRAS hacia ADELANTE).                   commit 379413d
+- Checkpoint Opcion C F2 (rollback).                                       commit b8402e2
+- Todo gateado por `outbound.enabled`; con el flag off, comportamiento clasico.
+
+### Layout y datos del muelle nuevo -> LISTOS
+- `layouts/WH1 v2.tmx` (30x42): arriba racks/picking; abajo 7 stagings de 20 celdas
+  (pares de columnas x={3,4}..{27,28}, filas y=29..38) con pasillos entre pares.
+  Tileset INCRUSTADO (auto-contenido, sin enlaces externos). commit 5ec15ca
+- `layouts/Warehouse_Logic_v2.xlsx`: OutboundStaging = 140 celdas (20/staging).
+- `warehouse.db`: tabla staging_areas recreada SIN PK con las 140 celdas. (NO commiteada;
+  ver COMO_FUNCIONA #2 para reproducir. Backup en _backup_iniciativa3/warehouse.db.bak)
+- `config_stress_tw_v2.json`: escenario headless (mapa v2 + excel v2 + outbound on).
+
+### Capa WEB (UI navegador) -> PARCIAL
+- El servidor corre OCULTO (server_manager.py / server.pid). Reinicio: stop_server.bat +
+  start_server.bat  (o `python server_manager.py restart`). Ver COMO_FUNCIONA #10.
+- ARREGLADO: `/api/layout` ahora sirve el mapa del CONFIG (antes ruta fija mala ->
+  mostraba mapa viejo 30x30 que no coincidia con la simulacion). commit 7d00c7a.
+  REQUIERE reiniciar el servidor para tomar efecto.
+- VERIFICADO en el navegador: el configurador (`/web_configurator/`) funciona; se cargo
+  el layout v2, se corrio la simulacion (OK, replay generado) y se vio en el visor.
+- BUG ABIERTO (causa de lo que reporta el Director): al GUARDAR, el configurador
+  SOBRESCRIBE config.json solo con los campos que conoce y DESCARTA los bloques
+  `congestion` (time-window) y `outbound` (carriles). Resultado en la corrida web:
+  * sin `congestion` -> ruteo clasico -> los operarios SE ATRAVIESAN.
+  * sin `outbound`   -> descarga clasica -> llegan solo a la PRIMERA loza del staging
+    (no caminan al fondo ni usan carriles).
+  (config_manager.save_config hace json.dump del dict de la UI, sin fusionar.)
+
+## PROXIMOS PASOS (en orden)
+1. [WEB] Arreglar `config_manager.save_config` para que FUSIONE con el config.json
+   existente (preservar `congestion` y `outbound`, no solo los campos de la UI) y que
+   `outbound.enabled=true`. Reiniciar servidor y re-verificar en el navegador que NO se
+   atraviesan y que caminan al fondo del muelle por carriles. (Decision del Director.)
+2. [WEB] (opcional) Exponer en el configurador interruptores para mode time-window y
+   outbound.enabled, para no depender de bloques "ocultos".
+3. [WEB] Robustez del guardado: config.json salio algo malformado (datos sobrantes);
+   escribir de forma atomica/validada.
+4. [MOTOR] Refinamiento menor F1.2b/F1.3: ~60 reservas de celda fallidas (pallets que no
+   quedan como obstaculo). No bloquea; mejora de fidelidad.
+5. [MOTOR] Embudo del PUNTO DE DESCARGA: con 100% a un staging se forma cola en la celda
+   de entrada (real, pero artefacto de la prueba). Repartir ordenes entre los 7 stagings
+   lo alivia. Iniciativa aparte si se quiere optimizar.
+6. [FUTURO] Fase 2: camion/despacho real que retire pallets (reemplaza el scaffold).
+   Capa 3: layout a escala real. Ver VISION_PRODUCTO y PLAN_INICIATIVA_3.
+
+> Estado bueno actual del MOTOR = F1.3 (commit 379413d). Estado bueno de la WEB =
+> tras 7d00c7a + (pendiente) el arreglo del guardado del configurador.

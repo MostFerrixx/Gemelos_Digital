@@ -72,9 +72,13 @@ Estos principios ya rigen el codigo y deben sobrevivir a cualquier evolucion:
   Opcion C): 0 colisiones entre agentes en movimiento, sin deadlock, termina.
 - **Allocation Layer (V12.1)**: asignacion de stock real (FCFS) antes de crear
   WorkOrders; soporte de surtido parcial / backorder.
-- **Outbound**: NO modelado realmente. El staging es hoy un punto de servicio con
-  "rotacion infinita implicita" (la mercancia se evapora al descargar). Sin
-  pallets persistentes ni despacho. Es la Capa 2 en curso (Iniciativa #3).
+- **Outbound (Capa 2, Iniciativa #3)**: EN CURSO, motor hecho. Ya hay pallets
+  persistentes, zona de aforo real (mapa WH1 v2: 7 stagings de 20 celdas), pallets
+  como obstaculos que el planner esquiva, y descarga realista por CARRILES (2 columnas
+  por staging, espera fuera, llenado de atras hacia adelante) -- Fase 1 completa y
+  validada headless. PENDIENTE: integrarlo en la UI web (el configurador hoy descarta
+  los bloques congestion/outbound al guardar) y la Fase 2 (camion/despacho real; hoy
+  hay un scaffold temporal). Detalle vivo en docs/PROGRESO_INICIATIVA_3.md.
 - **Layout**: de juguete (WH1, 30x30). Suficiente para validar mecanismos, lejos
   de una instalacion real.
 - **Herramientas**: optimizador (Optuna), configurador web (FastAPI), viewer
