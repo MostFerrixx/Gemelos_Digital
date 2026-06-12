@@ -47,11 +47,14 @@ class ReservationTable:
     # Consultas
     # ------------------------------------------------------------------
     def is_free(self, cell: Cell, t_in: float, t_out: float,
-                ignore_agent: Optional[str] = None) -> bool:
+                ignore_agent: Optional[str] = None,
+                ignore_agents=None) -> bool:
         """
         True si [t_in, t_out] no pisa ninguna reserva de OTRO agente en `cell`.
         Dos intervalos [a,b] y [c,d] se solapan si a < d y c < b. Con `clearance`
         se exige separacion adicional: se expanden los existentes por +/- clearance.
+        `ignore_agents` (opcional, aditivo): coleccion de ids EXTRA a ignorar
+        ademas de `ignore_agent` (p.ej. el gruero que coloca un pallet).
         """
         ivs = self.reservations.get(cell)
         if not ivs:
@@ -59,6 +62,8 @@ class ReservationTable:
         cl = self.clearance
         for (e_in, e_out, e_agent) in ivs:
             if e_agent == ignore_agent:
+                continue
+            if ignore_agents is not None and e_agent in ignore_agents:
                 continue
             # solapan si t_in < e_out+cl  y  e_in-cl < t_out  (margen a ambos lados)
             if t_in < (e_out + cl) and (e_in - cl) < t_out:
@@ -90,14 +95,19 @@ class ReservationTable:
     # ------------------------------------------------------------------
     # Insercion
     # ------------------------------------------------------------------
-    def reserve(self, cell: Cell, t_in: float, t_out: float, agent_id: str) -> bool:
+    def reserve(self, cell: Cell, t_in: float, t_out: float, agent_id: str,
+                ignore_agents=None) -> bool:
         """
         Inserta la ocupacion de `cell` para [t_in, t_out] manteniendo orden por t_in.
         Verifica el invariante (assert defensivo): si pisara otra reserva, NO inserta,
         cuenta `overlap_violations` y devuelve False (defensa en profundidad, plan 4.8).
         Devuelve True si se inserto.
+        `ignore_agents` (opcional, aditivo): ids cuyas reservas NO bloquean esta
+        insercion (caso pallet: ignorar al gruero que lo esta colocando; sus
+        permanencias en la celda son el PASADO inmediato, no un conflicto real).
         """
-        if not self.is_free(cell, t_in, t_out, ignore_agent=agent_id):
+        if not self.is_free(cell, t_in, t_out, ignore_agent=agent_id,
+                            ignore_agents=ignore_agents):
             self.overlap_violations += 1
             return False
         ivs = self.reservations.setdefault(cell, [])

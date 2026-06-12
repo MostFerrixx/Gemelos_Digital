@@ -275,13 +275,17 @@ class EventGenerator:
                 try:
                     import json as _json
                     rep = planner.shadow_report()
+                    # MINI-FIX reservas: adjuntar metricas outbound al reporte JSON
+                    # (diagnostico persistente; el stream del runner web no es fiable).
+                    _om = getattr(self.almacen, 'outbound_metrics', None)
+                    rep['outbound_metrics'] = _om if _om else 'outbound_off_o_sin_metricas'
                     suffix = f"_{self.session_timestamp}" if self.session_timestamp else ""
                     tw_path = os.path.join(self.session_output_dir,
                                            f"timewindow_shadow_report{suffix}.json")
                     with open(tw_path, "w", encoding="utf-8") as _f:
                         _json.dump(rep, _f, indent=2)
                     print("\n" + "=" * 70)
-                    print("[TIMEWINDOW] REPORTE PLANNER ESPACIO-TEMPORAL (SOMBRA, Fase 1)")
+                    print("[TIMEWINDOW] REPORTE PLANNER ESPACIO-TEMPORAL (metricas)")
                     print("=" * 70)
                     print(f"  Tramos planificados: {rep.get('segments_planned')}")
                     print(f"  Planes encontrados: {rep.get('plans_found')} | "
@@ -298,6 +302,17 @@ class EventGenerator:
                     print("=" * 70)
                 except Exception as _e:
                     print(f"[TIMEWINDOW][WARN] no se pudo escribir reporte sombra: {_e}")
+
+            # MINI-FIX reservas: telemetria del subsistema outbound (si esta activo).
+            # Imprime el desglose de reservas de pallet (ok/fail) para diagnosticar
+            # los solapes de la tabla que NO vienen del planner.
+            try:
+                _om = getattr(self.almacen, 'outbound_metrics', None)
+                if _om:
+                    print("[OUTBOUND] METRICAS: " + ", ".join(
+                        f"{k}={v}" for k, v in sorted(_om.items())))
+            except Exception as _e:
+                print(f"[OUTBOUND][WARN] no se pudieron imprimir metricas: {_e}")
 
             # Exportar métricas de optimización si se solicitó
             if self.output_metrics_path:

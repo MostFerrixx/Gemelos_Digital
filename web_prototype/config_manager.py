@@ -70,8 +70,18 @@ class WebConfigurationManager:
             is_valid, errors = self.validate_config(config)
             if not is_valid:
                 return False, errors
-            
-            # Backup existing config
+
+            # MERGE: load existing config and overlay UI keys on top.
+            # Contract: NEVER drop keys the UI does not manage (e.g. blocks
+            # 'congestion' and 'outbound' used by the simulation engine).
+            existing = self._load_existing_for_merge()
+            merged = dict(existing)
+            merged.update(config)
+            preserved = sorted(set(existing.keys()) - set(config.keys()))
+            if preserved:
+                print(f"[CONFIG_MANAGER] Merge preserved keys not managed by UI: {preserved}")
+
+            # Backup existing config (before overwriting)
             if os.path.exists(self.config_path):
                 backup_path = f"{self.config_path}.backup"
                 with open(self.config_path, 'r', encoding='utf-8') as f:
@@ -79,18 +89,41 @@ class WebConfigurationManager:
                 with open(backup_path, 'w', encoding='utf-8') as f:
                     f.write(backup_content)
                 print(f"[CONFIG_MANAGER] Created backup: {backup_path}")
-            
-            # Save new config
-            with open(self.config_path, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=4, ensure_ascii=False)
-            
+
+            # ATOMIC write: dump to temp file, then os.replace (rename).
+            # Avoids half-written/corrupt config.json on crash or FUSE issues.
+            tmp_path = f"{self.config_path}.tmp"
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(merged, f, indent=4, ensure_ascii=False)
+            os.replace(tmp_path, self.config_path)
+
             print(f"[CONFIG_MANAGER] Saved config to {self.config_path}")
             return True, []
-            
+
         except Exception as e:
             error_msg = f"Error saving config: {str(e)}"
             print(f"[CONFIG_MANAGER ERROR] {error_msg}")
             return False, [error_msg]
+
+    def _load_existing_for_merge(self) -> Dict:
+        """
+        Load the current on-disk config to merge with incoming UI config.
+        Fallback chain: config.json -> config.json.backup -> {} (with warning).
+        Never raises: saving must not fail because the existing file is broken.
+        """
+        for path in (self.config_path, f"{self.config_path}.backup"):
+            try:
+                if os.path.exists(path):
+                    with open(path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    if isinstance(data, dict):
+                        if path != self.config_path:
+                            print(f"[CONFIG_MANAGER WARN] config.json unreadable; merging from backup: {path}")
+                        return data
+            except Exception as e:
+                print(f"[CONFIG_MANAGER WARN] Could not read {path} for merge: {e}")
+        print(f"[CONFIG_MANAGER WARN] No existing config readable; saving UI config as-is")
+        return {}
     
     def validate_config(self, config: Dict) -> Tuple[bool, List[str]]:
         """
@@ -157,8 +190,25 @@ class WebConfigurationManager:
                         if 'discharge_time' not in agent or agent['discharge_time'] <= 0:
                             errors.append(f"Agent {idx}: invalid discharge_time")
             
+            # Paso 2: basic validation of advanced engine blocks (if UI sends them)
+            if 'congestion' in config:
+                cong = config['congestion']
+                if not isinstance(cong, dict):
+                    errors.append("congestion must be an object")
+                else:
+                    if not isinstance(cong.get('enabled', False), bool):
+                        errors.append("congestion.enabled must be boolean")
+                    if cong.get('mode') is not None and cong.get('mode') not in ('off', 'timewindow'):
+                        errors.append("congestion.mode must be 'off' or 'timewindow'")
+            if 'outbound' in config:
+                ob = config['outbound']
+                if not isinstance(ob, dict):
+                    errors.append("outbound must be an object")
+                elif not isinstance(ob.get('enabled', False), bool):
+                    errors.append("outbound.enabled must be boolean")
+
             is_valid = len(errors) == 0
-            
+
             if is_valid:
                 print(f"[CONFIG_MANAGER] Configuration validation: PASSED")
             else:

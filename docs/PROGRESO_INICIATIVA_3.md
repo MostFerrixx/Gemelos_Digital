@@ -356,21 +356,78 @@ reversible (flag off => baseline byte-identico).
   (config_manager.save_config hace json.dump del dict de la UI, sin fusionar.)
 
 ## PROXIMOS PASOS (en orden)
-1. [WEB] Arreglar `config_manager.save_config` para que FUSIONE con el config.json
-   existente (preservar `congestion` y `outbound`, no solo los campos de la UI) y que
-   `outbound.enabled=true`. Reiniciar servidor y re-verificar en el navegador que NO se
-   atraviesan y que caminan al fondo del muelle por carriles. (Decision del Director.)
-2. [WEB] (opcional) Exponer en el configurador interruptores para mode time-window y
-   outbound.enabled, para no depender de bloques "ocultos".
-3. [WEB] Robustez del guardado: config.json salio algo malformado (datos sobrantes);
-   escribir de forma atomica/validada.
-4. [MOTOR] Refinamiento menor F1.2b/F1.3: ~60 reservas de celda fallidas (pallets que no
-   quedan como obstaculo). No bloquea; mejora de fidelidad.
+1. [WEB] save_config con MERGE -> **HECHO Y VERIFICADO EN NAVEGADOR** (guardado
+   UI preserva bloques; motor web corre con time-window: 0 fallidos/0 cap_hits;
+   replay muestra carriles: 1 gruero por columna, llegan al FONDO, espera fuera).
+   Detalle completo: `docs/PLAN_FIX_GUARDADO_CONFIGURADOR.md` seccion 4b.
+   OJO: el backup NO era copia fiel (tenia bloques apagados); la referencia
+   buena para reparar es config_stress_tw_v2.json. PENDIENTE: commit.
+2. [WEB] Toggles de time-window y outbound en el configurador -> **HECHO Y
+   VERIFICADO EN NAVEGADOR** (card "Motor Avanzado" en Estrategias; tests a-c
+   PASS, d cubierto por diseno). Detalle: `docs/PLAN_PASO2_TOGGLES_UI.md`.
+   PENDIENTE: commit + decision sobre quitar el confirm() bloqueante de
+   "Aplicar Configuracion" (congela el renderer; hallazgo documentado).
+3. [WEB] Robustez del guardado -> **HECHO** (absorbido en el paso 1: escritura
+   atomica tmp+os.replace y fallback ante config corrupto).
+3b. [DEUDA] `warehouse.db` es global (no por-layout): elegir el mapa VIEJO
+   WH1.tmx en la UI usa igual las 140 celdas de staging v2 (fuera del mundo
+   30x30). Ya estaba roto antes del merge; documentado, sin resolver.
+4. [MOTOR] Refinamiento reservas de pallet -> **HECHO Y VALIDADO** (mini-fix).
+   Causa raiz: la reserva-obstaculo del pallet chocaba con reservas del PROPIO
+   gruero que lo colocaba -> rechazada -> pallet invisible para el ruteo.
+   Fix: `reserve()/is_free()` aceptan `ignore_agents` (aditivo, default None =
+   comportamiento identico); `_outbound_place_pallet` reserva con
+   `ignore_agents={self.id}`. Telemetria nueva: `pallet_reserve_ok/fail` en
+   outbound_metrics, persistida en el timewindow report JSON.
+   VALIDADO (web runner, mapa v2, outbound+timewindow on): pallet_reserve_ok=
+   306/306, fail=0 (antes ~23% fallaba). Los ~179 solapes residuales del
+   contador global son de la RETENCION de descarga (5s), no de pallets:
+   306 holds = 127 ok + 179 fail (cuadra exacto). Causa: el planner enruta
+   a OTROS agentes por las columnas de staging vacias (atajo). Impacto menor
+   (el carril ya excluye a otros grueros); fix de fondo = prohibir transito
+   por columnas de staging -> integrarlo al plan de Fase 2.
+   HALLAZGOS COLATERALES de esta sesion:
+   - El runner web falla 1 de cada 2 corridas con exit code 0xC000013A al
+     arrancar (reintentar funciona). Bug aparte, no investigado.
+   - El stream del runner PIERDE lineas de stdout (mi print [OUTBOUND] nunca
+     aparecio pese a ejecutarse; el marcador de etiqueta si). Por eso la
+     telemetria se persiste en el JSON del reporte, no en stdout.
+   - La etiqueta del reporte "(SOMBRA, Fase 1)" era un print fijo enganoso;
+     renombrada a "(metricas)".
 5. [MOTOR] Embudo del PUNTO DE DESCARGA: con 100% a un staging se forma cola en la celda
    de entrada (real, pero artefacto de la prueba). Repartir ordenes entre los 7 stagings
    lo alivia. Iniciativa aparte si se quiere optimizar.
-6. [FUTURO] Fase 2: camion/despacho real que retire pallets (reemplaza el scaffold).
-   Capa 3: layout a escala real. Ver VISION_PRODUCTO y PLAN_INICIATIVA_3.
+6. Fase 2: camion/despacho real -> **PLAN DETALLADO LISTO** en
+   `docs/PLAN_FASE2_CAMION_REAL.md` (camion abstracto FIFO global, scaffold
+   como politica de rollback, espera en carril, eventos truck_*, y F2.d =
+   staging no-transitable para el planner). PENDIENTE OK del Director para
+   F2.a. Capa 3: layout a escala real (despues).
+7. [CALIBRACION DE TIEMPOS REALES] Investigacion HECHA ->
+   `docs/INVESTIGACION_TIEMPOS_REALES_OPERACION.md`: benchmarks de la industria
+   con fuentes (velocidades, picking, horquilla, empaque, camion), radiografia
+   del motor actual (hallazgos: velocidad ~10x la real; TIME_PER_CELL 0.1
+   hardcodeado en 3 sitios; picking comparte constante con descarga; comentario
+   de velocidad del Forklift invertido; camion F2 con defaults ~100x rapidos) y
+   TABLA DE CALIBRACION propuesta bajo la convencion 1 celda = 1 m, 1 s = 1 s.
+   IMPACTA los defaults de Fase 2 (truck_capacity 26, loading_time ~90 s/pallet,
+   truck_interval ~3600 s) -> actualizar PLAN_FASE2 antes de implementar.
+   PENDIENTE: decision del Director (escala + perfil) y aplicar los 6 cambios
+   de codigo de la seccion 4.2 del doc.
+   **WORKSTREAM ACTIVO**: analisis de impacto completo + plan por fases C1-C5
+   en `docs/ANALISIS_IMPACTO_CALIBRACION_TIEMPOS.md` (config-ificacion neutra
+   -> perfil calibrado -> UX -> actualizar Fase 2). La Fase 2 del camion se
+   implementara DESPUES de C1/C2, sobre la escala real.
 
 > Estado bueno actual del MOTOR = F1.3 (commit 379413d). Estado bueno de la WEB =
-> tras 7d00c7a + (pendiente) el arreglo del guardado del configurador.
+> tras 7d00c7a + fix del guardado del configurador (implementado, pendiente
+> verificacion en navegador por el Director).
+
+- [FIX GUARDADO WEB - IMPLEMENTADO] save_config ahora FUSIONA (merge superficial:
+  preserva claves que la UI no maneja) + escritura ATOMICA (tmp+os.replace) +
+  fallback si el config existente esta corrupto. Testeado en sandbox 4/4.
+  config.json reparado con los bloques VALIDADOS de config_stress_tw_v2.json
+  (el .backup tenia una version APAGADA: mode off/shadow; no era copia fiel).
+  Docs obsoletos archivados (HANDOFF, INSTRUCCIONES, DOBLE_BARRIDO, y 4 de
+  docs/ sobre tilesets/TMX viejos) -> archived/. Plan detallado y bitacora:
+  `docs/PLAN_FIX_GUARDADO_CONFIGURADOR.md`. Falta: reinicio del servidor +
+  verificacion visual del Director; luego commit.

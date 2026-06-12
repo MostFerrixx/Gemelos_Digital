@@ -51,11 +51,19 @@ if %errorlevel% neq 0 (
     exit /b 0
 )
 
-REM Terminar el proceso
+REM Terminar el proceso (con /T: mata el ARBOL completo, no solo el padre;
+REM sin /T el hijo que escucha en el puerto 8000 sobrevivia y bloqueaba el reinicio)
 echo [INFO] Deteniendo servidor (PID: %SERVER_PID%)...
-taskkill /PID %SERVER_PID% /F >nul 2>&1
+taskkill /PID %SERVER_PID% /F /T >nul 2>&1
+set "KILL_RESULT=%errorlevel%"
 
-if %errorlevel% equ 0 (
+REM Barrido de seguridad: matar cualquier proceso residual que siga en el puerto 8000
+for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":8000.*LISTENING"') do (
+    echo [INFO] Proceso residual en puerto 8000: PID %%a - deteniendo...
+    taskkill /PID %%a /F /T >nul 2>&1
+)
+
+if %KILL_RESULT% equ 0 (
     echo [EXITO] Servidor detenido exitosamente
     del "%PID_FILE%" >nul 2>&1
     echo.

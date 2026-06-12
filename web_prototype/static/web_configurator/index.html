@@ -276,6 +276,31 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Motor Avanzado</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                    <input type="checkbox" id="toggle-timewindow" style="width:auto;">
+                                    Ruteo anti-colisión (time-window)
+                                </label>
+                                <span class="help-text">Los agentes reservan espacio-tiempo y se esquivan entre sí
+                                    (no se atraviesan). Apagado = ruteo clásico.</span>
+                            </div>
+                            <div class="form-group">
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                    <input type="checkbox" id="toggle-outbound" style="width:auto;">
+                                    Subsistema outbound (carriles de carga)
+                                </label>
+                                <span class="help-text">Pallets persistentes y descarga por carriles en el muelle:
+                                    1 operario por columna, llenado de atrás hacia adelante. Apagado = descarga
+                                    clásica en el ancla.</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Tab 3: Flota de Agentes -->

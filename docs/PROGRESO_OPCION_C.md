@@ -149,4 +149,90 @@ CAMBIOS PROBADOS (todos gateados a mode:timewindow + shadow:false; flag off NO-O
   determinista via `reserve_dwell`), `_tw_idle_hold(span)` (reserva rodante en idle con
   release_agent+reserve por ciclo), `_tw_parking_cell` (BFS off-staging por spawn_index),
   `_tw_return_to_park` (navegar a parking tras el tour).
-- Cableado: dwell en picking (Ground), lift+pick+bajad
+- Cableado: dwell en picking (Ground), lift+pick+bajada (Forklift), descarga (ambos),
+  reserva durante el stagger de arranque, idle rodante en el idle-loop, y parking tras tour.
+
+RESULTADO (config_stress_tw_exec.json, 20 agentes, WH1, orders_test_sandbox):
+| Metrica                 | F2 (base) | F2b (intento) | Lectura |
+|-------------------------|-----------|---------------|---------|
+| I1 total                | 81        | **116 (PEOR)**| regresion |
+| termina / freeze        | si / no   | si / no       | ok |
+| sim_end_t               | 268       | 270           | ~igual |
+| reserve_overlaps        | 0         | **754**       | reservas FALLAN en masa |
+| plans_failed / fallbacks| 0 / 0     | **5 / 5**     | caen al estatico (atraviesan) |
+| expansion_cap_hits      | 0         | **5**         | cap 20000 golpeado |
+| avg_plan_ms / max_ms    | 2.8 / 36  | **34 / 362**  | planner ~12x mas caro |
+| avg_expansions          | 124       | **1690**      | explota la busqueda |
+
+DESGLOSE por estado de los ocupantes (co-ocupaciones, instrumentando _record_cooccupation):
+- idle+moving = 87 (era 56)  <- EMPEORADO por el parking
+- moving+picking = 13 (era 14)  <- casi igual (reserva de pick llega TARDE, ver abajo)
+- lifting+moving = 0 (era 5)  <- ELIMINADO (la reserva de lift SI funciona)
+- moving+unloading{+unloading...} = 15 eventos, hasta 6 agentes a la vez en (3,29)
+  <- apilamiento en la META de descarga (celda compartida)
+
+CAUSA RAIZ (decisiva, NO es bug de ejecucion):
+1. UNA reserva solo DIRIGE al planner; NO impide que un agente ocupe FISICAMENTE su META
+   fija. El staging "1" es UNA sola celda de grid (3,29) que los 20 agentes DEBEN ocupar
+   para descargar. Reservarla no los dispersa: se apilan igual (hasta 6 a la vez) y sus
+   reservas de dwell chocan entre si -> los 754 reserve_overlaps. Misma raiz, mas leve, en
+   picking: la reserva se hace AL LLEGAR (demasiado tarde), cuando otros ya planificaron su
+   ruta a traves de la celda durante mi aproximacion -> moving+picking apenas baja.
+2. El PARKING de idle fue contraproducente: el unico espacio libre junto al depot es el
+   CORREDOR DE TRAFICO (y=27/28/29); dispersar ahi a los idle los convierte en MAS
+   obstaculos en los carriles y suma viajes ida/vuelta -> idle+moving SUBE (56->87).
+3. La carga extra de reservas dispara el coste del A* (avg 124->1690 exp); 5 planes pegan
+   en el cap (20000) -> fallback estatico -> ese ignora reservas -> atraviesa a los parados.
+
+QUE SI FUNCIONO (senal positiva, conservable): reservar la permanencia DETERMINISTA en
+celdas de RACK (lifting -> 0; picking parcial). El problema NO es la idea de standing
+reservation; es (a) reservarla tarde y (b) la META de descarga / idle siendo UNA celda.
+
+DECISION REQUERIDA DEL DIRECTOR (Ley #1; es la decision de "aforo del depot" ya prevista):
+- **Opcion A (RECOMENDADA) - staging/depot como ZONA de aforo-k.** Cada staging deja de
+  ser 1 celda y pasa a un CLUSTER de k celdas caminables; al llegar, cada agente toma una
+  celda LIBRE distinta del cluster y la reserva -> hasta k descargan en paralelo (realista)
+  -> I1=0 honesto SIN colapsar throughput. Requiere: (1) resolver staging -> conjunto de
+  celdas + asignar celda libre por agente; (2) parking de idle DENTRO de la zona-k (no en
+  el corredor); (3) reservar el dwell AL PLANIFICAR la ruta (no al llegar) para que el
+  planner serialice cuando la zona este llena. Es DISENO, no parche.
+- **Opcion B - redefinir I1** = "0 colisiones reales" = 0 moving+moving + 0 en celdas de
+  TRAFICO; las celdas designadas de staging/depot se tratan como zona de aforo EXCLUIDA del
+  conteo de colision (pasa a metrica de aforo). Barata; cambia el criterio (es la Opcion 3).
+- **Opcion C - serializar el cuello**: reservar dwell al planificar + subir max_expansions;
+  el planner hace esperar hasta liberar (3,29). I1=0 estricto en 1 celda PERO colapsa el
+  throughput (descarga estrictamente secuencial) y dispara el coste. Solo como prueba de
+  concepto de que el motor serializa.
+
+ESTADO: experimento RESPALDADO en `_backup_iniciativa2/opcionC_fase_2b_experiment_standing_res/`
+(operators.py + spacetime_planner.py + diag_harness.py). Working dir REVERTIDO a F2 (re-
+validado I1=81, byte-identico). SIN COMMIT del intento (criterio no cumplido).
+
+---
+
+## BITACORA (cronologica, lo mas reciente abajo)
+
+- [INICIO] Leido el plan completo `docs/PLAN_INICIATIVA_2_OPCION_C.md`. Rastreada
+  la cadena viva: `pathfinder.py` (A* estatico, octil, get_neighbors orden fijo),
+  `route_calculator.py` (`calculate_route` -> segment_paths), `operators.py`
+  (`_recorrer_tramo` ~L333: rama no-cell byte-identica + rama F3 cell_exclusion;
+  choke `_set_pos` ~L290; consumo de ruta ~L530/593 Ground, ~L924/987 Forklift),
+  `congestion_manager.py` (ACTIVE_MODES, EXCLUSION_MODES, I1 instrument, F3 owner,
+  watchdog), `warehouse.py` (~L195 init congestion), `event_generator.py`
+  (~L211 loop, ~L259 write_report). Entorno: simpy/pandas/openpyxl/pytmx/pygame
+  instalados; harness corre (20 agentes, termina en sim_t=262, ~32s wallclock).
+  Bug FUSE confirmado: `rm`/`unlink` da EPERM; `mv` (rename) SI funciona -> se usa
+  para round-trip y para limpiar `index.lock` stale (git commitea OK).
+- [F0 HECHO] Andamiaje completo + no-regresion byte-identica. Commit `421b20f`.
+- [F1 HECHO] ReservationTable + SpaceTimePlanner en sombra. 0 solapes sobre layout real,
+  coste avg 12ms/plan, .jsonl byte-identico, determinista. Commit `<pendiente abajo>`.
+- [NOTA F2] NO iniciada (requiere visto bueno del Director). F2 cambiaria la EJECUCION
+  (_recorrer_tramo seguiria el plan en vez de la ruta estatica). El injerto ya existe.
+- [F2b INTENTO+REVERT] Implementadas standing reservations (dwell determinista + idle
+  rodante + parking). Revalidado: I1 REGRESO 81->116 (reserve_overlaps 754, 5 plans_failed,
+  planner 12x mas caro). Causa raiz aislada: META de descarga = 1 celda compartida (3,29)
+  -> reservar dirige al planner pero no impide ocupar la meta fisica -> apilan igual; el
+  parking de idle los mete al corredor de trafico. PARADO segun instruccion #3 (no parchear
+  a ciegas). Experimento respaldado en _backup_iniciativa2/opcionC_fase_2b_experiment_*;
+  working dir revertido a F2 (re-validado I1=81). Pendiente: DECISION del Director sobre
+  modelar staging/depot como zona de aforo-k (Opcion A recomendada). Ver seccion FASE 2b.

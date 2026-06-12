@@ -570,8 +570,18 @@ class BaseOperator:
         rt = getattr(self.almacen, 'reservation_table', None)
         if rt is not None:
             try:
-                rt.reserve(slot.cell, float(self.env.now),
-                           float(self.env.now) + 1e9, pid)
+                # MINI-FIX reservas (post F1.3): ignorar las reservas del PROPIO
+                # gruero que coloca el pallet (su permanencia/dwell en la celda
+                # es el pasado inmediato, no un conflicto real). Sin esto, la
+                # reserva del pallet fallaba (~180 solapes) y el pallet quedaba
+                # INVISIBLE para el ruteo de los demas agentes.
+                ok = rt.reserve(slot.cell, float(self.env.now),
+                                float(self.env.now) + 1e9, pid,
+                                ignore_agents={self.id})
+                m_fix = getattr(self.almacen, 'outbound_metrics', None)
+                if m_fix is not None:
+                    key = 'pallet_reserve_ok' if ok else 'pallet_reserve_fail'
+                    m_fix[key] = m_fix.get(key, 0) + 1
             except Exception:
                 pass
         m = getattr(self.almacen, 'outbound_metrics', None)

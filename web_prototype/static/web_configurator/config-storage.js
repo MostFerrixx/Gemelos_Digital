@@ -292,11 +292,10 @@ class ConfigurationStorage {
     }
 
     async useConfiguration() {
-        // Apply current form configuration to config.json
-        if (!confirm('¿Desea aplicar esta configuración a config.json? El simulador usará esta configuración en la próxima ejecución.')) {
-            return;
-        }
-
+        // Apply current form configuration to config.json.
+        // NOTA: se elimino el confirm() nativo (bloqueaba el renderer entero y
+        // congelaba la pestana). El guardado es seguro: backup automatico +
+        // escritura atomica + merge en el backend (ver PLAN_PASO2_TOGGLES_UI.md).
         try {
             // Get current configuration from form
             const config = this.configurator.serializeConfig();

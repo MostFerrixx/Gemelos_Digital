@@ -480,9 +480,42 @@ class WebConfigurator {
             document.getElementById(`staging-${i}`).value = value;
         }
 
+        // Motor Avanzado (paso 2): toggles desde los bloques del config.
+        // Ausencia de bloque = usar defaults validados (ON), NO apagar.
+        const cong = config.congestion;
+        const twChecked = cong ? (cong.enabled === true && cong.mode === 'timewindow') : true;
+        const obChecked = config.outbound ? (config.outbound.enabled === true) : true;
+        const twToggle = document.getElementById('toggle-timewindow');
+        const obToggle = document.getElementById('toggle-outbound');
+        if (twToggle) twToggle.checked = twChecked;
+        if (obToggle) obToggle.checked = obChecked;
+
         // Trigger validations
         this.validatePercentages();
         this.validateStagingDistribution();
+    }
+
+    // Defaults VALIDADOS (copiados de config_stress_tw_v2.json, valores F1.3).
+    // Se usan solo si el config en memoria no trae los bloques (config viejo).
+    getDefaultAdvancedBlocks() {
+        return {
+            congestion: {
+                enabled: true, mode: 'timewindow', wait_timeout: 0.5,
+                wait_hard_cap: 30.0, backoff_base: 0.1, backoff_jitter: 0.1,
+                max_repath: 3, repath_cost_factor: 2.0, spawn_offset: 0.3,
+                watchdog_window: 5.0, allow_swap: false, aging_rate: 1.0,
+                staggered_start: true,
+                timewindow: {
+                    shadow: false, clearance: 0.0, dt_wait: 0.1,
+                    max_expansions: 20000, plan_horizon: 0.0, allow_diagonal: false
+                }
+            },
+            outbound: {
+                enabled: true, dispatch_policy: 'interval', truck_interval: 20.0,
+                truck_capacity: 8, loading_time: 2.0, zone_capacity_default: 8,
+                slot_wait_alert: 60.0, slot_poll_dt: 0.1, dwell_scaffold: 10.0
+            }
+        };
     }
 
     serializeConfig() {
@@ -565,6 +598,31 @@ class WebConfigurator {
         config.num_montacargas = forkliftCount;
         config.num_operarios_total = groundOperatorCount + forkliftCount;
         config.num_operarios = groundOperatorCount + forkliftCount;
+
+        // Motor Avanzado (paso 2). REGLA CRITICA (merge superficial en backend):
+        // siempre enviar el bloque COMPLETO. Base = bloque del config en memoria
+        // (this.currentConfig, viene del GET); si falta, defaults validados.
+        const defaults = this.getDefaultAdvancedBlocks();
+        const baseCong = JSON.parse(JSON.stringify(
+            (this.currentConfig && this.currentConfig.congestion) || defaults.congestion));
+        const baseOb = JSON.parse(JSON.stringify(
+            (this.currentConfig && this.currentConfig.outbound) || defaults.outbound));
+
+        const twOn = document.getElementById('toggle-timewindow')?.checked ?? true;
+        const obOn = document.getElementById('toggle-outbound')?.checked ?? true;
+
+        baseCong.enabled = twOn;
+        baseCong.mode = twOn ? 'timewindow' : 'off';
+        if (twOn) {
+            // Forzar variante EFECTIVA: un config viejo con shadow:true dejaria
+            // el toggle ON sin efecto real (el planner solo observaria).
+            if (!baseCong.timewindow) baseCong.timewindow = JSON.parse(JSON.stringify(defaults.congestion.timewindow));
+            baseCong.timewindow.shadow = false;
+        }
+        baseOb.enabled = obOn;
+
+        config.congestion = baseCong;
+        config.outbound = baseOb;
 
         return config;
     }
