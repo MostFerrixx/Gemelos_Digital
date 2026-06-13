@@ -413,14 +413,22 @@ reversible (flag off => baseline byte-identico).
    truck_interval ~3600 s) -> actualizar PLAN_FASE2 antes de implementar.
    PENDIENTE: decision del Director (escala + perfil) y aplicar los 6 cambios
    de codigo de la seccion 4.2 del doc.
-   **WORKSTREAM ACTIVO**: analisis de impacto completo + plan por fases C1-C5
-   en `docs/ANALISIS_IMPACTO_CALIBRACION_TIEMPOS.md` (config-ificacion neutra
-   -> perfil calibrado -> UX -> actualizar Fase 2). La Fase 2 del camion se
-   implementara DESPUES de C1/C2, sobre la escala real.
+   **WORKSTREAM ACTIVO — C1 COMPLETADO (PENDIENTE VALIDACION NUMERICA)**:
+   analisis de impacto completo + plan por fases C1-C5 en
+   `docs/ANALISIS_IMPACTO_CALIBRACION_TIEMPOS.md`.
+   C1 (config-ificacion neutra) -> IMPLEMENTADO: bloque `tiempos` en config.json
+   + BaseOperator lee los valores en __init__ + 5 sitios hardcodeados reemplazados
+   (TIME_PER_CELL Ground L763, TIME_PER_CELL Forklift L~1169, LIFT_TIME L~1170,
+   picking_duration x2, _outbound_nav_to time_per_cell). Defaults = valores
+   actuales (0.1, 1.0, 0.8, 2.0, null) => CERO CAMBIO DE COMPORTAMIENTO esperado.
+   Compilacion OK (py_compile). PENDIENTE: validacion numerica del Director (ver
+   PARA TI DIRECTOR al pie de esta seccion).
+   PROXIMOS: C2 perfil calibrado (solo es cambiar config.json) -> La Fase 2 del
+   camion se implementara DESPUES de C1/C2, sobre la escala real.
 
-> Estado bueno actual del MOTOR = F1.3 (commit 379413d). Estado bueno de la WEB =
-> tras 7d00c7a + fix del guardado del configurador (implementado, pendiente
-> verificacion en navegador por el Director).
+> Estado bueno actual del MOTOR = F1.3 + C1 (config-ificacion neutra) IMPLEMENTADA.
+> Commit del estado: e57aa06 (incluye F1.3 + fix guardado + toggles UI + mini-fix pallet).
+> C1 PENDIENTE VALIDAR + COMMITEAR (rama feature/allocation-layer-v12.1).
 
 - [FIX GUARDADO WEB - IMPLEMENTADO] save_config ahora FUSIONA (merge superficial:
   preserva claves que la UI no maneja) + escritura ATOMICA (tmp+os.replace) +
@@ -431,3 +439,24 @@ reversible (flag off => baseline byte-identico).
   docs/ sobre tilesets/TMX viejos) -> archived/. Plan detallado y bitacora:
   `docs/PLAN_FIX_GUARDADO_CONFIGURADOR.md`. Falta: reinicio del servidor +
   verificacion visual del Director; luego commit.
+
+- [C1 CONFIG-IFICACION NEUTRA — IMPLEMENTADA, PENDIENTE VALIDACION NUMERICA]
+  Workstream de calibracion de tiempos. Cambios:
+  * config.json: nuevo bloque `tiempos` (cell_size_m=1.0, time_per_cell=0.1,
+    speed_factor_ground=1.0, speed_factor_forklift=0.8,
+    tiempo_picking_por_linea=null, tiempo_horquilla=2.0).
+  * operators.py BaseOperator.__init__: lee bloque `tiempos` de configuracion;
+    asigna self.time_per_cell, self.speed_factor_ground, self.speed_factor_forklift,
+    self.picking_time (None si null), self.lift_time.
+  * GroundOperator: self.default_speed = self.speed_factor_ground; TIME_PER_CELL =
+    self.time_per_cell; picking_duration = picking_time or discharge_time.
+  * Forklift: self.default_speed = self.speed_factor_forklift; TIME_PER_CELL =
+    self.time_per_cell; LIFT_TIME = self.lift_time; picking_duration idem; comentario
+    invertido CORREGIDO.
+  * _outbound_nav_to: time_per_cell=self.time_per_cell (era literal 0.1).
+  Todos los defaults = valores que estaban hardcodeados => CERO cambio de comportamiento
+  con configs existentes. Compilacion: py_compile OK (con protocolo anti-FUSE aplicado:
+  round-trip mv + wc -l=1705 completo).
+  VALIDACION PENDIENTE: correr config_stress_tw_v2.json y confirmar:
+    pallet_reserve_ok=306, fail=0, table_overlap_violations ~179,
+    tramos ~480, exec_fallbacks=0. (Esos fueron los numeros del commit e57aa06.)

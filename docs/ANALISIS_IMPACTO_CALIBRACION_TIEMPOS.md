@@ -134,7 +134,7 @@ aprox) pero los VALORES objetivos cambian de orden de magnitud. No bloquea
 
 ## 3. PLAN DE TRABAJO PROPUESTO (fases; cada una con OK previo, Ley #1)
 
-### C1. Config-ificacion NEUTRA (sin cambio de comportamiento)  -> [ ]
+### C1. Config-ificacion NEUTRA (sin cambio de comportamiento)  -> [IMPLEMENTADA, pendiente validacion numerica]
 Llevar a config: time_per_cell (x3 sitios), velocidad por tipo de agente,
 tiempo_picking_por_linea, tiempo_horquilla, (poll dts). DEFAULTS = valores
 actuales. Anadir `cell_size_m` (documental). Corregir comentario Forklift.
@@ -185,3 +185,12 @@ Seccion "Tiempos de operacion" con el patron del paso 2.
 
 ## 6. BITACORA DEL WORKSTREAM (lo mas reciente abajo)
 - [ANALISIS REDACTADO] Pendiente OK del Director para arrancar C1.
+- [C1 IMPLEMENTADA] OK del Director recibido. Config-ificacion neutra completa:
+  bloque `tiempos` en config.json + BaseOperator lee el bloque + 5 sitios de
+  constantes hardcodeadas reemplazados en operators.py (Time_per_cell x3,
+  LIFT_TIME, picking_duration x2, default_speed x2). Comentario invertido
+  del Forklift (L1165) CORREGIDO. Compilacion py_compile OK. Protocolo anti-FUSE
+  aplicado (round-trip mv; archivo 1705 lineas completo).
+  PENDIENTE: correr config_stress_tw_v2.json y verificar metricas identicas al
+  commit e57aa06 (pallet_reserve_ok=306, fail=0, table_overlap ~179, tramos ~480,
+  exec_fallbacks=0). Luego commitear y marcar C1 cerrada.

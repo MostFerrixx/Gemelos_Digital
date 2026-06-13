@@ -93,6 +93,19 @@ class BaseOperator:
         self.total_work_time = 0
         self.idle_time = 0
 
+        # --- Bloque tiempos (C1: config-ificacion neutra) ---
+        # Lee los parametros de tiempo del bloque "tiempos" de config.json.
+        # Todos los defaults son exactamente los valores que antes estaban
+        # hardcodeados, por lo que configs sin el bloque "tiempos" producen
+        # comportamiento IDENTICO (cero cambio observable).
+        _tiempos = configuracion.get("tiempos", {}) if configuracion else {}
+        self.time_per_cell = float(_tiempos.get("time_per_cell", 0.1))
+        self.speed_factor_ground = float(_tiempos.get("speed_factor_ground", 1.0))
+        self.speed_factor_forklift = float(_tiempos.get("speed_factor_forklift", 0.8))
+        _pick = _tiempos.get("tiempo_picking_por_linea", None)
+        self.picking_time = float(_pick) if _pick is not None else None
+        self.lift_time = float(_tiempos.get("tiempo_horquilla", 2.0))
+
         print(f"[AGENT] {self.id} ({self.type}) inicializado - Capacidad: {self.capacity}")
 
     def get_priority_for_work_area(self, work_area: str) -> int:
@@ -627,9 +640,10 @@ class BaseOperator:
                 path = None
         if path and len(path) > 1:
             self.status = "moving"
+            # C1: time_per_cell leido de config (self.time_per_cell); default 0.1
             yield from self._recorrer_tramo(
                 path, self.default_speed, on_before=None, on_after=None,
-                time_per_cell=0.1)
+                time_per_cell=self.time_per_cell)
         else:
             self._jump_to(tuple(cell))
 
@@ -743,7 +757,8 @@ class GroundOperator(BaseOperator):
         )
 
         # Ground operator specific attributes
-        self.default_speed = 1.0  # Speed multiplier
+        # C1: default_speed leido de config (speed_factor_ground); default 1.0
+        self.default_speed = self.speed_factor_ground
         self.preferred_areas = ["Area_Ground", "Area_Piso_L1"]
 
     def agent_process(self):
@@ -760,7 +775,8 @@ class GroundOperator(BaseOperator):
         6. Repetir
         """
         # Configuracion de simulacion
-        TIME_PER_CELL = 0.1  # Segundos por celda de grid (ajustable)
+        # C1: TIME_PER_CELL leido de config; default 0.1 (escala actual)
+        TIME_PER_CELL = self.time_per_cell
 
         # Inicializar posicion en depot
         staging_locs = self.almacen.data_manager.get_outbound_staging_locations()
@@ -909,7 +925,8 @@ class GroundOperator(BaseOperator):
                     'cargo_volume': self.cargo_volume
                 })
 
-                picking_duration = self.discharge_time
+                # C1: picking_time leido de config; None => usa discharge_time (compat)
+                picking_duration = self.picking_time if self.picking_time is not None else self.discharge_time
                 yield self.env.timeout(picking_duration)
 
                 self.almacen.registrar_evento('operation_completed', {
@@ -1147,7 +1164,10 @@ class Forklift(BaseOperator):
         )
 
         # Forklift specific attributes
-        self.default_speed = 0.8  # Slightly slower than ground operators
+        # C1: default_speed leido de config (speed_factor_forklift); default 0.8.
+        # NOTA: default_speed es multiplicador de TIEMPO (0.8 => 20% mas rapido
+        # que Ground, no mas lento). El comentario anterior era incorrecto.
+        self.default_speed = self.speed_factor_forklift
         self.preferred_areas = ["Area_Rack"]
         self.lift_height = 0  # Current lift height
 
@@ -1161,13 +1181,14 @@ class Forklift(BaseOperator):
         Implementa ciclo pull-based con mecanica de elevacion
 
         Diferencias vs GroundOperator:
-        - Tiempo de elevacion/bajada de horquilla
-        - Velocidad mas lenta (default_speed = 0.8)
+        - Tiempo de elevacion/bajada de horquilla (LIFT_TIME)
+        - Velocidad diferente (default_speed = speed_factor_forklift de config)
         - Descarga multiple en stagings (MULTI-STAGING SUPPORT)
         """
         # Configuracion de simulacion
-        TIME_PER_CELL = 0.1  # Segundos por celda de grid
-        LIFT_TIME = 2.0      # Segundos para elevar/bajar horquilla
+        # C1: TIME_PER_CELL y LIFT_TIME leidos de config; defaults = valores actuales
+        TIME_PER_CELL = self.time_per_cell
+        LIFT_TIME = self.lift_time
 
         # Inicializar posicion en depot
         staging_locs = self.almacen.data_manager.get_outbound_staging_locations()
@@ -1324,7 +1345,8 @@ class Forklift(BaseOperator):
                     'cargo_volume': self.cargo_volume
                 })
 
-                picking_duration = self.discharge_time
+                # C1: picking_time leido de config; None => usa discharge_time (compat)
+                picking_duration = self.picking_time if self.picking_time is not None else self.discharge_time
                 yield self.env.timeout(picking_duration)
 
                 print(f"[{self.id}] t={self.env.now:.1f} Bajando horquilla")

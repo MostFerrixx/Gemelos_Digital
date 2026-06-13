@@ -113,5 +113,13 @@
         "slot_wait_alert": 60,
         "slot_poll_dt": 0.1,
         "dwell_scaffold": 10
+    },
+    "tiempos": {
+        "cell_size_m": 1.0,
+        "time_per_cell": 0.1,
+        "speed_factor_ground": 1.0,
+        "speed_factor_forklift": 0.8,
+        "tiempo_picking_por_linea": null,
+        "tiempo_horquilla": 2.0
     }
 }
