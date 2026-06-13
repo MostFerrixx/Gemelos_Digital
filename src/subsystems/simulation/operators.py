@@ -605,8 +605,19 @@ class BaseOperator:
                 occ = zone.occupancy()
                 if occ > m['peak_occupancy'].get(staging_id, 0):
                     m['peak_occupancy'][staging_id] = occ
-        dwell = float(self.almacen.outbound_config.get('dwell_scaffold', 10.0))
-        self.env.process(self._outbound_scaffold_release(slot, pallet, dwell))
+        # F2.a: registrar pallet en la cola FIFO del camion.
+        # La lista se mantiene ordenada por (t_staged, id) para FIFO determinista
+        # incluso si dos pallets llegan en el mismo tick de simulacion.
+        _staged_list = getattr(self.almacen, 'staged_pallets', None)
+        if _staged_list is not None:
+            _staged_list.append(pallet)
+            _staged_list.sort(key=lambda p: (p.t_staged, p.id))
+        # F2.a: scaffold SOLO si policy=='scaffold' (Fase 1 proxy).
+        # Con policy='interval', OutboundProcess.run() gestiona el release.
+        _policy = self.almacen.outbound_config.get('dispatch_policy', 'scaffold')
+        if _policy == 'scaffold':
+            dwell = float(self.almacen.outbound_config.get('dwell_scaffold', 10.0))
+            self.env.process(self._outbound_scaffold_release(slot, pallet, dwell))
 
     def _outbound_scaffold_release(self, slot, pallet, dwell):
         """SCAFFOLD Fase 1 (proxy del camion): libera la posicion tras `dwell` seg."""

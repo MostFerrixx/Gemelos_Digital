@@ -235,12 +235,106 @@ class OutboundProcess:
 
     def run(self):
         """
-        FASE 0: stub no-op. No retira pallets ni avanza el reloj.
-        (Generador vacio: si se arrancara por error, termina de inmediato.)
+        F2.a: proceso de camion real (politica 'interval').
+
+        Ciclo:
+          1. Esperar truck_interval segundos de simulacion.
+          2. Tomar hasta truck_capacity pallets FIFO de almacen.staged_pallets.
+          3. Si n==0: emitir truck_arrived+truck_departed y continuar.
+          4. Si n>0: yield timeout(loading_time * n) [per-pallet].
+          5. Liberar DockSlot + RT de cada pallet; marcarlo 'shipped'.
+          6. Emitir pallet_shipped por cada uno + truck_departed.
+          7. Actualizar metricas outbound_metrics.
+
+        policy='scaffold': los scaffold en operators.py siguen manejando todo;
+        este generador termina inmediatamente para no interferir.
         """
-        print("[OUTBOUND] OutboundProcess.run() stub (Fase 0): no-op.")
-        return
-        yield  # marca este metodo como generador (inalcanzable en Fase 0)
+        if self.policy == 'scaffold':
+            # Fase 1 sigue activa; OutboundProcess no participa.
+            return
+            yield  # pragma: no cover
+
+        truck_num = 0
+        while True:
+            yield self.env.timeout(self.truck_interval)
+            truck_num += 1
+            truck_id = "TRUCK-" + str(truck_num)
+            staged = getattr(self.almacen, 'staged_pallets', [])
+            n = min(self.truck_capacity, len(staged))
+
+            self.almacen.registrar_evento('truck_arrived', {
+                'truck_id': truck_id,
+                'n_queued': len(staged),
+                'n_to_load': n,
+            })
+
+            if n == 0:
+                print(f"[OUTBOUND] {truck_id} llega t={self.env.now:.0f}s: "
+                      f"sin pallets, sale vacio.")
+                self.trucks_dispatched += 1
+                _m = getattr(self.almacen, 'outbound_metrics', None)
+                if _m is not None:
+                    _m['trucks_dispatched'] = _m.get('trucks_dispatched', 0) + 1
+                self.almacen.registrar_evento('truck_departed', {
+                    'truck_id': truck_id,
+                    'pallets_loaded': 0,
+                    'backlog': 0,
+                })
+                continue
+
+            # FIFO: staged ya esta ordenado por (t_staged, id); tomar los primeros n.
+            to_load = staged[:n]
+            del staged[:n]
+
+            # Carga: loading_time POR PALLET (decision F2.a / C4).
+            yield self.env.timeout(self.loading_time * n)
+
+            # Liberar recursos y marcar shipped.
+            rt = getattr(self.almacen, 'reservation_table', None)
+            _m = getattr(self.almacen, 'outbound_metrics', None)
+            for pallet in to_load:
+                # 1. Liberar DockSlot buscando por celda en la StagingZone.
+                zone = getattr(self.almacen, 'staging_zones', {}).get(
+                    pallet.staging_id)
+                if zone is not None:
+                    for slot in zone.slots:
+                        if slot.cell == pallet.cell:
+                            slot.release()
+                            break
+                # 2. Liberar reserva-obstaculo en ReservationTable (si existe).
+                if rt is not None:
+                    try:
+                        rt.release_agent(pallet.id)
+                    except Exception:
+                        pass
+                # 3. Marcar shipped.
+                pallet.status = 'shipped'
+                pallet.t_shipped = float(self.env.now)
+                # 4. Metricas y evento.
+                if _m is not None:
+                    _m['pallets_shipped'] = _m.get('pallets_shipped', 0) + 1
+                self.pallets_shipped += 1
+                self.almacen.registrar_evento('pallet_shipped', {
+                    'pallet_id': pallet.id,
+                    'staging_id': pallet.staging_id,
+                    't_staged': pallet.t_staged,
+                    't_shipped': pallet.t_shipped,
+                })
+
+            # Metricas de camion.
+            self.trucks_dispatched += 1
+            backlog = len(staged)
+            if _m is not None:
+                _m['trucks_dispatched'] = _m.get('trucks_dispatched', 0) + 1
+                _m['pallets_shipped_by_truck'] = (
+                    _m.get('pallets_shipped_by_truck', 0) + n)
+            print(f"[OUTBOUND] {truck_id} despacha {n} pallets en "
+                  f"{self.loading_time * n:.1f}s. Backlog={backlog}.")
+            self.almacen.registrar_evento('truck_departed', {
+                'truck_id': truck_id,
+                'pallets_loaded': n,
+                'backlog': backlog,
+            })
 
     def __repr__(self):
         return (f"OutboundProcess(policy={self.policy}, "

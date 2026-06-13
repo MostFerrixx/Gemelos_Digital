@@ -485,6 +485,30 @@ reversible (flag off => baseline byte-identico).
   Motor Avanzado: merge superficial preserva cell_size_m y speed_factor_ground que
   la UI no expone). Validacion en config_manager.py. WORKSTREAM C1-C5 COMPLETADO.
 
+- [F2.a CAMION REAL — IMPLEMENTADA Y VALIDADA]
+  Proceso de despacho real (policy=interval) activo. Cambios en 3 archivos:
+  * warehouse.py: `self.staged_pallets = []` (cola FIFO central); instancia
+    OutboundProcess si policy != 'scaffold' y lo asigna a self.outbound_process
+    (el gate de event_generator.py ya lo arrancaba, no hizo falta tocarlo).
+  * operators.py `_outbound_place_pallet()`: appends pallet a staged_pallets
+    (ordenado por (t_staged, id) para FIFO determinista); lanza scaffold SOLO
+    si policy=='scaffold'. Con policy='interval', el slot queda ocupado hasta
+    que el camion lo libera.
+  * outbound.py `OutboundProcess.run()`: bucle while True; timeout(truck_interval);
+    FIFO pop de staged_pallets ([:truck_capacity]); timeout(loading_time*n)
+    per-pallet; libera DockSlot (busqueda por celda en zone.slots) + RT
+    (release_agent(pallet.id)); marca pallet.status='shipped'; emite
+    truck_arrived / pallet_shipped x n / truck_departed via registrar_evento().
+    Con policy='scaffold': return inmediato (F1.3 compat preservada).
+  VALIDACION: smoke-test SimPy headless (sin stack completo):
+    - 6 pallets, capacity=4, loading=2s: TRUCK-1=4 pallets (8s), TRUCK-2=2 (4s).
+    - FIFO confirmado: WO0..WO3 primero, WO4..WO5 segundo.
+    - staged_pallets=0 al final, 6 pallet_shipped emitidos, truck_arrived/departed OK.
+    - policy=scaffold: 0 trucks, 0 eventos, staged_pallets intacta. F1.3 compat OK.
+  PENDIENTE: correr la simulacion completa (run_generate_replay.py) con outbound.enabled=true
+  y verificar outbound_metrics al final (pallets_staged==pallets_shipped, trucks_dispatched>0).
+  COMMIT: (ver abajo).
+
 - [C4 HECHA] PLAN_FASE2_CAMION_REAL.md actualizado con defaults de escala real.
   truck_capacity 26, truck_interval 3600, loading_time 90 s/pallet (decision
   formalizada: POR PALLET desde F2.a). Analisis de estabilidad: a escala real

@@ -246,7 +246,8 @@ class AlmacenMejorado:
         self.outbound_config = configuracion.get('outbound', {'enabled': False})
         self.outbound_enabled = bool(self.outbound_config.get('enabled', False))
         self.staging_zones = {}       # {staging_id: StagingZone}; se puebla si enabled
-        self.outbound_process = None  # se instancia en Fase 2 (camion)
+        self.staged_pallets = []      # F2.a: cola FIFO de pallets esperando camion
+        self.outbound_process = None  # se instancia en F2.a si policy != 'scaffold'
         if self.outbound_enabled:
             from .outbound import StagingZone, build_zone_cells
             zones_raw = (self.data_manager.get_outbound_staging_zones()
@@ -293,6 +294,17 @@ class AlmacenMejorado:
             }
             print(f"[OUTBOUND] Fase1 zonas (k={k}): "
                   f"{ {sid: z.capacity for sid, z in self.staging_zones.items()} }")
+            # F2.a: instanciar OutboundProcess si policy != 'scaffold'.
+            # policy='scaffold': operators.py sigue manejando el release (proxy Fase1).
+            # policy='interval': OutboundProcess.run() hace el camion real.
+            _policy = self.outbound_config.get('dispatch_policy', 'interval')
+            if _policy != 'scaffold':
+                from .outbound import OutboundProcess
+                self.outbound_process = OutboundProcess(
+                    self.env, self, self.outbound_config)
+                print(f"[OUTBOUND] F2.a: OutboundProcess activo (policy={_policy})")
+            else:
+                print("[OUTBOUND] F2.a: policy=scaffold => OutboundProcess no arranca")
         else:
             print("[OUTBOUND] desactivado (enabled:false) - comportamiento actual.")
 
