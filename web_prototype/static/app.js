@@ -898,6 +898,11 @@ const ControlsModule = {
         this.setMetricValue('metric-assigned', woMetrics.assigned || 0);
         this.setMetricValue('metric-in-progress', woMetrics.in_progress || 0);
         this.setMetricValue('metric-staged', woMetrics.staged || 0);
+
+        // F2.c: KPIs de despacho (outbound). Siempre 0 si outbound desactivado.
+        const obMetrics = metrics.outbound || {};
+        this.setMetricValue('metric-trucks', obMetrics.trucks_dispatched || 0);
+        this.setMetricValue('metric-shipped', obMetrics.pallets_shipped || 0);
     },
 
     setMetricValue(elementId, value) {
@@ -1097,7 +1102,10 @@ const MetricsModule = {
             { id: 'metric-released', label: 'Released', class: 'released' },
             { id: 'metric-assigned', label: 'Assigned', class: 'assigned' },
             { id: 'metric-in-progress', label: 'In Progress', class: 'in-progress' },
-            { id: 'metric-staged', label: 'Staged', class: 'staged' }
+            { id: 'metric-staged', label: 'Staged', class: 'staged' },
+            // F2.c: KPIs de despacho — siempre visibles (0 si outbound off)
+            { id: 'metric-trucks', label: 'Trucks', class: 'trucks' },
+            { id: 'metric-shipped', label: 'Shipped', class: 'shipped' }
         ];
 
         metricsBar.innerHTML = '';

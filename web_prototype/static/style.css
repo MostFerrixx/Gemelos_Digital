@@ -470,6 +470,15 @@ canvas {
     color: var(--status-staged);
 }
 
+/* F2.c: KPIs de despacho outbound */
+.metric-compact.trucks .value {
+    color: var(--color-accent-blue);
+}
+
+.metric-compact.shipped .value {
+    color: var(--color-accent-green);
+}
+
 /* ============================================
    TABLE CONTAINER
    ============================================ */

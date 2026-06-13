@@ -159,6 +159,26 @@ class ReplayData:
                 # Use data if it has content, otherwise use the entire event (for synthetic events)
                 state['work_orders'][wo_id] = data if data else event
 
+        # F2.c: handlers de eventos de camion (outbound). Acumulan contadores en
+        # state['outbound'] para que los snapshots y /api/snapshot los expongan.
+        # Con outbound.enabled=false nunca se emiten estos tipos -> contadores = 0.
+        elif etype == 'truck_arrived':
+            ob = state.setdefault('outbound', {
+                'trucks_dispatched': 0, 'pallets_shipped': 0, 'backlog': 0})
+            ob['last_truck_id'] = event.get('truck_id')
+
+        elif etype == 'truck_departed':
+            ob = state.setdefault('outbound', {
+                'trucks_dispatched': 0, 'pallets_shipped': 0, 'backlog': 0})
+            if event.get('pallets_loaded', 0) > 0:
+                ob['trucks_dispatched'] = ob.get('trucks_dispatched', 0) + 1
+            ob['backlog'] = event.get('backlog', 0)
+
+        elif etype == 'pallet_shipped':
+            ob = state.setdefault('outbound', {
+                'trucks_dispatched': 0, 'pallets_shipped': 0, 'backlog': 0})
+            ob['pallets_shipped'] = ob.get('pallets_shipped', 0) + 1
+
     def load_data(self):
         print(f"Loading replay data from {REPLAY_FILE}...")
         try:
@@ -811,6 +831,12 @@ def get_snapshot(t: float):
             "performance": {
                 "throughput_per_minute": round(throughput, 2),
                 "avg_time_per_wo": round(t / wo_completed, 2) if wo_completed > 0 else 0
+            },
+            # F2.c: contadores de camion acumulados hasta t (0 si outbound off)
+            "outbound": {
+                "trucks_dispatched": current_state.get('outbound', {}).get('trucks_dispatched', 0),
+                "pallets_shipped": current_state.get('outbound', {}).get('pallets_shipped', 0),
+                "backlog": current_state.get('outbound', {}).get('backlog', 0),
             }
         }
     }

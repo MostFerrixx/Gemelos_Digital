@@ -509,6 +509,27 @@ reversible (flag off => baseline byte-identico).
   y verificar outbound_metrics al final (pallets_staged==pallets_shipped, trucks_dispatched>0).
   COMMIT: 6db30e6.
 
+- [F2.c EVENTOS TRUCK AL VISOR WEB — IMPLEMENTADA Y VALIDADA]
+  Los eventos truck_arrived/truck_departed/pallet_shipped ya llegaban al .jsonl
+  (via el else generico de registrar_evento). F2.c cierra la cadena hasta el
+  visor. 3 archivos, todo aditivo:
+  * server.py _apply_event_to_state: 3 nuevos elif (truck_arrived guarda
+    last_truck_id; truck_departed incrementa trucks_dispatched si carga>0 y
+    actualiza backlog; pallet_shipped incrementa pallets_shipped). El dict
+    state['outbound'] se crea lazy con setdefault.
+  * server.py /api/snapshot: campo "outbound" en el bloque "metrics" de la
+    respuesta (trucks_dispatched, pallets_shipped, backlog). Siempre presente
+    aunque valga 0 (outbound off => no hay eventos => contadores en 0).
+  * app.js MetricsModule.init(): 2 nuevos KPIs en la barra compact:
+    metric-trucks (azul) y metric-shipped (verde).
+  * app.js updateMetricsFromData: lee metrics.outbound y actualiza los 2 KPIs.
+  * style.css: clases .trucks y .shipped con colores del tema (accent-blue,
+    accent-green).
+  Validado: smoke-test Python (10 eventos: 2 trucks x 4+2 pallets): trucks=2,
+  shipped=6, backlog=0. Sin eventos outbound: contadores 0 (compat off OK).
+  py_compile server.py OK; node --check app.js OK.
+  COMMIT: (ver abajo).
+
 - [F2.b POLL-WAIT EN CARRIL — IMPLEMENTADA Y VALIDADA]
   Reemplazado el `break` silencioso en _outbound_discharge_lanes por un bucle
   poll-wait: cuando la columna esta llena el agente ESPERA DENTRO del carril
