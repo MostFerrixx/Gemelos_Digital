@@ -152,7 +152,7 @@ de planner, determinista (2 corridas), y CRITERIOS DE REALISMO: ~50-60% del
 tiempo del picker en viaje + lineas/hora dentro de 60-150. Capturar BASELINE
 NUEVO (md5 + KPIs) y registrarlo.
 
-### C3. Experiencia de uso  -> [ ]
+### C3. Experiencia de uso  -> [HECHA]
 Velocidades 30x/60x en el visor web (y revisar Pygame); verificar formato de
 horas del dashboard; preset "demo" vs "real" disponibles en configuraciones.
 
@@ -211,3 +211,8 @@ Seccion "Tiempos de operacion" con el patron del paso 2.
     (e) TEST DE REALISMO: Tiempo_Viaje / (Tiempo_Viaje + Tiempo_Picking) ~ 50-60%.
     (f) lineas/hora dentro del rango 60-150.
   Capturar BASELINE NUEVO (md5 + makespan + KPIs) y registrarlo aqui.
+- [C3 HECHA] web_prototype/static/index.html: opciones 30x y 60x agregadas al
+  select #speed-select (parseFloat del valor => sin cambio en app.js de logica).
+  web_prototype/static/app.js: formatTime actualizado a HH:MM:SS cuando >= 1 h
+  (antes MM:SS -> mostraria "180:00" para una sim de 3 h; ahora "03:00:00").
+  Commit: ver historial.

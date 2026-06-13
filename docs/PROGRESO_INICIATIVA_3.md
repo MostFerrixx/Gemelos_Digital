@@ -475,4 +475,9 @@ reversible (flag off => baseline byte-identico).
   C2 NO toca codigo: es 100% cambio de config. El motor lo absorbe gracias a C1.
   PROXIMOS: el Director corre config_calibrado_v1.json y verifica criterios C2
   (ver ANALISIS_IMPACTO seccion 6 bitacora). Capturar BASELINE NUEVO si pasa.
-  Luego: C3 (velocidades 30x/60x en el visor) y C4 (actualizar PLAN_FASE2).
+  Luego: C4 (actualizar PLAN_FASE2 con defaults reales).
+
+- [C3 HECHA] Visor web: opciones 30x/60x agregadas al selector de velocidad
+  (web_prototype/static/index.html). formatTime actualizado a HH:MM:SS para
+  replays de simulaciones calibradas de duracion > 1 hora (app.js). Sin cambios
+  en la logica de playback (parseFloat del option.value lo absorbe automaticamente).
