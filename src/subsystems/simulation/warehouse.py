@@ -308,6 +308,23 @@ class AlmacenMejorado:
                 print(f"[OUTBOUND] F2.a: OutboundProcess activo (policy={_policy})")
             else:
                 print("[OUTBOUND] F2.a: policy=scaffold => OutboundProcess no arranca")
+            # F2.d: marcar celdas de staging como NO-CAMINABLES en collision_matrix.
+            # Impide que el planner A* (y el SpaceTimePlanner) las use como atajos.
+            # Los agentes de descarga navegan hasta el pasillo de entrada (celda
+            # caminable delante del carril) y luego hacen _jump_to al slot interior.
+            # Con outbound off => este bloque no se ejecuta => matriz intacta.
+            _lm = self.layout_manager
+            if _lm is not None and hasattr(_lm, 'collision_matrix'):
+                _f2d_blocked = 0
+                for _zone in self.staging_zones.values():
+                    for _slot in _zone.slots:
+                        _sx, _sy = _slot.cell
+                        if (0 <= _sy < len(_lm.collision_matrix) and
+                                0 <= _sx < len(_lm.collision_matrix[_sy])):
+                            _lm.collision_matrix[_sy][_sx] = False
+                            _f2d_blocked += 1
+                print(f"[OUTBOUND] F2.d: {_f2d_blocked} celdas de staging "
+                      f"marcadas no-caminables en collision_matrix.")
         else:
             print("[OUTBOUND] desactivado (enabled:false) - comportamiento actual.")
 

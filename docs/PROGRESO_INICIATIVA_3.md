@@ -509,6 +509,28 @@ reversible (flag off => baseline byte-identico).
   y verificar outbound_metrics al final (pallets_staged==pallets_shipped, trucks_dispatched>0).
   COMMIT: 6db30e6.
 
+- [F2.d STAGING NO-TRANSITABLE — IMPLEMENTADA Y VALIDADA]
+  Impide que el planner A* use las celdas de staging como atajos. 2 archivos:
+  * warehouse.py: tras construir staging_zones, itera todos los slots y pone
+    lm.collision_matrix[y][x]=False. Gateado en outbound_enabled (con off =>
+    matriz intacta). Print: "[OUTBOUND] F2.d: N celdas de staging no-caminables."
+  * operators.py _outbound_discharge_lanes: 2 cambios quirurgicos:
+    (a) Antes del loop: calcula entry_cell=(lane_x, front_y-1) y navega via A*
+    al pasillo de entrada (celda walkable). Con staging bloqueado, A* alcanza
+    el pasillo sin problema.
+    (b) En el loop: reemplaza yield from _outbound_nav_to(slot.cell) por
+    self._jump_to(slot.cell). El agente salta directamente al slot desde el
+    pasillo (distancia intra-carril <= zone_capacity/n_columnas celdas; ok
+    para simulacion). La salida usa _outbound_nav_to(exit_cell) que = el mismo
+    pasillo => si la posicion actual esta bloqueada, _jump_to(exit_cell).
+  Smoke-tests:
+    - 3 celdas de staging bloqueadas; pasillo (y=front-1) walkable [OK].
+    - A* rechaza staging; entry_cell=(10,4) correcto; deposito FONDO->FRENTE [OK].
+    - exit_cell == entry_cell => salida limpia al pasillo [OK].
+  Con outbound off: collision_matrix intacta; _outbound_discharge_lanes no se
+  llama nunca => no-op total (baseline byte-identico conservado).
+  COMMIT: (ver abajo).
+
 - [F2.c EVENTOS TRUCK AL VISOR WEB — IMPLEMENTADA Y VALIDADA]
   Los eventos truck_arrived/truck_departed/pallet_shipped ya llegaban al .jsonl
   (via el else generico de registrar_evento). F2.c cierra la cadena hasta el

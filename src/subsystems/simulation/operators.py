@@ -693,6 +693,16 @@ class BaseOperator:
                 if waited > mm['max_slot_wait']:
                     mm['max_slot_wait'] = waited
 
+        # 2) F2.d: con staging bloqueado para A*, navegar primero al PASILLO de
+        # entrada (celda walkable justo delante del carril) via A* normal.
+        # El movimiento intra-carril (slot a slot) usara _jump_to (ver abajo).
+        _front_col = zone.columns.get(lane, [])
+        if _front_col:
+            _fc = _front_col[-1].cell   # celda delantera del carril (y menor)
+            _entry = (_fc[0], _fc[1] - 1)  # pasillo justo delante (caminable)
+            if _entry[1] >= 0:
+                yield from self._outbound_nav_to(_entry)
+
         # 2) Entrar y descargar de ATRAS hacia ADELANTE (un gruero solo en esta columna).
         for wo in staging_wos:
             slot = zone.deepest_empty_cell(lane)
@@ -713,7 +723,10 @@ class BaseOperator:
                         _mm.get('lane_full_wait_events', 0) + 1)
                     _mm['lane_full_wait_time'] = (
                         _mm.get('lane_full_wait_time', 0.0) + _lane_wait)
-            yield from self._outbound_nav_to(slot.cell)
+            # F2.d: staging bloqueado para A* => saltar directamente al slot.
+            # El agente ya esta en el pasillo de entrada (paso anterior).
+            # Distancia intra-carril <= zone_capacity/n_columnas celdas: aceptable.
+            self._jump_to(slot.cell)
             # F1.3: reservar la celda AL LLEGAR (la mantiene ocupada durante la descarga
             # para que nadie enrute a traves del gruero que descarga). place_pallet luego
             # consolida (Pallet + metricas + scaffold); la reserva duplicada del mismo id
