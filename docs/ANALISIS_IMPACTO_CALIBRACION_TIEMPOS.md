@@ -142,7 +142,7 @@ VALIDAR: config viejo => byte-identico al baseline `18502db7` (md5) y
 solapes/fallbacks identicos en el escenario v2. ESTE PASO NO CAMBIA NADA
 OBSERVABLE: solo habilita la calibracion como config puro.
 
-### C2. PERFIL CALIBRADO + revalidacion del nucleo  -> [ ]
+### C2. PERFIL CALIBRADO + revalidacion del nucleo  -> [ARCHIVO CREADO, pendiente validacion numerica]
 Crear el perfil con la tabla de la investigacion (seccion 4): celda 1 m,
 Ground 1.0 s/celda, Forklift 0.5, picking 15 s, horquilla 8 s, descarga 12/15,
 congestion re-escalada (wait_timeout ~5, backoff ~1, watchdog ~50, dt_wait
@@ -185,6 +185,9 @@ Seccion "Tiempos de operacion" con el patron del paso 2.
 
 ## 6. BITACORA DEL WORKSTREAM (lo mas reciente abajo)
 - [ANALISIS REDACTADO] Pendiente OK del Director para arrancar C1.
+- [C1 COMMITEADA] Commit 0422591. Validacion numerica PENDIENTE (Director corre
+  config_stress_tw_v2.json y confirma pallet_reserve_ok=306, fail=0, overlaps~179,
+  fallbacks=0). Los defaults identicos garantizan no-regresion teorica.
 - [C1 IMPLEMENTADA] OK del Director recibido. Config-ificacion neutra completa:
   bloque `tiempos` en config.json + BaseOperator lee el bloque + 5 sitios de
   constantes hardcodeadas reemplazados en operators.py (Time_per_cell x3,
@@ -193,4 +196,18 @@ Seccion "Tiempos de operacion" con el patron del paso 2.
   aplicado (round-trip mv; archivo 1705 lineas completo).
   PENDIENTE: correr config_stress_tw_v2.json y verificar metricas identicas al
   commit e57aa06 (pallet_reserve_ok=306, fail=0, table_overlap ~179, tramos ~480,
-  exec_fallbacks=0). Luego commitear y marcar C1 cerrada.
+  exec_fallbacks=0). Luego marcar C1 cerrada.
+- [C2 PERFIL CREADO] config_calibrado_v1.json creado con escala real:
+  time_per_cell=1.0, speed_factor_forklift=0.5, picking=15 s, horquilla=8 s,
+  discharge_time Ground=12 s / Forklift=15 s. Congestion re-escalado x10:
+  wait_timeout=5.0, backoff=1.0, jitter=1.0, watchdog=50, spawn_offset=3.0,
+  dt_wait=1.0. Outbound: slot_poll_dt=1.0, dwell_scaffold=300, truck_interval=3600,
+  truck_capacity=26, loading_time=90. JSON valido verificado.
+  PENDIENTE VALIDACION: correr config_calibrado_v1.json y verificar criterios C2:
+    (a) termina, determinista (2 corridas identicas).
+    (b) 0 fallbacks, 0 cap_hits (si cap_hits>0 subir max_expansions).
+    (c) 0 reserve_overlaps del planner.
+    (d) makespan en rango de horas (orden de magnitud de turno parcial).
+    (e) TEST DE REALISMO: Tiempo_Viaje / (Tiempo_Viaje + Tiempo_Picking) ~ 50-60%.
+    (f) lineas/hora dentro del rango 60-150.
+  Capturar BASELINE NUEVO (md5 + makespan + KPIs) y registrarlo aqui.

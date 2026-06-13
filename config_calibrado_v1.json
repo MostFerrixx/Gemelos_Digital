@@ -1,0 +1,129 @@
+{
+    "_comentario": "PERFIL CALIBRADO v1 — 1 celda = 1 m, 1 s sim = 1 s real (C2 del workstream de calibracion). Usar junto con WH1 v2.tmx. Para el perfil RAPIDO de demos usar config.json.",
+    "order_generation_mode": "stochastic",
+    "fulfillment_policy": "ship_partial",
+    "order_file_path": "",
+    "total_ordenes": 150,
+    "distribucion_tipos": {
+        "pequeno": {
+            "porcentaje": 60,
+            "volumen": 5
+        },
+        "mediano": {
+            "porcentaje": 30,
+            "volumen": 25
+        },
+        "grande": {
+            "porcentaje": 10,
+            "volumen": 80
+        }
+    },
+    "capacidad_carro": 150,
+    "dispatch_strategy": "Optimizacion Global",
+    "tour_type": "Tour Mixto (Multi-Destino)",
+    "agent_types": [
+        {
+            "type": "GroundOperator",
+            "capacity": 250,
+            "discharge_time": 12,
+            "work_area_priorities": {
+                "Area_Ground": 1
+            }
+        },
+        {
+            "type": "GroundOperator",
+            "capacity": 250,
+            "discharge_time": 12,
+            "work_area_priorities": {
+                "Area_Ground": 1
+            }
+        },
+        {
+            "type": "Forklift",
+            "capacity": 200,
+            "discharge_time": 15,
+            "work_area_priorities": {
+                "Area_High": 1,
+                "Area_Special": 2
+            }
+        },
+        {
+            "type": "Forklift",
+            "capacity": 200,
+            "discharge_time": 15,
+            "work_area_priorities": {
+                "Area_High": 1,
+                "Area_Special": 2
+            }
+        }
+    ],
+    "layout_file": "layouts/WH1 v2.tmx",
+    "sequence_file": "layouts/Warehouse_Logic_v2.xlsx",
+    "map_scale": 1.3,
+    "outbound_staging_distribution": {
+        "1": 100,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0
+    },
+    "num_operarios_terrestres": 2,
+    "num_montacargas": 2,
+    "num_operarios_total": 4,
+    "capacidad_montacargas": 1000,
+    "tiempo_descarga_por_tarea": 12,
+    "assignment_rules": {
+        "GroundOperator": {},
+        "Forklift": {}
+    },
+    "tareas_zona_a": 0,
+    "tareas_zona_b": 0,
+    "num_operarios": 4,
+    "tiempos": {
+        "_comentario": "Escala real: 1 celda = 1 m. Ground 1.0 m/s => 1.0 s/celda. Forklift 2.0 m/s => 0.5 x time. Picking 15 s/linea (benchmark industria). Horquilla 8 s (elevacion real nivel bajo-medio).",
+        "cell_size_m": 1.0,
+        "time_per_cell": 1.0,
+        "speed_factor_ground": 1.0,
+        "speed_factor_forklift": 0.5,
+        "tiempo_picking_por_linea": 15.0,
+        "tiempo_horquilla": 8.0
+    },
+    "congestion": {
+        "_comentario": "Todos los parametros de tiempo re-escalados x10 (time_per_cell 0.1->1.0). dt_wait=1.0 (granularidad = 1 celda de espera, adecuado para escala real).",
+        "enabled": true,
+        "mode": "timewindow",
+        "wait_timeout": 5.0,
+        "wait_hard_cap": 300,
+        "backoff_base": 1.0,
+        "backoff_jitter": 1.0,
+        "max_repath": 3,
+        "repath_cost_factor": 2,
+        "spawn_offset": 3.0,
+        "watchdog_window": 50,
+        "allow_swap": false,
+        "aging_rate": 1,
+        "staggered_start": true,
+        "timewindow": {
+            "shadow": false,
+            "clearance": 0,
+            "dt_wait": 1.0,
+            "max_expansions": 20000,
+            "plan_horizon": 0,
+            "allow_diagonal": false
+        }
+    },
+    "outbound": {
+        "_comentario": "slot_poll_dt re-escalado x10. dwell_scaffold=300 s (5 min proxy del camion; visible en escala real). truck_interval=3600 s (1 camion/hora/puerta). truck_capacity=26 (trailer 53 ft). loading_time=90 s/pallet (Fase 2 lo usara como por-pallet).",
+        "enabled": true,
+        "dispatch_policy": "interval",
+        "truck_interval": 3600,
+        "truck_capacity": 26,
+        "loading_time": 90,
+        "zone_capacity_default": 8,
+        "slot_wait_alert": 600,
+        "slot_poll_dt": 1.0,
+        "dwell_scaffold": 300
+    }
+}

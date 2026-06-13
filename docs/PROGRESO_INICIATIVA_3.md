@@ -457,6 +457,22 @@ reversible (flag off => baseline byte-identico).
   Todos los defaults = valores que estaban hardcodeados => CERO cambio de comportamiento
   con configs existentes. Compilacion: py_compile OK (con protocolo anti-FUSE aplicado:
   round-trip mv + wc -l=1705 completo).
-  VALIDACION PENDIENTE: correr config_stress_tw_v2.json y confirmar:
+  VALIDACION PENDIENTE (C1): correr config_stress_tw_v2.json y confirmar:
     pallet_reserve_ok=306, fail=0, table_overlap_violations ~179,
     tramos ~480, exec_fallbacks=0. (Esos fueron los numeros del commit e57aa06.)
+  C1 COMMITEADA: commit 0422591.
+
+- [C2 PERFIL CALIBRADO — ARCHIVO CREADO, PENDIENTE VALIDACION]
+  Archivo: `config_calibrado_v1.json` en la raiz del proyecto.
+  Cambios vs config.json (perfil demo):
+    tiempos: time_per_cell 0.1->1.0; speed_factor_forklift 0.8->0.5;
+    picking_por_linea null->15.0; tiempo_horquilla 2.0->8.0.
+    discharge_time: Ground 5->12, Forklift 5->15.
+    congestion: wait_timeout 0.5->5.0; backoff_base/jitter 0.1->1.0;
+    watchdog_window 5->50; spawn_offset 0.3->3.0; dt_wait 0.1->1.0.
+    outbound: slot_poll_dt 0.1->1.0; dwell_scaffold 10->300;
+    truck_interval 20->3600; truck_capacity 8->26; loading_time 2->90.
+  C2 NO toca codigo: es 100% cambio de config. El motor lo absorbe gracias a C1.
+  PROXIMOS: el Director corre config_calibrado_v1.json y verifica criterios C2
+  (ver ANALISIS_IMPACTO seccion 6 bitacora). Capturar BASELINE NUEVO si pasa.
+  Luego: C3 (velocidades 30x/60x en el visor) y C4 (actualizar PLAN_FASE2).
