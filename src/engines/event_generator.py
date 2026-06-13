@@ -316,9 +316,9 @@ class EventGenerator:
 
             # Exportar métricas de optimización si se solicitó
             if self.output_metrics_path:
-                print("[EVENT-GENERATOR] Exportando métricas de optimización...")
+                print("[EVENT-GENERATOR] Exportando metricas de optimizacion...")
                 self.export_optimization_metrics(self.output_metrics_path)
-                print(f"[EVENT-GENERATOR] Métricas exportadas: {self.output_metrics_path}")
+                print(f"[EVENT-GENERATOR] Metricas exportadas: {self.output_metrics_path}")
             
             print("="*60)
             print("GENERACION COMPLETADA")

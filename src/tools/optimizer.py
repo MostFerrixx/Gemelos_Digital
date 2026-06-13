@@ -86,7 +86,7 @@ class SimulationOptimizer:
         print(f"  Config base: {base_config_path}")
         print(f"  Jobs paralelos: {n_parallel_jobs}")
         print(f"  Costos: Ground=${self.COST_GROUND_OP}/h, Forklift=${self.COST_FORKLIFT}/h")
-        print(f"  Penalización fallos: ${self.PENALTY_FAILED_WO}/WO")
+        print(f"  Penalizacion fallos: ${self.PENALTY_FAILED_WO}/WO")
     
     def objective(self, trial: optuna.Trial) -> float:
         """

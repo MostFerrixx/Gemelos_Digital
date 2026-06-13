@@ -31,19 +31,41 @@ from src.subsystems.database.importer import ExcelImporter, ImportResult
 
 
 def find_excel_file() -> str:
-    """Find the default Warehouse_Logic.xlsx file."""
-    # Fuente unica de verdad = RAIZ. El arbol data/ fue una migracion abandonada
-    # y su copia divergente esta archivada en _legacy/data/ (ver _legacy/README.md).
+    """Find the default Warehouse_Logic xlsx file.
+
+    Prioridad (Ley 3 - config.json es la unica fuente de verdad):
+    1. sequence_file definido en config.json (igual que usa el motor SimPy)
+    2. layouts/Warehouse_Logic_v2.xlsx  (fallback conocido)
+    3. layouts/Warehouse_Logic.xlsx     (fallback legado)
+    """
+    import json
+
+    # 1. Leer desde config.json, igual que hace event_generator.py
+    config_path = PROJECT_ROOT / "config.json"
+    if config_path.exists():
+        try:
+            with open(config_path, "r", encoding="utf-8") as _f:
+                _cfg = json.load(_f)
+            seq = _cfg.get("sequence_file", "")
+            if seq:
+                candidate = PROJECT_ROOT / seq if not os.path.isabs(seq) else Path(seq)
+                if candidate.exists():
+                    return str(candidate)
+                print(f"[MIGRATION WARN] sequence_file en config.json no existe: {candidate}")
+        except Exception as _e:
+            print(f"[MIGRATION WARN] No se pudo leer config.json: {_e}")
+
+    # 2-3. Fallbacks
     possible_paths = [
+        PROJECT_ROOT / "layouts" / "Warehouse_Logic_v2.xlsx",
         PROJECT_ROOT / "layouts" / "Warehouse_Logic.xlsx",
         PROJECT_ROOT / "Warehouse_Logic.xlsx",
     ]
-    
     for path in possible_paths:
         if path.exists():
             return str(path)
-    
-    return str(possible_paths[0])  # Return first as default
+
+    return str(possible_paths[0])  # Devolver _v2 como default aunque no exista
 
 
 def run_migration(excel_path: str, db_path: str, 

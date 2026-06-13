@@ -74,7 +74,7 @@ class DispatcherV11:
         self.operadores_activos: Dict[str, Any] = {}             # {operator_id: assigned_tour}
 
         # Dispatch Strategy (from config.json)
-        print(f"[DISPATCHER DEBUG] Configuración recibida: {configuracion}")
+        print(f"[DISPATCHER DEBUG] Configuracion recibida: {configuracion}")
         # print(f"[DISPATCHER DEBUG] dispatch_strategy en config: '{configuracion.get('dispatch_strategy', 'NO ENCONTRADO')}'")
         self.estrategia = configuracion.get('dispatch_strategy', 'Optimizacion Global')
         # print(f"[DISPATCHER DEBUG] Estrategia asignada: '{self.estrategia}'")
@@ -325,13 +325,13 @@ class DispatcherV11:
             return []
 
         # Paso 3: Usar AssignmentCostCalculator para encontrar la MEJOR primera WO dentro del área prioritaria
-        # print(f"[DISPATCHER DEBUG] [Optimización Global] Evaluando mejor primera WO (area prioritaria) entre {len(candidatos_area_prioridad)} candidatos")
+        # print(f"[DISPATCHER DEBUG] [Optimizacion Global] Evaluando mejor primera WO (area prioritaria) entre {len(candidatos_area_prioridad)} candidatos")
         best_first_wo = self._encontrar_mejor_primera_wo(operator, candidatos_area_prioridad)
         if not best_first_wo:
-            print(f"[DISPATCHER DEBUG] No se encontró mejor primera WO")
+            print(f"[DISPATCHER DEBUG] No se encontro mejor primera WO")
             return []
         
-        print(f"[DISPATCHER] [Optimización Global] Primera WO por costo: {best_first_wo.id} (seq={best_first_wo.pick_sequence}, area={best_first_wo.work_area})")
+        print(f"[DISPATCHER] [Optimizacion Global] Primera WO por costo: {best_first_wo.id} (seq={best_first_wo.pick_sequence}, area={best_first_wo.work_area})")
         
         # Paso 4: Construir tour siguiendo pick_sequence desde la primera WO
         # Preferir misma área, pero permitir cambio de área si se agota la secuencia
@@ -410,7 +410,7 @@ class DispatcherV11:
         best_area_wos = [wo for wo in candidatos 
                         if area_priorities[wo.work_area] == best_priority]
         
-        print(f"[DISPATCHER] Área con mejor prioridad: {best_priority}, "
+        print(f"[DISPATCHER] Area con mejor prioridad: {best_priority}, "
               f"WOs encontradas: {len(best_area_wos)}")
         
         return best_area_wos
@@ -481,7 +481,7 @@ class DispatcherV11:
             staging_locs = self.data_manager.get_outbound_staging_locations()
             current_pos = staging_locs.get(1, (3, 29))  # Staging 1 como depot default
         
-        # print(f"[DISPATCHER DEBUG] Calculando costos desde posición: {current_pos}")
+        # print(f"[DISPATCHER DEBUG] Calculando costos desde posicion: {current_pos}")
         for wo in candidatos:
             cost_result = self.assignment_calculator.calculate_cost(operator, wo, current_pos)
             costos.append((wo, cost_result))
@@ -578,14 +578,14 @@ class DispatcherV11:
         print(f"[DISPATCHER] ===== INICIO CONSTRUCCION TOUR =====")
         print(f"[DISPATCHER] Primera WO: {primera_wo.id} (seq={primera_wo.pick_sequence}, area={primera_wo.work_area})")
         print(f"[DISPATCHER] Capacidad disponible: {operator.capacity}L")
-        print(f"[DISPATCHER] Áreas a procesar: {ordered_areas}")
+        print(f"[DISPATCHER] Areas a procesar: {ordered_areas}")
         print(f"[DISPATCHER] Tour type: {self.tour_type}")
         
         # ==================== PROCESAR CADA ÁREA ====================
         for area in ordered_areas:
             # Verificar límites globales
             if len(tour_wos) >= self.max_wos_por_tour:
-                print(f"[DISPATCHER] Límite max_wos_por_tour alcanzado: {self.max_wos_por_tour}")
+                print(f"[DISPATCHER] Limite max_wos_por_tour alcanzado: {self.max_wos_por_tour}")
                 break
             
             if volume_acumulado >= operator.capacity:
@@ -614,7 +614,7 @@ class DispatcherV11:
             # seleccionada (ya sea por costo en Optimización Global o por seq en Ejecución de Plan)
             min_seq = ultimo_seq_agregado
             
-            print(f"\n[DISPATCHER] ===== PROCESANDO ÁREA: {area} =====")
+            print(f"\n[DISPATCHER] ===== PROCESANDO AREA: {area} =====")
             print(f"[DISPATCHER] [{area}] WOs disponibles: {len(area_wos_sorted)}")
             print(f"[DISPATCHER] [{area}] Capacidad restante: {operator.capacity - volume_acumulado}L")
             print(f"[DISPATCHER] [{area}] Min sequence: {min_seq}")
@@ -714,7 +714,7 @@ class DispatcherV11:
             # Resumen del área
             total_wos_area = wos_agregadas_barrido1 + (wos_agregadas_barrido2 if capacidad_restante > 0 else 0)
             total_vol_area = volumen_barrido1 + (volumen_barrido2 if capacidad_restante > 0 else 0)
-            print(f"[DISPATCHER] [{area}] ÁREA COMPLETADA: "
+            print(f"[DISPATCHER] [{area}] AREA COMPLETADA: "
                   f"{total_wos_area} WOs totales, {total_vol_area}L totales")
         
         # ==================== RESUMEN FINAL ====================
@@ -725,8 +725,8 @@ class DispatcherV11:
         print(f"\n[DISPATCHER] ===== TOUR FINAL =====")
         print(f"[DISPATCHER] Total WOs: {len(tour_wos)}")
         print(f"[DISPATCHER] Volumen: {volume_acumulado}/{operator.capacity}L")
-        print(f"[DISPATCHER] Utilización: {utilizacion:.1f}%")
-        print(f"[DISPATCHER] Áreas: {areas_usadas}")
+        print(f"[DISPATCHER] Utilizacion: {utilizacion:.1f}%")
+        print(f"[DISPATCHER] Areas: {areas_usadas}")
         print(f"[DISPATCHER] Stagings: {stagings_usados}")
         print(f"[DISPATCHER] Secuencias: [{', '.join(str(wo.pick_sequence) for wo in tour_wos)}]")
         
@@ -895,7 +895,7 @@ class DispatcherV11:
         staging_ids = set(wo.staging_id for wo in work_orders)
         
         if len(staging_ids) > 1:
-            print(f"[DISPATCHER ERROR] Tour Simple requiere WOs de una sola ubicación de staging")
+            print(f"[DISPATCHER ERROR] Tour Simple requiere WOs de una sola ubicacion de staging")
             print(f"[DISPATCHER ERROR] Encontradas ubicaciones: {staging_ids}")
             print(f"[DISPATCHER ERROR] WOs: {[wo.id for wo in work_orders]}")
             return []

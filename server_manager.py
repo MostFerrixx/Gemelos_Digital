@@ -83,7 +83,7 @@ class ServerManager:
         # Check if port is available
         if not self.is_port_available(SERVER_PORT):
             print(f"[ERROR] El puerto {SERVER_PORT} ya esta en uso")
-            print("Detén el proceso que esta usando el puerto o cambia el puerto del servidor")
+            print("Deten el proceso que esta usando el puerto o cambia el puerto del servidor")
             return False
         
         # Create log directory

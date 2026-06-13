@@ -91,10 +91,28 @@ class WebConfigurationManager:
                 print(f"[CONFIG_MANAGER] Created backup: {backup_path}")
 
             # ATOMIC write: dump to temp file, then os.replace (rename).
-            # Avoids half-written/corrupt config.json on crash or FUSE issues.
+            # Nota: json.dump en modo texto puede dejar bytes nulos residuales
+            # en FUSE/NTFS (el cluster pre-asignado no se trunca correctamente).
+            # Solucion: producir el string con json.dumps, codificar a bytes
+            # explicitamente, y escribir en modo binario para garantizar
+            # truncado exacto al tamano del contenido.
+            json_str = json.dumps(merged, indent=4, ensure_ascii=False)
+            json_bytes = json_str.encode('utf-8')
             tmp_path = f"{self.config_path}.tmp"
-            with open(tmp_path, 'w', encoding='utf-8') as f:
-                json.dump(merged, f, indent=4, ensure_ascii=False)
+            with open(tmp_path, 'wb') as f:
+                f.write(json_bytes)
+                f.flush()
+                os.fsync(f.fileno())
+
+            # Verificar que el tmp no tenga bytes nulos (defensa adicional)
+            with open(tmp_path, 'rb') as f:
+                raw = f.read()
+            if b'\x00' in raw:
+                print("[CONFIG_MANAGER WARN] Null bytes detected in tmp; stripping (FUSE artifact)")
+                raw = raw.replace(b'\x00', b'')
+                with open(tmp_path, 'wb') as f:
+                    f.write(raw)
+
             os.replace(tmp_path, self.config_path)
 
             print(f"[CONFIG_MANAGER] Saved config to {self.config_path}")

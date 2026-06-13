@@ -113,7 +113,7 @@ class AnalyticsEngine:
         tiempo_fin = self.events_df['timestamp'].max()
         tiempo_total_sim_segundos = tiempo_fin - tiempo_inicio
         
-        print(f"[ANALYTICS-ENGINE] DEBUG: Tiempo simulación - Inicio: {tiempo_inicio}s, Fin: {tiempo_fin}s, Total: {tiempo_total_sim_segundos}s")
+        print(f"[ANALYTICS-ENGINE] DEBUG: Tiempo simulacion - Inicio: {tiempo_inicio}s, Fin: {tiempo_fin}s, Total: {tiempo_total_sim_segundos}s")
         
         # Total de tareas completadas
         work_order_completed_events = self.events_df[self.events_df['tipo'] == 'work_order_completed']

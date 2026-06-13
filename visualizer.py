@@ -76,7 +76,7 @@ def load_tmx_geometry(tmx_path: str, layer_name: str = "walls") -> Tuple[pytmx.T
         FileNotFoundError: Si el archivo TMX no existe
         ValueError: Si el archivo TMX no puede ser parseado
     """
-    print(f"[VISUALIZER] Cargando geometría TMX desde: {tmx_path}")
+    print(f"[VISUALIZER] Cargando geometria TMX desde: {tmx_path}")
     
     if not os.path.exists(tmx_path):
         raise FileNotFoundError(f"Archivo TMX no encontrado: {tmx_path}")
@@ -100,13 +100,13 @@ def load_tmx_geometry(tmx_path: str, layer_name: str = "walls") -> Tuple[pytmx.T
                  'wall' in layer_name_attr.lower() or
                  'patron' in layer_name_attr.lower())):
                 geometry_layer = layer
-                print(f"[VISUALIZER] Capa de geometría encontrada: {layer_name_attr}")
+                print(f"[VISUALIZER] Capa de geometria encontrada: {layer_name_attr}")
                 break
         
         if not geometry_layer:
             print(f"[VISUALIZER] ADVERTENCIA: Capa '{layer_name}' no encontrada")
             print(f"[VISUALIZER] Capas disponibles: {available_layers}")
-            print(f"[VISUALIZER] Continuando sin geometría de muros")
+            print(f"[VISUALIZER] Continuando sin geometria de muros")
         
         return tm, geometry_layer
         
@@ -182,7 +182,7 @@ def generate_heatmap_image(tm: pytmx.TiledMap,
     
     # Calcular intensidad máxima para normalización
     max_intensity = max(heatmap_data.values()) if heatmap_data else 1.0
-    print(f"[VISUALIZER] Intensidad máxima detectada: {max_intensity}")
+    print(f"[VISUALIZER] Intensidad maxima detectada: {max_intensity}")
     
     # Contadores para estadísticas
     wall_count = 0
@@ -192,7 +192,7 @@ def generate_heatmap_image(tm: pytmx.TiledMap,
     # Iterar sobre cada celda del almacén
     for x in range(tm.width):
         for y in range(tm.height):
-            # Calcular coordenadas de píxeles en la imagen
+            # Calcular coordenadas de pixeles en la imagen
             pixel_x = x * pixel_scale
             pixel_y = y * pixel_scale
             pixel_rect = [pixel_x, pixel_y, pixel_x + pixel_scale, pixel_y + pixel_scale]
@@ -253,11 +253,11 @@ def generate_heatmap_image(tm: pytmx.TiledMap,
     # Estadísticas
     total_tiles = tm.width * tm.height
     print(f"[VISUALIZER] Imagen generada: {output_path}")
-    print(f"[VISUALIZER] Dimensiones: {img_width}x{img_height} píxeles ({tm.width}x{tm.height} tiles)")
-    print(f"[VISUALIZER] Estadísticas:")
-    print(f"  • Muros: {wall_count}/{total_tiles} ({wall_count/total_tiles*100:.1f}%)")
-    print(f"  • Con actividad: {activity_count}/{total_tiles} ({activity_count/total_tiles*100:.1f}%)")
-    print(f"  • Espacios vacíos: {empty_count}/{total_tiles} ({empty_count/total_tiles*100:.1f}%)")
+    print(f"[VISUALIZER] Dimensiones: {img_width}x{img_height} pixeles ({tm.width}x{tm.height} tiles)")
+    print(f"[VISUALIZER] Estadisticas:")
+    print(f"  - Muros: {wall_count}/{total_tiles} ({wall_count/total_tiles*100:.1f}%)")
+    print(f"  - Con actividad: {activity_count}/{total_tiles} ({activity_count/total_tiles*100:.1f}%)")
+    print(f"  - Espacios vacios: {empty_count}/{total_tiles} ({empty_count/total_tiles*100:.1f}%)")
     
     return output_path
 
@@ -340,7 +340,7 @@ Ejemplos de uso:
         print(f"ERROR: Archivo no encontrado - {e}")
         return 1
     except ValueError as e:
-        print(f"ERROR: Datos inválidos - {e}")
+        print(f"ERROR: Datos invalidos - {e}")
         return 1
     except Exception as e:
         print(f"ERROR INESPERADO: {e}")
@@ -354,4 +354,4 @@ if __name__ == "__main__":
     sys.exit(main())
 
 
-print("[OK] Módulo 'visualizer' cargado - Generador de heatmap geométrico en imagen PNG.")
+print("[OK] Modulo 'visualizer' cargado - Generador de heatmap geometrico en imagen PNG.")

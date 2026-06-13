@@ -1086,9 +1086,21 @@ class GroundOperator(BaseOperator):
                             self.total_distance_traveled += len(return_path) - 1
                         else:
                             self._jump_to(staging_location)
+                            # F2.d fix: staging no-walkable para A*; regresar al
+                            # pasillo (y-1) antes de quedar idle para que el
+                            # dispatcher pueda rutar desde una celda transitable.
+                            _exit_cell = (staging_location[0], staging_location[1] - 1)
+                            if _exit_cell[1] >= 0:
+                                self._jump_to(_exit_cell)
                     except Exception as e:
                         print(f"[{self.id}] ERROR en pathfinding a staging {staging_id}: {e}")
                         self._jump_to(staging_location)
+                        # F2.d fix: staging no-walkable para A*; regresar al
+                        # pasillo (y-1) antes de quedar idle para que el
+                        # dispatcher pueda rutar desde una celda transitable.
+                        _exit_cell = (staging_location[0], staging_location[1] - 1)
+                        if _exit_cell[1] >= 0:
+                            self._jump_to(_exit_cell)
 
                 # DESCARGAR GRANULAR en este staging (V12: Progreso visible por WO)
                 self.status = "unloading"
@@ -1517,9 +1529,21 @@ class Forklift(BaseOperator):
                             self.total_distance_traveled += len(return_path) - 1
                         else:
                             self._jump_to(staging_location)
+                            # F2.d fix: staging no-walkable para A*; regresar al
+                            # pasillo (y-1) antes de quedar idle para que el
+                            # dispatcher pueda rutar desde una celda transitable.
+                            _exit_cell = (staging_location[0], staging_location[1] - 1)
+                            if _exit_cell[1] >= 0:
+                                self._jump_to(_exit_cell)
                     except Exception as e:
                         print(f"[{self.id}] ERROR en pathfinding a staging {staging_id}: {e}")
                         self._jump_to(staging_location)
+                        # F2.d fix: staging no-walkable para A*; regresar al
+                        # pasillo (y-1) antes de quedar idle para que el
+                        # dispatcher pueda rutar desde una celda transitable.
+                        _exit_cell = (staging_location[0], staging_location[1] - 1)
+                        if _exit_cell[1] >= 0:
+                            self._jump_to(_exit_cell)
 
                 # DESCARGAR GRANULAR en este staging (V12: Progreso visible por WO)
                 self.status = "unloading"

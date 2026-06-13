@@ -78,17 +78,26 @@ class RouteCalculator:
 
         # Validate start position
         if not self.pathfinder.is_walkable(start_position[0], start_position[1]):
-            errors.append(f"Start position {start_position} is not walkable")
-            return {
-                'success': False,
-                'total_distance': 0.0,
-                'num_stops': 0,
-                'visit_sequence': [],
-                'full_path': [],
-                'segment_paths': [],
-                'segment_distances': [],
-                'errors': errors
-            }
+            # F2.d fix: staging cells son no-caminables para A*. Cuando un
+            # agente esta en una de ellas (depot en staging zone, o stuck tras
+            # teleport), buscar la celda transitable mas cercana y rutear desde
+            # ahi. Evita DISPATCHER ERROR en lugar de retornar failure.
+            _snap = self._nearest_walkable(start_position)
+            if _snap is None:
+                errors.append(f"Start position {start_position} is not walkable")
+                return {
+                    'success': False,
+                    'total_distance': 0.0,
+                    'num_stops': 0,
+                    'visit_sequence': [],
+                    'full_path': [],
+                    'segment_paths': [],
+                    'segment_distances': [],
+                    'errors': errors
+                }
+            print(f"[ROUTE-CALC] Start {start_position} no-caminable; "
+                  f"snap a {_snap} (F2.d staging fix)")
+            start_position = _snap
 
         # Validate work order positions
         if not self.validate_work_order_positions(work_orders):
@@ -178,6 +187,26 @@ class RouteCalculator:
               f"distancia total: {total_distance:.2f}")
 
         return result
+
+    def _nearest_walkable(self, pos, max_radius=8):
+        """BFS minimo: celda transitable mas cercana a pos.
+        F2.d fix: permite rutear cuando el agente arranca en staging.
+        """
+        from collections import deque
+        visited = {tuple(pos)}
+        queue = deque([tuple(pos)])
+        while queue:
+            x, y = queue.popleft()
+            for dx, dy in [(0,-1),(0,1),(-1,0),(1,0),(1,-1),(-1,-1),(1,1),(-1,1)]:
+                nx, ny = x+dx, y+dy
+                cell = (nx, ny)
+                if cell not in visited:
+                    visited.add(cell)
+                    if self.pathfinder.is_walkable(nx, ny):
+                        return cell
+                    if abs(nx - pos[0]) + abs(ny - pos[1]) < max_radius:
+                        queue.append(cell)
+        return None
 
     def order_work_orders_by_sequence(self, work_orders: List[Any], preserve_first: bool = False) -> List[Any]:
         """

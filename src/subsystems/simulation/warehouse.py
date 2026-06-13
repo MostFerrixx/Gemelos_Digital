@@ -344,7 +344,7 @@ class AlmacenMejorado:
         # BUGFIX JSONL: Crear dispatcher DESPUÉS de completar inicialización
         # para evitar problemas de referencia con replay_buffer
         from .dispatcher import DispatcherV11
-        print(f"[WAREHOUSE DEBUG] Configuración pasada al DispatcherV11: {configuracion}")
+        print(f"[WAREHOUSE DEBUG] Configuracion pasada al DispatcherV11: {configuracion}")
         print(f"[WAREHOUSE DEBUG] dispatch_strategy en config: '{configuracion.get('dispatch_strategy', 'NO ENCONTRADO')}'")
         self.dispatcher = DispatcherV11(
             env=env,
@@ -544,7 +544,7 @@ class AlmacenMejorado:
                 return punto.get('pick_sequence', 999)
         
         # Si no se encuentra, usar fallback
-        print(f"[WAREHOUSE WARN] No se encontró pick_sequence para {ubicacion} en {work_area}")
+        print(f"[WAREHOUSE WARN] No se encontro pick_sequence para {ubicacion} en {work_area}")
         return 999
 
     def _seleccionar_staging_id(self) -> int:
