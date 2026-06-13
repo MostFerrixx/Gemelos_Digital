@@ -156,7 +156,7 @@ NUEVO (md5 + KPIs) y registrarlo.
 Velocidades 30x/60x en el visor web (y revisar Pygame); verificar formato de
 horas del dashboard; preset "demo" vs "real" disponibles en configuraciones.
 
-### C4. Actualizar PLAN_FASE2 con defaults reales  -> [ ]
+### C4. Actualizar PLAN_FASE2 con defaults reales  -> [HECHA]
 truck_capacity 26, loading_time por-pallet ~90 s, interval ~3600 s, dwell del
 test de saturacion, y recien entonces arrancar F2.a sobre la escala real.
 
@@ -211,6 +211,12 @@ Seccion "Tiempos de operacion" con el patron del paso 2.
     (e) TEST DE REALISMO: Tiempo_Viaje / (Tiempo_Viaje + Tiempo_Picking) ~ 50-60%.
     (f) lineas/hora dentro del rango 60-150.
   Capturar BASELINE NUEVO (md5 + makespan + KPIs) y registrarlo aqui.
+- [C4 HECHA] PLAN_FASE2_CAMION_REAL.md actualizado con defaults calibrados:
+  truck_capacity 8->26, truck_interval 20->3600, loading_time 2 total->90 s/pallet
+  (decision: POR PALLET desde F2.a), dwell_scaffold 10->300. Seccion 3.5a
+  formaliza la decision de loading_time por-pallet. Seccion 3.5b: analisis de
+  estabilidad a escala real (tasa deposito ~0.003-0.010 pallets/s con 4 agentes;
+  tasa despacho ~0.0044 pallets/s ciclo lleno => ESTABLE). Plan listo para F2.a.
 - [C3 HECHA] web_prototype/static/index.html: opciones 30x y 60x agregadas al
   select #speed-select (parseFloat del valor => sin cambio en app.js de logica).
   web_prototype/static/app.js: formatTime actualizado a HH:MM:SS cuando >= 1 h

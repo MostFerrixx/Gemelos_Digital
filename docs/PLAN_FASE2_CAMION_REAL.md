@@ -27,8 +27,12 @@ el corazon del producto de la Iniciativa #3.
 - Carriles F1.3: si la columna se llena, el gruero hace `break` y deja WOs sin
   depositar (hoy casi no pasa porque el scaffold recicla rapido). Con camion
   real la saturacion SI ocurrira -> hay que definir la espera.
-- Config `outbound`: `dispatch_policy` ("interval" hoy), `truck_interval` 20.0,
-  `truck_capacity` 8, `loading_time` 2.0, `dwell_scaffold` 10.0.
+- Config `outbound` (perfil DEMO config.json): `dispatch_policy` "interval",
+  `truck_interval` 20.0, `truck_capacity` 8, `loading_time` 2.0, `dwell_scaffold` 10.0.
+  Config `outbound` (perfil REAL config_calibrado_v1.json — C4 ACTUALIZADO):
+  `truck_interval` 3600 s (1 camion/hora/puerta), `truck_capacity` 26 (trailer 53 ft),
+  `loading_time` 90 s/pallet (por pallet; ver decision 3.5a), `dwell_scaffold` 300 s,
+  `slot_poll_dt` 1.0 s.
 - Telemetria persistida en el timewindow report JSON (outbound_metrics).
 
 ## 3. DECISIONES DE DISENO (a aprobar)
@@ -65,15 +69,38 @@ cada truck_interval seg:
   truck_arrived (evento)
   tomar hasta C pallets FIFO de staged_pallets
     (si 0 pallets: truck_departed inmediato, contar truck_idle_arrivals)
-  yield timeout(loading_time)            # carga total, no por pallet (MVP)
+  yield timeout(loading_time * n_pallets)   # POR PALLET (ver 3.5a)
   por cada pallet: status=shipped, slot.release(),
     rt.release_agent("PALLET:<id>"), evento pallet_shipped
   truck_departed (evento) + metricas (trucks_dispatched, backlog restante)
 ```
-Estabilidad: tasa de despacho C/T debe ser >= tasa de deposito sostenida; con
-defaults C=8/T=20 = 0.4 pallets/s (el escenario web de 4 agentes deposita
-~0.2/s => estable; el stress de 20 agentes deposita ~0.47/s => saturara y
-activara backpressure: ESPERADO y medible, no bug). `slot_wait_alert` avisa.
+
+#### 3.5a Decision: loading_time POR PALLET (no total) — C4
+La hoja de investigacion (INVESTIGACION_TIEMPOS_REALES_OPERACION.md sec 3.5)
+establece 60-120 s POR PALLET en un montacargas dock-trailer. El plan original
+usaba loading_time como TOTAL (2 s para 8 pallets = irreal). Decision:
+implementar POR PALLET desde F2.a. En el codigo: `yield timeout(loading_time *
+n_pallets_tomados)`. El config ya tiene loading_time=90 en el perfil calibrado.
+
+#### 3.5b Analisis de estabilidad a escala REAL (C4)
+Con perfil calibrado (config_calibrado_v1.json):
+- Tasa de DESPACHO: C=26 pallets / T=3600 s = 0.0072 pallets/s neto.
+  Ciclo real del camion: 3600 s espera + 90*n_tomados carga. Con n=26
+  (trailer lleno): ciclo = 3600 + 2340 = 5940 s, tasa = 0.0044 pallets/s.
+- Tasa de DEPOSITO con 4 agentes (escenario v2, 150 ordenes, escala real):
+  el escenario completo dura un turno parcial (~2-4 h sim). A ~90 lineas/h por
+  agente y con la proporcion de ordenes por tipo, la tasa de pallets depositados
+  es del orden de 0.003-0.010 pallets/s pico. ESTABLE a escala real.
+- El escenario de SATURACION (stress) ahora es T pequeno (ej. T=120 s) o muchos
+  agentes (20), no el default. El slot_wait_alert=600 s avisa cuando un gruero
+  lleva 10 min esperando slot.
+- El VALOR del simulador con escala real: con 4 agentes y 150 ordenes, los pallets
+  se acumulan durante ~2 h y el camion llega cada hora con capacidad de vaciar el
+  muelle de una vez. Se ve la DINAMICA REAL: pico de ocupacion antes del camion,
+  valle despues. Eso es exactamente el fenomeno que el Director quiere mostrar.
+
+Nota: con perfil DEMO (config.json) la dinamica no es comparable (T=20 s, C=8,
+loading_time=2 s total), pero sirve para demos rapidas donde la escala no importa.
 
 ### 3.6 Columna llena: el gruero ESPERA EN EL CARRIL (no break)
 Sustituir el `break` por espera con poll (`slot_poll_dt`) hasta que el camion
@@ -148,3 +175,10 @@ vuelva el sandbox (o el Director corre el snippet de hash que le pase).
 
 ## 7. BITACORA DE EJECUCION (lo mas reciente abajo)
 - [PLAN REDACTADO] Pendiente OK del Director para F2.a.
+- [C4 ACTUALIZADO] Defaults de escala real incorporados al plan (seccion 2 y 3.5):
+  truck_capacity 8->26, truck_interval 20->3600, loading_time 2 total->90 s/pallet,
+  dwell_scaffold 10->300, slot_poll_dt 0.1->1.0. Decision de diseno formalizada:
+  loading_time es POR PALLET desde F2.a (sec 3.5a). Analisis de estabilidad a
+  escala real agregado (sec 3.5b): tasa deposito ~0.003-0.010 pallets/s con 4
+  agentes, tasa despacho ~0.0044/s ciclo lleno => ESTABLE con perfil calibrado.
+  Este plan ya esta listo para implementar F2.a sobre la escala real.
