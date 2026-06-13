@@ -160,7 +160,7 @@ horas del dashboard; preset "demo" vs "real" disponibles en configuraciones.
 truck_capacity 26, loading_time por-pallet ~90 s, interval ~3600 s, dwell del
 test de saturacion, y recien entonces arrancar F2.a sobre la escala real.
 
-### C5. (Posterior) UI de tiempos en el configurador  -> [ ]
+### C5. (Posterior) UI de tiempos en el configurador  -> [HECHA]
 Seccion "Tiempos de operacion" con el patron del paso 2.
 
 ## 4. RIESGOS PRINCIPALES (resumen)
@@ -211,6 +211,13 @@ Seccion "Tiempos de operacion" con el patron del paso 2.
     (e) TEST DE REALISMO: Tiempo_Viaje / (Tiempo_Viaje + Tiempo_Picking) ~ 50-60%.
     (f) lineas/hora dentro del rango 60-150.
   Capturar BASELINE NUEVO (md5 + makespan + KPIs) y registrarlo aqui.
+- [C5 HECHA] Card "Tiempos de Operacion" en la pestana Estrategias del configurador
+  web. Campos: time_per_cell, speed_factor_forklift, picking_por_linea (opcional),
+  tiempo_horquilla. Selector de preset Demo/Real/Personalizado con auto-deteccion
+  al cargar y relleno automatico al cambiar. Serializacion: bloque completo (patron
+  Motor Avanzado). Validacion: config_manager.py valida tipos y rangos. Cell_size_m
+  y speed_factor_ground se preservan desde el bloque en memoria (la UI no los expone
+  para no complicar al Director, pero no se pierden al guardar).
 - [C4 HECHA] PLAN_FASE2_CAMION_REAL.md actualizado con defaults calibrados:
   truck_capacity 8->26, truck_interval 20->3600, loading_time 2 total->90 s/pallet
   (decision: POR PALLET desde F2.a), dwell_scaffold 10->300. Seccion 3.5a

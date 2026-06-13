@@ -207,6 +207,29 @@ class WebConfigurationManager:
                 elif not isinstance(ob.get('enabled', False), bool):
                     errors.append("outbound.enabled must be boolean")
 
+            # C5: validacion del bloque tiempos (si la UI lo envia)
+            if 'tiempos' in config:
+                t = config['tiempos']
+                if not isinstance(t, dict):
+                    errors.append("tiempos must be an object")
+                else:
+                    for key in ('time_per_cell', 'speed_factor_ground', 'speed_factor_forklift',
+                                'tiempo_horquilla', 'cell_size_m'):
+                        val = t.get(key)
+                        if val is not None:
+                            try:
+                                if float(val) <= 0:
+                                    errors.append(f"tiempos.{key} must be > 0")
+                            except (TypeError, ValueError):
+                                errors.append(f"tiempos.{key} must be a positive number")
+                    pick = t.get('tiempo_picking_por_linea')
+                    if pick is not None:
+                        try:
+                            if float(pick) < 0:
+                                errors.append("tiempos.tiempo_picking_por_linea must be >= 0")
+                        except (TypeError, ValueError):
+                            errors.append("tiempos.tiempo_picking_por_linea must be a number or null")
+
             is_valid = len(errors) == 0
 
             if is_valid:

@@ -67,6 +67,43 @@ class WebConfigurator {
         document.getElementById('btn-generate-template').addEventListener('click', () => this.generateTemplate());
         document.getElementById('btn-populate-skus').addEventListener('click', () => this.populateSKUs());
         document.getElementById('btn-load-work-areas').addEventListener('click', () => this.loadWorkAreas());
+
+        // C5: Tiempos preset selector
+        const tiemposPreset = document.getElementById('tiempos-preset');
+        if (tiemposPreset) {
+            tiemposPreset.addEventListener('change', (e) => {
+                if (e.target.value === 'demo') {
+                    document.getElementById('tiempos-time-per-cell').value = 0.1;
+                    document.getElementById('tiempos-speed-forklift').value = 0.8;
+                    document.getElementById('tiempos-picking').value = '';
+                    document.getElementById('tiempos-lift').value = 2.0;
+                } else if (e.target.value === 'real') {
+                    document.getElementById('tiempos-time-per-cell').value = 1.0;
+                    document.getElementById('tiempos-speed-forklift').value = 0.5;
+                    document.getElementById('tiempos-picking').value = 15;
+                    document.getElementById('tiempos-lift').value = 8.0;
+                }
+                // 'custom': el usuario edita manualmente, no se sobreescriben los campos
+            });
+            // Cambio manual de cualquier campo -> muestra "Personalizado"
+            ['tiempos-time-per-cell', 'tiempos-speed-forklift',
+             'tiempos-picking', 'tiempos-lift'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('input', () => { tiemposPreset.value = 'custom'; });
+            });
+        }
+    }
+
+    // C5: determina si los valores actuales coinciden con un preset conocido.
+    _updateTiemposPreset(tpc, sfk, pick, lift) {
+        const sel = document.getElementById('tiempos-preset');
+        if (!sel) return;
+        const isDemo = Math.abs(tpc - 0.1) < 0.001 && Math.abs(sfk - 0.8) < 0.001
+                       && pick == null && Math.abs(lift - 2.0) < 0.001;
+        const isReal = Math.abs(tpc - 1.0) < 0.001 && Math.abs(sfk - 0.5) < 0.001
+                       && pick != null && Math.abs(pick - 15.0) < 0.001
+                       && Math.abs(lift - 8.0) < 0.001;
+        sel.value = isDemo ? 'demo' : (isReal ? 'real' : 'custom');
     }
 
     async handleFileImport(event) {
@@ -490,6 +527,23 @@ class WebConfigurator {
         if (twToggle) twToggle.checked = twChecked;
         if (obToggle) obToggle.checked = obChecked;
 
+        // C5: Tiempos de Operacion — cargar bloque tiempos desde config.
+        // Ausencia del bloque = usar defaults demo (comportamiento actual).
+        const t = config.tiempos || {};
+        const tpc  = (t.time_per_cell != null)          ? t.time_per_cell          : 0.1;
+        const sfk  = (t.speed_factor_forklift != null)  ? t.speed_factor_forklift  : 0.8;
+        const pick = (t.tiempo_picking_por_linea != null) ? t.tiempo_picking_por_linea : null;
+        const lift = (t.tiempo_horquilla != null)        ? t.tiempo_horquilla       : 2.0;
+        const tpcEl  = document.getElementById('tiempos-time-per-cell');
+        const sfkEl  = document.getElementById('tiempos-speed-forklift');
+        const pickEl = document.getElementById('tiempos-picking');
+        const liftEl = document.getElementById('tiempos-lift');
+        if (tpcEl)  tpcEl.value  = tpc;
+        if (sfkEl)  sfkEl.value  = sfk;
+        if (pickEl) pickEl.value = (pick != null) ? pick : '';
+        if (liftEl) liftEl.value = lift;
+        this._updateTiemposPreset(tpc, sfk, pick, lift);
+
         // Trigger validations
         this.validatePercentages();
         this.validateStagingDistribution();
@@ -514,6 +568,15 @@ class WebConfigurator {
                 enabled: true, dispatch_policy: 'interval', truck_interval: 20.0,
                 truck_capacity: 8, loading_time: 2.0, zone_capacity_default: 8,
                 slot_wait_alert: 60.0, slot_poll_dt: 0.1, dwell_scaffold: 10.0
+            },
+            // C5: defaults del bloque tiempos (perfil DEMO = valores actuales del motor)
+            tiempos: {
+                cell_size_m: 1.0,
+                time_per_cell: 0.1,
+                speed_factor_ground: 1.0,
+                speed_factor_forklift: 0.8,
+                tiempo_picking_por_linea: null,
+                tiempo_horquilla: 2.0
             }
         };
     }
@@ -623,6 +686,24 @@ class WebConfigurator {
 
         config.congestion = baseCong;
         config.outbound = baseOb;
+
+        // C5: bloque tiempos completo. Mismo patron que congestion/outbound:
+        // base = bloque en memoria (para preservar cell_size_m y speed_factor_ground
+        // que la UI no expone); la UI sobreescribe solo las claves que conoce.
+        const defaultsTiempos = this.getDefaultAdvancedBlocks().tiempos;
+        const baseTiempos = JSON.parse(JSON.stringify(
+            (this.currentConfig && this.currentConfig.tiempos) || defaultsTiempos));
+        const tpcVal  = parseFloat(document.getElementById('tiempos-time-per-cell')?.value);
+        const sfkVal  = parseFloat(document.getElementById('tiempos-speed-forklift')?.value);
+        const pickRaw = document.getElementById('tiempos-picking')?.value;
+        const liftVal = parseFloat(document.getElementById('tiempos-lift')?.value);
+        if (!isNaN(tpcVal)  && tpcVal  > 0) baseTiempos.time_per_cell          = tpcVal;
+        if (!isNaN(sfkVal)  && sfkVal  > 0) baseTiempos.speed_factor_forklift  = sfkVal;
+        baseTiempos.tiempo_picking_por_linea =
+            (pickRaw !== '' && pickRaw != null && !isNaN(parseFloat(pickRaw)))
+            ? parseFloat(pickRaw) : null;
+        if (!isNaN(liftVal) && liftVal >= 0) baseTiempos.tiempo_horquilla       = liftVal;
+        config.tiempos = baseTiempos;
 
         return config;
     }

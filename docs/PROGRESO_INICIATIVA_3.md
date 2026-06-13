@@ -475,7 +475,15 @@ reversible (flag off => baseline byte-identico).
   C2 NO toca codigo: es 100% cambio de config. El motor lo absorbe gracias a C1.
   PROXIMOS: el Director corre config_calibrado_v1.json y verifica criterios C2
   (ver ANALISIS_IMPACTO seccion 6 bitacora). Capturar BASELINE NUEVO si pasa.
-  Luego: C5 (UI de tiempos en el configurador web, opcional/posterior).
+  C5 HECHA (ver abajo).
+
+- [C5 HECHA] Card "Tiempos de Operacion" en la pestana Estrategias del configurador
+  web. Selector preset Demo/Real/Personalizado; campos time_per_cell,
+  speed_factor_forklift, picking_por_linea (opcional), tiempo_horquilla.
+  Al cargar un config se auto-detecta el preset; al seleccionar Demo o Real se
+  rellenan los campos automaticamente. Bloque enviado COMPLETO al backend (patron
+  Motor Avanzado: merge superficial preserva cell_size_m y speed_factor_ground que
+  la UI no expone). Validacion en config_manager.py. WORKSTREAM C1-C5 COMPLETADO.
 
 - [C4 HECHA] PLAN_FASE2_CAMION_REAL.md actualizado con defaults de escala real.
   truck_capacity 26, truck_interval 3600, loading_time 90 s/pallet (decision
