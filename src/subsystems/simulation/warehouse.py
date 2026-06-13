@@ -291,6 +291,9 @@ class AlmacenMejorado:
                 'slot_wait_time': 0.0,
                 'max_slot_wait': 0.0,
                 'peak_occupancy': {},
+                # F2.b: espera dentro del carril cuando la columna esta llena.
+                'lane_full_wait_events': 0,
+                'lane_full_wait_time': 0.0,
             }
             print(f"[OUTBOUND] Fase1 zonas (k={k}): "
                   f"{ {sid: z.capacity for sid, z in self.staging_zones.items()} }")

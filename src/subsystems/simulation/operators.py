@@ -697,7 +697,22 @@ class BaseOperator:
         for wo in staging_wos:
             slot = zone.deepest_empty_cell(lane)
             if slot is None:
-                break  # columna llena (raro): deja de depositar en esta visita
+                # F2.b: columna llena => esperar dentro del carril (el agente ya
+                # esta fisicamente dentro) hasta que el camion/scaffold libere
+                # una celda. Sin time-cap: el slot SIEMPRE se libera (scaffold
+                # tras dwell_scaffold s; camion tras truck_interval s).
+                _lane_wait = 0.0
+                self.status = "waiting"
+                while slot is None:
+                    yield self.env.timeout(dt)
+                    _lane_wait += dt
+                    slot = zone.deepest_empty_cell(lane)
+                _mm = getattr(self.almacen, 'outbound_metrics', None)
+                if _mm is not None:
+                    _mm['lane_full_wait_events'] = (
+                        _mm.get('lane_full_wait_events', 0) + 1)
+                    _mm['lane_full_wait_time'] = (
+                        _mm.get('lane_full_wait_time', 0.0) + _lane_wait)
             yield from self._outbound_nav_to(slot.cell)
             # F1.3: reservar la celda AL LLEGAR (la mantiene ocupada durante la descarga
             # para que nadie enrute a traves del gruero que descarga). place_pallet luego

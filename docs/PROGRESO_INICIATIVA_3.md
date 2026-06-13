@@ -507,6 +507,20 @@ reversible (flag off => baseline byte-identico).
     - policy=scaffold: 0 trucks, 0 eventos, staged_pallets intacta. F1.3 compat OK.
   PENDIENTE: correr la simulacion completa (run_generate_replay.py) con outbound.enabled=true
   y verificar outbound_metrics al final (pallets_staged==pallets_shipped, trucks_dispatched>0).
+  COMMIT: 6db30e6.
+
+- [F2.b POLL-WAIT EN CARRIL — IMPLEMENTADA Y VALIDADA]
+  Reemplazado el `break` silencioso en _outbound_discharge_lanes por un bucle
+  poll-wait: cuando la columna esta llena el agente ESPERA DENTRO del carril
+  (esta fisicamente ahi, no tiene a donde ir) hasta que truck/scaffold libere
+  una celda, luego deposita el siguiente pallet. Sin time-cap: el slot siempre
+  se libera (scaffold tras dwell_scaffold s, truck tras truck_interval s).
+  Cambios:
+  * warehouse.py outbound_metrics: +lane_full_wait_events, +lane_full_wait_time.
+  * operators.py _outbound_discharge_lanes: break -> while slot is None:
+    yield timeout(dt) + acumulacion de _lane_wait + registro en metrics.
+  Smoke-test SimPy (zona 1 slot, slot lleno, truck libera a t=50):
+    espera=50.0s correcta, deposito en t=50, lane_full_wait_events=1 OK.
   COMMIT: (ver abajo).
 
 - [C4 HECHA] PLAN_FASE2_CAMION_REAL.md actualizado con defaults de escala real.
