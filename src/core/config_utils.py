@@ -18,8 +18,7 @@ def get_default_config() -> dict:
         'capacidad_carro': 150,
 
         # Configuracion de estrategias
-        'strategy': 'Zoning and Snake',
-        'dispatch_strategy': 'Ejecucion de Plan (Filtro por Prioridad)',
+        'dispatch_strategy': 'Ejecucion de Plan',  # alias corto (H-5)
         'tour_type': 'Tour Mixto (Multi-Destino)',
 
         # Configuracion de layout

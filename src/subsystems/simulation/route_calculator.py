@@ -330,9 +330,14 @@ class RouteCalculator:
             Reordered list of WorkOrders (closest-first strategy)
 
         Notes:
-            - Alternative to pick_sequence ordering
-            - May be used if config.dispatch_strategy == "Cercania"
-            - Greedy TSP approximation (not optimal but fast)
+            - Alternativa al ordenamiento por pick_sequence
+            - CANDIDATA para integracion como variante del tour de Cercania:
+              despues de filtrar por radio, ordenar los candidatos por vecino
+              mas cercano en lugar de por costo de AssignmentCostCalculator.
+            - Aproximacion greedy del TSP (no optima pero O(n^2) y rapida)
+            - Estado actual: IMPLEMENTADA pero NO llamada desde ningun sitio.
+              Para activarla: llamar desde DispatcherV11._construir_tour()
+              cuando tour_type == "Cercania" (en lugar de preserve_first).
         """
         if not work_orders:
             return []
