@@ -151,10 +151,106 @@ Pendiente de corregir en un sprint de deuda tecnica.
 
 ---
 
-## BK-02 — (reservado para proximos items)
+## BK-02 — Exponer "FIFO Estricto" en el selector de estrategia de la UI
+
+**Estado:** PENDIENTE
+**Prioridad:** Media
+**Origen:** Auditoria de estrategias (sesion 2026-06-14)
+
+### Contexto
+
+La estrategia `_estrategia_fifo()` ("FIFO Estricto") esta completamente implementada
+en `dispatcher.py` (linea 275) y funciona correctamente cuando el dispatcher la recibe
+via el string exacto `"FIFO Estricto"`. Sin embargo, no esta expuesta en el configurador
+web: el selector de dispatch-strategy solo muestra Optimizacion Global, Ejecucion de Plan
+y Cercania.
+
+### Valor
+
+- Permite usar FIFO como **linea base de comparacion**: si las estrategias inteligentes
+  no superan a FIFO en throughput, el diseño del almacen o la distribucion de WOs tiene
+  un problema mas profundo.
+- Util en pruebas de regresion donde se quiere comportamiento deterministico y simple.
+- Costo de implementacion: 1 linea de HTML.
+
+### Plan de implementacion
+
+**Paso 1 — HTML (`index.html`):**
+```html
+<option value="FIFO Estricto">FIFO Estricto (Cola de llegada)</option>
+```
+Agregar en el `<select id="dispatch-strategy">` antes de las opciones existentes
+(ya que es la mas simple y sirve como baseline).
+
+**Paso 2 — app.js:**
+No requiere cambios: `serializeConfig()` ya lee el value del select directamente.
+`loadConfigToForm()` ya llama a `setSelectValue` que manejara el nuevo valor.
+
+**Paso 3 — config_manager.py:**
+Agregar `"FIFO Estricto"` a la lista de valores validos en la validacion de
+`dispatch_strategy`.
+
+**Paso 4 — Verificar:**
+Seleccionar "FIFO Estricto", correr simulacion, confirmar en logs:
+`[DISPATCHER] Inicializado con estrategia: 'FIFO Estricto'`
+y que los operarios toman WOs en orden de llegada sin logica de distancia.
+
+### Estimacion de esfuerzo
+
+- HTML: 1 linea
+- config_manager.py: 1 linea de validacion
+- Prueba: 5 min
+Total: sprint ultra-corto (~15 min)
+
+---
+
+## BK-03 — Evaluar integracion de Greedy Nearest-Neighbor en el tour de Cercania
+
+**Estado:** PENDIENTE — requiere decision del Director
+**Prioridad:** Baja
+**Origen:** Auditoria de estrategias (sesion 2026-06-14)
+
+### Contexto
+
+En `src/subsystems/simulation/route_calculator.py` (linea 319) existe el metodo
+`calculate_greedy_nearest_neighbor()` completamente implementado pero sin callers.
+El comentario original dice "May be used if dispatch_strategy == Cercania".
+
+### Que hace
+
+Una vez que la estrategia Cercania filtra los candidatos dentro del radio, actualmente
+los ordena por costo (`AssignmentCostCalculator`). La alternativa greedy-nearest-neighbor
+ordenaria esos mismos candidatos por vecino mas cercano: desde la posicion actual, siempre
+ir al producto mas proximo, luego al siguiente mas proximo desde ahi, y asi sucesivamente.
+
+### Ventaja potencial
+
+En escenarios donde el operario queda parado en un punto arbitrario del layout (no al inicio
+del pasillo), el vecino mas cercano puede reducir el total de caminata mas que el ordenamiento
+por costo actual. La diferencia seria mayor en layouts con alta densidad de WOs dispersas.
+
+### Riesgo
+
+- El metodo usa distancia euclidea, no la distancia real del pathfinder (que evita obstaculos).
+  Para que sea util, habria que opcionalmente usar distancia de pathfinder (mas costosa en CPU).
+- No esta probado en produccion: necesita prueba E2E antes de activar.
+
+### Plan de evaluacion (antes de integrar)
+
+1. Correr la misma simulacion con Cercania actual vs Cercania+greedy-NN (via flag de config).
+2. Medir: total de distancia recorrida por operario, throughput de WOs, tiempo de simulacion.
+3. Si la mejora es > 5% en distancia sin impacto en CPU, integrar. Si no, descartar.
+
+### Codigo a tocar si se decide integrar
+
+- `dispatcher.py`: en `_construir_tour()`, cuando `tour_type == "Cercania"`,
+  llamar `route_calculator.calculate_greedy_nearest_neighbor(operator.position, selected_wos)`
+  para reordenar antes de calcular la ruta fisica.
+- `config.json`: opcionalmente agregar `"cercania_tour_mode": "greedy_nn"` vs `"cost"`.
 
 ---
 
 *Este documento se actualiza al detectar nuevos items en sesiones de desarrollo.
+Para retomar BK-01, leer: `dispatcher.py` lineas 252-273 (router de estrategias) al detectar nuevos items en sesiones de desarrollo.
 Para retomar BK-01, leer: `dispatcher.py` lineas 252-273 (router de estrategias)
 y `web_prototype/static/web_configurator/index.html` (selector dispatch-strategy).*
