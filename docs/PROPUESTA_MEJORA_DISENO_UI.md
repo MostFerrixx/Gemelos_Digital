@@ -236,27 +236,27 @@ El viewer tiene problemas de contraste en textos secundarios y terciarios sobre 
 
 ## PARTE 5: PRIORIZACIÓN Y ROADMAP
 
-### Nivel 1 — Quick Wins (1-2h de implementación c/u, alto impacto)
+### Nivel 1 — Quick Wins (1-2h de implementación c/u, alto impacto) — IMPLEMENTADAS
 
-| ID | Mejora | Archivo(s) | Impacto |
-|----|--------|-----------|---------|
-| D-01 | Tooltips en sidebar del viewer (title=) | `index.html` del viewer | Bajo esfuerzo, mejora descubribilidad |
-| D-02 | Leyenda de status de agentes en right-panel | `right-dashboard.js` + CSS | Bajo esfuerzo, mejora comprensión |
-| D-03 | Fix contraste texto viewer (2 variables CSS) | `style.css` viewer | 1 línea, mejora accesibilidad |
-| D-04 | Separadores de sección en sidebar configurador | `index.html` configurador | Mejora flujo navegación |
-| D-05 | Empty state en canvas (overlay SVG) | `app.js` + CSS | Mejora onboarding |
-| D-06 | Botón "Abrir Visor" en configurador | `index.html` + `app.js` | Alto impacto en flujo E2E |
-| D-07 | Escala tipográfica en configurador (CSS puro) | `style.css` configurador | Mejora jerarquía visual |
+| ID | Mejora | Archivo(s) | Estado |
+|----|--------|-----------|--------|
+| D-01 | Tooltips en sidebar del viewer (title=) | `index.html` del viewer | OK implementada (anterior) |
+| D-02 | Leyenda de status de agentes en right-panel | `right-dashboard.js` + CSS | OK implementada (anterior) |
+| D-03 | Fix contraste texto viewer (2 variables CSS) | `style.css` viewer | OK 2026-06-14 commit 884a420 |
+| D-04 | Separadores de sección en sidebar configurador | `index.html` configurador | OK 2026-06-14 commit 884a420 |
+| D-05 | Empty state en canvas (overlay SVG) | `app.js` + CSS | OK 2026-06-14 commit 884a420 |
+| D-06 | Botón "Abrir Visor" en configurador | `index.html` + `app.js` | OK 2026-06-14 commit 884a420 |
+| D-07 | Escala tipográfica en configurador (CSS puro) | `style.css` configurador | OK 2026-06-14 commit 884a420 |
 
-### Nivel 2 — Mejoras Medias (medio día c/u)
+### Nivel 2 — Mejoras Medias (medio día c/u) — ✓ IMPLEMENTADAS
 
-| ID | Mejora | Impacto |
-|----|--------|---------|
-| D-08 | Color de acento por sección en sidebar configurador | Orientación visual, reduce carga cognitiva |
-| D-09 | Sub-card para prioridades de Work Area en Flota | Reduce densidad del form más complejo |
-| D-10 | Validación inline en inputs de Flota | Mejora calidad de configuración |
-| D-11 | Jerarquía de KPIs en ticker del panel derecho | Dirección de atención al usuario |
-| D-12 | Sistema de notificaciones compartido (viewer) | Consistencia de feedback |
+| ID | Mejora | Impacto | Estado |
+|----|--------|---------|--------|
+| D-08 | Color de acento por sección en sidebar configurador | Orientación visual, reduce carga cognitiva | ✓ Implementada 2026-06-14 |
+| D-09 | Sub-card para prioridades de Work Area en Flota | Reduce densidad del form más complejo | ✓ Implementada 2026-06-14 |
+| D-10 | Validación inline en inputs de Flota | Mejora calidad de configuración | ✓ Implementada 2026-06-14 |
+| D-11 | Jerarquía de KPIs en ticker del panel derecho | Dirección de atención al usuario | ✓ Implementada 2026-06-14 |
+| D-12 | Sistema de notificaciones compartido (viewer) | Consistencia de feedback | ✓ Implementada 2026-06-14 |
 
 ### Nivel 3 — Cambios Mayores (sprints)
 
