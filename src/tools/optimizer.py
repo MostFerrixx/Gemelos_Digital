@@ -109,13 +109,16 @@ class SimulationOptimizer:
         n_ground = trial.suggest_int("num_operarios_terrestres", 1, 20)
         n_forklifts = trial.suggest_int("num_montacargas", 1, 10)
         
-        # Dispatch strategies disponibles (ajustar según sistema)
+        # Dispatch strategies disponibles — solo strings que el dispatcher reconoce
+        # "FIFO Simple" y "Proximity-Based" eran nombres fantasma (no existian en dispatcher)
+        # "Ejecucion de Plan (Filtro por Prioridad)" reemplazado por alias corto H-5
         dispatch_strategy = trial.suggest_categorical(
             "dispatch_strategy",
             [
-                "Ejecucion de Plan (Filtro por Prioridad)",
-                "FIFO Simple",
-                "Proximity-Based",
+                "Optimizacion Global",
+                "FIFO Estricto",
+                "Ejecucion de Plan",
+                "Cercania",
             ]
         )
         
@@ -285,7 +288,7 @@ class SimulationOptimizer:
                 study.enqueue_trial({
                     "num_operarios_terrestres": self.base_config.get("num_operarios_terrestres", 2),
                     "num_montacargas": self.base_config.get("num_montacargas", 1),
-                    "dispatch_strategy": self.base_config.get("dispatch_strategy", "Ejecucion de Plan (Filtro por Prioridad)")
+                    "dispatch_strategy": self.base_config.get("dispatch_strategy", "Ejecucion de Plan")
                 })
             
             # Ejecutar optimización
