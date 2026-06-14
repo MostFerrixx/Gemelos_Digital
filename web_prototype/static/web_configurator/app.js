@@ -92,6 +92,20 @@ class WebConfigurator {
                 if (el) el.addEventListener('input', () => { tiemposPreset.value = 'custom'; });
             });
         }
+
+        // BK-01: Listener dispatch-strategy — mostrar/ocultar radio_cercania
+        const dispatchSelect = document.getElementById('dispatch-strategy');
+        if (dispatchSelect) {
+            dispatchSelect.addEventListener('change', () => this._updateRadioCercaniaVisibility());
+        }
+    }
+
+    // BK-01: muestra/oculta el campo radio_cercania segun estrategia seleccionada
+    _updateRadioCercaniaVisibility() {
+        const sel = document.getElementById('dispatch-strategy');
+        const group = document.getElementById('radio-cercania-group');
+        if (!sel || !group) return;
+        group.style.display = sel.value === 'Cercania' ? 'block' : 'none';
     }
 
     // C5: determina si los valores actuales coinciden con un preset conocido.
@@ -500,6 +514,11 @@ class WebConfigurator {
         this.setSelectValue(strategySelect, strategy, normalize);
         this.setSelectValue(tourSelect, tour, normalize);
 
+        // BK-01: radio_cercania — cargar valor y mostrar/ocultar campo
+        const radioCercaniaEl = document.getElementById('radio-cercania');
+        if (radioCercaniaEl) radioCercaniaEl.value = config.radio_cercania != null ? config.radio_cercania : 100;
+        this._updateRadioCercaniaVisibility();
+
         // Tab 3: Flota de Agentes
         if (config.agent_types && config.agent_types.length > 0) {
             this.fleetManager.loadFleet(config.agent_types);
@@ -612,6 +631,7 @@ class WebConfigurator {
 
             // Tab 2: Estrategias
             dispatch_strategy: document.getElementById('dispatch-strategy').value,
+            radio_cercania: parseInt(document.getElementById('radio-cercania')?.value) || 100,
             tour_type: document.getElementById('tour-type').value,
 
             // Tab 3: Flota de Agentes

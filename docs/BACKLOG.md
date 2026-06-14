@@ -8,7 +8,18 @@ Responsable: Cerebellum
 
 ## BK-01 — Exponer estrategias de despacho ocultas en el configurador web
 
-**Estado:** PENDIENTE — no implementado
+**Estado:** IMPLEMENTADO — 2026-06-14
+**Commit:** ver rama feature/allocation-layer-v12.1 (incluido en BK-01 commit)
+**Evidencia:**
+- `[DISPATCHER] Inicializado con estrategia: 'Cercania'`
+- `[DISPATCHER] Radio cercania: 80`
+- `[DISPATCHER] Estrategia 'Cercania' selecciono 27 candidatos`
+
+**Archivos modificados:**
+- `web_prototype/static/web_configurator/index.html` — nueva `<option value="Cercania">` + div `#radio-cercania-group`
+- `web_prototype/static/web_configurator/app.js` — `_updateRadioCercaniaVisibility()`, load/serialize `radio_cercania`, listener `dispatch-strategy`
+- `web_prototype/config_manager.py` — validacion `radio_cercania` (int 1-500), default en `_get_default_config()`
+- `config.json` — campo `radio_cercania: 100` agregado
 **Prioridad:** Media
 **Origen:** Investigacion de H-1 (sesion 2026-06-14). El Director confirmo que las
              estrategias tienen proposito real y deben ser seleccionables.
@@ -127,6 +138,16 @@ No requiere parametros adicionales.
 - Prueba en navegador: ~10 min
 
 Total: 1 sprint corto (~1-2 horas), sin tocar el motor de simulacion.
+
+---
+
+## Nota de bug detectado durante BK-01 (no bloqueante)
+
+El value HTML `"Ejecucion de Plan"` no coincide con el string que verifica el dispatcher
+(`"Ejecucion de Plan (Filtro por Prioridad)"`). En la practica, al seleccionar esa estrategia
+el dispatcher cae al default (`_estrategia_optimizacion_global`). El comportamiento
+es identico al de "Optimizacion Global" por lo que no produce errores visibles.
+Pendiente de corregir en un sprint de deuda tecnica.
 
 ---
 

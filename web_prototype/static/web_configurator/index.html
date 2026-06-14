@@ -261,9 +261,16 @@
                                 <select id="dispatch-strategy">
                                     <option value="Optimizacion Global">Optimización Global (Recomendado)</option>
                                     <option value="Ejecucion de Plan">Ejecución de Plan (Filtro por Prioridad)</option>
+                                    <option value="Cercania">Cercanía (Asignación por Proximidad)</option>
                                 </select>
                                 <span class="help-text">Define cómo se asignan las tareas a los agentes
                                     disponibles.</span>
+                                <!-- BK-01: Campo radio_cercania — visible solo cuando estrategia = Cercanía -->
+                                <div id="radio-cercania-group" class="form-group" style="display:none; margin-top:12px;">
+                                    <label>Radio de cercanía (celdas)</label>
+                                    <input type="number" id="radio-cercania" min="1" max="500" value="100">
+                                    <span class="help-text">El operario solo considera WorkOrders dentro de este radio. Default: 100 celdas (~layout WH1).</span>
+                                </div>
                             </div>
                         </div>
                     </div>

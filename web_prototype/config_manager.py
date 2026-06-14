@@ -210,6 +210,12 @@ class WebConfigurationManager:
             # Validate capacidad_carro
             if 'capacidad_carro' not in config or config['capacidad_carro'] <= 0:
                 errors.append("capacidad_carro must be greater than 0")
+
+            # BK-01: Validate radio_cercania (optional, solo si viene en el config)
+            if 'radio_cercania' in config:
+                rc = config['radio_cercania']
+                if not isinstance(rc, int) or rc < 1 or rc > 500:
+                    errors.append("radio_cercania must be an integer between 1 and 500")
             
             # Validate staging distribution
             if 'outbound_staging_distribution' in config:
@@ -612,6 +618,7 @@ class WebConfigurationManager:
             },
             "capacidad_carro": 150,
             "dispatch_strategy": "Optimizacion Global",
+            "radio_cercania": 100,
             "tour_type": "Tour Mixto (Multi-Destino)",
             "layout_file": "layouts/WH1.tmx",
             "sequence_file": "layouts/Warehouse_Logic.xlsx",
