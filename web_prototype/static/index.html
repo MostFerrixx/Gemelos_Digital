@@ -80,19 +80,19 @@
                     <p class="dashboard-subtitle">Sistema de Monitoreo en Tiempo Real</p>
                 </div>
 
-                <!-- Ticker Row (KPIs Rápidos) -->
+                <!-- Ticker Row (KPIs Rápidos) — D-11: jerarquía visual -->
                 <div class="ticker-row">
-                    <div class="ticker-item">
-                        <span class="ticker-label">Tiempo</span>
-                        <span class="ticker-value" id="ticker-tiempo">00:00:00</span>
-                    </div>
-                    <div class="ticker-item">
+                    <div class="ticker-item ticker-item--primary">
                         <span class="ticker-label">WIP</span>
                         <span class="ticker-value" id="ticker-wip">0/0</span>
                     </div>
-                    <div class="ticker-item">
+                    <div class="ticker-item ticker-item--secondary">
                         <span class="ticker-label">Util</span>
                         <span class="ticker-value" id="ticker-util">-</span>
+                    </div>
+                    <div class="ticker-item">
+                        <span class="ticker-label">Tiempo</span>
+                        <span class="ticker-value" id="ticker-tiempo">00:00:00</span>
                     </div>
                     <div class="ticker-item">
                         <span class="ticker-label">T/put</span>
@@ -190,6 +190,9 @@
             </select>
         </footer>
     </div>
+
+    <!-- D-12: Toast container para notificaciones del viewer -->
+    <div id="viewer-toast-container"></div>
 
     <script src="app.js?v=fa8f1d5"></script>
     <script src="right-dashboard.js?v=fa8f1d5"></script>

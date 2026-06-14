@@ -360,3 +360,54 @@
     font-size: 10px;
     color: var(--dashboard-text-secondary);
 }
+/* ============================================================
+   D-11: Jerarquia de KPIs en ticker del panel derecho
+   WIP = primario (mayor), Util = secundario, resto = normal
+   ============================================================ */
+
+/* KPI primario: WIP — el numero mas importante del turno */
+.right-dashboard .ticker-item--primary {
+    flex: 1.6;
+    border-right: 1px solid var(--dashboard-border);
+    padding-right: 8px;
+    margin-right: 4px;
+}
+
+.right-dashboard .ticker-item--primary .ticker-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dashboard-accent-orange);
+}
+
+.right-dashboard .ticker-item--primary .ticker-value {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--dashboard-accent-orange);
+}
+
+/* KPI secundario: Util — eficiencia de la flota */
+.right-dashboard .ticker-item--secondary .ticker-value {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+/* Reordenar colores para mantener coherencia con nuevo orden */
+/* WIP (1er hijo ahora = --primary class) ya usa orange via clase */
+/* Util (2do hijo) = green */
+.right-dashboard .ticker-item--secondary .ticker-value {
+    color: var(--dashboard-accent-green);
+}
+
+/* Tiempo (3er hijo en nuevo orden) = blue */
+.right-dashboard .ticker-item:nth-child(3) .ticker-value {
+    color: var(--dashboard-accent-blue);
+    font-size: 12px;
+}
+
+/* T/put (4to hijo) = teal, discreto */
+.right-dashboard .ticker-item:nth-child(4) .ticker-value {
+    color: var(--dashboard-accent-teal);
+    font-size: 12px;
+}

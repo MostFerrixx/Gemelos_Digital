@@ -1164,7 +1164,7 @@ const ImportModule = {
     async uploadFile(file) {
         // Validate file extension
         if (!file.name.endsWith('.jsonl')) {
-            alert('Error: Solo se permiten archivos .jsonl');
+            showViewerToast('Error: Solo se permiten archivos .jsonl', 'error');
             return;
         }
 
@@ -1200,7 +1200,7 @@ const ImportModule = {
 
         } catch (error) {
             console.error('[ImportModule] Upload error:', error);
-            alert(`Error al importar archivo: ${error.message}`);
+            showViewerToast(`Error al importar archivo: ${error.message}`, 'error');
             this.setButtonState('error');
 
             // Reset to normal state after showing error
@@ -1286,11 +1286,31 @@ const AutoloadModule = {
 
         } catch (error) {
             console.error('[AutoloadModule] Error:', error);
-            alert(`Error loading simulation: ${error.message}`);
+            showViewerToast(`Error al cargar simulacion: ${error.message}`, 'error');
             if (loadingOverlay) loadingOverlay.classList.add('hidden');
         }
     }
 };
+
+// ============================================
+//  D-12: SISTEMA DE TOASTS DEL VIEWER
+// ============================================
+function showViewerToast(message, type = 'info', duration = 4000) {
+    const container = document.getElementById('viewer-toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `viewer-toast viewer-toast--${type}`;
+    toast.textContent = message;
+
+    container.appendChild(toast);
+
+    // Auto-remove
+    setTimeout(() => {
+        toast.classList.add('viewer-toast--hiding');
+        setTimeout(() => toast.remove(), 350);
+    }, duration);
+}
 
 // ============================================
 //  INITIALIZATION

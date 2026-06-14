@@ -208,6 +208,43 @@ class FleetManager {
             priorityRow.remove();
         });
 
+        // D-10: Validacion inline — work area select
+        const waSelect = priorityRow.querySelector('.work-area-select');
+        waSelect.addEventListener('change', () => {
+            const errEl = priorityRow.querySelector('.wa-error');
+            if (!waSelect.value) {
+                waSelect.classList.add('input-field-error');
+                if (!errEl) {
+                    const e = document.createElement('span');
+                    e.className = 'input-inline-error wa-error';
+                    e.textContent = 'Selecciona un Work Area';
+                    waSelect.insertAdjacentElement('afterend', e);
+                }
+            } else {
+                waSelect.classList.remove('input-field-error');
+                if (errEl) errEl.remove();
+            }
+        });
+
+        // D-10: Validacion inline — prioridad (1-10)
+        const priInput = priorityRow.querySelector('.input-priority');
+        priInput.addEventListener('input', () => {
+            const val = parseInt(priInput.value);
+            const errEl = priorityRow.querySelector('.pri-error');
+            if (isNaN(val) || val < 1 || val > 10) {
+                priInput.classList.add('input-field-error');
+                if (!errEl) {
+                    const e = document.createElement('span');
+                    e.className = 'input-inline-error pri-error';
+                    e.textContent = 'Valor entre 1 y 10';
+                    priInput.insertAdjacentElement('afterend', e);
+                }
+            } else {
+                priInput.classList.remove('input-field-error');
+                if (errEl) errEl.remove();
+            }
+        });
+
         prioritiesList.appendChild(priorityRow);
     }
 
