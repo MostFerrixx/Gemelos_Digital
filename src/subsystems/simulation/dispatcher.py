@@ -206,7 +206,11 @@ class DispatcherV11:
         print(f"[DISPATCHER] Estrategia '{self.estrategia}' selecciono {len(candidatos)} candidatos")
 
         # Step 3: Select best batch based on strategy
-        if self.estrategia in ("Optimizacion Global", "Ejecucion de Plan (Filtro por Prioridad)"):
+        if self.estrategia in (
+            "Optimizacion Global",
+            "Ejecucion de Plan",
+            "Ejecucion de Plan (Filtro por Prioridad)"
+        ):
             # Para estas estrategias, los candidatos YA representan el tour correcto
             # - Optimizacion Global: primera WO por costo, resto por pick_sequence
             # - Ejecucion de Plan: todo por pick_sequence desde la primera WO
@@ -263,7 +267,11 @@ class DispatcherV11:
             return self._estrategia_fifo(operator)
         elif self.estrategia == "Optimizacion Global":
             return self._estrategia_optimizacion_global(operator)
-        elif self.estrategia == "Ejecucion de Plan (Filtro por Prioridad)" or self.estrategia == "Ejecución de Plan (Filtro por Prioridad)":
+        elif self.estrategia in (
+            "Ejecucion de Plan",
+            "Ejecucion de Plan (Filtro por Prioridad)",
+            "Ejecución de Plan (Filtro por Prioridad)"
+        ):
             return self._estrategia_ejecucion_plan(operator)
         elif self.estrategia == "Cercania":
             return self._estrategia_cercania(operator)
