@@ -133,6 +133,24 @@ body {
     font-size: 1.1rem;
 }
 
+/* D-04: Separadores de seccion en sidebar */
+.nav-section-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-secondary);
+    padding: 0.75rem 1rem 0.25rem;
+    opacity: 0.7;
+    user-select: none;
+}
+
+.nav-section-label--advanced {
+    margin-top: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+}
+
 .sidebar-footer {
     padding: 1rem;
     border-top: 1px solid var(--color-border);
@@ -281,6 +299,15 @@ body {
     background-color: rgba(37, 99, 235, 0.05);
 }
 
+.btn-action:disabled,
+.btn-action[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+    border-color: var(--color-border);
+    color: var(--color-text-secondary);
+}
+
 .btn-action .icon {
     font-size: 1.5rem;
 }
@@ -356,9 +383,11 @@ body {
 }
 
 .card-header h3 {
-    font-size: 1rem;
+    font-size: 0.9rem;       /* D-07: era 1rem; reducido para diferenciar de page title */
     font-weight: 600;
-    color: var(--color-text-main);
+    color: var(--color-text-secondary);   /* D-07: era text-main; header de card es jerarquia secundaria */
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
 }
 
 .card-body {
@@ -372,10 +401,18 @@ body {
 
 .form-group label {
     display: block;
-    font-size: 0.875rem;
+    font-size: 0.875rem;   /* D-07: label = nivel 3 de jerarquia */
     font-weight: 500;
     color: var(--color-text-main);
     margin-bottom: 0.5rem;
+}
+
+/* D-07: Texto de ayuda / hint debajo de inputs */
+.form-hint {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--color-text-secondary);
+    margin-top: 0.25rem;
 }
 
 .form-group input[type="text"],

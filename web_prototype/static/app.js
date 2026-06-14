@@ -862,6 +862,9 @@ const ControlsModule = {
             // Update metrics from unified response (no separate request needed!)
             this.updateMetricsFromData(data.metrics);
 
+            // H-4: Notify right-dashboard immediately on seek (avoids 500ms interval lag)
+            document.dispatchEvent(new CustomEvent('snapshotReady', { detail: data }));
+
             // Clear controller reference
             this.currentAbortController = null;
         } catch (error) {
@@ -1327,6 +1330,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Load initial state at t=0
     await ControlsModule.seekTo(0);
+
+    // D-05: Empty state — ocultar si hay replay cargado, mostrar si no
+    const emptyState = document.getElementById('empty-state-overlay');
+    if (emptyState) {
+        if (AppState.maxTime && AppState.maxTime > 0) {
+            emptyState.classList.add('hidden');
+        }
+        // Si maxTime == 0 queda visible (estado por defecto del HTML)
+    }
 
     console.log('[Main] System ready');
 });

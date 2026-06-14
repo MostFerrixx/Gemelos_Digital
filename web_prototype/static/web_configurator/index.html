@@ -20,6 +20,8 @@
             </div>
 
             <nav class="sidebar-nav">
+                <!-- D-04: Separador — Configuracion Basica -->
+                <div class="nav-section-label">Configuracion</div>
                 <button class="nav-item active" data-tab="carga">
                     <span class="nav-icon">📦</span>
                     <span class="nav-text">Carga de Trabajo</span>
@@ -32,6 +34,8 @@
                     <span class="nav-icon">🚜</span>
                     <span class="nav-text">Flota de Agentes</span>
                 </button>
+                <!-- D-04: Separador — Opciones Avanzadas -->
+                <div class="nav-section-label nav-section-label--advanced">Avanzado</div>
                 <button class="nav-item" data-tab="layout-datos">
                     <span class="nav-icon">🗺️</span>
                     <span class="nav-text">Layout y Datos</span>
@@ -76,6 +80,10 @@
                     <button id="btn-save" class="btn-secondary">
                         <span class="icon">💾</span> Guardar
                     </button>
+                    <!-- D-06: Enlace directo al Visor de Replay -->
+                    <a href="/" target="_blank" id="btn-open-viewer" class="btn-secondary" title="Abrir Visor de Replay en nueva pestana" style="text-decoration:none; display:inline-flex; align-items:center; gap:0.4rem;">
+                        <span class="icon">▶</span> Abrir Visor
+                    </a>
 
                     <button id="btn-run-simulation" class="btn-highlight">
                         <span class="icon">▶</span> Run Simulation
@@ -402,10 +410,10 @@
                             <h3>Acciones de Datos</h3>
                         </div>
                         <div class="card-body actions-grid">
-                            <button id="btn-generate-template" class="btn-action">
+                            <button id="btn-generate-template" class="btn-action" disabled title="Funcionalidad en desarrollo">
                                 <span class="icon">📄</span> Generar Plantilla TMX
                             </button>
-                            <button id="btn-populate-skus" class="btn-action">
+                            <button id="btn-populate-skus" class="btn-action" disabled title="Funcionalidad en desarrollo">
                                 <span class="icon">🔢</span> Poblar SKUs Aleatorios
                             </button>
                             <button id="btn-load-work-areas" class="btn-action">
@@ -515,6 +523,22 @@
                 <div id="manage-configs-list" class="configs-list">
                     <!-- Populated dynamically -->
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Confirmar Flota por Defecto -->
+    <div id="modal-confirm-fleet" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Generar Flota por Defecto</h3>
+            </div>
+            <div class="modal-body">
+                <p>Esto reemplazara la configuracion de flota actual. ¿Desea continuar?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-text" id="btn-confirm-fleet-cancel">Cancelar</button>
+                <button class="btn-primary" id="btn-confirm-fleet-ok">Generar</button>
             </div>
         </div>
     </div>

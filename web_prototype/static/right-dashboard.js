@@ -24,6 +24,18 @@
         // This syncs with the playback updates
         updateInterval = setInterval(updateDashboard, 500);
 
+        // H-4: Sync immediately on manual seek (no 500ms interval lag)
+        document.addEventListener('snapshotReady', function(e) {
+            const data = e.detail;
+            if (data.metricas) {
+                updateTicker(data.metricas);
+                updateCards(data.metricas);
+            }
+            if (data.state && data.state.agents) {
+                updateOperators(data.state.agents);
+            }
+        });
+
         console.log('[AgentDashboard] Ready');
     }
 

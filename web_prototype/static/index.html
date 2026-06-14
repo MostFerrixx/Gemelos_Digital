@@ -29,16 +29,20 @@
                     <div class="sidebar-title">Gemelo Digital</div>
 
                     <!-- Import JSONL Button -->
-                    <button id="importJsonlBtn" class="sidebar-toggle-btn" title="Import JSONL Simulation">
+                    <button id="importJsonlBtn" class="sidebar-toggle-btn" title="Importar archivo de simulacion (.jsonl)">
                         <span class="icon">📁</span>
                     </button>
                     <!-- Hidden file input -->
                     <input type="file" id="jsonlFileInput" accept=".jsonl" style="display: none;" />
 
-                    <button id="toggleTableBtn" class="sidebar-toggle-btn" title="Table View">
+                    <button id="toggleTableBtn" class="sidebar-toggle-btn" title="Ver tabla de Work Orders">
                         <span class="icon">📊</span>
                     </button>
-                    <div class="sidebar-connection" title="Connected">
+                    <!-- D-06: Enlace al Configurador -->
+                    <a href="/web_configurator/" target="_blank" class="sidebar-toggle-btn" title="Abrir Configurador en nueva pestana" style="text-decoration:none; display:flex; align-items:center; justify-content:center;">
+                        <span class="icon">⚙️</span>
+                    </a>
+                    <div class="sidebar-connection" title="Servidor conectado">
                         <span class="connection-dot"></span>
                     </div>
                 </div>
@@ -50,7 +54,21 @@
                 <!-- Loading Overlay (shown during slow seeks) -->
                 <div id="loading-overlay" style="display: none;">
                     <div class="spinner"></div>
-                    <span>Loading...</span>
+                    <span>Cargando...</span>
+                </div>
+                <!-- D-05: Empty State (shown before any JSONL is loaded) -->
+                <div id="empty-state-overlay">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7" rx="1"/>
+                        <rect x="14" y="3" width="7" height="7" rx="1"/>
+                        <rect x="3" y="14" width="7" height="7" rx="1"/>
+                        <rect x="14" y="14" width="7" height="7" rx="1"/>
+                    </svg>
+                    <p class="empty-state-title">Sin simulacion cargada</p>
+                    <p class="empty-state-hint">Importa un archivo <strong>.jsonl</strong> para visualizar la simulacion</p>
+                    <button class="empty-state-btn" onclick="document.getElementById('importJsonlBtn').click()">
+                        📁 Importar simulacion
+                    </button>
                 </div>
             </div>
 
@@ -117,6 +135,13 @@
                 <!-- Operarios Activos (Lista Scrollable) -->
                 <div class="operators-section">
                     <h3 class="section-header">Operarios Activos</h3>
+                    <!-- D-02: Leyenda de status de agentes -->
+                    <div class="status-legend">
+                        <span class="status-legend-item" data-status="idle">○ Idle</span>
+                        <span class="status-legend-item" data-status="moving">→ En ruta</span>
+                        <span class="status-legend-item" data-status="picking">↓ Picking</span>
+                        <span class="status-legend-item" data-status="unloading">⬆ Descarga</span>
+                    </div>
                     <div class="operators-list" id="operators-list">
                         <!-- Populated dynamically by MetricsModule -->
                     </div>

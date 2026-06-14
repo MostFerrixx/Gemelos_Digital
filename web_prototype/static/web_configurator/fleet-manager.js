@@ -212,10 +212,32 @@ class FleetManager {
     }
 
     generateDefaultFleet() {
-        if (!confirm('¿Desea generar la configuración de flota por defecto? Esto reemplazará la configuración actual.')) {
+        const modal = document.getElementById('modal-confirm-fleet');
+        if (!modal) {
+            // Fallback: modal not found, execute directly
+            this._executeDefaultFleet();
             return;
         }
 
+        modal.classList.remove('hidden');
+
+        const okBtn = document.getElementById('btn-confirm-fleet-ok');
+        const cancelBtn = document.getElementById('btn-confirm-fleet-cancel');
+
+        const cleanup = () => {
+            modal.classList.add('hidden');
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+        };
+
+        const onOk = () => { cleanup(); this._executeDefaultFleet(); };
+        const onCancel = () => { cleanup(); };
+
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+    }
+
+    _executeDefaultFleet() {
         // Clear existing fleet
         this.clearAllGroups();
 

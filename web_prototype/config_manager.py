@@ -113,7 +113,31 @@ class WebConfigurationManager:
                 with open(tmp_path, 'wb') as f:
                     f.write(raw)
 
-            os.replace(tmp_path, self.config_path)
+            # NOTA: os.replace() en FUSE/WinFsp no trunca el archivo destino
+            # (sobrescribe in-place dejando bytes residuales al final).
+            # Solucion: escribir directamente a config_path en modo 'wb'
+            # que garantiza truncado exacto al tamano del contenido.
+            with open(self.config_path, 'wb') as f:
+                f.write(raw)
+                f.flush()
+                os.fsync(f.fileno())
+
+            # Cleanup del tmp
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+
+            # Post-verificacion: confirmar que no hay null bytes en el archivo final
+            with open(self.config_path, 'rb') as f:
+                final_raw = f.read()
+            if b'\x00' in final_raw:
+                print("[CONFIG_MANAGER WARN] Null bytes en config.json final - reintentando strip")
+                clean = final_raw.replace(b'\x00', b'')
+                with open(self.config_path, 'wb') as f:
+                    f.write(clean)
+                    f.flush()
+                    os.fsync(f.fileno())
 
             print(f"[CONFIG_MANAGER] Saved config to {self.config_path}")
             return True, []
