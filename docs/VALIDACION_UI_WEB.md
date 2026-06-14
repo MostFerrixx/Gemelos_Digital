@@ -930,3 +930,128 @@ Segunda ronda de validacion empirica: los 7 controles que en la sesion original 
 **Hallazgos:** 4 cerrados. H-1 resuelto. H-2 resuelto. H-3 reclasificado (no era bug). H-4 resuelto.
 
 **Estado general:** 62 controles verificados. 60 FUNCIONA, 0 rotos. Los 4 hallazgos estan cerrados. La interfaz esta lista para uso operativo. Pendiente menor: verificar KPIs de outbound (G15/G16) con una simulacion completa con camion activo.
+
+
+---
+
+## AUDITORÍA: MAPEO UI → BACKEND — ESTRATEGIAS DE DESPACHO
+**Fecha:** 2026-06-14 | **Método:** Chrome MCP (DOM inspection) + headless SimPy + logs dispatcher
+
+### Alcance
+Verificar que el `value` HTML de cada opción del selector `#dispatch-strategy` sea exactamente el
+string que el backend (`DispatcherV11._seleccionar_work_orders_candidatos`) compara para elegir
+la función de despacho correcta. También se verifican: tour_type y radio_cercania.
+
+---
+
+### Tabla 1 — Estrategias de despacho (selector `#dispatch-strategy`)
+
+| # | Texto visible en UI | Value enviado al backend | String que espera el dispatcher | Función ejecutada | ¿Coinciden? |
+|---|---|---|---|---|---|
+| 1 | Optimización Global (Recomendado) | `"Optimizacion Global"` | `== "Optimizacion Global"` | `_estrategia_optimizacion_global()` | **SÍ ✅** |
+| 2 | Ejecución de Plan (Filtro por Prioridad) | `"Ejecucion de Plan"` | `== "Ejecucion de Plan (Filtro por Prioridad)"` | `_estrategia_ejecucion_plan()` | **NO ❌** |
+| 3 | Cercanía (Asignación por Proximidad) | `"Cercania"` | `== "Cercania"` | `_estrategia_cercania()` | **SÍ ✅** |
+
+---
+
+### Tabla 2 — Tipo de tour (selector `#tour-type`)
+
+| Texto visible en UI | Value enviado al backend | String que espera el dispatcher | ¿Coinciden? |
+|---|---|---|---|
+| Tour Mixto (Multi-Destino) | `"Tour Mixto (Multi-Destino)"` | `!= "Tour Simple (Un Destino)"` | **SÍ ✅** |
+| Tour Simple (Un Destino) | `"Tour Simple (Un Destino)"` | `== "Tour Simple (Un Destino)"` | **SÍ ✅** |
+
+---
+
+### Tabla 3 — radio_cercania (campo `#radio-cercania`)
+
+| Condición | Comportamiento UI | Comportamiento backend | ¿Correcto? |
+|---|---|---|---|
+| Estrategia ≠ Cercanía | Campo oculto (display:none) | dispatcher usa `configuracion.get('radio_cercania', 100)` | **SÍ ✅** |
+| Estrategia = Cercanía | Campo visible, valor serializado en POST | `self.radio_cercania = configuracion.get('radio_cercania', 100)` | **SÍ ✅** |
+
+---
+
+### BUG DETECTADO — H-5: "Ejecución de Plan" nunca ejecuta su estrategia
+
+**Severidad:** ALTA — comportamiento silenciosamente incorrecto (no hay error visible al usuario)
+
+**Causa raíz:** Desajuste de string en DOS puntos del dispatcher:
+
+**Punto A — `_seleccionar_work_orders_candidatos()` (línea ~266):**
+```python
+# dispatcher.py espera:
+elif self.estrategia == "Ejecucion de Plan (Filtro por Prioridad)" or self.estrategia == "Ejecución de Plan (Filtro por Prioridad)":
+    return self._estrategia_ejecucion_plan(operator)
+# La UI envía "Ejecucion de Plan" → ninguna condición coincide → else:
+print(f"[DISPATCHER WARN] Estrategia desconocida '{self.estrategia}', usando Optimizacion Global")
+return self._estrategia_optimizacion_global(operator)
+```
+
+**Punto B — `asignar_trabajo()` Step 3 (línea ~209):**
+```python
+# Verifica:
+if self.estrategia in ("Optimizacion Global", "Ejecucion de Plan (Filtro por Prioridad)"):
+    selected_work_orders = candidatos  # usa tour pre-construido
+else:
+    selected_work_orders = self._seleccionar_mejor_batch(operator, candidatos)  # costo
+# "Ejecucion de Plan" NO está en la tupla → usa _seleccionar_mejor_batch() (incorrecto para EP)
+```
+
+**Efecto neto cuando el usuario selecciona "Ejecución de Plan":**
+1. Candidatos seleccionados por `_estrategia_optimizacion_global()` (INCORRECTO — debería ser `_estrategia_ejecucion_plan()`)
+2. Batch seleccionado por `_seleccionar_mejor_batch()` con scoring de costo (INCORRECTO para EP)
+3. **No hay error en pantalla.** Solo el log `[DISPATCHER WARN]` evidencia el problema.
+
+**Evidencia empírica (log de simulación con dispatch_strategy="Ejecucion de Plan"):**
+```
+[DISPATCHER] Inicializado con estrategia: 'Ejecucion de Plan'
+[DISPATCHER WARN] Estrategia desconocida 'Ejecucion de Plan', usando Optimizacion Global
+[DISPATCHER] Estrategia 'Ejecucion de Plan' selecciono 18 candidatos
+```
+(Sin línea "usando tour construido por la estrategia" → confirma que cayó a _seleccionar_mejor_batch)
+
+**Contraste con estrategia funcional Optimizacion Global:**
+```
+[DISPATCHER] Inicializado con estrategia: 'Optimizacion Global'
+[DISPATCHER] Estrategia 'Optimizacion Global' selecciono 20 candidatos
+[DISPATCHER] Optimizacion Global: usando tour construido por la estrategia (20 WOs)
+```
+
+---
+
+### Fix propuesto (pendiente de aprobación del Director)
+
+**Opción A — Corregir el value HTML (recomendada, toca solo la UI):**
+```html
+<!-- index.html — cambiar value de la opción -->
+<option value="Ejecucion de Plan (Filtro por Prioridad)">Ejecución de Plan (Filtro por Prioridad)</option>
+```
+Ventaja: el dispatcher no se toca. Desventaja: configs guardadas anteriormente con
+`"Ejecucion de Plan"` quedarán huérfanas (igual que hoy, pero ya documentado).
+
+**Opción B — Agregar alias en el dispatcher (toca el motor):**
+```python
+elif self.estrategia in ("Ejecucion de Plan (Filtro por Prioridad)",
+                          "Ejecución de Plan (Filtro por Prioridad)",
+                          "Ejecucion de Plan"):   # alias para compatibilidad con configs viejas
+    return self._estrategia_ejecucion_plan(operator)
+```
+Ventaja: retrocompatible con configs existentes. Misma corrección en Step 3.
+
+**Recomendación:** Opción B — es más segura y el motor es el lugar canónico de la lógica.
+
+---
+
+### RESUMEN DE HALLAZGOS DE ESTA AUDITORÍA
+
+| Control | ¿UI coincide con backend? | Detalle |
+|---|---|---|
+| Estrategia: Optimización Global | SÍ ✅ | Funciona correctamente |
+| Estrategia: Ejecución de Plan | **NO ❌** | UI envía `"Ejecucion de Plan"`, dispatcher espera `"Ejecucion de Plan (Filtro por Prioridad)"` — silenciosamente ejecuta Optimización Global |
+| Estrategia: Cercanía | SÍ ✅ | Funciona correctamente; radio_cercania serializado y aplicado |
+| Tour Mixto (Multi-Destino) | SÍ ✅ | Funciona correctamente |
+| Tour Simple (Un Destino) | SÍ ✅ | Funciona correctamente |
+| radio_cercania (campo numérico) | SÍ ✅ | Visibilidad condicional OK, valor serializado y leído por dispatcher |
+
+**Veredicto:** 1 de 3 estrategias de despacho está rota (H-5). Las demás: correctas.
