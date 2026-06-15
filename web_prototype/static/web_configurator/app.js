@@ -514,9 +514,13 @@ class WebConfigurator {
         this.setSelectValue(strategySelect, strategy, normalize);
         this.setSelectValue(tourSelect, tour, normalize);
 
-        // BK-01: radio_cercania — cargar valor y mostrar/ocultar campo
+        // BK-01 + H-6: radio_cercania y params de expansion — cargar valores y mostrar/ocultar
         const radioCercaniaEl = document.getElementById('radio-cercania');
         if (radioCercaniaEl) radioCercaniaEl.value = config.radio_cercania != null ? config.radio_cercania : 100;
+        const radioExpPasoEl = document.getElementById('radio-expansion-paso');
+        if (radioExpPasoEl) radioExpPasoEl.value = config.radio_expansion_paso != null ? config.radio_expansion_paso : 50;
+        const radioMaxExpEl = document.getElementById('radio-max-expansiones');
+        if (radioMaxExpEl) radioMaxExpEl.value = config.radio_max_expansiones != null ? config.radio_max_expansiones : 5;
         this._updateRadioCercaniaVisibility();
 
         // Tab 3: Flota de Agentes
@@ -632,6 +636,8 @@ class WebConfigurator {
             // Tab 2: Estrategias
             dispatch_strategy: document.getElementById('dispatch-strategy').value,
             radio_cercania: parseInt(document.getElementById('radio-cercania')?.value) || 100,
+            radio_expansion_paso: parseInt(document.getElementById('radio-expansion-paso')?.value) || 50,
+            radio_max_expansiones: parseInt(document.getElementById('radio-max-expansiones')?.value) || 5,
             tour_type: document.getElementById('tour-type').value,
 
             // Tab 3: Flota de Agentes

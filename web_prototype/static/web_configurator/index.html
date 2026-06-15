@@ -265,11 +265,27 @@
                                 </select>
                                 <span class="help-text">Define cómo se asignan las tareas a los agentes
                                     disponibles.</span>
-                                <!-- BK-01: Campo radio_cercania — visible solo cuando estrategia = Cercanía -->
+                                <!-- BK-01 + H-6: Params de Cercanía — visibles solo cuando estrategia = Cercanía -->
                                 <div id="radio-cercania-group" class="form-group" style="display:none; margin-top:12px;">
                                     <label>Radio de cercanía (celdas)</label>
                                     <input type="number" id="radio-cercania" min="1" max="500" value="100">
-                                    <span class="help-text">El operario solo considera WorkOrders dentro de este radio. Default: 100 celdas (~layout WH1).</span>
+                                    <span class="help-text">El operario prioriza WorkOrders dentro de este radio. Si no hay, expande gradualmente. Default: 100 celdas.</span>
+                                    <!-- H-6: params de expansion gradual del radio blando -->
+                                    <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color,#e2e8f0);">
+                                        <label style="font-size:0.85rem; color:var(--text-secondary,#64748b);">Expansión de radio</label>
+                                        <div style="display:flex; gap:12px; margin-top:6px;">
+                                            <div style="flex:1;">
+                                                <label style="font-size:0.8rem;">Paso (celdas)</label>
+                                                <input type="number" id="radio-expansion-paso" min="1" max="1000" value="50" title="Cuántas celdas se amplía el radio en cada intento cuando no hay WOs en el radio inicial. Default: 50.">
+                                                <span class="help-text" style="font-size:0.75rem;">Incremento por intento</span>
+                                            </div>
+                                            <div style="flex:1;">
+                                                <label style="font-size:0.8rem;">Máx. expansiones</label>
+                                                <input type="number" id="radio-max-expansiones" min="0" max="20" value="5" title="Número máximo de expansiones antes de usar todas las WOs compatibles del almacén. Default: 5.">
+                                                <span class="help-text" style="font-size:0.75rem;">0 = sin expansión</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
