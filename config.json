@@ -1,91 +1,94 @@
 {
-    "order_generation_mode": "stochastic",
-    "fulfillment_policy": "ship_partial",
-    "order_file_path": "",
-    "total_ordenes": 150,
-    "distribucion_tipos": {
-        "pequeno": {
-            "porcentaje": 60,
-            "volumen": 5
-        },
-        "mediano": {
-            "porcentaje": 30,
-            "volumen": 25
-        },
-        "grande": {
-            "porcentaje": 10,
-            "volumen": 80
-        }
+  "order_generation_mode": "stochastic",
+  "fulfillment_policy": "ship_partial",
+  "order_file_path": "",
+  "total_ordenes": 300,
+  "distribucion_tipos": {
+    "pequeno": {
+      "porcentaje": 60,
+      "volumen": 5
     },
-    "capacidad_carro": 150,
-    "dispatch_strategy": "Optimizacion Global",
-    "radio_cercania": 100,
-    "tour_type": "Tour Mixto (Multi-Destino)",
-    "agent_types": [],
-    "layout_file": "layouts/WH1.tmx",
-    "sequence_file": "layouts/Warehouse_Logic.xlsx",
-    "map_scale": 1.3,
-    "outbound_staging_distribution": {
-        "1": 100,
-        "2": 0,
-        "3": 0,
-        "4": 0,
-        "5": 0,
-        "6": 0,
-        "7": 0
+    "mediano": {
+      "porcentaje": 30,
+      "volumen": 25
     },
-    "num_operarios_terrestres": 2,
-    "num_montacargas": 2,
-    "num_operarios_total": 4,
-    "capacidad_montacargas": 1000,
-    "tiempo_descarga_por_tarea": 5,
-    "assignment_rules": {
-        "GroundOperator": {},
-        "Forklift": {}
-    },
-    "tareas_zona_a": 0,
-    "tareas_zona_b": 0,
-    "num_operarios": 4,
-    "congestion": {
-        "enabled": true,
-        "mode": "timewindow",
-        "wait_timeout": 0.5,
-        "wait_hard_cap": 30,
-        "backoff_base": 0.1,
-        "backoff_jitter": 0.1,
-        "max_repath": 3,
-        "repath_cost_factor": 2,
-        "spawn_offset": 0.3,
-        "watchdog_window": 5,
-        "allow_swap": false,
-        "aging_rate": 1,
-        "staggered_start": true,
-        "timewindow": {
-            "shadow": false,
-            "clearance": 0,
-            "dt_wait": 0.1,
-            "max_expansions": 20000,
-            "plan_horizon": 0,
-            "allow_diagonal": false
-        }
-    },
-    "outbound": {
-        "enabled": true,
-        "dispatch_policy": "interval",
-        "truck_interval": 20,
-        "truck_capacity": 8,
-        "loading_time": 2,
-        "zone_capacity_default": 8,
-        "slot_wait_alert": 60,
-        "slot_poll_dt": 0.1,
-        "dwell_scaffold": 10
-    },
-    "tiempos": {
-        "cell_size_m": 1,
-        "time_per_cell": 0.1,
-        "speed_factor_ground": 1,
-        "speed_factor_forklift": 0.8,
-        "tiempo_picking_por_linea": null,
-        "tiempo_horquilla": 2
+    "grande": {
+      "porcentaje": 10,
+      "volumen": 80
     }
+  },
+  "capacidad_carro": 150,
+  "dispatch_strategy": "Ejecucion de Plan",
+  "radio_cercania": 100,
+  "tour_type": "Tour Mixto (Multi-Destino)",
+  "agent_types": [],
+  "layout_file": "layouts/WH1.tmx",
+  "sequence_file": "layouts/Warehouse_Logic.xlsx",
+  "map_scale": 1.3,
+  "outbound_staging_distribution": {
+    "1": 100,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0
+  },
+  "num_operarios_terrestres": 2,
+  "num_montacargas": 2,
+  "num_operarios_total": 4,
+  "capacidad_montacargas": 1000,
+  "tiempo_descarga_por_tarea": 5,
+  "assignment_rules": {
+    "GroundOperator": {},
+    "Forklift": {}
+  },
+  "tareas_zona_a": 0,
+  "tareas_zona_b": 0,
+  "num_operarios": 4,
+  "congestion": {
+    "enabled": true,
+    "mode": "timewindow",
+    "wait_timeout": 0.5,
+    "wait_hard_cap": 30,
+    "backoff_base": 0.1,
+    "backoff_jitter": 0.1,
+    "max_repath": 3,
+    "repath_cost_factor": 2,
+    "spawn_offset": 0.3,
+    "watchdog_window": 5,
+    "allow_swap": false,
+    "aging_rate": 1,
+    "staggered_start": true,
+    "timewindow": {
+      "shadow": false,
+      "clearance": 0,
+      "dt_wait": 0.1,
+      "max_expansions": 20000,
+      "plan_horizon": 0,
+      "allow_diagonal": false
+    }
+  },
+  "outbound": {
+    "enabled": false,
+    "dispatch_policy": "interval",
+    "truck_interval": 9999,
+    "truck_capacity": 8,
+    "loading_time": 2,
+    "zone_capacity_default": 8,
+    "slot_wait_alert": 60,
+    "slot_poll_dt": 0.1,
+    "dwell_scaffold": 10
+  },
+  "tiempos": {
+    "cell_size_m": 1,
+    "time_per_cell": 0.1,
+    "speed_factor_ground": 1,
+    "speed_factor_forklift": 0.8,
+    "tiempo_picking_por_linea": null,
+    "tiempo_horquilla": 2
+  },
+  "num_ground_operators": 1,
+  "num_forklifts": 0,
+  "num_work_orders": 20
 }
