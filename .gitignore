@@ -611,3 +611,19 @@ uploads/
 ordenes_prueba_real.json
 # Snapshots del optimizador en la raiz (los YA trackeados requieren 'git rm --cached')
 config_optimized_*.json
+
+# === Artefactos FUSE (WinFsp sandbox) ===
+# Generados por el protocolo anti-FUSE de Cerebellum (shutil.copy2 deja temp files)
+.fuse_hidden*
+
+# Commits scripts temporales de Cerebellum (consumidos, ya no necesarios)
+commit*.bat
+COMMIT_*.bat
+do_commit.bat
+
+# Git lock files (no deben commitearse nunca)
+.git/index.lock
+.git/HEAD.lock
+
+# Scripts de limpieza temporal
+LIMPIAR_TEMPORALES.bat
