@@ -20,6 +20,8 @@
   "capacidad_carro": 150,
   "dispatch_strategy": "Ejecucion de Plan",
   "radio_cercania": 100,
+  "radio_expansion_paso": 50,
+  "radio_max_expansiones": 5,
   "tour_type": "Tour Mixto (Multi-Destino)",
   "agent_types": [],
   "layout_file": "layouts/WH1.tmx",

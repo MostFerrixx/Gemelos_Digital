@@ -216,6 +216,15 @@ class WebConfigurationManager:
                 rc = config['radio_cercania']
                 if not isinstance(rc, int) or rc < 1 or rc > 500:
                     errors.append("radio_cercania must be an integer between 1 and 500")
+            # H-6 fix: validar parametros de expansion gradual
+            if 'radio_expansion_paso' in config:
+                rep = config['radio_expansion_paso']
+                if not isinstance(rep, int) or rep < 1 or rep > 1000:
+                    errors.append("radio_expansion_paso must be an integer between 1 and 1000")
+            if 'radio_max_expansiones' in config:
+                rme = config['radio_max_expansiones']
+                if not isinstance(rme, int) or rme < 0 or rme > 20:
+                    errors.append("radio_max_expansiones must be an integer between 0 and 20")
             
             # Validate staging distribution
             if 'outbound_staging_distribution' in config:
@@ -619,6 +628,8 @@ class WebConfigurationManager:
             "capacidad_carro": 150,
             "dispatch_strategy": "Optimizacion Global",
             "radio_cercania": 100,
+            "radio_expansion_paso": 50,
+            "radio_max_expansiones": 5,
             "tour_type": "Tour Mixto (Multi-Destino)",
             "layout_file": "layouts/WH1.tmx",
             "sequence_file": "layouts/Warehouse_Logic.xlsx",

@@ -1265,3 +1265,82 @@ en la UI, evitando que el usuario configure un radio que cause deadlock.
 No bloqueante para uso normal (radio default = 100 es seguro).
 **FIFO Estricto** (no expuesto en UI) también funciona correctamente ✅.
 
+
+---
+
+## FIX H-6 — Resolución del Deadlock de Cercanía con Radio Blando
+
+**Fecha:** 2026-06-15
+**Estado:** RESUELTO
+**Commit:** ver rama feature/allocation-layer-v12.1
+**Archivos modificados:**
+- `src/subsystems/simulation/dispatcher.py` — `_estrategia_cercania()` + `__init__`
+- `web_prototype/config_manager.py` — validación de nuevos params
+- `config.json` — dos nuevos parámetros con defaults seguros
+
+### Solución implementada: Opción A — Radio Blando con Expansión Gradual
+
+Decisión del Director (2026-06-15): implementar expansión gradual del radio cuando
+el filtro inicial no encuentra candidatos, en lugar de bloquearse en bucle infinito.
+
+**Parámetros nuevos en config.json:**
+
+```json
+"radio_expansion_paso": 50,
+"radio_max_expansiones": 5
+```
+
+Con los defaults (radio=100, paso=50, max=5), el radio se expande en:
+100 → 150 → 200 → 250 → 300 → 350 → todas las WOs compatibles.
+
+Con radio restrictivo (p.ej. 15), primer paso es 65 celdas — ya cubre la mayoría
+de warehouses pequeños.
+
+### Lógica implementada en `_estrategia_cercania()`
+
+```
+1. Filtrar WOs con radio inicial (radio_cercania)
+2. Si candidatos vacíos → expandir radio += radio_expansion_paso, hasta max_expansiones
+3. Si aún vacíos → fallback total: todas las WOs compatibles del almacén
+4. En cada expansión: log "[DISPATCHER] Radio expandido xN (ini->nuevo celdas)"
+5. Métrica: dispatcher.total_expansiones_radio (contador diagnóstico)
+```
+
+**No-regresión garantizada:** cuando hay candidatos dentro del radio inicial, el
+código toma exactamente el mismo camino que antes. La expansión solo se activa
+si y solo si `candidatos == []`.
+
+### Evidencia de validación
+
+**Prueba A — radio=15 (caso que antes causaba deadlock):**
+
+```
+[DISPATCHER] Radio cercania: 15 (expansion paso=50, max=5)
+[DISPATCHER] Radio expandido x1 (15->65 celdas) para GroundOp-02 -- encontrados 59 candidatos
+[DISPATCHER] Radio expandido x1 (15->65 celdas) para GroundOp-01 -- encontrados 39 candidatos
+[DISPATCHER] Radio expandido x1 (15->65 celdas) para GroundOp-02 -- encontrados 19 candidatos
+Tiempo ejecucion: 3.57s   <-- antes: loop infinito a t=135,249s simulados
+```
+
+- Todas las WOs completadas (Pending: 0 al final)
+- 3 expansiones de radio registradas (una por cada agotamiento del radio local)
+- La simulación terminó normalmente en 3.57 segundos de CPU
+
+**Prueba B — radio=100 (comportamiento normal, no-regresión):**
+
+```
+[DISPATCHER] Radio cercania: 100 (expansion paso=50, max=5)
+[DISPATCHER] Estrategia 'Cercania' selecciono 40 candidatos  ← sin expansion
+[DISPATCHER] Estrategia 'Cercania' selecciono 31 candidatos  ← sin expansion
+Tiempo ejecucion: 4.09s
+```
+
+- CERO mensajes de "Radio expandido" — camino original intacto
+- Comportamiento idéntico al pre-fix
+
+### Veredicto H-6
+
+**RESUELTO ✅** — El deadlock fue eliminado con radio blando. El radio sigue siendo
+una preferencia (no restricción de zona). La expansión gradual modela el comportamiento
+real de un operario que, cuando su zona está vacía, amplía su búsqueda hasta encontrar
+trabajo — nunca se queda parado.

@@ -93,10 +93,16 @@ class DispatcherV11:
         # Configuration parameters
         self.max_wos_por_tour = configuracion.get('max_wos_por_tour', 20)
         self.radio_cercania = configuracion.get('radio_cercania', 100)  # Grid cells
+        # H-6 fix: radio blando -- parametros de expansion gradual
+        self.radio_expansion_paso = configuracion.get('radio_expansion_paso', 50)   # celdas/paso
+        self.radio_max_expansiones = configuracion.get('radio_max_expansiones', 5)  # tope maximo
+        # Metrica de expansiones (diagnostico H-6)
+        self.total_expansiones_radio = 0  # veces que un operario tuvo que expandir su radio
 
         print(f"[DISPATCHER] Inicializado con estrategia: '{self.estrategia}'")
         print(f"[DISPATCHER] Max WOs por tour: {self.max_wos_por_tour}, "
-              f"Radio cercania: {self.radio_cercania}")
+              f"Radio cercania: {self.radio_cercania} "
+              f"(expansion paso={self.radio_expansion_paso}, max={self.radio_max_expansiones})")
 
     def agregar_work_orders(self, work_orders: List[Any]) -> None:
         """
@@ -742,31 +748,62 @@ class DispatcherV11:
 
     def _estrategia_cercania(self, operator: Any) -> List[Any]:
         """
-        Proximity Strategy - Filter WorkOrders within radius, then optimize
+        Proximity Strategy - Filter WorkOrders within radius, then optimize.
+
+        H-6 fix: radio blando con expansion gradual.
+        Si el radio inicial no tiene candidatos, se expande en pasos de
+        radio_expansion_paso hasta radio_max_expansiones veces. Si aun asi no
+        hay candidatos, usa todas las WOs compatibles (radio=infinito).
+        El radio sigue siendo preferencia, no restriccion de zona.
 
         Args:
             operator: Operator instance
 
         Returns:
-            List[WorkOrder] - WOs within proximity radius
+            List[WorkOrder] - WOs within proximity radius (expanded if needed)
         """
         if operator.current_position is None:
             # Fallback to FIFO if no position known
             return self._estrategia_fifo(operator)
 
-        # Filter by work area compatibility AND proximity
-        candidatos = []
         op_x, op_y = operator.current_position
 
-        for wo in self.work_orders_pendientes:
-            if not operator.can_handle_work_area(wo.work_area):
-                continue
+        def _filtrar_por_radio(radio: float) -> List[Any]:
+            resultado = []
+            for wo in self.work_orders_pendientes:
+                if not operator.can_handle_work_area(wo.work_area):
+                    continue
+                wo_x, wo_y = wo.ubicacion
+                if math.sqrt((wo_x - op_x)**2 + (wo_y - op_y)**2) <= radio:
+                    resultado.append(wo)
+            return resultado
 
-            wo_x, wo_y = wo.ubicacion
-            distance = math.sqrt((wo_x - op_x)**2 + (wo_y - op_y)**2)
+        # --- Intento 0: radio inicial ---
+        candidatos = _filtrar_por_radio(self.radio_cercania)
 
-            if distance <= self.radio_cercania:
-                candidatos.append(wo)
+        # --- Expansion gradual si no hay candidatos (H-6 fix) ---
+        if not candidatos:
+            radio_actual = self.radio_cercania
+            for expansion in range(1, self.radio_max_expansiones + 1):
+                radio_actual += self.radio_expansion_paso
+                candidatos = _filtrar_por_radio(radio_actual)
+                if candidatos:
+                    self.total_expansiones_radio += 1
+                    op_id = getattr(operator, 'operator_id', str(operator))
+                    print(f"[DISPATCHER] Radio expandido x{expansion} "
+                          f"({self.radio_cercania}->{radio_actual:.0f} celdas) "
+                          f"para {op_id} -- encontrados {len(candidatos)} candidatos")
+                    break
+
+            # --- Fallback final: todas las WOs compatibles ---
+            if not candidatos:
+                self.total_expansiones_radio += 1
+                candidatos = [wo for wo in self.work_orders_pendientes
+                              if operator.can_handle_work_area(wo.work_area)]
+                if candidatos:
+                    op_id = getattr(operator, 'operator_id', str(operator))
+                    print(f"[DISPATCHER] Radio expandido al MAXIMO para {op_id} "
+                          f"-- usando {len(candidatos)} WOs compatibles del almacen")
 
         # Limit to max_wos_por_tour
         return candidatos[:self.max_wos_por_tour * 2]
