@@ -96,6 +96,10 @@ class DispatcherV11:
         # H-6 fix: radio blando -- parametros de expansion gradual
         self.radio_expansion_paso = configuracion.get('radio_expansion_paso', 50)   # celdas/paso
         self.radio_max_expansiones = configuracion.get('radio_max_expansiones', 5)  # tope maximo
+        # BK-03 experiment: modo de construccion del tour para Cercania
+        # "cost" = orden por AssignmentCostCalculator (actual, default)
+        # "greedy_nn" = orden por vecino mas cercano desde posicion actual
+        self.cercania_tour_mode = configuracion.get('cercania_tour_mode', 'cost')
         # Metrica de expansiones (diagnostico H-6)
         self.total_expansiones_radio = 0  # veces que un operario tuvo que expandir su radio
 
@@ -904,8 +908,16 @@ class DispatcherV11:
 
         # Calculate optimal route
         try:
-            # Preserve first WorkOrder for "Optimización Global" strategy
-            preserve_first = (self.estrategia == "Optimizacion Global")
+            # BK-03 experiment: greedy_nn pre-sort para Cercania
+            if self.estrategia == "Cercania" and self.cercania_tour_mode == "greedy_nn":
+                work_orders = self.route_calculator.calculate_greedy_nearest_neighbor(
+                    start_pos, work_orders
+                )
+                preserve_first = True  # respetar el orden NN como ancla del tour
+            else:
+                # Preserve first WorkOrder for "Optimizacion Global" strategy
+                preserve_first = (self.estrategia == "Optimizacion Global")
+
             route_result = self.route_calculator.calculate_route(
                 start_position=start_pos,
                 work_orders=work_orders,

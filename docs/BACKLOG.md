@@ -211,11 +211,32 @@ Total: sprint ultra-corto (~15 min)
 
 ## BK-03 — Evaluar integracion de Greedy Nearest-Neighbor en el tour de Cercania
 
-**Estado:** PENDIENTE — requiere decision del Director
-**Prioridad:** Baja
+**Estado:** DESCARTADO con evidencia — experimento ejecutado 2026-06-15
+**Prioridad:** N/A
 **Origen:** Auditoria de estrategias (sesion 2026-06-14)
 
-### Contexto
+### Resultado del experimento (2026-06-15)
+
+Experimento ejecutado: 3 corridas Cercania/cost + 3 corridas Cercania/greedy_nn
+(radio=100, 300 WOs, 2 operarios terrestres, 0 montacargas).
+
+| Metrica            | COST (baseline) | GREEDY_NN  | Delta      |
+|--------------------|-----------------|------------|------------|
+| Distancia total    | 188,576 px      | 178,635 px | -5.27%     |
+| WOs completadas    | 614.7           | 591.3      | **-3.80%** |
+| Tiempo simulacion  | 3,409.5 s       | 3,293.4 s  | -3.40%     |
+| **Distancia/WO**   | 306.8 px        | 302.1 px   | **-1.54%** |
+
+**Conclusion:** El -5.27% en distancia total es un artefacto: greedy_nn hace menos
+trabajo (-3.8% WOs) en menos tiempo (-3.4%), acumulando menos distancia porque
+hace menos recorridos. La metrica real de eficiencia (distancia por WO completada)
+solo mejora un -1.54%, que con N=3 esta dentro del ruido estadistico.
+
+**Decision: NO integrar.** La flag `cercania_tour_mode` queda en el codigo con
+default `"cost"` (comportamiento original) y documentada en caso de que el Director
+quiera retomar el experimento con N mayor o con distancia real de pathfinder.
+
+### Contexto original
 
 En `src/subsystems/simulation/route_calculator.py` (linea 319) existe el metodo
 `calculate_greedy_nearest_neighbor()` completamente implementado pero sin callers.
@@ -230,25 +251,4 @@ ir al producto mas proximo, luego al siguiente mas proximo desde ahi, y asi suce
 
 ### Ventaja potencial
 
-En escenarios donde el operario queda parado en un punto arbitrario del layout (no al inicio
-del pasillo), el vecino mas cercano puede reducir el total de caminata mas que el ordenamiento
-por costo actual. La diferencia seria mayor en layouts con alta densidad de WOs dispersas.
-
-### Riesgo
-
-- El metodo usa distancia euclidea, no la distancia real del pathfinder (que evita obstaculos).
-  Para que sea util, habria que opcionalmente usar distancia de pathfinder (mas costosa en CPU).
-- No esta probado en produccion: necesita prueba E2E antes de activar.
-
-### Plan de evaluacion (antes de integrar)
-
-1. Correr la misma simulacion con Cercania actual vs Cercania+greedy-NN (via flag de config).
-2. Medir: total de distancia recorrida por operario, throughput de WOs, tiempo de simulacion.
-3. Si la mejora es > 5% en distancia sin impacto en CPU, integrar. Si no, descartar.
-
-### Codigo a tocar si se decide integrar
-
-- `dispatcher.py`: en `_construir_tour()`, cuando `tour_type == "Cercania"`,
-  llamar `route_calculator.calculate_greedy_nearest_neighbor(operator.position, selected_wos)`
-  para reordenar antes de calcular la ruta fisica.
-- `config.json`: opcionalmente agregar `"cercania_tour_mode": "g
+En escenarios donde el operario 
