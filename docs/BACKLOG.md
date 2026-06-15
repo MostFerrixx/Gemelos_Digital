@@ -153,9 +153,14 @@ Pendiente de corregir en un sprint de deuda tecnica.
 
 ## BK-02 — Exponer "FIFO Estricto" en el selector de estrategia de la UI
 
-**Estado:** PENDIENTE
-**Prioridad:** Media
+**Estado:** EN REPENSAR — diseño pendiente (decision del Director, 2026-06-15)
+**Prioridad:** Baja (bloqueado hasta redefinicion)
 **Origen:** Auditoria de estrategias (sesion 2026-06-14)
+
+> **Nota del Director (2026-06-15):** No exponer todavía. Hay que repensar qué
+> debería hacer FIFO Estricto para que tenga sentido como herramienta real de
+> operación, antes de exponerlo en la UI. El motor ya lo implementa correctamente;
+> la pregunta es sobre el diseño de uso, no la implementación técnica.
 
 ### Contexto
 
@@ -246,11 +251,4 @@ por costo actual. La diferencia seria mayor en layouts con alta densidad de WOs 
 - `dispatcher.py`: en `_construir_tour()`, cuando `tour_type == "Cercania"`,
   llamar `route_calculator.calculate_greedy_nearest_neighbor(operator.position, selected_wos)`
   para reordenar antes de calcular la ruta fisica.
-- `config.json`: opcionalmente agregar `"cercania_tour_mode": "greedy_nn"` vs `"cost"`.
-
----
-
-*Este documento se actualiza al detectar nuevos items en sesiones de desarrollo.
-Para retomar BK-01, leer: `dispatcher.py` lineas 252-273 (router de estrategias) al detectar nuevos items en sesiones de desarrollo.
-Para retomar BK-01, leer: `dispatcher.py` lineas 252-273 (router de estrategias)
-y `web_prototype/static/web_configurator/index.html` (selector dispatch-strategy).*
+- `config.json`: opcionalmente agregar `"cercania_tour_mode": "g
