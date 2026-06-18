@@ -18,11 +18,11 @@
 |---|---|---|---|---|---|
 | D1 | FIFO Estricto | Despacho | **VÁLIDA** | NO | SÍ (simple, útil como baseline) |
 | D2 | Optimización Global | Despacho | **VÁLIDA** | SÍ ✅ | SÍ (estrategia principal) |
-| D3 | Ejecución de Plan | Despacho | **VÁLIDA** pero inaccesible (bug H-5) | NO ❌ | SÍ (corregir el bug) |
+| D3 | Ejecución de Plan | Despacho | **VÁLIDA** — bug H-5 RESUELTO (`c4c772f`) | SÍ ✅ | SÍ |
 | D4 | Cercanía | Despacho | **VÁLIDA** | SÍ ✅ | SÍ (caso de uso real) |
 | T1 | Tour Mixto (Multi-Destino) | Tour | **VÁLIDA** | SÍ ✅ | SÍ (modo por defecto) |
 | T2 | Tour Simple (Un Destino) | Tour | **VÁLIDA** | SÍ ✅ | SÍ (staging único) |
-| R1 | Greedy Nearest-Neighbor | Ruta | **MUERTA** (no se llama) | NO | A revisar |
+| R1 | Greedy Nearest-Neighbor | Ruta | **DESCARTADA** — experimento BK-03 ejecutado; mejora real <2% | NO | NO integrar |
 | F1 | FIFO Simple | Fantasma | **FANTASMA** (no implementada) | NO | ELIMINAR referencia |
 | F2 | Proximity-Based | Fantasma | **FANTASMA** (no implementada) | NO | ELIMINAR referencia |
 | F3 | Zoning and Snake | Fantasma | **HUÉRFANA** (campo incorrecto) | NO | ELIMINAR referencia |
@@ -461,5 +461,4 @@ silenciosamente a Optimización Global, sesgando los resultados.
 | Optimización Global | VÁLIDA | SÍ ✅ | SÍ ✅ |
 | Ejecución de Plan | VÁLIDA | SÍ ✅ (H-5 corregido) | SÍ ✅ |
 | FIFO Estricto | VÁLIDA | NO (candidata a exponer) | SÍ ✅ |
-| Cercanía | VÁLIDA | SÍ ✅ | SÍ ✅ |
-
+| Cercanía | V

@@ -2,7 +2,7 @@
 # Propuesta de solución orientada a operación real de almacén
 
 **Fecha:** 2026-06-15
-**Estado:** ANÁLISIS Y PROPUESTA — pendiente de decisión del Director
+**Estado:** RESUELTO — Fix implementado y commiteado en `8a2fe86` (2026-06-15)
 **Archivos involucrados:** `src/subsystems/simulation/dispatcher.py`
 **Bug documentado en:** `docs/VALIDACION_UI_WEB.md` (sección VAL-COMP-3, Prueba B)
 

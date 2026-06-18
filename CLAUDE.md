@@ -89,17 +89,49 @@ solo lee código muerto/roto.
 `run_migration.py:75` lee `data/layouts/Warehouse_Logic.xlsx` (dos copias que
 pueden divergir entre la BD y la simulación). Unificar cuando toque.
 
-## 5. ESTADO ACTUAL (al arrancar, contrástalo con `git status`)
-- `main` es la única rama buena. Las otras 8 son backups/divergencias obsoletas.
-- **Hay trabajo SIN COMMITEAR en el working dir = la "Allocation Layer V12.1"**:
-  asignación de stock real (FCFS) antes de crear WorkOrders. Toca
-  `data_manager.py` (`get_available_stock`), `warehouse.py`
-  (`WorkOrder.qty_requested/qty_allocated/is_partial`), `order_strategies.py` y
-  `config.json`. **Es valioso y frágil: la prioridad #0 es asegurarlo** (rama +
-  commit) antes de cualquier limpieza. La última idea pendiente era mostrar el
-  backorder en el dashboard como "deuda adjunta" (QTY REQ vs QTY PICK).
-- Existe `AUDITORIA.md` con el diagnóstico completo y un plan de limpieza por fases.
-  Léelo si necesitas detalle; mantenlo como referencia.
+## 5. ESTADO ACTUAL (actualizado 2026-06-18)
+
+### Rama activa
+`feature/allocation-layer-v12.1` — 20 commits por delante de `main`.
+El Director debe hacer `git push origin feature/allocation-layer-v12.1` desde
+su terminal Windows (el sandbox Linux no tiene red saliente hacia GitHub).
+Luego: merge a `main` (PR o merge directo). Lee `docs/HANDOFF.md` para el
+estado completo y los proximos pasos.
+
+### Lo que ya esta commiteado en la rama (no hay trabajo sin commitear)
+- **Allocation Layer V12.1** (commits fundacionales): asignacion de stock real
+  FCFS antes de crear WorkOrders. `data_manager.py`, `warehouse.py`
+  (`qty_requested/qty_allocated/is_partial`), `order_strategies.py`.
+- **Fix H-5** (`c4c772f`): dispatcher reconoce el alias corto "Ejecucion de Plan"
+  que envia la UI (antes caia silenciosamente a Optimizacion Global).
+- **Fix H-6** (`8a2fe86`): radio blando en `_estrategia_cercania()` — expande
+  radio por pasos en lugar de retornar lista vacia y causar deadlock.
+- **BK-01** (`bcdb264`): estrategia Cercania + `radio_cercania` expuestos en
+  configurador web.
+- **P3** (`76f1e21`): `radio_expansion_paso` y `radio_max_expansiones` expuestos
+  en configurador web (subseccion dentro de #radio-cercania-group).
+- **Limpieza**: cuarentena de archivos basura en `basura/`, quick wins UI D-03..D-12,
+  `.gitignore` actualizado (`.fuse_hidden*`, `commit*.bat`, locks).
+- **BK-03 descartado** (`dd5c729`): experimento greedy nearest-neighbor — mejora
+  real de distancia/WO solo -1.54% (dentro del ruido); throughput baja -3.8%.
+
+### Pendientes (no bloquean uso; ver docs/BACKLOG.md)
+- Push de la rama a GitHub (accion manual del Director).
+- Merge de `feature/allocation-layer-v12.1` a `main`.
+- BK-02 (FIFO Estricto en UI): EN REPENSAR — decision de diseno pendiente.
+- Revision de `web_dashboard/` (puerto 8001, huerfana): Director quiere
+  decidir si conservar o eliminar antes de poda.
+- Mejoras de diseno D-08+ (ya implementadas; quedan D-13+ si se definen).
+- `push_feature.bat` en raiz: puede borrarse tras el push.
+
+### Bugs conocidos (no criticos)
+- `run_migration.py:75` lee `data/layouts/Warehouse_Logic.xlsx` pero la
+  simulacion lee `layouts/Warehouse_Logic.xlsx` (dos copias pueden divergir).
+- `warehouse.db-shm` y `warehouse.db-wal` aparecen como untracked (ya en
+  .gitignore; son artefactos de SQLite en uso).
+
+Existe `AUDITORIA.md` con el diagnostico estructural completo (mayo 2026).
+Lee `docs/HANDOFF.md` para el estado operativo actualizado.
 
 ## 6. LAS LEYES (CEREBELLUM PROTOCOL) — innegociables
 1. **PLAN ANTES QUE CÓDIGO.** Ante cualquier tarea no trivial: primero
@@ -116,33 +148,4 @@ pueden divergir entre la BD y la simulación). Unificar cuando toque.
 5. **NO ALUCINES.** Antes de afirmar cómo funciona algo, **léelo** (Grep/Read).
    Si no estás seguro, dilo y verifícalo; no inventes nombres de archivos/funciones.
 6. **RESPETA LA ARQUITECTURA.** No reintroduzcas la live simulation ni rompas la
-   separación headless→jsonl→viewer. Con el código muerto: ignóralo durante
-   features; en fases de limpieza/refactor explícitas es el objetivo a eliminar o
-   consolidar (con backup y aprobación del Director).
-7. **GIT CON CUIDADO.** Trabaja en ramas feature; `main` es sagrada. No commitees
-   binarios ni datos (`warehouse.db`, `uploads/`). Sugiere el commit, no lo hagas
-   sin contexto.
-
-## 7. PROTOCOLO DE COMUNICACIÓN (estructura fija de tus respuestas)
-Para tareas de desarrollo, responde SIEMPRE en este orden:
-
-> **ESTADO Y CONTEXTO:** dónde estamos y qué entendí del pedido.
-> **DIAGNÓSTICO Y PLAN DE ACCIÓN:** causa raíz + plan numerado (con archivos
->   concretos a tocar y opciones A/B si las hay, con tu recomendación).
-> **[Si el plan requiere OK]** → pregunta y espera. **[Si es trivial o ya
->   aprobado]** → ejecuta tú mismo con tus herramientas.
-> **PARA TI (DIRECTOR):** pasos de validación empírica (qué ejecutar, qué deberías
->   ver). Incluye el comando de commit sugerido cuando proceda.
-> **Cierre:** una pregunta clara de avance (p. ej. "¿Procedo?" / "¿Cuál es la
->   siguiente prioridad?").
-
-Sé directo y técnico; explica el "porqué" de las decisiones de arquitectura.
-
-## 8. AL INICIAR CADA SESIÓN (sustituye a las reglas rotas de .cursorrules)
-1. `git status` y `git log --oneline -5`.
-2. Revisa si hay cambios sin commitear (¿sigue ahí la Allocation Layer V12.1?).
-3. Lee `AUDITORIA.md` si necesitas el mapa completo del proyecto.
-4. Resume al Director el estado real y la próxima acción sugerida, y pregunta la
-   prioridad. No empieces a cambiar nada sin su luz verde.
-
-— Cerebellum sincronizado. ¿Cuál es la siguiente prioridad, Director?
+   separación headless→jsonl→viewe

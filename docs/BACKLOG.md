@@ -251,4 +251,32 @@ ir al producto mas proximo, luego al siguiente mas proximo desde ahi, y asi suce
 
 ### Ventaja potencial
 
-En escenarios donde el operario 
+En escenarios donde el operario queda parado en un punto arbitrario del layout (no al inicio
+del pasillo), el vecino mas cercano puede reducir el total de caminata mas que el ordenamiento
+por costo actual. La diferencia seria mayor en layouts con alta densidad de WOs dispersas.
+
+### Riesgo
+
+- El metodo usa distancia euclidea, no la distancia real del pathfinder (que evita obstaculos).
+  Para que sea util, habria que opcionalmente usar distancia de pathfinder (mas costosa en CPU).
+- No esta probado en produccion: necesita prueba E2E antes de activar.
+
+### Plan de evaluacion (antes de integrar)
+
+1. Correr la misma simulacion con Cercania actual vs Cercania+greedy-NN (via flag de config).
+2. Medir: total de distancia recorrida por operario, throughput de WOs, tiempo de simulacion.
+3. Si la mejora es > 5% en distancia sin impacto en CPU, integrar. Si no, descartar.
+
+### Codigo a tocar si se decide integrar
+
+- `dispatcher.py`: en `_construir_tour()`, cuando `tour_type == "Cercania"`,
+  llamar `route_calculator.calculate_greedy_nearest_neighbor(operator.position, selected_wos)`
+  para reordenar antes de calcular la ruta fisica.
+- `config.json`: opcionalmente agregar `"cercania_tour_mode": "greedy_nn"` vs `"cost"`.
+
+---
+
+*Este documento se actualiza al detectar nuevos items en sesiones de desarrollo.
+Para retomar BK-01, leer: `dispatcher.py` lineas 252-273 (router de estrategias) al detectar nuevos items en sesiones de desarrollo.
+Para retomar BK-01, leer: `dispatcher.py` lineas 252-273 (router de estrategias)
+y `web_prototype/static/web_configurator/index.html` (selector dispatch-strategy).*
