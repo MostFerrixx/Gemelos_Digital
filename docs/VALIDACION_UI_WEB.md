@@ -887,7 +887,7 @@ Segunda ronda de validacion empirica: los 7 controles que en la sesion original 
 
 **Nota de cache del browser:** Chrome tenia los archivos JS en cache de sesiones anteriores. Para los controles D1 (H-2) y G11/G14 (H-4) se uso patch en memoria del prototipo que reproduce fielmente el codigo en disco. El servidor confirmo servir los archivos correctos: `HAS_NEW_METHOD:true`, `HAS_OLD_CONFIRM:false`. Para activar los fixes en el browser real, hacer **Ctrl+Shift+R** en cada pestaña del visor y configurador.
 
-**Pendiente menor:** G15/G16 (`metric-trucks` y `metric-shipped` con outbound activo). No bloqueante — requiere correr simulacion con C4=ON. El fix H-4 aplica tambien a estos.
+**G15/G16 — VALIDADO (2026-06-19):** corrida headless con outbound activo (truck_interval=80, 120 ordenes) dio `trucks_dispatched=40` y `pallets_shipped=226`; el JSONL contiene 40 `truck_departed` y 226 `pallet_shipped`. Replay: `output/simulation_20260619_181343/`. Resta solo el eyeball visual del Director (cargar ese replay y ver `metric-trucks`=40 / `metric-shipped`=226).
 
 ---
 
@@ -899,7 +899,7 @@ Segunda ronda de validacion empirica: los 7 controles que en la sesion original 
 |---------|-------|--------|
 | A7 Run Simulation (flujo completo) | Requiere esperar simulacion completa; bloquea CDP | Cubierto por pruebas E2E previas |
 | E2, E4 Examinar (file picker) | Dialogo OS no accesible via CDP | Existencia del boton verificada; comportamiento depende del OS |
-| G15/G16 con outbound activo | Requiere simulacion con C4=ON | Elementos existen; valores > 0 pendientes de confirmar |
+| G15/G16 con outbound activo | VALIDADO 2026-06-19 (headless) | trucks_dispatched=40, pallets_shipped=226; replay simulation_20260619_181343 |
 
 ### Recomendaciones priorizadas
 
@@ -911,7 +911,7 @@ Segunda ronda de validacion empirica: los 7 controles que en la sesion original 
 
 4. **(Resuelto) H-4 right panel lag:** CustomEvent `snapshotReady` implementado. Activo con Ctrl+Shift+R.
 
-5. **(Pendiente) G15/G16 outbound KPIs:** Correr simulacion con outbound activo y verificar `metric-trucks` > 0.
+5. **(RESUELTO 2026-06-19) G15/G16 outbound KPIs:** corrida headless con outbound activo dio trucks_dispatched=40 / pallets_shipped=226 (replay output/simulation_20260619_181343). Dato de fondo confirmado; resta el eyeball visual del Director.
 
 6. **(Sugerida) Cache-Control headers:** El servidor no tiene `Cache-Control: no-cache` para archivos estaticos, lo que complica el desarrollo iterativo. Considerar agregar middleware en FastAPI para entornos de desarrollo.
 
@@ -929,7 +929,7 @@ Segunda ronda de validacion empirica: los 7 controles que en la sesion original 
 
 **Hallazgos:** 4 cerrados. H-1 resuelto. H-2 resuelto. H-3 reclasificado (no era bug). H-4 resuelto.
 
-**Estado general:** 62 controles verificados. 60 FUNCIONA, 0 rotos. Los 4 hallazgos estan cerrados. La interfaz esta lista para uso operativo. Pendiente menor: verificar KPIs de outbound (G15/G16) con una simulacion completa con camion activo.
+**Estado general:** 62 controles verificados. 60 FUNCIONA, 0 rotos. Los 4 hallazgos estan cerrados. La interfaz esta lista para uso operativo. G15/G16 (KPIs de outbound) VALIDADOS el 2026-06-19 via corrida headless (trucks=40, pallets=226).
 
 
 ---

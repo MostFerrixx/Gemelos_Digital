@@ -1,11 +1,12 @@
 # HANDOFF — Gemelo Digital de Almacen
 # Estado operativo para nueva sesion de Cerebellum
 
-**Generado:** 2026-06-18
+**Generado:** 2026-06-18  ·  **Actualizado:** 2026-06-19
 **Por:** Cerebellum (sesion de traspaso)
-**Rama activa:** `feature/allocation-layer-v12.1`
-**Proxima accion del Director:** `git push origin feature/allocation-layer-v12.1`
-  (desde terminal Windows — el sandbox Linux no tiene red saliente)
+**Rama activa:** `feature/allocation-layer-v12.1`  ·  **HEAD:** `ba55f27`
+**Estado:** rama PUSHEADA y MERGEADA a `main` (fast-forward, 2026-06-19); las 5 refs
+  (HEAD, feature local/remoto, main local/remoto) alineadas en `ba55f27`.
+**Proxima accion del Director:** elegir siguiente prioridad del backlog (ver seccion 5).
 
 ---
 
@@ -64,10 +65,10 @@ El arbol data/ es una migracion abandonada que solo lee codigo muerto.
 ## 3. GIT — ESTADO ACTUAL
 
 **Rama:** `feature/allocation-layer-v12.1`
-**HEAD local:** `dd5c729`
-**Remote:** `9af0455` (6 commits atras — push pendiente)
+**HEAD local:** `ba55f27`  ·  **Remote:** `ba55f27` (sincronizado; push hecho 2026-06-19)
+**main:** `ba55f27` (local y remoto; merge por fast-forward, 0 commits divergentes)
 
-### Commits en la rama por delante de main (20 total):
+### Historial de la rama (snapshot hasta dd5c729; ya consolidado en main via ba55f27):
 
 ```
 dd5c729  exp(p4-bk03): greedy NN descartado con evidencia
@@ -92,21 +93,14 @@ bcdb264  feat(ui): BK-01 Cercania + radio_cercania en configurador
 9af0455  (base: chore limpieza docs + fixes E2E)
 ```
 
-### Para hacer el push (desde terminal Windows del Director):
-```
-cd "D:\Documentos\Martin\Gemelos Digital"
-git push origin feature/allocation-layer-v12.1
-```
-SHA remoto esperado tras el push: `dd5c729c31ca0f6b3108d9a74df50814c5be181f`
-
-### Para el merge a main (despues del push):
-```
-git checkout main
-git merge --no-ff feature/allocation-layer-v12.1 -m "merge: allocation layer V12.1 + fixes H5/H6 + BK-01 + UI"
-git push origin main
-```
-> NOTA: el sandbox Linux no puede hacer push. Ambas operaciones deben correr en
-> Windows donde las credenciales de GitHub estan en el Credential Manager.
+### Push y merge a main: HECHOS (2026-06-19)
+- Push de la rama: `9af0455..ba55f27` -> origin/feature/allocation-layer-v12.1.
+- Merge a `main`: fast-forward server-side (`git push origin ba55f27:refs/heads/main`),
+  SIN checkout de main (evita arrastrar el indice anomalo de FUSE). main local
+  sincronizado con `git fetch origin main:main`.
+- Validado: las 5 refs en `ba55f27`; `git rev-list --count main..feature` = 0.
+- Saneo de indice: `git reset --mixed HEAD` + remocion de lock obsoleto dejaron el
+  working tree limpio (ya no hay borrados fantasma de HANDOFF.md / ANALISIS_H6).
 
 ---
 
@@ -173,12 +167,12 @@ Decision: no integrar. Flag `cercania_tour_mode` queda en codigo con default `"c
 
 ## 5. PENDIENTES Y PROXIMOS PASOS
 
-### Inmediato (requiere accion del Director)
-| Accion | Como |
+### Inmediato: COMPLETADO (2026-06-19)
+| Accion | Estado |
 |---|---|
-| Push a GitHub | `git push origin feature/allocation-layer-v12.1` desde terminal Windows |
-| Merge a main | `git checkout main && git merge --no-ff feature/...` desde terminal Windows |
-| Borrar push_feature.bat | Eliminar desde Explorer tras el push exitoso |
+| Push a GitHub | HECHO — `9af0455..ba55f27` en origin/feature/allocation-layer-v12.1 |
+| Merge a main | HECHO — fast-forward server-side; main = `ba55f27` |
+| Borrar push_feature.bat | HECHO — borrado en la limpieza post-merge |
 
 ### Backlog activo (ver docs/BACKLOG.md para detalle)
 
