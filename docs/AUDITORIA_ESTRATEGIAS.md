@@ -461,4 +461,5 @@ silenciosamente a Optimización Global, sesgando los resultados.
 | Optimización Global | VÁLIDA | SÍ ✅ | SÍ ✅ |
 | Ejecución de Plan | VÁLIDA | SÍ ✅ (H-5 corregido) | SÍ ✅ |
 | FIFO Estricto | VÁLIDA | NO (candidata a exponer) | SÍ ✅ |
-| Cercanía | V
+| Cercanía | VÁLIDA | SÍ ✅ | SÍ ✅ |
+

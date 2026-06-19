@@ -18,7 +18,7 @@ Simulador de gemelo digital de almacen (Warehouse Digital Twin).
 - **NO hay simulacion en vivo**: el flujo siempre es headless -> jsonl -> replay.
 
 Stack: Python / SimPy / Pygame / PyQt6 / pytmx / pandas / Optuna / FastAPI / SQLite.
-> NOTA: FastAPI/uvicorn/pydantic no estan en requirements.txt. Un pip install limpio no levanta el servidor.
+> NOTA: FastAPI/uvicorn/pydantic YA estan en requirements.txt (lineas 24-27); un pip install limpio levanta el servidor web.
 
 ---
 
@@ -196,12 +196,11 @@ D-01 a D-12 estan implementadas. Si el Director define nuevas mejoras de UI,
 se numeran D-13 en adelante en docs/PROPUESTA_MEJORA_DISENO_UI.md.
 
 ### Issues conocidos (no criticos)
-- `run_migration.py:75` lee `data/layouts/Warehouse_Logic.xlsx` pero la simulacion
-  lee `layouts/Warehouse_Logic.xlsx`. Dos copias que pueden divergir.
+- (RESUELTO) `run_migration.py` lee de `layouts/` via `find_excel_file()`, igual que
+  la simulacion; no existe copia `data/layouts/` ni divergencia.
 - `warehouse.db-shm` / `warehouse.db-wal`: archivos de WAL de SQLite, aparecen como
   untracked pero ya estan en .gitignore.
-- `push_feature.bat` en raiz: artefacto de intento de push autonomo. Borrar tras push.
-- FastAPI/uvicorn/pydantic no estan en requirements.txt.
+- `push_feature.bat`: BORRADO (limpieza post-merge, sesion 2026-06-19).
 
 ---
 

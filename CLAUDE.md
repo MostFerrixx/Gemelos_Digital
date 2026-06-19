@@ -53,7 +53,7 @@ Núcleo de simulación (sano y principal): `src/subsystems/simulation/`
 
 Stack: Python · SimPy · Pygame/pygame_gui · PyQt6 (dashboard WO por IPC) · pytmx ·
 pandas/openpyxl · Optuna · SQLite · FastAPI/uvicorn/pydantic (web).
-⚠️ FastAPI/uvicorn/pydantic NO están en requirements.txt todavía.
+FastAPI/uvicorn/pydantic YA están en requirements.txt (líneas 24-27).
 
 ## 4. MAPA DE CÓDIGO VIVO vs MUERTO (no confundas uno con otro)
 La regla de oro: **distinguir vivo de muerto, y no mezclarlos sin querer.**
@@ -85,9 +85,9 @@ poda en limpieza:
 Fuente de datos canónica = **la RAÍZ** (`config.json`, `layouts/WH1.tmx`,
 `layouts/Warehouse_Logic.xlsx`). El árbol `data/` es una migración abandonada que
 solo lee código muerto/roto.
-⚠️ BUG conocido: la simulación lee `layouts/Warehouse_Logic.xlsx` pero
-`run_migration.py:75` lee `data/layouts/Warehouse_Logic.xlsx` (dos copias que
-pueden divergir entre la BD y la simulación). Unificar cuando toque.
+NOTA: la simulación y `run_migration.py` leen ambos desde `layouts/`. El migrador
+usa `find_excel_file()` (busca `layouts/Warehouse_Logic_v2.xlsx`, luego
+`layouts/Warehouse_Logic.xlsx`); no existe copia en `data/layouts/`. Sin divergencia.
 
 ## 5. ESTADO ACTUAL (actualizado 2026-06-18)
 
@@ -122,11 +122,10 @@ estado completo y los proximos pasos.
 - Revision de `web_dashboard/` (puerto 8001, huerfana): Director quiere
   decidir si conservar o eliminar antes de poda.
 - Mejoras de diseno D-08+ (ya implementadas; quedan D-13+ si se definen).
-- `push_feature.bat` en raiz: puede borrarse tras el push.
 
 ### Bugs conocidos (no criticos)
-- `run_migration.py:75` lee `data/layouts/Warehouse_Logic.xlsx` pero la
-  simulacion lee `layouts/Warehouse_Logic.xlsx` (dos copias pueden divergir).
+- (RESUELTO) `run_migration.py` lee de `layouts/` via `find_excel_file()`, igual
+  que la simulacion; no hay copia `data/layouts/` ni divergencia.
 - `warehouse.db-shm` y `warehouse.db-wal` aparecen como untracked (ya en
   .gitignore; son artefactos de SQLite en uso).
 
@@ -148,4 +147,33 @@ Lee `docs/HANDOFF.md` para el estado operativo actualizado.
 5. **NO ALUCINES.** Antes de afirmar cómo funciona algo, **léelo** (Grep/Read).
    Si no estás seguro, dilo y verifícalo; no inventes nombres de archivos/funciones.
 6. **RESPETA LA ARQUITECTURA.** No reintroduzcas la live simulation ni rompas la
-   separación headless→jsonl→viewe
+   separación headless→jsonl→viewer. Con el código muerto: ignóralo durante
+   features; en fases de limpieza/refactor explícitas es el objetivo a eliminar o
+   consolidar (con backup y aprobación del Director).
+7. **GIT CON CUIDADO.** Trabaja en ramas feature; `main` es sagrada. No commitees
+   binarios ni datos (`warehouse.db`, `uploads/`). Sugiere el commit, no lo hagas
+   sin contexto.
+
+## 7. PROTOCOLO DE COMUNICACIÓN (estructura fija de tus respuestas)
+Para tareas de desarrollo, responde SIEMPRE en este orden:
+
+> **ESTADO Y CONTEXTO:** dónde estamos y qué entendí del pedido.
+> **DIAGNÓSTICO Y PLAN DE ACCIÓN:** causa raíz + plan numerado (con archivos
+>   concretos a tocar y opciones A/B si las hay, con tu recomendación).
+> **[Si el plan requiere OK]** → pregunta y espera. **[Si es trivial o ya
+>   aprobado]** → ejecuta tú mismo con tus herramientas.
+> **PARA TI (DIRECTOR):** pasos de validación empírica (qué ejecutar, qué deberías
+>   ver). Incluye el comando de commit sugerido cuando proceda.
+> **Cierre:** una pregunta clara de avance (p. ej. "¿Procedo?" / "¿Cuál es la
+>   siguiente prioridad?").
+
+Sé directo y técnico; explica el "porqué" de las decisiones de arquitectura.
+
+## 8. AL INICIAR CADA SESIÓN (sustituye a las reglas rotas de .cursorrules)
+1. `git status` y `git log --oneline -5`.
+2. Revisa si hay cambios sin commitear (¿sigue ahí la Allocation Layer V12.1?).
+3. Lee `AUDITORIA.md` si necesitas el mapa completo del proyecto.
+4. Resume al Director el estado real y la próxima acción sugerida, y pregunta la
+   prioridad. No empieces a cambiar nada sin su luz verde.
+
+— Cerebellum sincronizado. ¿Cuál es la siguiente prioridad, Director?
