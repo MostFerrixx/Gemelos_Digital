@@ -27,6 +27,22 @@ class FleetManager {
         if (generateDefaultBtn) {
             generateDefaultBtn.addEventListener('click', () => this.generateDefaultFleet());
         }
+
+        // C (BK-04): recalcular la cobertura de areas ante CUALQUIER cambio de la flota
+        // (agregar/quitar grupo, agregar/quitar prioridad, cambiar el area de un select).
+        // MutationObserver = cambios estructurales; change delegado = cambio de valor de
+        // un work-area-select. Asi C no depende de hookear cada metodo individual.
+        ['ground-operators-container', 'forklifts-container'].forEach((id) => {
+            const cont = document.getElementById(id);
+            if (!cont) return;
+            cont.addEventListener('change', (e) => {
+                if (e.target && e.target.classList && e.target.classList.contains('work-area-select')) {
+                    this.updateAreaCoverage();
+                }
+            });
+            const mo = new MutationObserver(() => this.updateAreaCoverage());
+            mo.observe(cont, { childList: true, subtree: true });
+        });
     }
 
     setWorkAreas(workAreas) {
@@ -35,6 +51,50 @@ class FleetManager {
 
         // Update all existing dropdowns
         this.updateAllWorkAreaDropdowns();
+        this.updateAreaCoverage();
+    }
+
+    // C (BK-04): pinta el panel de cobertura. Verde = area con al menos un agente;
+    // rojo = area sin responsable. Devuelve la lista de areas sin cubrir.
+    // Matiz clave: si NO hay grupos de flota, agent_types serializa a [] y el motor usa
+    // su flota fallback que cubre TODO -> flota vacia es VALIDA (no se marca rojo).
+    updateAreaCoverage() {
+        const panel = document.getElementById('area-coverage-panel');
+        const areas = this.workAreas || [];
+        const groups = document.querySelectorAll('.fleet-group');
+
+        // Areas cubiertas = union de los work-area-select con valor.
+        const covered = new Set();
+        document.querySelectorAll('.work-area-select').forEach((s) => {
+            if (s.value) covered.add(s.value);
+        });
+        const uncovered = (groups.length > 0)
+            ? areas.filter((a) => !covered.has(a))
+            : [];  // flota vacia => valida (el motor cubre todo)
+
+        if (panel) {
+            if (!areas.length) {
+                panel.innerHTML = '<span class="coverage-label">Cobertura de areas:</span> '
+                    + '<span class="coverage-warn">sin areas cargadas</span>';
+            } else if (groups.length === 0) {
+                panel.innerHTML = '<span class="coverage-label">Cobertura de areas:</span> '
+                    + '<span class="coverage-ok">✓ Flota vacia: el motor usara su flota por '
+                    + 'defecto (cubre todas las areas)</span>';
+            } else {
+                const chips = areas.map((a) => {
+                    const ok = covered.has(a);
+                    return '<span class="coverage-chip ' + (ok ? 'covered' : 'uncovered') + '">'
+                        + (ok ? '✓' : '✗') + ' ' + a + '</span>';
+                }).join(' ');
+                const summary = uncovered.length
+                    ? '<span class="coverage-warn">⚠ ' + uncovered.length
+                      + ' area(s) sin agente — no se podra guardar/correr</span>'
+                    : '<span class="coverage-ok">✓ Todas las areas cubiertas</span>';
+                panel.innerHTML = '<span class="coverage-label">Cobertura de areas:</span> '
+                    + chips + ' ' + summary;
+            }
+        }
+        return uncovered;
     }
 
     updateAllWorkAreaDropdowns() {
@@ -278,15 +338,32 @@ class FleetManager {
         // Clear existing fleet
         this.clearAllGroups();
 
-        // Add default GroundOperator group
+        // Fix 1 (BK-04): repartir las areas REALES del layout (this.workAreas), no
+        // nombres hardcodeados. Heuristica: areas "de piso" -> GroundOperator; el resto
+        // (racks altos / especiales) -> Forklift. Cada area cae en exactamente un grupo,
+        // asi la flota por defecto cubre TODAS por construccion (valida sola).
+        const areas = (this.workAreas || []).slice();
+        const isGround = (a) => /ground|piso|floor|suelo|terrestre|level[_-]?0|l0/i.test(a);
+        const groundAreas = areas.filter(isGround);
+        const forkAreas = areas.filter(a => !isGround(a));
+
+        if (!areas.length) {
+            this.configurator.showNotification(
+                'No hay areas de trabajo cargadas. Carga el layout/Excel antes de generar la flota.',
+                'warning');
+        }
+
+        // Operarios terrestres: cubren las areas de piso (todas, si no hay de forklift)
         this.addGroup('GroundOperator');
-        this.addDefaultPriorities('GroundOperator', 0, ['Area_Ground', 'Area_Piso_L1']);
+        this.addDefaultPriorities('GroundOperator', 0, groundAreas);
 
-        // Add default Forklift group
+        // Montacargas: cubren el resto (racks / especiales)
         this.addGroup('Forklift');
-        this.addDefaultPriorities('Forklift', 0, ['Area_Rack']);
+        this.addDefaultPriorities('Forklift', 0, forkAreas);
 
-        this.configurator.showNotification('Flota por defecto generada exitosamente', 'success');
+        this.updateAreaCoverage();
+        this.configurator.showNotification(
+            'Flota por defecto generada (cubre todas las areas del layout)', 'success');
     }
 
     addDefaultPriorities(agentType, groupIndex, workAreas) {

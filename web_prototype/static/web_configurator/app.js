@@ -802,7 +802,7 @@ class WebConfigurator {
                 }
             } else {
                 console.warn('[WEB_CONFIGURATOR] No work areas found in file, using defaults');
-                this.workAreas = ['Area_Ground', 'Area_Rack', 'Area_Piso_L1'];
+                this.workAreas = ['Area_Ground', 'Area_High', 'Area_Special'];
                 this.fleetManager.setWorkAreas(this.workAreas);
 
                 if (!silent) {

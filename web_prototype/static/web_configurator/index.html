@@ -385,6 +385,10 @@
                         <button id="btn-generate-default-fleet" class="btn-text">Generar Flota por Defecto</button>
                     </div>
 
+                    <!-- C (BK-04): cobertura de areas en vivo. Marca en rojo las areas
+                         del layout sin ningun agente; se recalcula al cambiar la flota. -->
+                    <div id="area-coverage-panel" class="coverage-panel"></div>
+
                     <div class="fleet-section">
                         <div class="section-header">
                             <h3>Operarios Terrestres</h3>
@@ -744,8 +748,12 @@
                             body: JSON.stringify({ config: config })
                         });
 
-                        if (!saveResponse.ok) {
-                            throw new Error('Failed to save configuration');
+                        const saveResult = await saveResponse.json().catch(() => ({}));
+                        if (!saveResponse.ok || saveResult.success === false) {
+                            const msg = (saveResult && Array.isArray(saveResult.errors) && saveResult.errors.length)
+                                ? saveResult.errors.join('; ')
+                                : 'No se pudo guardar la configuracion';
+                            throw new Error(msg);
                         }
 
                         this.appendLog('[INFO] Configuration saved successfully', 'success');

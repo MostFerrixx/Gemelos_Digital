@@ -271,6 +271,27 @@ class WebConfigurationManager:
                                 or ti < 1 or ti > 3600:
                             errors.append("outbound.truck_interval must be a number between 1 and 3600")
 
+            # Cobertura de areas (BK-04): si hay agent_types EXPLICITO, toda area real
+            # del layout debe estar cubierta por al menos un grupo. Con agent_types vacio
+            # el motor crea una flota fallback que cubre todas las areas (ver
+            # operators.py crear_operarios), asi que NO se valida (flota vacia => valida).
+            agent_types = config.get('agent_types', [])
+            if isinstance(agent_types, list) and agent_types:
+                seq = config.get('sequence_file', '')
+                required_areas = self.extract_work_areas(seq) if seq else []
+                if required_areas:
+                    covered = set()
+                    for a in agent_types:
+                        if isinstance(a, dict):
+                            wap = a.get('work_area_priorities', {})
+                            if isinstance(wap, dict):
+                                covered.update(wap.keys())
+                    for area in required_areas:
+                        if area not in covered:
+                            errors.append(
+                                "El area '" + str(area) + "' no tiene ningun agente "
+                                "asignado. Asignala a un grupo en la pestana 'Flota de Agentes'.")
+
             # C5: validacion del bloque tiempos (si la UI lo envia)
             if 'tiempos' in config:
                 t = config['tiempos']

@@ -278,9 +278,40 @@ por costo actual. La diferencia seria mayor en layouts con alta densidad de WOs 
 
 ## BK-04 — Flota por defecto deja Forklift sin work_area + outbound no termina
 
-**Estado:** DETECTADO 2026-06-19 (prueba en vivo de truck_interval en navegador)
-**Prioridad:** Media-Alta (bloquea correr con outbound + flota por defecto desde la UI)
-**Origen:** Ronda en vivo navegador (docs/VALIDACION_UI_WEB.md, seccion 2026-06-19)
+**Estado:** RESUELTO (preventivo) 2026-06-20 — solucion A + Fix 1 rehecho + C.
+**Prioridad:** Media-Alta (bloqueaba correr con outbound + flota por defecto desde la UI)
+**Origen:** Ronda en vivo navegador (docs/VALIDACION_UI_WEB.md, secciones 2026-06-19/20)
+
+### Solucion implementada (2026-06-20)
+Enfoque PREVENTIVO acordado con el Director (sin watchdog que corte la sim):
+- **A — validacion backend bloqueante** (`web_prototype/config_manager.py::validate_config`):
+  con `agent_types` explicito, toda area real del layout (`extract_work_areas`) debe
+  estar cubierta por algun grupo; si no, rechaza guardado/run nombrando el area. Con
+  `agent_types` vacio NO valida (el motor usa flota fallback que cubre todo => sin
+  regresion). El run tambien queda frenado: `index.html::startSimulation` aborta si el
+  auto-guardado devuelve `success:false`.
+- **Fix 1 rehecho** (`fleet-manager.js::_executeDefaultFleet`): la flota por defecto usa
+  las areas REALES (`this.workAreas`), no nombres hardcodeados; reparte piso->Ground,
+  resto->Forklift, cubriendo todas por construccion.
+- **C — indicador en vivo** (`#area-coverage-panel` + `updateAreaCoverage`): marca en
+  rojo las areas sin agente y se recalcula ante cualquier cambio de flota.
+- Tambien se corrigio la lista fallback stale en `app.js` (Area_Rack/Area_Piso_L1 ->
+  areas reales Area_Ground/Area_High/Area_Special).
+
+Validado en vivo: flota por defecto cubre todo y la corrida con outbound TERMINA
+(exit 0, Pending=0, 44 trucks / 153 pallets); dejar un area huerfana => C en rojo + A
+bloquea Apply y Run con el mensaje; flota vacia sigue valida (sin regresion). Ver
+docs/VALIDACION_UI_WEB.md (seccion 2026-06-20).
+
+> NOTA (no bloqueante): el Fix 2 defensivo (watchdog de terminacion del OutboundProcess)
+> fue DESCARTADO por el Director. El `while True` de OutboundProcess sigue ahi; ya no
+> causa hang porque la prevencion impide configs con areas huerfanas, pero si en el
+> futuro aparece otro deadlock de asignacion, la sim podria colgarse igual. Queda como
+> nota para reconsiderar si se desea robustez extra del motor.
+
+---
+
+### (Diagnostico original, 2026-06-19)
 
 ### Sintoma
 Tras "Generar Flota por Defecto" en el configurador y correr con outbound ON, la

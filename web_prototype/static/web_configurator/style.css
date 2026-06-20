@@ -1445,3 +1445,53 @@ select:disabled {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
+
+/* C (BK-04): panel de cobertura de areas en la pestana Flota de Agentes */
+.coverage-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 4px 0;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--color-surface, rgba(127, 127, 127, 0.06));
+    font-size: 13px;
+}
+.coverage-panel:empty {
+    display: none;
+}
+.coverage-label {
+    font-weight: 600;
+    margin-right: 4px;
+}
+.coverage-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid transparent;
+}
+.coverage-chip.covered {
+    background: rgba(22, 163, 74, 0.12);
+    color: #16a34a;
+    border-color: rgba(22, 163, 74, 0.35);
+}
+.coverage-chip.uncovered {
+    background: rgba(220, 38, 38, 0.12);
+    color: #dc2626;
+    border-color: rgba(220, 38, 38, 0.45);
+}
+.coverage-warn {
+    color: #dc2626;
+    font-weight: 600;
+    margin-left: 4px;
+}
+.coverage-ok {
+    color: #16a34a;
+    font-weight: 600;
+    margin-left: 4px;
+}

@@ -1379,3 +1379,39 @@ nunca se asignan (Pending atascado, Completed congelado). Con outbound ON, el
 `OutboundProcess` (bucle `while True` de camiones) impide que la sim finalice -> corre
 infinito emitiendo camiones vacios. NO lo causa el cambio de truck_interval; este solo
 lo hizo visible (mas logs de camion). Detalle y plan en BK-04.
+
+---
+
+## RONDA EN VIVO (NAVEGADOR) — 2026-06-20: prevencion de areas sin responsable (BK-04 cerrado)
+
+**Metodo:** Chrome MCP conduciendo el configurador contra el servidor FastAPI local.
+Se implemento la solucion preventiva A + Fix 1 rehecho + C.
+
+### Que se implemento
+- **A (backend, bloqueante):** `config_manager.validate_config` ahora comprueba la
+  cobertura de areas: con `agent_types` explicito, toda area real del layout
+  (`extract_work_areas`) debe estar en las prioridades de algun grupo; si no, rechaza
+  el guardado/run nombrando el area. Si `agent_types` esta vacio, NO valida (el motor
+  usa su flota fallback que cubre todo) -> sin regresion. El run tambien queda frenado:
+  `startSimulation` (index.html) ahora aborta si el auto-guardado devuelve `success:false`.
+- **Fix 1 rehecho:** `_executeDefaultFleet` (fleet-manager.js) usa `this.workAreas`
+  (areas REALES del layout), no nombres hardcodeados. Heuristica: areas de piso ->
+  GroundOperator; el resto -> Forklift. Cubre todas por construccion.
+- **C (indicador en vivo):** panel `#area-coverage-panel` en la pestana Flota que lista
+  las areas y marca en rojo las sin agente; se recalcula ante cualquier cambio de flota
+  (MutationObserver + change delegado). Estilos en style.css.
+
+### Resultados de las pruebas en vivo
+
+| Caso | Resultado |
+|---|---|
+| Flota vacia (config original) | Panel: "Flota vacia: el motor usara su flota por defecto (cubre todas)"; valido (sin bloqueo). NO regresion. |
+| Generar Flota por Defecto | Reparte Area_Ground->GroundOperator, Area_High/Area_Special->Forklift; panel "✓ Todas las areas cubiertas". |
+| Corrida headless con esa flota + outbound | **TERMINA** (exit 0, Pending=0, Completed=153, 44 trucks / 153 pallets). Ya NO se cuelga. |
+| Quitar Area_High de la flota | C marca "✗ Area_High ⚠ 1 area(s) sin agente"; uncovered=["Area_High"]. |
+| Aplicar config invalida | A bloquea: toast "Error: El area 'Area_High' no tiene ningun agente asignado...". config.json NO se sobrescribe. |
+| Run con config invalida | El runner aborta con el mismo mensaje (no arranca la sim, no crea replay). |
+
+**Veredicto:** BK-04 RESUELTO de forma preventiva. Imposible guardar/correr una config
+que deje un area sin responsable (backend), la flota por defecto sale valida sola, y la
+UI avisa en vivo. La flota vacia sigue siendo valida (sin regresion).
