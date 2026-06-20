@@ -261,8 +261,15 @@ class WebConfigurationManager:
                 ob = config['outbound']
                 if not isinstance(ob, dict):
                     errors.append("outbound must be an object")
-                elif not isinstance(ob.get('enabled', False), bool):
-                    errors.append("outbound.enabled must be boolean")
+                else:
+                    if not isinstance(ob.get('enabled', False), bool):
+                        errors.append("outbound.enabled must be boolean")
+                    # truck_interval (opcional): expuesto en la UI; validar rango.
+                    if 'truck_interval' in ob:
+                        ti = ob['truck_interval']
+                        if isinstance(ti, bool) or not isinstance(ti, (int, float)) \
+                                or ti < 1 or ti > 3600:
+                            errors.append("outbound.truck_interval must be a number between 1 and 3600")
 
             # C5: validacion del bloque tiempos (si la UI lo envia)
             if 'tiempos' in config:

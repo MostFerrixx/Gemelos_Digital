@@ -98,6 +98,12 @@ class WebConfigurator {
         if (dispatchSelect) {
             dispatchSelect.addEventListener('change', () => this._updateRadioCercaniaVisibility());
         }
+
+        // Outbound: Listener toggle-outbound — mostrar/ocultar truck_interval
+        const outboundToggle = document.getElementById('toggle-outbound');
+        if (outboundToggle) {
+            outboundToggle.addEventListener('change', () => this._updateOutboundVisibility());
+        }
     }
 
     // BK-01: muestra/oculta el campo radio_cercania segun estrategia seleccionada
@@ -106,6 +112,14 @@ class WebConfigurator {
         const group = document.getElementById('radio-cercania-group');
         if (!sel || !group) return;
         group.style.display = sel.value === 'Cercania' ? 'block' : 'none';
+    }
+
+    // Outbound: muestra/oculta el campo truck_interval segun el toggle outbound
+    _updateOutboundVisibility() {
+        const tog = document.getElementById('toggle-outbound');
+        const group = document.getElementById('truck-interval-group');
+        if (!tog || !group) return;
+        group.style.display = tog.checked ? 'block' : 'none';
     }
 
     // C5: determina si los valores actuales coinciden con un preset conocido.
@@ -550,6 +564,15 @@ class WebConfigurator {
         if (twToggle) twToggle.checked = twChecked;
         if (obToggle) obToggle.checked = obChecked;
 
+        // Outbound: cargar truck_interval y mostrar/ocultar su campo segun el toggle
+        const truckIntervalEl = document.getElementById('truck-interval');
+        if (truckIntervalEl) {
+            const ti = (config.outbound && config.outbound.truck_interval != null)
+                ? config.outbound.truck_interval : 90;
+            truckIntervalEl.value = ti;
+        }
+        this._updateOutboundVisibility();
+
         // C5: Tiempos de Operacion — cargar bloque tiempos desde config.
         // Ausencia del bloque = usar defaults demo (comportamiento actual).
         const t = config.tiempos || {};
@@ -588,7 +611,7 @@ class WebConfigurator {
                 }
             },
             outbound: {
-                enabled: true, dispatch_policy: 'interval', truck_interval: 20.0,
+                enabled: true, dispatch_policy: 'interval', truck_interval: 90.0,
                 truck_capacity: 8, loading_time: 2.0, zone_capacity_default: 8,
                 slot_wait_alert: 60.0, slot_poll_dt: 0.1, dwell_scaffold: 10.0
             },
@@ -709,6 +732,12 @@ class WebConfigurator {
             baseCong.timewindow.shadow = false;
         }
         baseOb.enabled = obOn;
+        // Outbound: la UI tambien controla truck_interval (resto de claves se preservan)
+        const tiEl = document.getElementById('truck-interval');
+        if (tiEl && tiEl.value !== '') {
+            const tiVal = parseInt(tiEl.value);
+            if (!isNaN(tiVal) && tiVal >= 1) baseOb.truck_interval = tiVal;
+        }
 
         config.congestion = baseCong;
         config.outbound = baseOb;

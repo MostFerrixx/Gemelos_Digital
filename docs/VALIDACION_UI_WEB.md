@@ -1344,3 +1344,38 @@ Tiempo ejecucion: 4.09s
 una preferencia (no restricción de zona). La expansión gradual modela el comportamiento
 real de un operario que, cuando su zona está vacía, amplía su búsqueda hasta encontrar
 trabajo — nunca se queda parado.
+
+---
+
+## RONDA EN VIVO (NAVEGADOR) — 2026-06-19: truck_interval en UI + KPIs outbound en pantalla
+
+**Metodo:** Chrome MCP conduciendo el configurador y el visor contra el servidor FastAPI
+local (uvicorn :8000). Flujo completo ejercitado en vivo, no solo por codigo.
+
+### Parte 1 — Campo truck_interval (nuevo) en el configurador
+
+| Verificacion | Resultado |
+|---|---|
+| Campo oculto con outbound OFF | OK — `#truck-interval-group` con display:none |
+| Aparece al activar "Subsistema outbound" | OK — visible al togglear (listener `_updateOutboundVisibility`) |
+| Valor por defecto | 90 (desde config.json) |
+| Editable + persiste a config.json | OK — se cambio a 70, "Aplicar Configuracion" -> toast "exitosamente" -> config.json en disco = 70 |
+| Validacion de rango (config_manager) | OK — 1..3600; 99999 y 0 rechazados |
+
+### Parte 2 — Flujo completo y KPIs outbound en el visor
+
+- Configurador -> "Aplicar Configuracion": toast "Configuracion aplicada a config.json exitosamente".
+- "Generar Flota por Defecto": modal propio (valida de paso el fix H-2), genera 2+2 agentes.
+- "Run Simulation": el runner conecta por WebSocket, guarda config y lanza el proceso de sim.
+- Visor (autoload del replay outbound): al avanzar al final (t=01:00:57, 227/227 WOs, 100%),
+  la barra de metricas del bottom-panel muestra **TRUCKS=39** y **SHIPPED=226** EN PANTALLA
+  (replay output/simulation_20260619_181343). Confirmacion visual de G15/G16 lograda.
+
+### Hallazgo (BUG pre-existente, ver docs/BACKLOG.md BK-04)
+
+Al correr con la flota generada por "Generar Flota por Defecto", la sim NO termina:
+los Forklift quedan con `work_area_priorities` vacio, asi que las WOs de Area_High/Area_Special
+nunca se asignan (Pending atascado, Completed congelado). Con outbound ON, el
+`OutboundProcess` (bucle `while True` de camiones) impide que la sim finalice -> corre
+infinito emitiendo camiones vacios. NO lo causa el cambio de truck_interval; este solo
+lo hizo visible (mas logs de camion). Detalle y plan en BK-04.

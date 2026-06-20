@@ -276,6 +276,50 @@ por costo actual. La diferencia seria mayor en layouts con alta densidad de WOs 
 
 ---
 
+## BK-04 — Flota por defecto deja Forklift sin work_area + outbound no termina
+
+**Estado:** DETECTADO 2026-06-19 (prueba en vivo de truck_interval en navegador)
+**Prioridad:** Media-Alta (bloquea correr con outbound + flota por defecto desde la UI)
+**Origen:** Ronda en vivo navegador (docs/VALIDACION_UI_WEB.md, seccion 2026-06-19)
+
+### Sintoma
+Tras "Generar Flota por Defecto" en el configurador y correr con outbound ON, la
+simulacion NO termina: corre indefinidamente emitiendo camiones vacios (en una prueba,
+22.358 "truck sale vacio", t > 1.5M s) hasta timeout.
+
+### Causa raiz (dos partes)
+1. **Forklift sin work_area_priorities:** "Generar Flota por Defecto" crea los grupos
+   Forklift con `work_area_priorities: {}` (vacio). Las WorkOrders de Area_High /
+   Area_Special (que solo manejan forklifts) nunca se asignan -> quedan Pending para
+   siempre (en la prueba: Completed=72 congelado, Pending=99). Los GroundOperator si
+   reciben Area_Ground (priority 1), por eso completan su parte.
+2. **OutboundProcess no termina:** `outbound.py::OutboundProcess.run()` es un
+   `while True: yield timeout(truck_interval)`. Mientras viva, SimPy siempre tiene un
+   evento futuro -> `env.run()` nunca se queda sin eventos -> la sim no finaliza aunque
+   los operarios esten idle. Sin outbound, una sim con WOs imposibles terminaria al
+   agotarse los eventos (incompleta); con outbound queda colgada para siempre.
+
+### Evidencia
+- 181343 (replay valido, 40 trucks / 226 pallets) uso una config con `agent_types: []`,
+  donde el motor asigna areas por defecto a los forklifts -> SI completan Area_High.
+- La config guardada por la UI tiene `agent_types` explicito con Forklift
+  `work_area_priorities: {}` -> deadlock.
+
+### Plan propuesto (a confirmar con el Director)
+- **Fix 1 (UI):** que "Generar Flota por Defecto" asigne areas a los Forklift
+  (p.ej. Area_High + Area_Special) en `fleet-manager.js`, en lugar de `{}`.
+- **Fix 2 (motor, defensivo):** watchdog de terminacion: si N camiones consecutivos
+  salen vacios y no hay progreso de WOs durante X tiempo, cortar la sim (o que
+  OutboundProcess termine cuando no quedan pallets ni WOs asignables). Evita el hang
+  infinito ante cualquier deadlock de asignacion.
+- **Fix 3 (UX):** que el configurador advierta si hay WorkAreas sin ningun agente capaz.
+
+### Nota
+NO lo causa el cambio de `truck_interval` (bajar el default a 90 solo hizo el hang mas
+ruidoso). El feature truck_interval quedo validado de forma independiente.
+
+---
+
 *Este documento se actualiza al detectar nuevos items en sesiones de desarrollo.
 Para retomar BK-01, leer: `dispatcher.py` lineas 252-273 (router de estrategias) al detectar nuevos items en sesiones de desarrollo.
 Para retomar BK-01, leer: `dispatcher.py` lineas 252-273 (router de estrategias)

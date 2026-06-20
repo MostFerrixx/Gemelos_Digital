@@ -75,7 +75,7 @@
     "outbound": {
         "enabled": false,
         "dispatch_policy": "interval",
-        "truck_interval": 9999,
+        "truck_interval": 90,
         "truck_capacity": 8,
         "loading_time": 2,
         "zone_capacity_default": 8,
