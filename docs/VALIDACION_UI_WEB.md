@@ -1415,3 +1415,63 @@ Se implemento la solucion preventiva A + Fix 1 rehecho + C.
 **Veredicto:** BK-04 RESUELTO de forma preventiva. Imposible guardar/correr una config
 que deje un area sin responsable (backend), la flota por defecto sale valida sola, y la
 UI avisa en vivo. La flota vacia sigue siendo valida (sin regresion).
+
+---
+
+## QA ADVERSARIAL — 2026-06-21: intento activo de romper las protecciones de BK-04
+
+**Objetivo:** provocar el cuelgue / colar un area huerfana pese a A + Fix 1 + C.
+**Metodo:** POST directo al endpoint (bypass de la UI), corridas headless con `--config`
+(bypass del guardado), y casos borde. Servidor de prueba en :8001.
+
+### Lo que AGUANTO bien (protecciones OK)
+
+| Caso | Resultado |
+|---|---|
+| POST directo: Forklift con prioridades vacias | A BLOQUEA (nombra Area_High/Area_Special). El backend es la barrera real, no el frontend. |
+| POST directo: area con typo ('Area_Hihg') | A BLOQUEA (el typo no cuenta como cobertura). |
+| POST directo: cubrir un area inexistente, dejar Area_High fuera | A BLOQUEA (Area_High sin cubrir). |
+| truck_interval = 1 y 3600 | ACEPTADOS (limites). 0, -5, 3601, 5000, 'abc' RECHAZADOS. |
+| total_ordenes = 0 o negativo | RECHAZADO en el guardado ("must be greater than 0"). |
+| Capacidad ridicula (cap=10 < volumen) + outbound | TERMINA (el dispatcher stagea las WOs over-capacity; no cuelga). |
+| Flota por defecto + outbound (control) | TERMINA (exit 0, Pending=0). |
+
+### HALLAZGOS (grietas reales — NO corregidas, solo diagnostico)
+
+**QA-1 — El MOTOR no valida; A solo cubre el endpoint de guardado. (CRACK, grave)**
+`validate_config` corre solo en `save_config` (POST /api/configurator/config). El motor
+(`entry_points/run_generate_replay.py` -> `event_generator`) lee `config.json` o `--config`
+y corre SIN validar. Evidencia: fleet huerfano (forklift vacio) corrido headless directo
+-> **HANG** (5721 camiones vacios, Pending atascado). Vias de bypass reales: `config.json`
+editado a mano, `--config`, el optimizer (genera trial configs y corre el engine), un
+preset guardado ANTES de A, o cualquier disparo del run que no pase por el auto-guardado.
+La UI esta protegida (auto-save valida); el motor por si mismo no.
+
+**QA-2 — Flota vacia / 0 agentes cuelga, y A la ACEPTA. (CRACK, grave, ALCANZABLE POR LA UI)**
+A salta la validacion de cobertura cuando `agent_types` esta vacio (decision "anti-regresion",
+asumiendo que el fallback del motor cubre todo). Pero una flota vacia desde la UI serializa
+`agent_types=[]` Y `num_operarios_terrestres/montacargas = 0` -> el fallback crea **0 agentes**
+-> ningun WO se completa -> la sim NO termina. Evidencia: con outbound ON -> HANG (19757
+camiones vacios); con outbound OFF -> **tambien HANG** (el proceso del dispatcher espera WOs
+que nunca se completan). `validate_config` lo ACEPTA sin error. Es el mismo arbol del bug
+original ("un area sin responsable" generalizado a "ningun agente"). El agujero: A solo
+valida cobertura cuando `agent_types` NO esta vacio; el caso vacio + 0 operarios queda sin red.
+> Nota: la config COMMITEADA (config.json con `num_operarios=2`, `agent_types=[]`) NO cuelga
+> (el fallback crea 2+2 agentes). El cuelgue aparece cuando la UI guarda una flota vacia
+> (num_operarios=0), p.ej. si el usuario limpia la flota y aplica/corre sin generarla.
+
+**QA-3 — Tipo de equipo equivocado: se cuela un caso irreal (NO cuelga). (gap de realismo)**
+El motor decide capacidad solo por `work_area_priorities`, no por el tipo. Cubrir Area_High
+con un GroundOperator (sin forklift) PASA la validacion y la sim COMPLETA (el ground op hace
+el trabajo de altura). No cuelga, pero permite flotas fisicamente irreales. A garantiza
+no-cuelgue (cobertura), no correccion de tipo.
+
+### Veredicto QA
+Las protecciones A+Fix1+C cumplen su objetivo ESPECIFICO (impedir que la UI guarde/corra
+una flota con un area de trabajo sin responsable), y son robustas ante el bypass de la UI
+por POST directo. PERO hay dos grietas por donde el cuelgue sigue siendo posible:
+- **QA-1**: el motor no valida -> cualquier config no validada que llegue al engine cuelga.
+- **QA-2**: flota vacia / 0 agentes (UI-reachable) cuelga y A no lo detecta.
+Ambas apuntan a la misma raiz que el Director eligio NO cerrar: el `while True` del
+OutboundProcess (y la espera del dispatcher) sin watchdog de terminacion. La prevencion
+por cobertura tapo el caso mas comun, pero no es hermetica. Decision de diseño pendiente.
