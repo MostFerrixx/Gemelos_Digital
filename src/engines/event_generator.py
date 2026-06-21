@@ -209,9 +209,15 @@ class EventGenerator:
         return True
 
     def _expected_equipment_for_area(self, area):
-        # QA-3 (BK-04): tipo capaz de un area por CONVENCION DE NOMBRES (el dato no lo
-        # codifica: equipment_required es uniforme). Debe coincidir con
-        # config_manager._expected_equipment_for_area y fleet-manager.js isGround.
+        # QA-3 (Opcion B): tipo capaz de un area. FUENTE DE VERDAD = el mapa explicito
+        # config['work_area_equipment'] (editable en la UI). La convencion de nombres
+        # (regex) queda SOLO como fallback para configs viejas sin el mapa. Misma logica en
+        # config_manager._expected_equipment_for_area y fleet-manager.js.
+        wae = (self.configuracion or {}).get('work_area_equipment', {})
+        if isinstance(wae, dict):
+            t = wae.get(area)
+            if t:
+                return t
         import re
         if re.search(r'ground|piso|floor|suelo|terrestre|level[_-]?0|l0', str(area), re.I):
             return 'GroundOperator'

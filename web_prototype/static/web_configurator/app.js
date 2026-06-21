@@ -541,6 +541,8 @@ class WebConfigurator {
         if (config.agent_types && config.agent_types.length > 0) {
             this.fleetManager.loadFleet(config.agent_types);
         }
+        // QA-3 Opcion B: mapa area->equipo (siembra desde convencion lo que falte).
+        this.fleetManager.setWorkAreaEquipment(config.work_area_equipment || {});
 
         // Tab 4: Layout y Datos
         document.getElementById('layout-file').value = config.layout_file || 'layouts/WH1.tmx';
@@ -665,6 +667,8 @@ class WebConfigurator {
 
             // Tab 3: Flota de Agentes
             agent_types: this.fleetManager.serializeFleet(),
+            // QA-3 Opcion B: mapa explicito area->tipo de equipo requerido.
+            work_area_equipment: this.fleetManager.getWorkAreaEquipment(),
 
             // Tab 4: Layout y Datos
             layout_file: document.getElementById('layout-file').value,

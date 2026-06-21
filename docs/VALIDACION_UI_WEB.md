@@ -1525,3 +1525,46 @@ El Director aprobo cerrar las 3 grietas con enfoque preventivo (sin watchdog). I
 configurador, arranque del motor, indicador en vivo), y de forma consistente. El bypass del
 motor (la grieta mas peligrosa) ahora aborta en ~2s con mensaje claro en vez de colgarse.
 Las configs validas de siempre siguen funcionando igual (no-regresion confirmada).
+
+---
+
+## QA-3 ROBUSTO (Opcion B) — 2026-06-21: mapa explicito area->equipo (fin de la convencion por nombre)
+
+El "tipo requerido por area" dejaba de adivinarse por el nombre (regex fragil) y pasa a una
+FUENTE DE VERDAD explicita: el mapa `work_area_equipment` en config.json, editable en la UI.
+
+### Que se implemento
+- **config.json:** nuevo `work_area_equipment` (sembrado con el comportamiento actual:
+  `Area_Ground:GroundOperator, Area_High:Forklift, Area_Special:Forklift`). Tambien en el
+  default de `config_manager`.
+- **3 capas leen el mapa (regex solo como fallback de migracion):**
+  `config_manager._expected_equipment_for_area(area, mapa)`,
+  `event_generator._expected_equipment_for_area` (lee `config['work_area_equipment']`),
+  `fleet-manager.js._expectedEquipmentForArea` (lee `this.workAreaEquipment`).
+- **Completitud (validacion A):** si el mapa esta definido, toda area del layout debe
+  estar en el; si falta una, o un valor no es GroundOperator/Forklift, RECHAZA con mensaje.
+- **Editor UI:** en la pestana Flota, un selector de equipo por cada area
+  (`#area-equipment-editor`); al cambiarlo se recalcula C. `app.js` carga/serializa
+  `work_area_equipment` y siembra desde la convencion lo que falte (migracion suave).
+
+### Re-test (el tipo sale del MAPA, no del nombre)
+
+| Caso | Resultado |
+|---|---|
+| Validacion: GroundOp cubre Area_High, mapa High=Forklift | **RECHAZA** (tipo del mapa) |
+| Validacion: MISMO fleet, mapa OVERRIDE High=GroundOperator | **ACEPTA** (el tipo sale del mapa, no del nombre) |
+| Validacion: mapa sin Area_Special (completitud) | **RECHAZA** ("sin tipo de equipo definido") |
+| Validacion: valor invalido en el mapa ('Robot') | **RECHAZA** |
+| Motor: GroundOp cubre todo, mapa normal | **ABORTA** ("requiere un Forklift") |
+| Motor: MISMO fleet, mapa OVERRIDE todo=GroundOperator | **TERMINA** (motor respeta el mapa) |
+| No-regresion: committed (vacio 2+2) y Fix1 default | **ACEPTAN / TERMINAN** igual que antes |
+
+**Robustez ganada:** renombrar un area o un typo ya NO cambia silenciosamente el tipo
+esperado; el mapa explicito manda y la completitud obliga a declarar cada area. La
+convencion por nombre queda solo como fallback para configs viejas sin mapa (no-regresion).
+
+> NOTA: el editor UI (render del selector por area + efecto en C + serializacion) quedo con
+> verificacion en vivo PENDIENTE (la extension de Chrome se desconecto durante el re-test).
+> Verificado en su lugar: node --check de los JS (sin errores), el servidor sirve el
+> contenedor del editor y el `work_area_equipment` por defecto, y la logica JS es identica
+> a la del backend ya validado. Re-verificar en navegador cuando reconecte.

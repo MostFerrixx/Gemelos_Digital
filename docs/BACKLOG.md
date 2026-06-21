@@ -315,8 +315,11 @@ aprobo cerrarlas (sin watchdog):
   cubre_areas`, antes de `env.run`): si no hay agentes / no hay WOs / un area sin agente
   capaz, ABORTA con mensaje (exit 1) en vez de colgarse. Cubre el bypass del motor
   (config.json a mano, `--config`, optimizer, presets viejos).
-- **QA-3:** validacion y motor exigen el TIPO de agente capaz por area (convencion de
-  nombres; el dato no lo codifica). C marca el tipo incorrecto en naranja.
+- **QA-3:** validacion y motor exigen el TIPO de agente capaz por area. C marca el tipo
+  incorrecto en naranja. **(2026-06-21, Opcion B)** la fuente de verdad del tipo por area
+  paso de la convencion por nombre a un mapa EXPLICITO `work_area_equipment` en config.json,
+  editable en la UI, validado por completitud; la convencion queda solo como fallback de
+  migracion. Ver docs/VALIDACION_UI_WEB.md (seccion "QA-3 ROBUSTO (Opcion B)").
 Re-test adversarial confirmo: los vectores que antes colgaban ahora abortan en ~2s; las
 configs validas de siempre siguen funcionando (no-regresion). El `while True` sigue, pero
 ya no se alcanza por estas vias. Si aparece OTRO deadlock de asignacion no cubierto por

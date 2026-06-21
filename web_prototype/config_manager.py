@@ -13,17 +13,26 @@ from typing import Dict, List, Tuple, Optional
 import openpyxl
 
 
-# QA-3 (BK-04 hardening): tipo de agente capaz de un area. El dato del Excel/DB NO codifica
-# el equipo por area (equipment_required uniforme), asi que se usa CONVENCION DE NOMBRES:
-# areas "de piso" -> GroundOperator; el resto (racks altos / especiales) -> Forklift.
-# DEBE coincidir con la heuristica de la flota por defecto (fleet-manager.js: isGround) y
-# con la del chequeo de arranque del motor (event_generator). Si el layout usa otra
-# convencion de nombres, ajustar aqui.
+# QA-3 (Opcion B): tipo de agente capaz de un area. FUENTE DE VERDAD = el mapa explicito
+# `work_area_equipment` de config.json (editable en la UI). La convencion de nombres
+# (regex) queda SOLO como fallback de migracion para configs viejas sin el mapa.
+# La MISMA logica vive en event_generator (motor) y fleet-manager.js (indicador C).
+VALID_EQUIPMENT = ('GroundOperator', 'Forklift')
 _GROUND_AREA_RE = re.compile(r'ground|piso|floor|suelo|terrestre|level[_-]?0|l0', re.I)
 
 
-def _expected_equipment_for_area(area: str) -> str:
+def _equipment_by_naming(area: str) -> str:
+    """Fallback historico (convencion de nombres) cuando el mapa no define el area."""
     return 'GroundOperator' if _GROUND_AREA_RE.search(str(area)) else 'Forklift'
+
+
+def _expected_equipment_for_area(area: str, mapping: dict = None) -> str:
+    """Tipo requerido por el area: del mapa explicito si esta; si no, por convencion."""
+    if mapping:
+        t = mapping.get(area)
+        if t:
+            return t
+    return _equipment_by_naming(area)
 
 
 class WebConfigurationManager:
@@ -285,15 +294,28 @@ class WebConfigurationManager:
                                 or ti < 1 or ti > 3600:
                             errors.append("outbound.truck_interval must be a number between 1 and 3600")
 
-            # Cobertura de areas (BK-04 + hardening QA): la flota debe tener >=1 agente y
-            # cubrir cada area con un agente del TIPO capaz. Dos ramas:
-            #  - agent_types EXPLICITO: cada area real debe estar cubierta por un agente del
-            #    tipo correcto (QA-1 cobertura + QA-3 tipo).
-            #  - agent_types VACIO: el motor usa su flota fallback (num_operarios_*). Solo se
-            #    exige que haya >=1 agente (QA-2); el tipo no se valida (default interno).
+            # Cobertura de areas (BK-04 + hardening QA, Opcion B): la flota debe tener >=1
+            # agente y cubrir cada area con un agente del TIPO capaz. El "tipo requerido por
+            # area" sale del mapa explicito work_area_equipment (fallback: convencion).
             agent_types = config.get('agent_types', [])
             seq = config.get('sequence_file', '')
             required_areas = self.extract_work_areas(seq) if seq else []
+            wae = config.get('work_area_equipment', {})
+            if not isinstance(wae, dict):
+                errors.append("work_area_equipment debe ser un objeto area->tipo de equipo.")
+                wae = {}
+            else:
+                for k, v in wae.items():
+                    if v not in VALID_EQUIPMENT:
+                        errors.append("work_area_equipment['" + str(k) + "'] = '" + str(v)
+                                      + "' no es un tipo valido (GroundOperator o Forklift).")
+                # Completitud: si el mapa esta definido, toda area del layout debe estar en el.
+                if wae and required_areas:
+                    for area in required_areas:
+                        if area not in wae:
+                            errors.append(
+                                "El area '" + str(area) + "' no tiene tipo de equipo definido "
+                                "en 'work_area_equipment'. Definelo (GroundOperator o Forklift).")
             if isinstance(agent_types, list) and agent_types:
                 if required_areas:
                     for area in required_areas:
@@ -305,7 +327,7 @@ class WebConfigurationManager:
                                 "El area '" + str(area) + "' no tiene ningun agente "
                                 "asignado. Asignala a un grupo en la pestana 'Flota de Agentes'.")
                             continue
-                        exp = _expected_equipment_for_area(area)
+                        exp = _expected_equipment_for_area(area, wae)
                         if not any(a.get('type') == exp for a in cubridores):
                             errors.append(
                                 "El area '" + str(area) + "' esta cubierta por un tipo de "
@@ -689,6 +711,11 @@ class WebConfigurationManager:
             "layout_file": "layouts/WH1.tmx",
             "sequence_file": "layouts/Warehouse_Logic.xlsx",
             "map_scale": 1.3,
+            "work_area_equipment": {
+                "Area_Ground": "GroundOperator",
+                "Area_High": "Forklift",
+                "Area_Special": "Forklift"
+            },
             "num_operarios_terrestres": 2,
             "num_montacargas": 1,
             "num_operarios_total": 3,

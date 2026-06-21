@@ -11,6 +11,7 @@ class FleetManager {
             Forklift: []
         };
         this.workAreas = [];
+        this.workAreaEquipment = {};  // QA-3 Opcion B: mapa area -> tipo de equipo requerido
         this.init();
     }
 
@@ -51,14 +52,74 @@ class FleetManager {
 
         // Update all existing dropdowns
         this.updateAllWorkAreaDropdowns();
+        // Opcion B: asegurar que el mapa area->equipo cubra las areas y refrescar el editor.
+        this._seedEquipmentMap();
+        this.renderWorkAreaEquipmentEditor();
         this.updateAreaCoverage();
     }
 
-    // QA-3 (BK-04): tipo capaz de un area por CONVENCION DE NOMBRES (el dato no lo codifica).
-    // Debe coincidir con config_manager._expected_equipment_for_area y event_generator.
+    // QA-3 (Opcion B): tipo capaz de un area. FUENTE DE VERDAD = el mapa explicito
+    // this.workAreaEquipment (config.work_area_equipment, editable en la UI). La convencion
+    // de nombres (regex) queda SOLO como fallback. Misma logica en config_manager y
+    // event_generator.
     _expectedEquipmentForArea(area) {
+        const m = this.workAreaEquipment || {};
+        if (m[area]) return m[area];
         return /ground|piso|floor|suelo|terrestre|level[_-]?0|l0/i.test(String(area))
             ? 'GroundOperator' : 'Forklift';
+    }
+
+    // Siembra el mapa area->equipo desde la convencion para las areas que falten (migracion
+    // suave: configs viejas sin mapa se comportan igual que antes).
+    _seedEquipmentMap() {
+        (this.workAreas || []).forEach((a) => {
+            if (!this.workAreaEquipment[a]) {
+                this.workAreaEquipment[a] =
+                    /ground|piso|floor|suelo|terrestre|level[_-]?0|l0/i.test(String(a))
+                        ? 'GroundOperator' : 'Forklift';
+            }
+        });
+    }
+
+    // Carga el mapa desde config (siembra lo que falte) y renderiza el editor.
+    setWorkAreaEquipment(map) {
+        this.workAreaEquipment = Object.assign({}, map || {});
+        this._seedEquipmentMap();
+        this.renderWorkAreaEquipmentEditor();
+        this.updateAreaCoverage();
+    }
+
+    // Devuelve el mapa solo para las areas reales del layout (descarta entradas obsoletas).
+    getWorkAreaEquipment() {
+        const out = {};
+        (this.workAreas || []).forEach((a) => {
+            out[a] = this.workAreaEquipment[a] || this._expectedEquipmentForArea(a);
+        });
+        return out;
+    }
+
+    // Editor (Opcion B): un selector de equipo (GroundOperator/Forklift) por cada area.
+    renderWorkAreaEquipmentEditor() {
+        const cont = document.getElementById('area-equipment-editor');
+        if (!cont) return;
+        const areas = this.workAreas || [];
+        if (!areas.length) { cont.innerHTML = ''; return; }
+        const rows = areas.map((a) => {
+            const cur = this.workAreaEquipment[a] || this._expectedEquipmentForArea(a);
+            const opt = (v) => '<option value="' + v + '"' + (cur === v ? ' selected' : '')
+                + '>' + v + '</option>';
+            return '<div class="area-eq-row"><span class="area-eq-name">' + a + '</span>'
+                + '<select class="area-eq-select" data-area="' + a + '">'
+                + opt('GroundOperator') + opt('Forklift') + '</select></div>';
+        }).join('');
+        cont.innerHTML = '<div class="area-eq-title">Tipo de equipo requerido por area</div>'
+            + rows;
+        cont.querySelectorAll('.area-eq-select').forEach((s) => {
+            s.addEventListener('change', () => {
+                this.workAreaEquipment[s.getAttribute('data-area')] = s.value;
+                this.updateAreaCoverage();
+            });
+        });
     }
 
     // C (BK-04 hardening): pinta el panel de cobertura.
