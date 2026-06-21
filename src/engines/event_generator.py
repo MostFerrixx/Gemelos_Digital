@@ -186,6 +186,16 @@ class EventGenerator:
             self.almacen.dispatcher.initial_work_orders_snapshot = initial_snapshot
             print(f"[EVENT-GENERATOR] Snapshot inicial capturado: {len(initial_snapshot)} WorkOrders")
         
+        # 9b. QA hardening (BK-04): chequeo preventivo de la flota ANTES de correr. Cubre
+        # el bypass del configurador (config.json a mano, --config, optimizer, presets
+        # viejos): si no hay agentes, no hay WorkOrders, o un area queda sin un agente
+        # capaz del tipo correcto, se ABORTA con mensaje en vez de colgarse (while True del
+        # outbound / espera del dispatcher).
+        ok_flota, msg_flota = self._validar_flota_cubre_areas()
+        if not ok_flota:
+            print(f"[EVENT-GENERATOR ERROR] {msg_flota}")
+            return False
+
         # 10. Iniciar proceso del dispatcher
         if hasattr(self.almacen, 'dispatcher') and hasattr(self.almacen.dispatcher, 'dispatcher_process'):
             print("[EVENT-GENERATOR] Iniciando dispatcher...")
@@ -197,7 +207,51 @@ class EventGenerator:
         print(f"  - {self.almacen.total_ordenes} ordenes generadas")
         
         return True
-    
+
+    def _expected_equipment_for_area(self, area):
+        # QA-3 (BK-04): tipo capaz de un area por CONVENCION DE NOMBRES (el dato no lo
+        # codifica: equipment_required es uniforme). Debe coincidir con
+        # config_manager._expected_equipment_for_area y fleet-manager.js isGround.
+        import re
+        if re.search(r'ground|piso|floor|suelo|terrestre|level[_-]?0|l0', str(area), re.I):
+            return 'GroundOperator'
+        return 'Forklift'
+
+    def _validar_flota_cubre_areas(self):
+        """QA-1/QA-2/QA-3: valida la flota construida ANTES de env.run. Devuelve (ok, msg).
+        - >=1 agente (QA-2) y >=1 WorkOrder (evita el cuelgue de outbound con 0 ordenes).
+        - cada area con WOs cubierta por un agente capaz (QA-1 cobertura).
+        - con agent_types EXPLICITO, ademas por un agente del TIPO correcto (QA-3); con
+          flota fallback (agent_types vacio) el tipo NO se exige (es el default interno)."""
+        operarios = self.operarios or []
+        if len(operarios) == 0:
+            return False, ("La flota no tiene agentes (0 operarios). Simulacion cancelada "
+                           "para no quedar colgada. Configura al menos un grupo de agentes.")
+        try:
+            wos = list(self.almacen.dispatcher.lista_maestra_work_orders)
+        except Exception:
+            wos = []
+        if not wos:
+            return False, ("No hay WorkOrders que simular (0 ordenes). Simulacion cancelada "
+                           "para no quedar colgada (el outbound correria indefinidamente).")
+        areas = set()
+        for wo in wos:
+            wa = getattr(wo, 'work_area', None)
+            if wa:
+                areas.add(str(wa))
+        was_fallback = not (self.configuracion or {}).get('agent_types')
+        for area in sorted(areas):
+            cubridores = [op for op in operarios if op.can_handle_work_area(area)]
+            if not cubridores:
+                return False, ("El area '" + area + "' no tiene ningun agente capaz "
+                               "asignado. Simulacion cancelada (evita cuelgue).")
+            if not was_fallback:
+                exp = self._expected_equipment_for_area(area)
+                if not any(getattr(op, 'type', None) == exp for op in cubridores):
+                    return False, ("El area '" + area + "' la cubre un tipo de agente "
+                                   "incorrecto; requiere un " + exp + ". Simulacion cancelada.")
+        return True, ''
+
     def ejecutar(self):
         """Ejecuta la simulacion y genera archivos de salida"""
         try:

@@ -304,10 +304,23 @@ bloquea Apply y Run con el mensaje; flota vacia sigue valida (sin regresion). Ve
 docs/VALIDACION_UI_WEB.md (seccion 2026-06-20).
 
 > NOTA (no bloqueante): el Fix 2 defensivo (watchdog de terminacion del OutboundProcess)
-> fue DESCARTADO por el Director. El `while True` de OutboundProcess sigue ahi; ya no
-> causa hang porque la prevencion impide configs con areas huerfanas, pero si en el
-> futuro aparece otro deadlock de asignacion, la sim podria colgarse igual. Queda como
-> nota para reconsiderar si se desea robustez extra del motor.
+> fue DESCARTADO por el Director. El `while True` de OutboundProcess sigue ahi.
+
+### Hardening QA (2026-06-21) — cierre de grietas QA-1/QA-2/QA-3
+Un QA adversarial (docs/VALIDACION_UI_WEB.md) hallo 3 grietas sobre A+Fix1+C; el Director
+aprobo cerrarlas (sin watchdog):
+- **QA-2:** `validate_config` exige >=1 agente tambien con `agent_types` vacio (flota
+  vacia / 0 agentes ya NO pasa).
+- **QA-1:** chequeo preventivo al ARRANQUE del motor (`event_generator._validar_flota_
+  cubre_areas`, antes de `env.run`): si no hay agentes / no hay WOs / un area sin agente
+  capaz, ABORTA con mensaje (exit 1) en vez de colgarse. Cubre el bypass del motor
+  (config.json a mano, `--config`, optimizer, presets viejos).
+- **QA-3:** validacion y motor exigen el TIPO de agente capaz por area (convencion de
+  nombres; el dato no lo codifica). C marca el tipo incorrecto en naranja.
+Re-test adversarial confirmo: los vectores que antes colgaban ahora abortan en ~2s; las
+configs validas de siempre siguen funcionando (no-regresion). El `while True` sigue, pero
+ya no se alcanza por estas vias. Si aparece OTRO deadlock de asignacion no cubierto por
+estos chequeos, reconsiderar el watchdog.
 
 ---
 

@@ -6,10 +6,24 @@ Manages configuration loading, saving, validation, and presets.
 
 import os
 import json
+import re
 import uuid
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 import openpyxl
+
+
+# QA-3 (BK-04 hardening): tipo de agente capaz de un area. El dato del Excel/DB NO codifica
+# el equipo por area (equipment_required uniforme), asi que se usa CONVENCION DE NOMBRES:
+# areas "de piso" -> GroundOperator; el resto (racks altos / especiales) -> Forklift.
+# DEBE coincidir con la heuristica de la flota por defecto (fleet-manager.js: isGround) y
+# con la del chequeo de arranque del motor (event_generator). Si el layout usa otra
+# convencion de nombres, ajustar aqui.
+_GROUND_AREA_RE = re.compile(r'ground|piso|floor|suelo|terrestre|level[_-]?0|l0', re.I)
+
+
+def _expected_equipment_for_area(area: str) -> str:
+    return 'GroundOperator' if _GROUND_AREA_RE.search(str(area)) else 'Forklift'
 
 
 class WebConfigurationManager:
@@ -271,26 +285,39 @@ class WebConfigurationManager:
                                 or ti < 1 or ti > 3600:
                             errors.append("outbound.truck_interval must be a number between 1 and 3600")
 
-            # Cobertura de areas (BK-04): si hay agent_types EXPLICITO, toda area real
-            # del layout debe estar cubierta por al menos un grupo. Con agent_types vacio
-            # el motor crea una flota fallback que cubre todas las areas (ver
-            # operators.py crear_operarios), asi que NO se valida (flota vacia => valida).
+            # Cobertura de areas (BK-04 + hardening QA): la flota debe tener >=1 agente y
+            # cubrir cada area con un agente del TIPO capaz. Dos ramas:
+            #  - agent_types EXPLICITO: cada area real debe estar cubierta por un agente del
+            #    tipo correcto (QA-1 cobertura + QA-3 tipo).
+            #  - agent_types VACIO: el motor usa su flota fallback (num_operarios_*). Solo se
+            #    exige que haya >=1 agente (QA-2); el tipo no se valida (default interno).
             agent_types = config.get('agent_types', [])
+            seq = config.get('sequence_file', '')
+            required_areas = self.extract_work_areas(seq) if seq else []
             if isinstance(agent_types, list) and agent_types:
-                seq = config.get('sequence_file', '')
-                required_areas = self.extract_work_areas(seq) if seq else []
                 if required_areas:
-                    covered = set()
-                    for a in agent_types:
-                        if isinstance(a, dict):
-                            wap = a.get('work_area_priorities', {})
-                            if isinstance(wap, dict):
-                                covered.update(wap.keys())
                     for area in required_areas:
-                        if area not in covered:
+                        cubridores = [a for a in agent_types
+                                      if isinstance(a, dict)
+                                      and area in (a.get('work_area_priorities', {}) or {})]
+                        if not cubridores:
                             errors.append(
                                 "El area '" + str(area) + "' no tiene ningun agente "
                                 "asignado. Asignala a un grupo en la pestana 'Flota de Agentes'.")
+                            continue
+                        exp = _expected_equipment_for_area(area)
+                        if not any(a.get('type') == exp for a in cubridores):
+                            errors.append(
+                                "El area '" + str(area) + "' esta cubierta por un tipo de "
+                                "agente incorrecto; requiere un " + exp + ".")
+            else:
+                # QA-2: flota vacia => el fallback usa num_operarios_*; exige >=1 agente.
+                n_terr = config.get('num_operarios_terrestres', 0) or 0
+                n_fork = config.get('num_montacargas', 0) or 0
+                if (n_terr + n_fork) < 1:
+                    errors.append(
+                        "La flota esta vacia (0 agentes). Agrega al menos un grupo de "
+                        "agentes en la pestana 'Flota de Agentes'.")
 
             # C5: validacion del bloque tiempos (si la UI lo envia)
             if 'tiempos' in config:

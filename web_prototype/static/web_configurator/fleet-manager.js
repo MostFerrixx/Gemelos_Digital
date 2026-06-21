@@ -54,47 +54,72 @@ class FleetManager {
         this.updateAreaCoverage();
     }
 
-    // C (BK-04): pinta el panel de cobertura. Verde = area con al menos un agente;
-    // rojo = area sin responsable. Devuelve la lista de areas sin cubrir.
-    // Matiz clave: si NO hay grupos de flota, agent_types serializa a [] y el motor usa
-    // su flota fallback que cubre TODO -> flota vacia es VALIDA (no se marca rojo).
+    // QA-3 (BK-04): tipo capaz de un area por CONVENCION DE NOMBRES (el dato no lo codifica).
+    // Debe coincidir con config_manager._expected_equipment_for_area y event_generator.
+    _expectedEquipmentForArea(area) {
+        return /ground|piso|floor|suelo|terrestre|level[_-]?0|l0/i.test(String(area))
+            ? 'GroundOperator' : 'Forklift';
+    }
+
+    // C (BK-04 hardening): pinta el panel de cobertura.
+    //  verde  = area cubierta por un agente del TIPO correcto.
+    //  naranja= cubierta solo por el tipo INCORRECTO (QA-3).
+    //  rojo   = sin agente (QA-1).  Flota vacia (0 grupos) => rojo: no hay agentes (QA-2).
+    // Devuelve la lista de areas problematicas (sin cubrir o con tipo incorrecto).
     updateAreaCoverage() {
         const panel = document.getElementById('area-coverage-panel');
         const areas = this.workAreas || [];
         const groups = document.querySelectorAll('.fleet-group');
 
-        // Areas cubiertas = union de los work-area-select con valor.
-        const covered = new Set();
-        document.querySelectorAll('.work-area-select').forEach((s) => {
-            if (s.value) covered.add(s.value);
+        // area -> conjunto de tipos de agente que la cubren (segun el grupo del select)
+        const coveringTypes = {};
+        groups.forEach((g) => {
+            const type = g.getAttribute('data-agent-type');
+            g.querySelectorAll('.work-area-select').forEach((s) => {
+                if (s.value) (coveringTypes[s.value] = coveringTypes[s.value] || new Set()).add(type);
+            });
         });
-        const uncovered = (groups.length > 0)
-            ? areas.filter((a) => !covered.has(a))
-            : [];  // flota vacia => valida (el motor cubre todo)
 
-        if (panel) {
-            if (!areas.length) {
-                panel.innerHTML = '<span class="coverage-label">Cobertura de areas:</span> '
-                    + '<span class="coverage-warn">sin areas cargadas</span>';
-            } else if (groups.length === 0) {
-                panel.innerHTML = '<span class="coverage-label">Cobertura de areas:</span> '
-                    + '<span class="coverage-ok">✓ Flota vacia: el motor usara su flota por '
-                    + 'defecto (cubre todas las areas)</span>';
+        let html, problems = [];
+        if (!areas.length) {
+            html = '<span class="coverage-label">Cobertura de areas:</span> '
+                + '<span class="coverage-warn">sin areas cargadas</span>';
+        } else if (groups.length === 0) {
+            // QA-2: flota vacia = 0 agentes => invalido (ya NO se asume el fallback).
+            problems = areas.slice();
+            html = '<span class="coverage-label">Cobertura de areas:</span> '
+                + '<span class="coverage-warn">⚠ Flota vacia: no hay agentes — no se podra '
+                + 'guardar/correr. Genera o agrega una flota.</span>';
+        } else {
+            let nUnc = 0, nWrong = 0;
+            const chips = areas.map((a) => {
+                const types = coveringTypes[a];
+                const exp = this._expectedEquipmentForArea(a);
+                if (!types || types.size === 0) {
+                    problems.push(a); nUnc++;
+                    return '<span class="coverage-chip uncovered">✗ ' + a + '</span>';
+                }
+                if (!types.has(exp)) {
+                    problems.push(a); nWrong++;
+                    return '<span class="coverage-chip wrongtype" title="Requiere ' + exp
+                        + '">⚠ ' + a + '</span>';
+                }
+                return '<span class="coverage-chip covered">✓ ' + a + '</span>';
+            }).join(' ');
+            let summary;
+            if (!problems.length) {
+                summary = '<span class="coverage-ok">✓ Todas las areas cubiertas</span>';
             } else {
-                const chips = areas.map((a) => {
-                    const ok = covered.has(a);
-                    return '<span class="coverage-chip ' + (ok ? 'covered' : 'uncovered') + '">'
-                        + (ok ? '✓' : '✗') + ' ' + a + '</span>';
-                }).join(' ');
-                const summary = uncovered.length
-                    ? '<span class="coverage-warn">⚠ ' + uncovered.length
-                      + ' area(s) sin agente — no se podra guardar/correr</span>'
-                    : '<span class="coverage-ok">✓ Todas las areas cubiertas</span>';
-                panel.innerHTML = '<span class="coverage-label">Cobertura de areas:</span> '
-                    + chips + ' ' + summary;
+                const parts = [];
+                if (nUnc) parts.push(nUnc + ' sin agente');
+                if (nWrong) parts.push(nWrong + ' con tipo incorrecto');
+                summary = '<span class="coverage-warn">⚠ ' + parts.join(' y ')
+                    + ' — no se podra guardar/correr</span>';
             }
+            html = '<span class="coverage-label">Cobertura de areas:</span> ' + chips + ' ' + summary;
         }
-        return uncovered;
+        if (panel) panel.innerHTML = html;
+        return problems;
     }
 
     updateAllWorkAreaDropdowns() {

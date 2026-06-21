@@ -1485,6 +1485,11 @@ select:disabled {
     color: #dc2626;
     border-color: rgba(220, 38, 38, 0.45);
 }
+.coverage-chip.wrongtype {
+    background: rgba(217, 119, 6, 0.14);
+    color: #d97706;
+    border-color: rgba(217, 119, 6, 0.45);
+}
 .coverage-warn {
     color: #dc2626;
     font-weight: 600;

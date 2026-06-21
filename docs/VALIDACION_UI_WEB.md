@@ -1475,3 +1475,53 @@ por POST directo. PERO hay dos grietas por donde el cuelgue sigue siendo posible
 Ambas apuntan a la misma raiz que el Director eligio NO cerrar: el `while True` del
 OutboundProcess (y la espera del dispatcher) sin watchdog de terminacion. La prevencion
 por cobertura tapo el caso mas comun, pero no es hermetica. Decision de diseño pendiente.
+
+---
+
+## CIERRE DE GRIETAS QA — 2026-06-21: QA-1 + QA-2 + QA-3 (con re-test adversarial)
+
+El Director aprobo cerrar las 3 grietas con enfoque preventivo (sin watchdog). Implementado:
+
+### Que se implemento
+- **QA-2 (flota vacia / 0 agentes):** `validate_config` ahora, cuando `agent_types` esta
+  VACIO, exige `num_operarios_terrestres + num_montacargas >= 1`. Una flota vacia (0
+  agentes) ya NO pasa como valida. (Antes se saltaba la validacion asumiendo el fallback.)
+- **QA-1 (bypass del motor):** chequeo preventivo al ARRANQUE del motor
+  (`event_generator.crear_simulacion::_validar_flota_cubre_areas`, antes de `env.run`): si
+  no hay agentes, no hay WorkOrders, o un area con WOs queda sin agente capaz, **aborta**
+  (`return False` -> exit 1) con mensaje, en vez de colgarse. Cubre el bypass del
+  configurador (config.json a mano, `--config`, optimizer, presets viejos).
+- **QA-3 (tipo de equipo):** tanto `validate_config` como el chequeo del motor exigen que
+  el area la cubra un agente del TIPO capaz. El dato NO codifica el equipo por area
+  (`equipment_required` uniforme en la DB), asi que se usa **CONVENCION DE NOMBRES**:
+  areas "de piso" (`ground|piso|floor|...`) -> GroundOperator; el resto -> Forklift. La
+  misma regla en `config_manager._expected_equipment_for_area`, `event_generator` y
+  `fleet-manager.js::_expectedEquipmentForArea`. Aplica a flotas EXPLICITAS; la flota
+  fallback (agent_types vacio) queda exenta del tipo (es el default interno) para no
+  romper el config.json commiteado.
+- **C (indicador):** flota vacia -> rojo "no hay agentes"; area cubierta solo por el tipo
+  incorrecto -> chip naranja "tipo incorrecto"; correcto -> verde.
+
+> ASUNCION A REVISAR: el "tipo capaz por area" es una convencion de nombres (el dato no lo
+> tiene). Si el layout usa otros nombres, ajustar el regex en los 3 lugares.
+
+### Re-test adversarial (antes -> despues)
+
+| Vector | Antes | Despues |
+|---|---|---|
+| QA-1 motor: forklift sin areas + outbound (headless `--config`) | HANG (5721 vacios) | **ABORTA en 2s**: "Area_High no tiene ningun agente capaz" |
+| QA-2 motor: flota vacia 0 agentes + outbound | HANG | **ABORTA**: "La flota no tiene agentes" |
+| 0 ordenes + outbound (bypass) | HANG (7288 vacios) | **ABORTA**: "No hay WorkOrders que simular" |
+| QA-3 motor: GroundOp cubre todo (tipo malo) + outbound | completaba (irreal) | **ABORTA**: "requiere un Forklift" |
+| QA-2 endpoint: flota vacia (POST directo) | ACEPTADO | **RECHAZADO** (mismo mensaje) |
+| QA-3 endpoint: tipo malo (POST directo) | ACEPTADO | **RECHAZADO** |
+| C: flota vacia | "valida (motor cubre todo)" | **rojo "no hay agentes"** |
+| C: tipo incorrecto | verde (no distinguia) | **naranja "tipo incorrecto"** |
+| **No-regresion** committed (agent_types=[], 2+2) + outbound | TERMINA | **TERMINA** (igual) |
+| **No-regresion** Fix1 default (GO Ground, FL High/Special) | TERMINA | **TERMINA** (igual) |
+| **No-regresion** validacion: committed y Fix1 default | ACEPTADOS | **ACEPTADOS** |
+
+**Veredicto QA final:** las 3 grietas quedaron cerradas en las 3 capas (validacion del
+configurador, arranque del motor, indicador en vivo), y de forma consistente. El bypass del
+motor (la grieta mas peligrosa) ahora aborta en ~2s con mensaje claro en vez de colgarse.
+Las configs validas de siempre siguen funcionando igual (no-regresion confirmada).
