@@ -62,6 +62,7 @@ class ReplayData:
         self.max_time = 0
         self.snapshots = {}  # {timestamp: state_dict}
         self.snapshot_interval = 60.0  # Create a snapshot every 60 seconds
+        self.service_level = None  # INIT-5: resumen de nivel de servicio (backorders)
         self.load_data()
         self.precompute_snapshots()
 
@@ -183,6 +184,7 @@ class ReplayData:
         print(f"Loading replay data from {REPLAY_FILE}...")
         try:
             self.events = []
+            self.service_level = None
             with open(REPLAY_FILE, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
@@ -193,6 +195,8 @@ class ReplayData:
                         
                         # Handle SIMULATION_START to extract initial WOs
                         if event.get('type') == 'SIMULATION_START' or event.get('event_type') == 'SIMULATION_START':
+                            # INIT-5: resumen de nivel de servicio (backorders) desde la metadata.
+                            self.service_level = event.get('service_level')
                             # Extract initial WOs directly from event
                             initial_wos = event.get('initial_work_orders', [])
                             print(f"Found {len(initial_wos)} initial WOs in SIMULATION_START")
@@ -791,6 +795,7 @@ def get_snapshot(t: float):
     return {
         "timestamp": t,
         "max_time": replay_data.max_time,
+        "service_level": replay_data.service_level,  # INIT-5: nivel de servicio (backorders)
         "state": {
             "agents": agents,  # Now includes cargo_volume and capacidad
             "work_orders": current_state['work_orders']
@@ -837,7 +842,8 @@ def get_snapshot(t: float):
                 "trucks_dispatched": current_state.get('outbound', {}).get('trucks_dispatched', 0),
                 "pallets_shipped": current_state.get('outbound', {}).get('pallets_shipped', 0),
                 "backlog": current_state.get('outbound', {}).get('backlog', 0),
-            }
+            },
+            "service_level": replay_data.service_level  # INIT-5: nivel de servicio (backorders)
         }
     }
 
@@ -906,6 +912,7 @@ def get_state(t: float):
     return {
         "timestamp": t,
         "max_time": replay_data.max_time,
+        "service_level": replay_data.service_level,  # INIT-5: nivel de servicio (backorders)
         "agents": current_state['agents'],
         "work_orders": current_state['work_orders']
     }
@@ -955,6 +962,7 @@ def get_metrics(t: float):
 
     return {
         "simulation_time": t,
+        "service_level": replay_data.service_level,  # INIT-5: nivel de servicio (backorders)
         "work_orders": {
             "total": wo_total,
             "staged": wo_completed,

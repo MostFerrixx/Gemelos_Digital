@@ -7,6 +7,46 @@ Modulo extraido de run_simulator.py para modularizacion incremental.
 import json
 
 
+def build_service_level_summary(almacen):
+    """INIT-5: resumen de nivel de servicio (backorders) a partir del resultado de
+    validacion del allocation layer. Devuelve un dict serializable (plomeria: NO calcula
+    nada nuevo, solo transporta lo que el motor ya calculo en allocation_summary /
+    unfilled_demand). En modo estocastico (sin validacion de stock) -> available=False
+    (la UI muestra N/A). Fuente unica usada por el .jsonl y por el reporte Excel."""
+    vr = None
+    try:
+        if almacen is not None and hasattr(almacen, 'get_order_validation_result'):
+            vr = almacen.get_order_validation_result()
+    except Exception:
+        vr = None
+    if not vr:
+        return {
+            'available': False,
+            'mode': 'stochastic',
+            'fill_rate_pct': None,
+            'total_requested': 0,
+            'total_served': 0,
+            'total_unfilled': 0,
+            'orders_short': 0,
+            'backorder_items': 0,
+            'unfilled': [],
+        }
+    summ = getattr(vr, 'allocation_summary', {}) or {}
+    unfilled = list(getattr(vr, 'unfilled_demand', []) or [])
+    orders_short = len({u.get('order_id') for u in unfilled if u.get('order_id') is not None})
+    return {
+        'available': True,
+        'mode': 'deterministic',
+        'fill_rate_pct': summ.get('allocation_rate', 100.0),
+        'total_requested': summ.get('total_qty_requested', 0),
+        'total_served': summ.get('total_qty_allocated', 0),
+        'total_unfilled': summ.get('total_qty_unfilled', 0),
+        'orders_short': orders_short,
+        'backorder_items': summ.get('backorder_items_count', 0),
+        'unfilled': unfilled,
+    }
+
+
 def agregar_evento_replay(buffer, evento):
     """Agrega un evento al bufer de replay"""
     buffer.add_event(evento)
@@ -51,6 +91,13 @@ def volcar_replay_a_archivo(buffer, archivo_salida, configuracion, almacen=None,
                 print(f"[REPLAY-METADATA] Anadidas {len(initial_work_orders_snapshot)} initial_work_orders desde instantanea t=0")
             else:
                 print(f"[REPLAY-METADATA] WARNING: No se recibio instantanea inicial de WorkOrders")
+
+            # INIT-5: resumen de nivel de servicio (backorders) en la metadata del replay.
+            service = build_service_level_summary(almacen)
+            metadata['service_level'] = service
+            if service.get('available'):
+                print(f"[REPLAY-METADATA] Nivel de servicio: {service['fill_rate_pct']}% "
+                      f"(deuda {service['total_unfilled']} u / {service['orders_short']} pedidos)")
 
             f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
 

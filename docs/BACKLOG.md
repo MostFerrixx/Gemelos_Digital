@@ -367,6 +367,39 @@ ruidoso). El feature truck_interval quedo validado de forma independiente.
 
 ---
 
+## INIT-5 — Exponer nivel de servicio / backorders en visor y reportes
+
+**Estado:** RESUELTO 2026-06-21
+**Origen:** docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md (Top-5, #5). Idea pendiente del Director.
+
+### Que era
+El allocation layer ya calculaba la demanda no cubierta (`qty_requested` vs `qty_allocated`,
+`unfilled_demand`, fill-rate en `allocation_summary`) pero ese dato NO llegaba al usuario:
+se quedaba dentro del motor.
+
+### Que se implemento (plomeria, sin tocar la logica del motor)
+- **Fuente unica:** `core/replay_utils.build_service_level_summary(almacen)` arma el resumen
+  desde `almacen.get_order_validation_result()`. En modo estocastico (sin validacion de
+  stock) -> `available=False` (la UI muestra N/A).
+- **.jsonl:** `volcar_replay_a_archivo` adjunta `service_level` a la metadata `SIMULATION_START`.
+- **API:** `server.py` lee `service_level` de la metadata y lo expone en `/api/snapshot`
+  (top-level y dentro de `metrics`), `/api/state` y `/api/metrics`.
+- **Visor:** nuevo KPI **"Servicio"** en la barra de metricas (`metric-service`, fill-rate %;
+  N/A en estocastico) — `web_prototype/static/app.js`.
+- **Excel:** hoja nueva **"Nivel de servicio"** anexada al reporte (`exporter_v2`), con
+  resumen (pedido/servido/faltante/fill-rate/pedidos cortos) + desglose por pedido/SKU + total.
+
+### Validacion (corrida determinista con backorders: pedir 500 de SKU026 con stock 171, etc.)
+- `.jsonl`: `service_level` = available True, fill 44.6%, pedido 803, servido 358, deuda 445,
+  2 pedidos cortos, con desglose (ORD-A SKU026 req500/got171/falta329, ORD-B 300/184/116).
+- API: `/api/snapshot` (top y metrics), `/api/state`, `/api/metrics` devuelven el mismo resumen.
+- Excel: hoja "Nivel de servicio" presente junto a las existentes (no las rompe).
+- Estocastico (control): `available=False` -> N/A, sin romper.
+> Nota: el KPI visual en el navegador quedo sin captura en vivo (extension Chrome
+> desconectada); validado por API/JSONL/Excel y la logica JS es trivial (lee metrics.service_level).
+
+---
+
 *Este documento se actualiza al detectar nuevos items en sesiones de desarrollo.
 Para retomar BK-01, leer: `dispatcher.py` lineas 252-273 (router de estrategias) al detectar nuevos items en sesiones de desarrollo.
 Para retomar BK-01, leer: `dispatcher.py` lineas 252-273 (router de estrategias)

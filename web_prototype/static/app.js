@@ -906,6 +906,14 @@ const ControlsModule = {
         const obMetrics = metrics.outbound || {};
         this.setMetricValue('metric-trucks', obMetrics.trucks_dispatched || 0);
         this.setMetricValue('metric-shipped', obMetrics.pallets_shipped || 0);
+
+        // INIT-5: nivel de servicio (backorders). N/A si no hubo validacion de stock.
+        const svc = metrics.service_level;
+        if (svc && svc.available && svc.fill_rate_pct != null) {
+            this.setMetricValue('metric-service', svc.fill_rate_pct + '%');
+        } else {
+            this.setMetricValue('metric-service', 'N/A');
+        }
     },
 
     setMetricValue(elementId, value) {
@@ -1108,7 +1116,9 @@ const MetricsModule = {
             { id: 'metric-staged', label: 'Staged', class: 'staged' },
             // F2.c: KPIs de despacho — siempre visibles (0 si outbound off)
             { id: 'metric-trucks', label: 'Trucks', class: 'trucks' },
-            { id: 'metric-shipped', label: 'Shipped', class: 'shipped' }
+            { id: 'metric-shipped', label: 'Shipped', class: 'shipped' },
+            // INIT-5: nivel de servicio (fill-rate). N/A en modo estocastico.
+            { id: 'metric-service', label: 'Servicio', class: 'service' }
         ];
 
         metricsBar.innerHTML = '';

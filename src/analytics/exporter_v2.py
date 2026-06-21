@@ -152,7 +152,9 @@ class AnalyticsExporter:
                 if archivo_excel:
                     result.add_file(archivo_excel)
                     print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
-                
+                    # INIT-5: anexar hoja 'Nivel de servicio' (backorders) al reporte.
+                    self._append_service_level_sheet(archivo_excel)
+
                 if archivo_json:
                     result.add_file(archivo_json)
                     print(f"[3/4] Reporte de JSON generado: {archivo_json}")
@@ -197,6 +199,47 @@ class AnalyticsExporter:
                 print("[ROLLBACK] Rollback tuvo problemas - verificar manualmente")
 
             return result
+
+    def _append_service_level_sheet(self, excel_path):
+        """INIT-5: anexa una hoja 'Nivel de servicio' (backorders) al reporte Excel ya
+        generado, reabriendolo (desacoplado de AnalyticsEngine). Solo con pedidos reales
+        (modo determinista); en estocastico anota N/A. No rompe el resto del reporte."""
+        try:
+            import openpyxl
+            from core.replay_utils import build_service_level_summary
+            svc = build_service_level_summary(self.context.almacen)
+            wb = openpyxl.load_workbook(excel_path)
+            if 'Nivel de servicio' in wb.sheetnames:
+                del wb['Nivel de servicio']
+            ws = wb.create_sheet('Nivel de servicio')
+            if not svc.get('available'):
+                ws.append(['Nivel de servicio'])
+                ws.append(['Modo estocastico: sin validacion de stock -> N/A'])
+                wb.save(excel_path)
+                return
+            ws.append(['Nivel de servicio (backorders)'])
+            ws.append([])
+            ws.append(['Total pedido (u)', svc['total_requested']])
+            ws.append(['Total servido (u)', svc['total_served']])
+            ws.append(['Faltante / deuda (u)', svc['total_unfilled']])
+            ws.append(['Fill-rate (%)', svc['fill_rate_pct']])
+            ws.append(['Pedidos cortos', svc['orders_short']])
+            ws.append(['Items en backorder', svc['backorder_items']])
+            ws.append([])
+            ws.append(['Order ID', 'SKU', 'Pedido', 'Servido', 'Faltante', 'Cumplimiento %'])
+            for u in svc.get('unfilled', []):
+                req = u.get('qty_requested', 0) or 0
+                got = u.get('qty_allocated', 0) or 0
+                miss = u.get('qty_unfilled', max(req - got, 0))
+                pct = round(got / req * 100, 1) if req else 100.0
+                ws.append([u.get('order_id'), u.get('sku_id'), req, got, miss, pct])
+            ws.append([])
+            ws.append(['TOTAL', '', svc['total_requested'], svc['total_served'],
+                       svc['total_unfilled'], svc['fill_rate_pct']])
+            wb.save(excel_path)
+            print("[3/4] Hoja 'Nivel de servicio' anexada al Excel")
+        except Exception as e:
+            print(f"[3/4] WARNING: no se pudo anexar hoja de nivel de servicio: {e}")
 
     def export_complete_analytics_with_buffer(self, buffer_eventos=None) -> ExportResult:
         """
@@ -275,7 +318,9 @@ class AnalyticsExporter:
                 if archivo_excel:
                     result.add_file(archivo_excel)
                     print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
-                
+                    # INIT-5: anexar hoja 'Nivel de servicio' (backorders) al reporte.
+                    self._append_service_level_sheet(archivo_excel)
+
                 if archivo_json:
                     result.add_file(archivo_json)
                     print(f"[3/4] Reporte de JSON generado: {archivo_json}")
