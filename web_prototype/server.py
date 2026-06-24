@@ -51,6 +51,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# Anti-cache (desarrollo): evita que el navegador sirva versiones viejas de los estaticos
+# (configurador/visor) y haya que forzar recarga (Ctrl+Shift+R). Aplica solo al front
+# estatico; las APIs JSON ya son dinamicas y no se cachean igual.
+@app.middleware("http")
+async def add_no_cache_headers(request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.startswith("/web_configurator") or \
+            path.endswith((".js", ".css", ".html", ".htm")):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 # --- DATA LOADING ---
 TMX_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "layouts", "layout_v2.tmx"))
 # Using the replay JSONL file which contains the full simulation state including initial released WOs
