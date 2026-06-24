@@ -1,0 +1,10 @@
+/* D-13: tokens de diseño COMPARTIDOS entre el configurador y el visor.
+   Fuente unica de la identidad de marca (colores de acento + tipografia). Cada app
+   referencia estos tokens (con fallback al valor actual, asi no hay cambio visual hoy,
+   pero la marca queda centralizada: cambiar aqui afecta ambas apps de forma cohesiva). */
+:root {
+    --brand-primary: #2563eb;        /* azul de acento principal (botones, pestaña activa) */
+    --brand-primary-strong: #1d4ed8;
+    --brand-accent: #f0883e;         /* naranja de acento (KPIs, marcadores de timeline) */
+    --brand-font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}

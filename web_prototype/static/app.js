@@ -856,6 +856,7 @@ const ControlsModule = {
             // Update AppState (will notify all subscribers)
             AppState.setTime(time);
             AppState.maxTime = data.max_time;
+            this.renderEventMarkers(data.max_time);  // D-15: marcadores de eventos en la barra
             AppState.setWorkOrders(data.state.work_orders);
             AppState.setAgents(data.state.agents);
 
@@ -914,6 +915,29 @@ const ControlsModule = {
         } else {
             this.setMetricValue('metric-service', 'N/A');
         }
+    },
+
+    async renderEventMarkers(maxTime) {
+        // D-15: dibuja marcadores de eventos (salidas de camion) sobre la barra de tiempo.
+        // Se recalcula solo si cambia la duracion (al cargar un replay distinto).
+        if (!maxTime || maxTime <= 0 || this._markersMaxTime === maxTime) return;
+        this._markersMaxTime = maxTime;
+        const cont = document.getElementById('time-markers');
+        if (!cont) return;
+        try {
+            const r = await fetch('/api/event-markers');
+            const data = await r.json();
+            const mt = data.max_time || maxTime;
+            cont.innerHTML = '';
+            (data.markers || []).forEach(m => {
+                const pct = Math.max(0, Math.min(100, (m.t / mt) * 100));
+                const tick = document.createElement('div');
+                tick.className = 'time-marker time-marker--' + (m.type || 'event');
+                tick.style.left = pct + '%';
+                tick.title = (m.label || m.type || 'evento') + ' @' + this.formatTime(m.t);
+                cont.appendChild(tick);
+            });
+        } catch (e) { /* sin marcadores: no es critico */ }
     },
 
     setMetricValue(elementId, value) {

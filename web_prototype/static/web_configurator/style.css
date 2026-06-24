@@ -1,6 +1,6 @@
 ﻿:root {
     /* Light Theme Variables (Google Material / Modern SaaS) */
-    --color-primary: #2563eb;
+    --color-primary: var(--brand-primary, #2563eb);  /* D-13: token de marca compartido */
     --color-primary-hover: #1d4ed8;
     --color-bg-app: #f3f4f6;
     --color-bg-sidebar: #ffffff;
@@ -14,7 +14,7 @@
     --color-warning: #f59e0b;
     --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-family: var(--brand-font, 'Inter', system-ui, -apple-system, sans-serif);  /* D-13 */
     --sidebar-width: 260px;
     --header-height: 64px;
 }

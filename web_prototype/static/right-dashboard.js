@@ -201,16 +201,18 @@
     }
 
     function getStatusText(status) {
+        // D-16 (accesibilidad WCAG): cada estado lleva un GLIFO de forma ademas del texto,
+        // para no depender solo del color (consistente con la leyenda ○ → ↓ ⬆).
         const statusMap = {
-            'idle': 'Idle',
-            'moving': 'En ruta',
-            'working': 'Trabajando',
-            'picking': 'Picking',
-            'unloading': 'Descargando',
-            'lifting': 'Elevando',
-            'traveling': 'Viajando'
+            'idle': '○ Idle',
+            'moving': '→ En ruta',
+            'working': '⚙ Trabajando',
+            'picking': '↓ Picking',
+            'unloading': '⬆ Descargando',
+            'lifting': '⬆ Elevando',
+            'traveling': '→ Viajando'
         };
-        return statusMap[status.toLowerCase()] || 'Desconocido';
+        return statusMap[status.toLowerCase()] || '• Desconocido';
     }
 
     function formatTime(seconds) {

@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gemelo Digital | Web Viewer</title>
+    <link rel="stylesheet" href="design-tokens.css"><!-- D-13: tokens de marca compartidos -->
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="dashboard-agentes.css">
     <link rel="stylesheet" href="server_control.css">
@@ -178,7 +179,11 @@
                 <span class="btn-label">Play</span>
             </button>
             <span class="time-display" id="current-time">00:00</span>
-            <input type="range" id="time-slider" min="0" max="100" value="0" step="0.1">
+            <div class="slider-wrap">
+                <input type="range" id="time-slider" min="0" max="100" value="0" step="0.1">
+                <!-- D-15: marcadores de eventos (camiones) sobre la barra de tiempo -->
+                <div id="time-markers" class="time-markers"></div>
+            </div>
             <span class="time-display" id="max-time">00:00</span>
             <select id="speed-select">
                 <option value="1">1x</option>

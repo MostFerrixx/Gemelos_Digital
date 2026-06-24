@@ -1216,6 +1216,28 @@ def health_check():
     }
 
 
+@app.get("/api/event-markers")
+def get_event_markers():
+    """D-15: tiempos de eventos notables del replay para marcar en la barra de tiempo.
+    Hoy: salidas de camion (truck_departed) como hitos del outbound. Devuelve [] si no hay
+    (p.ej. outbound apagado)."""
+    markers = []
+    try:
+        for e in replay_data.events:
+            etype = e.get('type') or e.get('event_type')
+            if etype == 'truck_departed':
+                t = e.get('timestamp', 0)
+                loaded = e.get('pallets_loaded', 0)
+                markers.append({
+                    "t": t,
+                    "type": "truck",
+                    "label": f"Camion {e.get('truck_id', '')} ({loaded} pallets)".strip()
+                })
+    except Exception as ex:
+        print(f"[EVENT-MARKERS] WARN: {ex}")
+    return {"markers": markers, "max_time": replay_data.max_time}
+
+
 # Serve static files (Frontend)
 app.mount("/", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static"), html=True), name="static")
 

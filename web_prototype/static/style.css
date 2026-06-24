@@ -27,7 +27,7 @@
     --color-accent-blue-hover: #79c0ff;
     --color-accent-green: #3fb950;
     --color-accent-yellow: #d29922;
-    --color-accent-orange: #f0883e;
+    --color-accent-orange: var(--brand-accent, #f0883e);  /* D-13: token de marca compartido */
     --color-accent-red: #f85149;
     --color-accent-purple: #bc8cff;
 
@@ -1062,4 +1062,39 @@ select:focus {
 
 @keyframes viewer-toast-out {
     to { opacity: 0; transform: translateY(8px); }
+}
+
+/* D-15: marcadores de eventos sobre la barra de tiempo. .slider-wrap toma el flex:1 que
+   tenia el slider, y la capa de marcadores se superpone sin afectar el arrastre. */
+.slider-wrap {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.slider-wrap input[type="range"] {
+    flex: 1;
+    width: 100%;
+}
+.time-markers {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+.time-marker {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 12px;
+    transform: translate(-50%, -50%);
+    border-radius: 1px;
+    background: var(--color-accent-orange, #f0883e);
+    pointer-events: auto;
+    cursor: help;
+}
+.time-marker--truck {
+    background: var(--color-accent-orange, #f0883e);
 }
