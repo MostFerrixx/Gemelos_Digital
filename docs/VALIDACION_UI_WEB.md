@@ -6,35 +6,44 @@
 **Visor de Replay:** http://localhost:8000/
 **Ejecutor:** Cerebellum (Claude Fable 5)
 **Metodo:** Chrome MCP (JavaScript en pagina via CDP) + inspeccion de codigo fuente (server.py, app.js, fleet-manager.js) + llamadas API directas
-**Version del sistema:** V12.1 (rama feature/allocation-layer-v12.1 pusheada a GitHub)
-**Ultima actualizacion:** 2026-06-13 20:45
+**Version del sistema:** V12.1 (rama feature/allocation-layer-v12.1)
+**Ultima actualizacion:** 2026-06-27 (post-eliminacion E6/E7)
+
+---
+
+> **ACTUALIZACION 2026-06-27:** E6 y E7 ("Generar Plantilla TMX" / "Poblar SKUs Aleatorios")
+> fueron ELIMINADOS del HTML y JS en commit `f3a3ec5` (BK-05). No son controles validos
+> en la UI actual. El total pasa de 62 a 60 controles. D1 resuelto con modal (H-2).
 
 ---
 
 ## RESUMEN EJECUTIVO
 
-La UI web del Gemelo Digital fue validada en 62 controles distribuidos en 7 secciones (Toolbar, 5 tabs del configurador, y el Visor de Replay). El sistema esta en **buen estado funcional**: todos los flujos criticos operan correctamente y no se encontro ninguna funcionalidad rota. Los 4 hallazgos identificados son menores y ninguno es bloqueante para el uso operativo.
+La UI web del Gemelo Digital fue validada en 60 controles efectivos (62 originales - 2 eliminados).
+El sistema esta en **buen estado funcional**: todos los flujos criticos operan correctamente.
+Los 4 hallazgos identificados estan cerrados.
 
-### Tabla de resultados
+### Tabla de resultados (actualizada 2026-06-27)
 
 | Veredicto      | Cantidad | Controles                                         |
 |----------------|----------|---------------------------------------------------|
-| FUNCIONA       | 57       | A1-A8, B1-B13, C1-C9, D2-D4, E1,E3,E5,E8, F1-F8, G1-G19 |
-| PARCIAL        | 3        | D1 (confirm nativo), E6 (placeholder), E7 (placeholder) |
+| FUNCIONA       | 58       | A1-A8, B1-B13, C1-C9, D1-D4, E1,E3,E5,E8, F1-F8, G1-G19 |
+| PARCIAL        | 0        | — (D1 resuelto, E6/E7 eliminados)                 |
+| ELIMINADO      | 2        | E6, E7 (commit f3a3ec5, BK-05)                    |
 | NO FUNCIONA    | 0        | -                                                 |
 | N/A            | 2        | E2, E4 (file pickers del SO)                      |
-| **TOTAL**      | **62**   |                                                   |
+| **TOTAL**      | **60**   | (eran 62; -2 por eliminacion E6/E7)               |
 
 ### Hallazgos identificados (4) — todos cerrados
 
 | ID  | Control | Titulo                                      | Severidad  | Estado    |
 |-----|---------|---------------------------------------------|------------|-----------|
-| H-1 | E6, E7  | Botones placeholder sin backend             | Media      | RESUELTO  |
+| H-1 | E6, E7  | Botones placeholder sin backend             | Media      | ELIMINADOS (f3a3ec5) |
 | H-2 | D1      | `window.confirm()` nativo (anti-patron UX)  | Baja       | RESUELTO  |
 | H-3 | C5      | Preset de velocidad no persiste en config   | Baja       | NO APLICA |
 | H-4 | G11,G14 | Right panel actualiza async (no al seek)    | Baja       | RESUELTO  |
 
-**Conclusion:** Los 4 hallazgos han sido cerrados. H-1 y H-2 resueltos con codigo. H-3 reclasificado (la funcion ya existia en el codigo). H-4 resuelto con CustomEvent. Commits pendientes (ejecutar bat del Director).
+**Conclusion:** Los 4 hallazgos estan cerrados. H-1: botones eliminados en BK-05 (no habia backend ni spec coherente). H-2 y H-4: resueltos con codigo. H-3: reclasificado (la funcion ya existia).
 
 ---
 

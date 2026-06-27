@@ -39,15 +39,27 @@ vive en `main` / `feature/allocation-layer-v12.1`.
 
 ---
 
+## Lote 2 — Junio 2026: Cierre de H-6, Auditoria Estrategias, Limpieza de Basura
+
+Movidos con `git mv` en sesion 2026-06-27 (auditoria documental post-V12.1).
+
+| Documento | Por que se archiva |
+|-----------|-------------------|
+| `ANALISIS_H6_CERCANIA_DEADLOCK.md` | Analisis y plan del bug H-6 (deadlock de Cercania). Fix implementado en `8a2fe86` (radio blando). Ahora es registro historico. |
+| `AUDITORIA_ESTRATEGIAS.md` | Auditoria completa de estrategias de despacho (2026-06-14). Sus resultados estan integrados: BK-01 implementado, H-5 corregido, BK-03 descartado con evidencia, BK-02 en BACKLOG. El documento ya no guia ninguna accion activa. |
+| `LIMPIEZA_ARCHIVOS_BASURA.md` | Inventario de archivos basura (2026-06-14) cuando la limpieza aun no se habia hecho. La cuarentena se ejecuto en commit `8fd8a3c` (40+ archivos a basura/). El doc describe un trabajo completado y su estado actual es inexacto ("NO SE HA BORRADO NADA"). |
+
+---
+
 ## Que NO se archiva (sigue vigente en `docs/`)
 
-- `PRUEBAS_E2E_SISTEMA.md` — catalogo formal de los 53 casos E2E; referencia viva para regresion.
-- `RESULTADOS_PRUEBAS_E2E.md` — resultados actuales (40 PASS, 0 FAIL, 3 WARN, 10 SKIP, 1 MANUAL).
+- `HANDOFF.md` — estado operativo para nueva sesion; actualizado 2026-06-27.
+- `BACKLOG.md` — items pendientes con INIT-1/3/4 y WOs sobredimensionadas activos.
+- `PRUEBAS_E2E_SISTEMA.md` — catalogo formal de 53 casos E2E; referencia viva.
+- `RESULTADOS_PRUEBAS_E2E.md` — resultados mas recientes (40 PASS, 0 FAIL; 2026-06-13).
+- `VALIDACION_UI_WEB.md` — validacion de 60 controles UI; actualizado 2026-06-27.
+- `PROPUESTA_MEJORA_DISENO_UI.md` — D-01..D-16 implementadas; actualizado 2026-06-27.
 - `VISION_PRODUCTO.md` — norte estrategico del producto; atemporal.
-- `COMO_FUNCIONA_EL_PROGRAMA.md` — guia practica de como funciona el simulador realmente.
-- `INSTRUCCIONES_LAYOUT_PERSONALIZADO.md` — instrucciones operativas de layouts; referencia de uso.
+- `COMO_FUNCIONA_EL_PROGRAMA.md` — guia practica de como funciona el simulador.
+- `INSTRUCCIONES_LAYOUT_PERSONALIZADO.md` — instrucciones operativas de layouts TMX.
 - `INSTRUCCIONES_PROYECTO_COWORK.md` — metodologia atemporal del proyecto.
-
-> Los movimientos de este lote se hicieron con `shutil.move` (FUSE, index.lock bloqueaba git mv).
-> Para formalizarlos en git: el Director debe hacer `del .git\index.lock` y luego
-> `git add -A docs/` en el commit pendiente.

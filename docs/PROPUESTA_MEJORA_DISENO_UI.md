@@ -258,14 +258,14 @@ El viewer tiene problemas de contraste en textos secundarios y terciarios sobre 
 | D-11 | Jerarquía de KPIs en ticker del panel derecho | Dirección de atención al usuario | ✓ Implementada 2026-06-14 |
 | D-12 | Sistema de notificaciones compartido (viewer) | Consistencia de feedback | ✓ Implementada 2026-06-14 |
 
-### Nivel 3 — Cambios Mayores (sprints)
+### Nivel 3 — Cambios Mayores (sprints) — IMPLEMENTADOS 2026-06-27
 
-| ID | Mejora | Impacto |
-|----|--------|---------|
-| D-13 | Design tokens compartidos entre configurador y viewer | Cohesión de identidad de producto |
-| D-14 | Stepper numerado de tabs en configurador | Claridad de flujo para usuarios nuevos |
-| D-15 | Event markers en el scrubber de timeline | Navegación semántica del replay |
-| D-16 | Fix diferenciación de estado accesible (no-color) | Cumplimiento WCAG AA |
+| ID | Mejora | Impacto | Estado |
+|----|--------|---------|--------|
+| D-13 | Design tokens compartidos entre configurador y viewer | Cohesión de identidad de producto | ✓ Implementada (0e6d3dd) |
+| D-14 | Stepper numerado de tabs en configurador | Claridad de flujo para usuarios nuevos | ✓ Implementada (902877a) |
+| D-15 | Event markers en el scrubber de timeline | Navegación semántica del replay | ✓ Implementada (0e6d3dd) |
+| D-16 | Fix diferenciación de estado accesible (no-color) | Cumplimiento WCAG AA | ✓ Implementada (0e6d3dd) |
 
 ---
 
@@ -318,13 +318,11 @@ Transiciones:
 
 La UI del Gemelo Digital está en un 70% del camino hacia un producto de nivel profesional. Los fundamentos están bien — Inter, CSS variables, transiciones suaves, sistema de notificaciones en el configurador, microinteracciones en el viewer — pero las dos apps no se reconocen como parte del mismo producto.
 
-Las tres prioridades más rentables en términos de impacto/esfuerzo son:
+**Estado de implementacion (2026-06-27):** D-01 a D-16 estan todas implementadas.
+Las tres prioridades originales de la propuesta — D-06, D-03 y D-13 — fueron ejecutadas.
+D-13 a D-16 (cambios mayores) completadas en sesion 2026-06-27.
 
-1. **D-06** — Botón "Abrir Visor" en configurador. Costo: 30 minutos. Impacto: elimina la fricción más visible del flujo completo.
-2. **D-03** — Fix de contraste en el viewer. Costo: 2 minutos. Impacto: pasa de violar WCAG a cumplirlo.
-3. **D-13** — Unificación de design tokens. Costo: 1-2 días. Impacto: da identidad de producto cohesiva a largo plazo.
-
-El resto de las mejoras son incrementales y pueden agendarse en orden de prioridad según los objetivos del Director.
+Si el Director define nuevas mejoras de UI, se numeran D-17 en adelante en este mismo documento.
 
 ---
 

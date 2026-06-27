@@ -141,13 +141,12 @@ Total: 1 sprint corto (~1-2 horas), sin tocar el motor de simulacion.
 
 ---
 
-## Nota de bug detectado durante BK-01 (no bloqueante)
+## Nota de bug detectado durante BK-01 (RESUELTO)
 
-El value HTML `"Ejecucion de Plan"` no coincide con el string que verifica el dispatcher
-(`"Ejecucion de Plan (Filtro por Prioridad)"`). En la practica, al seleccionar esa estrategia
-el dispatcher cae al default (`_estrategia_optimizacion_global`). El comportamiento
-es identico al de "Optimizacion Global" por lo que no produce errores visibles.
-Pendiente de corregir en un sprint de deuda tecnica.
+**RESUELTO en commit `c4c772f` (Fix H-5, 2026-06-14).**
+El dispatcher ahora reconoce el alias corto "Ejecucion de Plan" que envia la UI,
+ademas del string largo "Ejecucion de Plan (Filtro por Prioridad)".
+El bug ya no existe en la rama activa ni en main.
 
 ---
 
@@ -400,8 +399,6 @@ se quedaba dentro del motor.
 
 ---
 
----
-
 ## BK-05 — Botones E6/E7 ("Generar Plantilla TMX" / "Poblar SKUs Aleatorios")
 
 **Estado:** ELIMINADO — 2026-06-27
@@ -422,6 +419,121 @@ cero implementacion = UI enganiosa. Eliminados limpiamente.
 
 ---
 
+## INIT-1 — Inventario y picking por ubicacion real + reservas
+
+**Estado:** PENDIENTE — sin sprint asignado
+**Prioridad:** Alta (correctitud fundacional del simulador)
+**Origen:** docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md, item #1
+
+### El problema
+El allocation layer agrupa stock por SKU (`SUM(qty_available) GROUP BY sku_code`)
+y asigna la WO a una ubicacion de picking **elegida al azar** dentro del area
+(`random.choice` en `_get_location_for_area`). Esa ubicacion puede no tener el SKU.
+Resultado: rutas, distancias, heatmaps y el optimizador miden sobre ubicaciones ficticias.
+
+### La oportunidad
+La tabla `inventory(location_id, sku_code, qty_available, qty_reserved)` ya existe
+en `warehouse.db` (y las vistas `v_inventory_status`). La infraestructura esta lista;
+solo falta usarla en `order_strategies.py` y registrar `qty_reserved`.
+
+### Archivos a tocar
+- `order_strategies.py`: `_get_location_for_area()` y `generate_work_orders()`.
+- `data_manager.py`: consultas por ubicacion en vez de agrupadas.
+- `warehouse.py`: usar `qty_reserved` de la BD.
+- `schema.sql` / `importer.py`: verificar que el importador llena `qty_available` por ubicacion.
+
+### Estimacion de esfuerzo
+Medio (1-2 sesiones). No toca la logica de simulacion, solo la asignacion previa.
+
+---
+
+## INIT-3 — Reparar y ampliar el optimizador Optuna
+
+**Estado:** PENDIENTE — sin sprint asignado
+**Prioridad:** Media-Alta (feature estrella del producto, hoy posiblemente no-op)
+**Origen:** docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md, item #3
+
+### El problema
+El optimizador (`src/tools/optimizer.py`) puede estar probando:
+(a) Nombres de estrategia que no coinciden con los del dispatcher.
+(b) Parametros que se mapean a claves legacy que el motor ignora (p.ej.
+    `num_operarios_terrestres` en vez de `agent_types`).
+(c) `export_optimization_metrics` lee `num_operarios_terrestres`/`num_montacargas`
+    para `resource_costs`; si el config usa `agent_types`, esos contadores son 0.
+
+### Que hay que hacer
+1. Alinear nombres de `dispatch_strategy` con los del dispatcher (Fix H-5 ya lo hizo para la UI; revisar si el optimizador lo heredo).
+2. Traducir los parametros sugeridos a `agent_types` reales.
+3. Ampliar el espacio de busqueda: capacidades, `max_wos_por_tour`, prioridades de zona.
+4. Exponer el mejor resultado en la web (`/api/optimization`).
+
+### Archivos a tocar
+- `src/tools/optimizer.py`
+- `src/engines/event_generator.py` (export_optimization_metrics)
+- `web_prototype/server.py` (endpoint de resultado)
+
+### Estimacion de esfuerzo
+Bajo-Medio (1 sesion para alineacion basica; otra para ampliar espacio).
+
+---
+
+## INIT-4 — Prioridad de ordenes / SLA / olas + fidelidad de tiempos de pick
+
+**Estado:** PENDIENTE — sin sprint asignado
+**Prioridad:** Media
+**Origen:** docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md, item #4
+
+### El problema
+- `WorkOrder.priority` siempre es 99 (placeholder via `getattr(wo,'priority',99)`).
+  Urgencias, SLAs y olas de picking no estan modelados.
+- Tiempo de picking = `discharge_time` FIJO, independiente de cantidad o volumen.
+  Una WO de 1 unidad tarda lo mismo que una de 200 → baja fidelidad.
+
+### Que hay que hacer
+1. Agregar `priority` y opcionalmente `due_time`/`wave` a `WorkOrder`.
+2. Parsear prioridad desde el archivo de ordenes (JSON).
+3. Que el dispatcher respete la prioridad al seleccionar candidatos.
+4. Escalar el tiempo de picking/descarga por `cantidad * factor` en vez de valor fijo.
+
+### Archivos a tocar
+- `warehouse.py` (WorkOrder.priority/due_time)
+- `order_strategies.py` (parsear prioridad del JSON de ordenes)
+- `dispatcher.py` (ordenar candidatos por prioridad)
+- `operators.py` (tiempo de picking escalado)
+- `config.json` (factor de tiempo por unidad, opcional)
+
+### Estimacion de esfuerzo
+Medio (1-2 sesiones). No requiere cambios en el replay ni en la UI basica.
+
+---
+
+## WOs sobredimensionadas — Fix defensivo en _validar_y_ajustar_cantidad
+
+**Estado:** PENDIENTE — sin sprint asignado
+**Prioridad:** Baja-Media (falsifica KPIs silenciosamente)
+**Origen:** docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md, Apendice quick-fixes
+
+### El problema
+En `warehouse.py::_validar_y_ajustar_cantidad`:
+Si `sku.volumen > max_capacity_del_operario`, entonces `unidades_por_viaje = 0`.
+Consecuencia:
+- La WO se marca como 'staged' con `qty_picked = 0`.
+- Cuenta como "completada" en los KPIs aunque no se pikeara nada.
+- Puede causar bucle infinito si el fallback no es robusto.
+
+### Fix propuesto
+1. Forzar `unidades_por_viaje = max(1, unidades_por_viaje)` para evitar division por cero.
+2. Si `sku.volumen > capacidad_maxima_de_todos_los_operarios_del_area`, marcar la WO
+   como 'failed' (no 'staged') y registrar un backorder explicito.
+3. Log de WARNING cuando se detecte WO imposible de servir por volumen.
+
+### Archivos a tocar
+- `warehouse.py`: `_validar_y_ajustar_cantidad()`
+- `order_strategies.py`: registrar WO imposible como backorder
+
+---
+
 *Este documento se actualiza al detectar nuevos items en sesiones de desarrollo.
-Para retomar BK-01, leer: `dispatcher.py` lineas 252-273 (router de estrategias)
-y `web_prototype/static/web_configurator/index.html` (selector dispatch-strategy).*
+Para retomar BK-01, leer: `dispatcher.py` (router de estrategias)
+y `web_prototype/static/web_configurator/index.html` (selector dispatch-strategy).
+Para los INIT items, ver: `docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md`.*

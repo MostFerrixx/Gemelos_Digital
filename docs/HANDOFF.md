@@ -3,9 +3,9 @@
 
 **Generado:** 2026-06-18  ·  **Actualizado:** 2026-06-27
 **Por:** Cerebellum (sesion de traspaso)
-**Rama activa:** `feature/allocation-layer-v12.1`  ·  **HEAD:** `41ddc22`
-**Estado:** 3 nuevos commits pendientes de push (ver seccion 3).
-**Proxima accion del Director:** `git push origin feature/allocation-layer-v12.1` + merge a main.
+**Rama activa:** `feature/allocation-layer-v12.1`  ·  **HEAD:** `f3a3ec5`
+**Estado:** Limpio — sincronizado con main. Sin commits pendientes.
+**Proxima accion sugerida:** Ver seccion 5 (pendientes de diseno/motor).
 
 ---
 
@@ -64,178 +64,150 @@ El arbol data/ es una migracion abandonada que solo lee codigo muerto.
 ## 3. GIT — ESTADO ACTUAL
 
 **Rama:** `feature/allocation-layer-v12.1`
-**HEAD local:** `41ddc22`  ·  **Remote:** `b990964` (3 commits pendientes de push)
-**main:** `ba55f27` (sincronizado con el ultimo push; pendiente fast-forward)
+**HEAD:** `f3a3ec5` (local y remote identicos)
+**main:** `f3a3ec5` (sincronizado via fast-forward; `git rev-list --count main..feature` = 0)
 
-**Accion requerida (Director):**
-```
-git push origin feature/allocation-layer-v12.1
-# Luego merge a main (fast-forward server-side)
-```
+No hay commits pendientes de push ni merge.
 
-### Nuevos commits (sesion 2026-06-27):
+### Log completo de la rama (mas reciente primero)
 
 ```
+f3a3ec5  chore(ui): eliminar botones stub E6/E7 (BK-05 cerrado)
+7efc9c7  docs(handoff): actualizar estado post-sesion 2026-06-27
 41ddc22  refactor(p2): extraer agent_process a BaseOperator (Template Method)
 413888c  feat(gate): WAREHOUSE_SEED via env var para reproducibilidad determinista
 b990964  refactor(logging): print() -> logging por nivel en hot-path del motor
+0e6d3dd  feat(ui): D-13 tokens compartidos + D-15 marcadores de eventos + D-16 no-color
+902877a  feat(ui): D-14 stepper numerado de pestanas en el configurador
+23b374b  feat(dev): anti-cache en estaticos del front
+8cc7f8d  feat(init-5): exponer nivel de servicio / backorders en visor, API y Excel
+e2c6293  feat(qa3): mapa explicito work_area_equipment como fuente de verdad
+19e8829  fix(bk-04): cerrar grietas QA-1/QA-2/QA-3
+e50b924  docs(qa): QA adversarial de BK-04 -- 2 grietas halladas
+1bb24a3  fix(bk-04): prevenir areas sin agente (cobertura) + flota por defecto valida
+0fa64e3  feat(ui): exponer truck_interval en configurador + bajar default a 90
+bb53c8e  docs(handoff): reflejar push+merge hechos; validar KPIs outbound G15/G16
+ba55f27  chore(limpieza): sanear indice FUSE, borrar junk y actualizar docs desfasados
+...      (historico anterior ya en main; ver git log para detalle)
 ```
-
-### Historial previo (ya en main via ba55f27):
-
-```
-dd5c729  exp(p4-bk03): greedy NN descartado con evidencia
-76f1e21  feat(p3): exponer radio_expansion_paso y radio_max_expansiones en configurador web
-9451795  chore(gitignore): .fuse_hidden*, commit*.bat, COMMIT_*.bat
-8a2fe86  fix(h-6): radio blando en estrategia Cercania (elimina deadlock)
-c24b087  docs(h-6): analisis deadlock Cercania + BK-02 EN REPENSAR
-3d0b0f8  docs(val-comp): validacion comportamiento real por estrategia + bug H-6
-336c442  docs(backlog): BK-02 FIFO Estricto + BK-03 greedy nearest-neighbor
-056ac09  refactor: eliminar campo fantasma Zoning-and-Snake, doc greedy-NN
-e91dddf  fix(optimizer): strings fantasma -> 4 estrategias reales de despacho
-c4c772f  fix(H-5): dispatcher reconoce alias corto "Ejecucion de Plan" de la UI
-836ba72  docs: AUDITORIA_ESTRATEGIAS.md inventario completo
-5980341  docs: H-5 auditoria estrategias (hallazgo)
-bcdb264  feat(ui): BK-01 Cercania + radio_cercania en configurador
-9ab9f42  docs: D-01..D-12 marcadas implementadas
-394d3f1  feat(ui): D-08..D-12 sidebar, fleet cards, inline validation, KPIs, toasts
-884a420  fix(ui): D-03..D-07 quick wins + H-1..H-4 cerrados
-99166bc  docs: backlog BK-01 estrategias ocultas
-8fd8a3c  chore: cuarentena archivos basura en basura/
-6e4e0e0  docs: propuesta mejora UI/UX + inventario basura
-9af0455  (base: chore limpieza docs + fixes E2E)
-```
-
-### Push y merge a main: HECHOS (2026-06-19)
-- Push de la rama: `9af0455..ba55f27` -> origin/feature/allocation-layer-v12.1.
-- Merge a `main`: fast-forward server-side (`git push origin ba55f27:refs/heads/main`),
-  SIN checkout de main (evita arrastrar el indice anomalo de FUSE). main local
-  sincronizado con `git fetch origin main:main`.
-- Validado: las 5 refs en `ba55f27`; `git rev-list --count main..feature` = 0.
-- Saneo de indice: `git reset --mixed HEAD` + remocion de lock obsoleto dejaron el
-  working tree limpio (ya no hay borrados fantasma de HANDOFF.md / ANALISIS_H6).
 
 ---
 
-## 4. LO QUE SE HIZO EN LAS ULTIMAS SESIONES
+## 4. LO QUE SE HIZO (HISTORIAL POR SESION)
 
-### Punto 1 — prints del hot-path -> logging por nivel (commit b990964, 2026-06-27)
-186 prints convertidos a logging por nivel (DEBUG/INFO/WARNING/ERROR) en:
-- `src/engines/event_generator.py`: 58 prints (todos INFO)
-- `src/subsystems/simulation/dispatcher.py`: 86 prints (mayoria DEBUG, algunos INFO/WARNING/ERROR)
-- `src/subsystems/simulation/operators.py`: 42 prints (mayoria DEBUG, algunos INFO/WARNING)
+### Sesion 2026-06-27 (commits f3a3ec5..b990964)
 
-Resultado: la salida en produccion baja de miles de lineas a ~800 (solo milestones).
-La linea critica para Watch Replay (`[EVENT-GENERATOR] Archivo generado: output/.../replay_....jsonl`)
-queda como INFO. `logging.basicConfig(level=INFO)` en `event_generator.py`.
+**Logging refactor — Punto 1** (`b990964`)
+~186 prints convertidos a logging por nivel en hot-path:
+- `event_generator.py` (58 prints → INFO), `dispatcher.py` (86 → DEBUG/INFO/WARN/ERROR),
+  `operators.py` (42 → DEBUG/INFO/WARN).
+Salida en produccion: de miles de lineas a ~800 milestones.
+La linea critica para Watch Replay (`.jsonl` generado) queda como INFO.
 
-### Gate de reproducibilidad — WAREHOUSE_SEED (commit 413888c, 2026-06-27)
-Variable de entorno `WAREHOUSE_SEED=42` fija el seed de `random` antes de la simulacion.
+**Gate WAREHOUSE_SEED** (`413888c`)
+Variable de entorno `WAREHOUSE_SEED=42` fija `random.seed()` antes de la sim.
 Sin la variable: comportamiento estocastico de produccion (sin cambio).
-Gate verificado: dos corridas con semilla 42 -> SHA256 byte-identico (a4ae8d4e9f7dd444..., 5379372 bytes).
+Gate byte-identico: SHA256 = `a4ae8d4e9f7dd444...` (5,379,372 bytes) en dos corridas.
 
-### Punto 2 — Refactor Ground/Forklift agent_process (commit 41ddc22, 2026-06-27)
-Patron Template Method extraido:
-- `BaseOperator.agent_process()`: ciclo pull-based completo (setup + PASO 1-6). Llama `yield from self._do_picking_at(wo)`.
-- `BaseOperator._do_picking_at()`: stub abstracto (NotImplementedError).
-- `GroundOperator._do_picking_at()`: status="picking" -> timeout -> cargo update.
-- `Forklift._do_picking_at()`: status="lifting" -> lift + timeout + lower -> cargo update.
-- `GroundOperator.agent_process()` y `Forklift.agent_process()`: ELIMINADOS (heredan de BaseOperator).
+**Template Method — Punto 2** (`41ddc22`)
+`BaseOperator.agent_process()` extrae el ciclo pull-based completo (PASO 1-6).
+`_do_picking_at()` es hook abstracto; `GroundOperator` y `Forklift` lo implementan.
+Resultado: -296 lineas en operators.py (1772→1476, -16.7%).
+Gate byte-identico post-refactor: SHA256 = idem baseline.
 
-Resultado: -296 lineas en operators.py (1772 -> 1476, -16.7%).
-Gate byte-identico: SHA256 post-refactor = a4ae8d4e9f7dd444... = baseline.
+**E6/E7 eliminados — Punto 3** (`f3a3ec5`)
+Botones stub "Generar Plantilla TMX" / "Poblar SKUs Aleatorios" quitados de
+`index.html` y `app.js`. Tarjeta "Acciones de Datos" queda con un solo boton real.
+BK-05 cerrado en BACKLOG.md.
 
+---
 
+### Sesiones previas (antes de 2026-06-27)
 
-### Allocation Layer V12.1 (base de la rama)
-Asignacion de stock real (FCFS) antes de crear WorkOrders.
-- `data_manager.py::get_available_stock()` — reserva stock real del Excel.
-- `warehouse.py::WorkOrder` — campos `qty_requested`, `qty_allocated`, `is_partial`.
-- `order_strategies.py` — genera WOs solo si hay stock; registra backorders.
-- `config.json` — `fulfillment_policy: "ship_partial"` como fuente de verdad.
+**D-13..D-16** (`0e6d3dd`, `902877a`)
+Design tokens compartidos configurador/viewer, stepper numerado de tabs,
+event markers en scrubber de timeline, fix accesibilidad no-color (WCAG AA).
 
-### Limpieza estructural
-- Cuarentena: 40+ archivos basura movidos a `basura/`.
-- `.gitignore` ampliado: `.fuse_hidden*`, `commit*.bat`, lock files.
-- 7044 archivos `.fuse_hidden*` borrados por el Director (LIMPIAR_TEMPORALES.bat).
+**anti-cache estaticos** (`23b374b`)
+Query string `?v=<timestamp>` en referencias CSS/JS para evitar reload forzado.
 
-### UI/UX — mejoras D-03 a D-12
-- D-03/D-04: sidebar colapsable, tabs con iconos.
-- D-05/D-06: fleet cards con estado visual, inline validation en inputs.
-- D-07: jerarquia visual de KPIs en el visor.
-- D-08 a D-12: colores de sidebar, toasts de estado en el viewer, etc.
-- H-1/H-2/H-4: E6/E7 deshabilitados, confirm reemplazado por modal, right panel sincronizado al seek.
+**INIT-5 — nivel de servicio** (`8cc7f8d`)
+Backorders/fill-rate expuestos en visor web (KPI "Servicio"), API
+(`/api/snapshot`, `/api/state`, `/api/metrics`) y hoja Excel "Nivel de servicio".
+Fuente: `core/replay_utils.build_service_level_summary(almacen)`.
+En modo estocastico (sin validacion de stock) muestra N/A.
 
-### Auditoria y fixes de estrategias de despacho
-- AUDITORIA_ESTRATEGIAS.md: mapeadas las 4 estrategias reales + 3 fantasmas eliminadas.
-- **Fix H-5** (`c4c772f`): la UI enviaba "Ejecucion de Plan" (sin sufijo) pero el dispatcher
-  buscaba "Ejecucion de Plan (Filtro por Prioridad)". Nunca ejecutaba su funcion.
-  Fix: alias corto reconocido en `__init__` del dispatcher.
-- **Fix optimizer.py**: estrategias fantasmas (FIFO Simple, Proximity-Based, Zoning-and-Snake)
-  reemplazadas por los 4 strings reales.
+**BK-04 + QA-1/2/3** (`1bb24a3`, `e50b924`, `e2c6293`, `19e8829`)
+- Fix preventivo: flota por defecto asigna work_areas validas a Forklift.
+- Mapa explicito `work_area_equipment` en `work_area_calculator.py` como fuente de verdad.
+- QA adversarial cerro 3 grietas: motor valida arranque, flota vacia detectada, tipo de equipo validado.
+- Outbound termina correctamente cuando no hay mas WOs.
 
-### Fix H-6 — Deadlock de Cercania (radio restrictivo)
-**Problema:** `_estrategia_cercania()` usaba un radio DURO. Si ningun WO estaba
-dentro del radio, retornaba `[]`. El caller retornaba `None`. `operators.py`
-hacia `yield timeout(0.5); continue` -> bucle infinito -> deadlock.
-**Fix (Radio Blando):** expansion progresiva del radio por pasos:
-```
-radio inicial -> radio + paso*1 -> ... -> radio + paso*N -> todos los WOs compatibles
-```
-Parametros en config.json:
-- `radio_cercania`: radio inicial en celdas (default 100)
-- `radio_expansion_paso`: incremento por intento (default 50)
-- `radio_max_expansiones`: maximo de expansiones (default 5)
-Validado: radio=15 con 25 WOs -> completa en 3.57s (antes: bucle infinito hasta t=135249).
-Los 3 parametros estan expuestos en el configurador web.
+**truck_interval en UI** (`0fa64e3`)
+Campo expuesto en configurador; default bajado a 90 seg (antes 300, causaba sim sin trucks visibles).
 
-### BK-01 — Estrategia Cercania expuesta en la UI
-- `index.html`: nueva opcion en selector + div `#radio-cercania-group` con sub-seccion
-  de expansion de radio.
-- `app.js`: load/serialize de radio_cercania, radio_expansion_paso, radio_max_expansiones.
-- `config_manager.py`: validacion de los 3 campos nuevos.
+**Allocation Layer V12.1** (base de la rama)
+Asignacion de stock real FCFS antes de crear WorkOrders.
+`data_manager.py::get_available_stock()`, `warehouse.py::WorkOrder`
+(qty_requested/qty_allocated/is_partial), `order_strategies.py`.
+`fulfillment_policy: "ship_partial"` en config.json.
 
-### BK-03 — Experimento greedy nearest-neighbor (DESCARTADO)
-Hipotesis: ordenar WOs por vecino mas cercano en lugar de por costo mejora distancia total.
-Resultado (3+3 corridas, Cercania, radio=100, 300 WOs, 2 operarios):
-- Distancia total: -5.27% (aparente)
-- Distancia / WO: -1.54% (real — dentro del ruido estadistico con N=3)
-- WOs completadas: -3.80% (REGRESION — hace menos trabajo)
-- El ahorro de distancia es un artefacto de hacer menos trabajo, no de mejor routing.
-Decision: no integrar. Flag `cercania_tour_mode` queda en codigo con default `"cost"`.
+**Fixes de estrategias** (H-5, BK-01, H-6)
+- H-5 (`c4c772f`): alias "Ejecucion de Plan" reconocido por el dispatcher.
+- BK-01 (`bcdb264`, `76f1e21`): Cercania + radio_cercania + expansion expuestos en UI.
+- H-6 (`8a2fe86`): radio blando elimina deadlock de Cercania con radio restrictivo.
+- BK-03 (`dd5c729`): greedy nearest-neighbor descartado con evidencia experimental.
+
+**D-03..D-12 + limpieza** (sesiones anteriores)
+Sidebar colapsable/iconos, fleet cards, inline validation, KPIs jerarquicos,
+colores de seccion, notificaciones. Cuarentena de 40+ archivos basura.
 
 ---
 
 ## 5. PENDIENTES Y PROXIMOS PASOS
 
-### Inmediato: COMPLETADO (2026-06-19)
-| Accion | Estado |
-|---|---|
-| Push a GitHub | HECHO — `9af0455..ba55f27` en origin/feature/allocation-layer-v12.1 |
-| Merge a main | HECHO — fast-forward server-side; main = `ba55f27` |
-| Borrar push_feature.bat | HECHO — borrado en la limpieza post-merge |
+### Backlog activo (ver docs/BACKLOG.md para detalle completo)
 
-### Backlog activo (ver docs/BACKLOG.md para detalle)
+| Item | Estado | Esfuerzo estimado |
+|------|--------|-------------------|
+| **BK-02** — FIFO Estricto en UI | EN REPENSAR (diseno pendiente del Director) | ~15 min cuando se decida |
+| **web_dashboard/** (puerto 8001) | PENDIENTE DECISION (Director quiere revisarla) | Depende de decision |
+| **INIT-1** — Picking por ubicacion real + reservas en BD | Pendiente | Alto |
+| **INIT-3** — Reparar optimizador Optuna | Pendiente | Bajo-Medio |
+| **INIT-4** — Prioridad de ordenes / SLA / olas | Pendiente | Medio |
+| **WOs sobredimensionadas** | Pendiente (falsifica KPIs) | Bajo (fix defensivo) |
+
+Ver `docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md` para descripcion completa de INIT-1/3/4.
 
 **BK-02 — FIFO Estricto en UI** (EN REPENSAR)
-El motor lo implementa correctamente (string `"FIFO Estricto"`). No se expone en la UI
-porque el Director quiere redefinir primero que deberia hacer operacionalmente.
-Esfuerzo cuando se decida: ~15 min (1 linea HTML + 1 linea validacion).
+El motor lo implementa correctamente. No se expone porque el Director quiere redefinir
+primero que deberia hacer FIFO operacionalmente.
 
 **web_dashboard/** (PENDIENTE DECISION)
-Puerto 8001. Ruta de replay rota. Parece huerfana pero el Director quiere revisarla
+Puerto 8001. Ruta de replay rota. Parece huerfana; el Director quiere revisarla
 antes de decidir si se conserva, se repara o se elimina.
 
-**Mejoras de diseno D-13+**
-D-01 a D-12 estan implementadas. Si el Director define nuevas mejoras de UI,
-se numeran D-13 en adelante en docs/PROPUESTA_MEJORA_DISENO_UI.md.
+**INIT-1 — Picking por ubicacion real**
+Hoy el allocation layer asigna la WO a una ubicacion de picking elegida al azar
+dentro del area, aunque ese SKU no este ahi. La tabla `inventory(location_id, ...)`
+en warehouse.db ya tiene la informacion; falta usarla en `order_strategies.py`.
+
+**INIT-3 — Optimizador Optuna**
+Los nombres de estrategia y parametros del optimizador estan desalineados del motor
+real. Resultado: el optimizador puede estar probando configuraciones que el motor ignora.
+
+**INIT-4 — Prioridad de ordenes**
+`WorkOrder.priority` siempre es 99 (placeholder). Sin prioridad real, SLA ni olas.
+Tiempo de picking es `discharge_time` fijo, independiente del volumen.
+
+**WOs sobredimensionadas**
+En `warehouse.py::_validar_y_ajustar_cantidad`: si `sku.volumen > max_capacity`,
+`unidades_por_viaje = 0` → bucle infinito (o la WO se marca 'staged' con qty=0).
+Fix: forzar minimo 1 unidad por viaje; marcar WOs imposibles como 'failed' (no 'staged').
 
 ### Issues conocidos (no criticos)
-- (RESUELTO) `run_migration.py` lee de `layouts/` via `find_excel_file()`, igual que
-  la simulacion; no existe copia `data/layouts/` ni divergencia.
-- `warehouse.db-shm` / `warehouse.db-wal`: archivos de WAL de SQLite, aparecen como
+- `warehouse.db-shm` / `warehouse.db-wal`: archivos WAL de SQLite, aparecen como
   untracked pero ya estan en .gitignore.
-- `push_feature.bat`: BORRADO (limpieza post-merge, sesion 2026-06-19).
 
 ---
 
@@ -243,19 +215,19 @@ se numeran D-13 en adelante en docs/PROPUESTA_MEJORA_DISENO_UI.md.
 
 | Archivo | Estado | Descripcion |
 |---|---|---|
-| `CLAUDE.md` | ACTUALIZADO 2026-06-18 | Identidad, arquitectura, leyes, estado actual |
+| `CLAUDE.md` | ACTUALIZADO 2026-06-27 | Identidad, arquitectura, leyes, estado actual |
 | `AUDITORIA.md` | Vigente (mayo 2026) | Diagnostico estructural completo del repo |
-| `docs/HANDOFF.md` | NUEVO 2026-06-18 | Este archivo — estado operativo para nueva sesion |
-| `docs/BACKLOG.md` | ACTUALIZADO 2026-06-18 | BK-01 IMPLEMENTADO, BK-02 EN REPENSAR, BK-03 DESCARTADO |
-| `docs/AUDITORIA_ESTRATEGIAS.md` | ACTUALIZADO 2026-06-18 | H-5 resuelto, R1 descartada |
-| `docs/ANALISIS_H6_CERCANIA_DEADLOCK.md` | ACTUALIZADO 2026-06-18 | H-6 resuelto en 8a2fe86 |
-| `docs/VALIDACION_UI_WEB.md` | Vigente (jun 2026) | 62 controles validados; 4 hallazgos cerrados |
-| `docs/PROPUESTA_MEJORA_DISENO_UI.md` | Vigente | D-01..D-12 implementadas |
-| `docs/PRUEBAS_E2E_SISTEMA.md` | Vigente | Bateria de 44 casos E2E |
-| `docs/LIMPIEZA_ARCHIVOS_BASURA.md` | Vigente | Cuarentena ejecutada en 8fd8a3c |
+| `docs/HANDOFF.md` | ACTUALIZADO 2026-06-27 | Este archivo — estado operativo para nueva sesion |
+| `docs/BACKLOG.md` | ACTUALIZADO 2026-06-27 | BK-01..BK-05 + INIT-5 cerrados; BK-02/INIT-1/3/4/WOs pendientes |
+| `docs/VALIDACION_UI_WEB.md` | ACTUALIZADO 2026-06-27 | 60 controles; E6/E7 eliminados, D1 resuelto |
+| `docs/PROPUESTA_MEJORA_DISENO_UI.md` | ACTUALIZADO 2026-06-27 | D-01..D-16 implementadas |
+| `docs/PRUEBAS_E2E_SISTEMA.md` | Referencia (2026-06-13) | Catalogo de 53 casos E2E |
+| `docs/RESULTADOS_PRUEBAS_E2E.md` | Referencia (2026-06-13) | Resultados: 40 PASS, 0 FAIL, 3 WARN |
 | `docs/COMO_FUNCIONA_EL_PROGRAMA.md` | Referencia | Descripcion operativa del sistema |
 | `docs/VISION_PRODUCTO.md` | Referencia | Vision y roadmap de alto nivel |
-| `docs/antiguos/` | OBSOLETOS | Docs de sesiones anteriores (V11 y antes) |
+| `docs/INSTRUCCIONES_LAYOUT_PERSONALIZADO.md` | Referencia | Tileset y estructura de layouts TMX |
+| `docs/INSTRUCCIONES_PROYECTO_COWORK.md` | Referencia | Metodologia atemporal del proyecto |
+| `docs/antiguos/` | ARCHIVO HISTORICO | Planes/bitacoras de iniciativas completadas |
 
 ---
 

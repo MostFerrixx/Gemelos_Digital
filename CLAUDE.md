@@ -89,45 +89,63 @@ NOTA: la simulación y `run_migration.py` leen ambos desde `layouts/`. El migrad
 usa `find_excel_file()` (busca `layouts/Warehouse_Logic_v2.xlsx`, luego
 `layouts/Warehouse_Logic.xlsx`); no existe copia en `data/layouts/`. Sin divergencia.
 
-## 5. ESTADO ACTUAL (actualizado 2026-06-18)
+## 5. ESTADO ACTUAL (actualizado 2026-06-27)
 
-### Rama activa
-`feature/allocation-layer-v12.1` — 20 commits por delante de `main`.
-El Director debe hacer `git push origin feature/allocation-layer-v12.1` desde
-su terminal Windows (el sandbox Linux no tiene red saliente hacia GitHub).
-Luego: merge a `main` (PR o merge directo). Lee `docs/HANDOFF.md` para el
-estado completo y los proximos pasos.
+### Rama activa y estado de git
+`feature/allocation-layer-v12.1` sincronizada con `main`. HEAD: `f3a3ec5`.
+No hay commits pendientes de push ni merge. Lee `docs/HANDOFF.md` para el
+estado operativo detallado.
 
-### Lo que ya esta commiteado en la rama (no hay trabajo sin commitear)
-- **Allocation Layer V12.1** (commits fundacionales): asignacion de stock real
-  FCFS antes de crear WorkOrders. `data_manager.py`, `warehouse.py`
+### Lo que ya esta commiteado (todo en main via fast-forward)
+- **Allocation Layer V12.1** (base): asignacion de stock real FCFS antes de
+  crear WorkOrders. `data_manager.py`, `warehouse.py`
   (`qty_requested/qty_allocated/is_partial`), `order_strategies.py`.
-- **Fix H-5** (`c4c772f`): dispatcher reconoce el alias corto "Ejecucion de Plan"
-  que envia la UI (antes caia silenciosamente a Optimizacion Global).
+- **Fix H-5** (`c4c772f`): dispatcher reconoce alias corto "Ejecucion de Plan"
+  de la UI (antes caia silenciosamente a Optimizacion Global).
 - **Fix H-6** (`8a2fe86`): radio blando en `_estrategia_cercania()` — expande
   radio por pasos en lugar de retornar lista vacia y causar deadlock.
-- **BK-01** (`bcdb264`): estrategia Cercania + `radio_cercania` expuestos en
-  configurador web.
-- **P3** (`76f1e21`): `radio_expansion_paso` y `radio_max_expansiones` expuestos
-  en configurador web (subseccion dentro de #radio-cercania-group).
-- **Limpieza**: cuarentena de archivos basura en `basura/`, quick wins UI D-03..D-12,
-  `.gitignore` actualizado (`.fuse_hidden*`, `commit*.bat`, locks).
-- **BK-03 descartado** (`dd5c729`): experimento greedy nearest-neighbor — mejora
-  real de distancia/WO solo -1.54% (dentro del ruido); throughput baja -3.8%.
+- **BK-01** (`bcdb264`): Cercania + radio_cercania + radio_expansion_paso +
+  radio_max_expansiones expuestos en configurador web. Fix H-5 incluido.
+- **BK-03 descartado** (`dd5c729`): greedy nearest-neighbor — -1.54% distancia/WO
+  (ruido estadistico); throughput baja -3.8%. Flag `cercania_tour_mode="cost"`.
+- **BK-04** (`1bb24a3`, `e2c6293`, `19e8829`): areas sin agente → fallo al
+  arrancar. Flota por defecto con work_areas validas. Mapa explicito
+  `work_area_equipment`. QA-1/2/3 cerradas.
+- **truck_interval en UI** (`0fa64e3`): expuesto en configurador, default 90.
+- **INIT-5** (`8cc7f8d`): nivel de servicio / backorders en visor web, API y
+  hoja Excel. Fuente: `core/replay_utils.build_service_level_summary()`.
+- **anti-cache estaticos** (`23b374b`): query string `?v=` en CSS/JS del front.
+- **D-13..D-16** (`902877a`, `0e6d3dd`): stepper numerado de tabs, design
+  tokens compartidos configurador/viewer, event markers en scrubber,
+  fix diferenciacion de estado accesible (no-color, WCAG AA).
+- **D-03..D-12** (sesiones anteriores): sidebar colapsable/iconos, fleet cards,
+  inline validation, jerarquia KPIs, colores de seccion, notificaciones.
+- **Logging refactor** (`b990964`): ~186 prints → logging por nivel en
+  hot-path (dispatcher, operators, event_generator). DEBUG off en produccion.
+- **WAREHOUSE_SEED** (`413888c`): semilla determinista via env var. Gate
+  byte-identico (SHA256=a4ae8d4e..., 5379372 bytes) verificado dos veces.
+- **Template Method** (`41ddc22`): BaseOperator.agent_process() + hooks
+  `_do_picking_at()` por subclase. -296 lineas en operators.py (-16.7%).
+  Gate byte-identico post-refactor confirmado.
+- **E6/E7 eliminados** (`f3a3ec5`): botones stub "Generar Plantilla TMX" /
+  "Poblar SKUs Aleatorios" quitados del HTML y JS (BK-05 cerrado).
+- **Limpieza** (`8fd8a3c`): 40+ archivos basura en basura/, .gitignore ampliado.
 
-### Pendientes (no bloquean uso; ver docs/BACKLOG.md)
-- Push de la rama a GitHub (accion manual del Director).
-- Merge de `feature/allocation-layer-v12.1` a `main`.
-- BK-02 (FIFO Estricto en UI): EN REPENSAR — decision de diseno pendiente.
-- Revision de `web_dashboard/` (puerto 8001, huerfana): Director quiere
-  decidir si conservar o eliminar antes de poda.
-- Mejoras de diseno D-08+ (ya implementadas; quedan D-13+ si se definen).
+### Pendientes (ver docs/BACKLOG.md para detalle)
+- **BK-02** — FIFO Estricto en UI: EN REPENSAR (diseno pendiente del Director).
+- **web_dashboard/** (puerto 8001): Director quiere revisarla antes de decidir.
+- **INIT-1** — Inventario y picking por ubicacion real + reservas en BD
+  (correctitud fundacional; hoy la WO va a ubicacion aleatoria del area).
+- **INIT-3** — Reparar optimizador Optuna (estrategias y parametros alineados).
+- **INIT-4** — Prioridad de ordenes / SLA / olas + tiempo de pick por volumen.
+- **WOs sobredimensionadas** — `_validar_y_ajustar_cantidad` en `warehouse.py`:
+  si `sku.volumen > max_capacity` → WO se marca 'staged' con qty=0 (falsifica
+  KPIs). Pendiente fix defensivo.
+- Ver `docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md` para detalle de INIT-1/3/4.
 
 ### Bugs conocidos (no criticos)
-- (RESUELTO) `run_migration.py` lee de `layouts/` via `find_excel_file()`, igual
-  que la simulacion; no hay copia `data/layouts/` ni divergencia.
-- `warehouse.db-shm` y `warehouse.db-wal` aparecen como untracked (ya en
-  .gitignore; son artefactos de SQLite en uso).
+- `warehouse.db-shm` y `warehouse.db-wal`: archivos WAL de SQLite, aparecen
+  como untracked (ya en .gitignore).
 
 Existe `AUDITORIA.md` con el diagnostico estructural completo (mayo 2026).
 Lee `docs/HANDOFF.md` para el estado operativo actualizado.
