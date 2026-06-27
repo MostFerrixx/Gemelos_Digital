@@ -5,6 +5,11 @@ Sin renderizado, sin Pygame, solo SimPy + generacion de .jsonl
 """
 
 import sys
+
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stdout)
+logger = logging.getLogger(__name__)
 import os
 
 import simpy
@@ -64,12 +69,12 @@ class EventGenerator:
             self.config_manager = ConfigurationManager(config_path=config_path)
             self.config_manager.validate_configuration()
             self.configuracion = self.config_manager.configuration
-            print("[EVENT-GENERATOR] Configuracion cargada exitosamente")
+            logger.info("[EVENT-GENERATOR] Configuracion cargada exitosamente")
         except ConfigurationError as e:
-            print(f"[EVENT-GENERATOR ERROR] Error en configuracion: {e}")
+            logger.error(f"[EVENT-GENERATOR ERROR] Error en configuracion: {e}")
             self.config_manager = None
             self.configuracion = get_default_config()
-            print("[EVENT-GENERATOR] Fallback: Usando configuracion por defecto")
+            logger.info("[EVENT-GENERATOR] Fallback: Usando configuracion por defecto")
         
         # Entorno SimPy
         self.env = None
@@ -93,34 +98,34 @@ class EventGenerator:
         self.operarios = []
         self.procesos_operarios = []
         
-        print(f"[EVENT-GENERATOR] Inicializado - Session: {self.session_timestamp}")
+        logger.info(f"[EVENT-GENERATOR] Inicializado - Session: {self.session_timestamp}")
     
     def crear_simulacion(self):
         """Crea una nueva simulacion (sin Pygame)"""
         if not self.configuracion:
-            print("[EVENT-GENERATOR ERROR] No hay configuracion valida")
+            logger.error("[EVENT-GENERATOR ERROR] No hay configuracion valida")
             return False
         
-        print("[EVENT-GENERATOR] Inicializando arquitectura TMX...")
+        logger.info("[EVENT-GENERATOR] Inicializando arquitectura TMX...")
         
         # 1. Inicializar LayoutManager
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
         tmx_file = os.path.join(project_root, self.configuracion.get('layout_file', 'layouts/WH1.tmx'))
-        print(f"[EVENT-GENERATOR] Cargando layout: {tmx_file}")
+        logger.info(f"[EVENT-GENERATOR] Cargando layout: {tmx_file}")
         
         try:
             self.layout_manager = LayoutManager(tmx_file, headless=True)
         except Exception as e:
-            print(f"[EVENT-GENERATOR ERROR] No se pudo cargar TMX: {e}")
+            logger.error(f"[EVENT-GENERATOR ERROR] No se pudo cargar TMX: {e}")
             return False
         
         # 2. Inicializar Pathfinder
-        print("[EVENT-GENERATOR] Inicializando pathfinding...")
+        logger.info("[EVENT-GENERATOR] Inicializando pathfinding...")
         try:
             self.pathfinder = Pathfinder(self.layout_manager.collision_matrix)
             self.route_calculator = RouteCalculator(self.pathfinder)
         except Exception as e:
-            print(f"[EVENT-GENERATOR ERROR] No se pudo inicializar pathfinder: {e}")
+            logger.error(f"[EVENT-GENERATOR ERROR] No se pudo inicializar pathfinder: {e}")
             return False
         
         # 3. Crear entorno SimPy
@@ -134,10 +139,10 @@ class EventGenerator:
         # 5. Crear calculador de costos
         self.cost_calculator = AssignmentCostCalculator(self.data_manager)
         
-        print(f"[EVENT-GENERATOR] Arquitectura TMX inicializada:")
-        print(f"  - Dimensiones: {self.layout_manager.grid_width}x{self.layout_manager.grid_height}")
-        print(f"  - Puntos de picking: {len(self.layout_manager.picking_points)}")
-        print(f"  - Staging areas: {len(self.data_manager.outbound_staging_locations)}")
+        logger.info(f"[EVENT-GENERATOR] Arquitectura TMX inicializada:")
+        logger.info(f"  - Dimensiones: {self.layout_manager.grid_width}x{self.layout_manager.grid_height}")
+        logger.info(f"  - Puntos de picking: {len(self.layout_manager.picking_points)}")
+        logger.info(f"  - Staging areas: {len(self.data_manager.outbound_staging_locations)}")
         
         # 6. Crear AlmacenMejorado
         self.almacen = AlmacenMejorado(
@@ -184,7 +189,7 @@ class EventGenerator:
         if hasattr(self.almacen, 'dispatcher') and hasattr(self.almacen.dispatcher, 'lista_maestra_work_orders'):
             initial_snapshot = [wo.to_dict() for wo in self.almacen.dispatcher.lista_maestra_work_orders]
             self.almacen.dispatcher.initial_work_orders_snapshot = initial_snapshot
-            print(f"[EVENT-GENERATOR] Snapshot inicial capturado: {len(initial_snapshot)} WorkOrders")
+            logger.info(f"[EVENT-GENERATOR] Snapshot inicial capturado: {len(initial_snapshot)} WorkOrders")
         
         # 9b. QA hardening (BK-04): chequeo preventivo de la flota ANTES de correr. Cubre
         # el bypass del configurador (config.json a mano, --config, optimizer, presets
@@ -193,18 +198,18 @@ class EventGenerator:
         # outbound / espera del dispatcher).
         ok_flota, msg_flota = self._validar_flota_cubre_areas()
         if not ok_flota:
-            print(f"[EVENT-GENERATOR ERROR] {msg_flota}")
+            logger.error(f"[EVENT-GENERATOR ERROR] {msg_flota}")
             return False
 
         # 10. Iniciar proceso del dispatcher
         if hasattr(self.almacen, 'dispatcher') and hasattr(self.almacen.dispatcher, 'dispatcher_process'):
-            print("[EVENT-GENERATOR] Iniciando dispatcher...")
+            logger.info("[EVENT-GENERATOR] Iniciando dispatcher...")
             self.env.process(self.almacen.dispatcher.dispatcher_process(self.operarios))
         
-        print(f"[EVENT-GENERATOR] Simulacion creada:")
-        print(f"  - {len(self.procesos_operarios)} operarios")
-        print(f"  - {len(self.almacen.dispatcher.lista_maestra_work_orders)} WorkOrders")
-        print(f"  - {self.almacen.total_ordenes} ordenes generadas")
+        logger.info(f"[EVENT-GENERATOR] Simulacion creada:")
+        logger.info(f"  - {len(self.procesos_operarios)} operarios")
+        logger.info(f"  - {len(self.almacen.dispatcher.lista_maestra_work_orders)} WorkOrders")
+        logger.info(f"  - {self.almacen.total_ordenes} ordenes generadas")
         
         return True
 
@@ -261,19 +266,19 @@ class EventGenerator:
     def ejecutar(self):
         """Ejecuta la simulacion y genera archivos de salida"""
         try:
-            print("="*60)
-            print("GENERADOR DE EVENTOS - GEMELO DIGITAL")
-            print(f"Session: {self.session_timestamp}")
-            print("Modo: Headless (sin UI)")
-            print("="*60)
+            logger.info("="*60)
+            logger.info("GENERADOR DE EVENTOS - GEMELO DIGITAL")
+            logger.info(f"Session: {self.session_timestamp}")
+            logger.info("Modo: Headless (sin UI)")
+            logger.info("="*60)
             
             # Crear simulacion
             if not self.crear_simulacion():
-                print("[EVENT-GENERATOR ERROR] Fallo al crear simulacion")
+                logger.error("[EVENT-GENERATOR ERROR] Fallo al crear simulacion")
                 return False
             
             # Ejecutar simulacion SimPy pura
-            print("[EVENT-GENERATOR] Ejecutando simulacion SimPy...")
+            logger.info("[EVENT-GENERATOR] Ejecutando simulacion SimPy...")
             step_counter = 0
             
             while not self.almacen.simulacion_ha_terminado():
@@ -284,29 +289,29 @@ class EventGenerator:
                     # Log cada 100 pasos
                     if step_counter % 100 == 0:
                         stats = self.almacen.dispatcher.obtener_estadisticas()
-                        print(f"[EVENT-GENERATOR] t={self.env.now:.1f}s | "
+                        logger.info(f"[EVENT-GENERATOR] t={self.env.now:.1f}s | "
                               f"Completadas: {stats['completados']}/{stats['total']}")
                 
                 except simpy.core.EmptySchedule:
                     if self.almacen.simulacion_ha_terminado():
                         break
                     else:
-                        print("[EVENT-GENERATOR WARNING] No hay eventos pero simulacion no termino")
+                        logger.warning("[EVENT-GENERATOR WARNING] No hay eventos pero simulacion no termino")
                         break
             
-            print(f"[EVENT-GENERATOR] Simulacion completada en t={self.env.now:.2f}s")
+            logger.info(f"[EVENT-GENERATOR] Simulacion completada en t={self.env.now:.2f}s")
             
             # Exportar analytics
-            print("[EVENT-GENERATOR] Exportando analytics...")
+            logger.info("[EVENT-GENERATOR] Exportando analytics...")
             context = SimulationContext.from_simulation_engine(self)
             analytics_exporter = AnalyticsExporter(context)
             export_result = analytics_exporter.export_complete_analytics()
             
             if not export_result.success:
-                print(f"[EVENT-GENERATOR WARNING] Exportacion con errores: {len(export_result.errors)}")
+                logger.warning(f"[EVENT-GENERATOR WARNING] Exportacion con errores: {len(export_result.errors)}")
             
             # Generar archivo .jsonl
-            print("[EVENT-GENERATOR] Generando archivo .jsonl...")
+            logger.info("[EVENT-GENERATOR] Generando archivo .jsonl...")
             os.makedirs(self.session_output_dir, exist_ok=True)
             output_file = os.path.join(self.session_output_dir, f"replay_{self.session_timestamp}.jsonl")
             initial_snapshot = getattr(self.almacen.dispatcher, 'initial_work_orders_snapshot', [])
@@ -319,8 +324,8 @@ class EventGenerator:
                 initial_snapshot
             )
             
-            print(f"[EVENT-GENERATOR] Archivo generado: {output_file}")
-            print(f"[EVENT-GENERATOR] Eventos capturados: {len(self.replay_buffer)}")
+            logger.info(f"[EVENT-GENERATOR] Archivo generado: {output_file}")
+            logger.info(f"[EVENT-GENERATOR] Eventos capturados: {len(self.replay_buffer)}")
 
             # INICIATIVA #2 - Fase 1: reporte de instrumentacion de congestion (si activa).
             # Se escribe a un JSON aparte para NO contaminar el replay .jsonl.
@@ -344,24 +349,24 @@ class EventGenerator:
                                            f"timewindow_shadow_report{suffix}.json")
                     with open(tw_path, "w", encoding="utf-8") as _f:
                         _json.dump(rep, _f, indent=2)
-                    print("\n" + "=" * 70)
-                    print("[TIMEWINDOW] REPORTE PLANNER ESPACIO-TEMPORAL (metricas)")
-                    print("=" * 70)
-                    print(f"  Tramos planificados: {rep.get('segments_planned')}")
-                    print(f"  Planes encontrados: {rep.get('plans_found')} | "
+                    logger.info("\n" + "=" * 70)
+                    logger.info("[TIMEWINDOW] REPORTE PLANNER ESPACIO-TEMPORAL (metricas)")
+                    logger.info("=" * 70)
+                    logger.info(f"  Tramos planificados: {rep.get('segments_planned')}")
+                    logger.info(f"  Planes encontrados: {rep.get('plans_found')} | "
                           f"fallidos: {rep.get('plans_failed')}")
-                    print(f"  Solapes en reservas (DEBE ser 0): "
+                    logger.info(f"  Solapes en reservas (DEBE ser 0): "
                           f"{rep.get('table_overlap_violations')}")
-                    print(f"  Coste planificacion: avg={rep.get('avg_plan_ms')}ms, "
+                    logger.info(f"  Coste planificacion: avg={rep.get('avg_plan_ms')}ms, "
                           f"max={round(rep.get('max_plan_ms', 0), 4)}ms")
-                    print(f"  Expansiones A*: avg={rep.get('avg_expansions')}, "
+                    logger.info(f"  Expansiones A*: avg={rep.get('avg_expansions')}, "
                           f"max={rep.get('max_expansions_in_a_plan')}, "
                           f"cap_hits={rep.get('expansion_cap_hits')}")
-                    print(f"  Esperas insertadas/plan: {rep.get('avg_waits_per_plan')}")
-                    print(f"  Reporte: {tw_path}")
-                    print("=" * 70)
+                    logger.info(f"  Esperas insertadas/plan: {rep.get('avg_waits_per_plan')}")
+                    logger.info(f"  Reporte: {tw_path}")
+                    logger.info("=" * 70)
                 except Exception as _e:
-                    print(f"[TIMEWINDOW][WARN] no se pudo escribir reporte sombra: {_e}")
+                    logger.warning(f"[TIMEWINDOW][WARN] no se pudo escribir reporte sombra: {_e}")
 
             # MINI-FIX reservas: telemetria del subsistema outbound (si esta activo).
             # Imprime el desglose de reservas de pallet (ok/fail) para diagnosticar
@@ -369,30 +374,30 @@ class EventGenerator:
             try:
                 _om = getattr(self.almacen, 'outbound_metrics', None)
                 if _om:
-                    print("[OUTBOUND] METRICAS: " + ", ".join(
+                    logger.info("[OUTBOUND] METRICAS: " + ", ".join(
                         f"{k}={v}" for k, v in sorted(_om.items())))
             except Exception as _e:
-                print(f"[OUTBOUND][WARN] no se pudieron imprimir metricas: {_e}")
+                logger.info(f"[OUTBOUND][WARN] no se pudieron imprimir metricas: {_e}")
 
             # Exportar métricas de optimización si se solicitó
             if self.output_metrics_path:
-                print("[EVENT-GENERATOR] Exportando metricas de optimizacion...")
+                logger.info("[EVENT-GENERATOR] Exportando metricas de optimizacion...")
                 self.export_optimization_metrics(self.output_metrics_path)
-                print(f"[EVENT-GENERATOR] Metricas exportadas: {self.output_metrics_path}")
+                logger.info(f"[EVENT-GENERATOR] Metricas exportadas: {self.output_metrics_path}")
             
-            print("="*60)
-            print("GENERACION COMPLETADA")
-            print(f"Archivos en: {self.session_output_dir}")
-            print("="*60)
+            logger.info("="*60)
+            logger.info("GENERACION COMPLETADA")
+            logger.info(f"Archivos en: {self.session_output_dir}")
+            logger.info("="*60)
             
             return True
         
         except KeyboardInterrupt:
-            print("\n[EVENT-GENERATOR] Interrupcion del usuario")
+            logger.info("\n[EVENT-GENERATOR] Interrupcion del usuario")
             return False
         
         except Exception as e:
-            print(f"[EVENT-GENERATOR ERROR] Error inesperado: {e}")
+            logger.error(f"[EVENT-GENERATOR ERROR] Error inesperado: {e}")
             import traceback
             traceback.print_exc()
             return False

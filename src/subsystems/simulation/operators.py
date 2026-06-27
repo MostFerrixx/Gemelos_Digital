@@ -7,6 +7,10 @@ Contains agent classes (GroundOperator, Forklift) and factory function
 """
 
 import simpy
+
+import logging
+
+logger = logging.getLogger(__name__)
 from typing import List, Dict, Any, Optional, Tuple
 
 
@@ -106,7 +110,7 @@ class BaseOperator:
         self.picking_time = float(_pick) if _pick is not None else None
         self.lift_time = float(_tiempos.get("tiempo_horquilla", 2.0))
 
-        print(f"[AGENT] {self.id} ({self.type}) inicializado - Capacidad: {self.capacity}")
+        logger.info(f"[AGENT] {self.id} ({self.type}) inicializado - Capacidad: {self.capacity}")
 
     def get_priority_for_work_area(self, work_area: str) -> int:
         """
@@ -368,7 +372,7 @@ class BaseOperator:
             )
         except Exception as e:
             # El modo sombra JAMAS debe romper la simulacion real (es un observador).
-            print(f"[TIMEWINDOW][SHADOW][WARN] plan fallo para {self.id}: {e}")
+            logger.warning(f"[TIMEWINDOW][SHADOW][WARN] plan fallo para {self.id}: {e}")
 
     def _timewindow_execute_plan(self, segment_path, speed, on_before, on_after,
                                  time_per_cell):
@@ -395,7 +399,7 @@ class BaseOperator:
             plan = planner.plan_and_reserve(
                 start, goal, t0, self.id, speed, static_steps=len(segment_path))
         except Exception as e:
-            print(f"[TIMEWINDOW][EXEC][WARN] plan fallo para {self.id}: {e}")
+            logger.warning(f"[TIMEWINDOW][EXEC][WARN] plan fallo para {self.id}: {e}")
             return False
         if not plan or len(plan) < 2:
             try:
@@ -826,7 +830,7 @@ class GroundOperator(BaseOperator):
         # Fase 3 (cell mode): reservar la celda de spawn (invariante de exclusion).
         self._claim_spawn(spawn_cell)
 
-        print(f"[{self.id}] Proceso iniciado en depot {spawn_cell}")
+        logger.info(f"[{self.id}] Proceso iniciado en depot {spawn_cell}")
 
         # Iniciativa #2 / Fase 2: arranque escalonado (stagger temporal).
         yield from self._spawn_stagger()
@@ -848,7 +852,7 @@ class GroundOperator(BaseOperator):
 
             if tour is None:
                 if self.almacen.simulacion_ha_terminado():
-                    print(f"[{self.id}] Simulacion finalizada, saliendo...")
+                    logger.info(f"[{self.id}] Simulacion finalizada, saliendo...")
                     break
 
                 yield self.env.timeout(0.5)  # V12: Reduced for fast termination detection
@@ -861,7 +865,7 @@ class GroundOperator(BaseOperator):
             work_orders = tour['work_orders']
             route_info = tour['route']
 
-            print(f"[{self.id}] t={self.env.now:.1f} Tour asignado: "
+            logger.info(f"[{self.id}] t={self.env.now:.1f} Tour asignado: "
                   f"{len(work_orders)} WOs, distancia: {tour['total_distance']:.1f}")
 
             if work_orders:
@@ -889,7 +893,7 @@ class GroundOperator(BaseOperator):
                         'cargo_volume': self.cargo_volume
                     })
 
-                    print(f"[{self.id}] t={self.env.now:.1f} Navegando a {wo.ubicacion} "
+                    logger.debug(f"[{self.id}] t={self.env.now:.1f} Navegando a {wo.ubicacion} "
                           f"(path: {len(segment_path)} pasos)")
 
                     def _on_before(step_idx, step_position):
@@ -930,7 +934,7 @@ class GroundOperator(BaseOperator):
                             })
 
                     def _on_after(step_idx, step_position):
-                        print(f"[{self.id}] t={self.env.now:.1f} Paso {step_idx}/{len(segment_path)-1}: {step_position}")
+                        logger.debug(f"[{self.id}] t={self.env.now:.1f} Paso {step_idx}/{len(segment_path)-1}: {step_position}")
 
                     yield from self._recorrer_tramo(
                         segment_path, self.default_speed,
@@ -1018,9 +1022,9 @@ class GroundOperator(BaseOperator):
                     })
 
             # PASO 4: Agrupar WOs por staging y descargar en cada uno
-            print(f"[{self.id}] Agrupando WOs por staging para descarga multiple")
+            logger.debug(f"[{self.id}] Agrupando WOs por staging para descarga multiple")
             staging_groups = self._agrupar_wos_por_staging(work_orders)
-            print(f"[{self.id}] Tour requiere visitar {len(staging_groups)} stagings: {list(staging_groups.keys())}")
+            logger.debug(f"[{self.id}] Tour requiere visitar {len(staging_groups)} stagings: {list(staging_groups.keys())}")
 
             # Ordenar stagings por distancia desde posicion actual
             ordered_stagings = self._ordenar_stagings_por_distancia(staging_groups, self.current_position)
@@ -1037,7 +1041,7 @@ class GroundOperator(BaseOperator):
                 # IMPORTANTE: Usar cantidad_inicial * sku.volumen porque cantidad_restante ya es 0 despues del picking
                 volumen_staging = sum(wo.cantidad_inicial * wo.sku.volumen for wo in staging_wos)
 
-                print(f"[{self.id}] [{idx}/{len(ordered_stagings)}] Navegando a staging {staging_id} "
+                logger.debug(f"[{self.id}] [{idx}/{len(ordered_stagings)}] Navegando a staging {staging_id} "
                       f"en {staging_location} para descargar {len(staging_wos)} WOs ({volumen_staging}L)")
 
                 # Navegar al staging
@@ -1059,7 +1063,7 @@ class GroundOperator(BaseOperator):
                                 'cargo_volume': self.cargo_volume
                             })
 
-                            print(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
+                            logger.debug(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
                                   f"(path: {len(return_path)} pasos)")
 
                             def _on_before(step_idx, step_position):
@@ -1074,7 +1078,7 @@ class GroundOperator(BaseOperator):
 
                             def _on_after(step_idx, step_position):
                                 if step_idx % 5 == 0:
-                                    print(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
+                                    logger.debug(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
                                           f"paso {step_idx}/{len(return_path)-1}")
 
                             yield from self._recorrer_tramo(
@@ -1093,7 +1097,7 @@ class GroundOperator(BaseOperator):
                             if _exit_cell[1] >= 0:
                                 self._jump_to(_exit_cell)
                     except Exception as e:
-                        print(f"[{self.id}] ERROR en pathfinding a staging {staging_id}: {e}")
+                        logger.error(f"[{self.id}] ERROR en pathfinding a staging {staging_id}: {e}")
                         self._jump_to(staging_location)
                         # F2.d fix: staging no-walkable para A*; regresar al
                         # pasillo (y-1) antes de quedar idle para que el
@@ -1114,7 +1118,7 @@ class GroundOperator(BaseOperator):
                     'cargo_volume': self.cargo_volume
                 })
 
-                print(f"[{self.id}] t={self.env.now:.1f} Iniciando descarga granular en staging {staging_id} "
+                logger.debug(f"[{self.id}] t={self.env.now:.1f} Iniciando descarga granular en staging {staging_id} "
                       f"({len(staging_wos)} WOs)")
 
                 # V12 GRANULAR DISCHARGE: Descargar cada WO individualmente
@@ -1149,12 +1153,12 @@ class GroundOperator(BaseOperator):
                     # persistente que ocupa la posicion de aforo (no-op si off).
                     self._outbound_place_pallet(_ob_slot, wo, staging_id)
 
-                    print(f"[{self.id}] t={self.env.now:.1f} [{wo_idx}/{len(staging_wos)}] "
+                    logger.debug(f"[{self.id}] t={self.env.now:.1f} [{wo_idx}/{len(staging_wos)}] "
                           f"WO {wo.id} staged (-{wo_volume}L, cargo: {self.cargo_volume}L)")
 
             # PASO 5: Limpiar cargo final (por seguridad)
             self.cargo_volume = 0
-            print(f"[{self.id}] t={self.env.now:.1f} Descarga completa en todos los stagings")
+            logger.debug(f"[{self.id}] t={self.env.now:.1f} Descarga completa en todos los stagings")
 
             self.almacen.registrar_evento('estado_agente', {
                 'agent_id': self.id,
@@ -1179,7 +1183,7 @@ class GroundOperator(BaseOperator):
             self.almacen.dispatcher.finalizar_tour(self)
             self.tasks_completed += len(work_orders)
 
-            print(f"[{self.id}] t={self.env.now:.1f} Tour completado, "
+            logger.info(f"[{self.id}] t={self.env.now:.1f} Tour completado, "
                   f"total completadas: {self.tasks_completed}")
 
 
@@ -1250,7 +1254,7 @@ class Forklift(BaseOperator):
         # Fase 3 (cell mode): reservar la celda de spawn (invariante de exclusion).
         self._claim_spawn(spawn_cell)
 
-        print(f"[{self.id}] Proceso iniciado en depot {spawn_cell}")
+        logger.info(f"[{self.id}] Proceso iniciado en depot {spawn_cell}")
 
         # Iniciativa #2 / Fase 2: arranque escalonado (stagger temporal).
         yield from self._spawn_stagger()
@@ -1272,7 +1276,7 @@ class Forklift(BaseOperator):
 
             if tour is None:
                 if self.almacen.simulacion_ha_terminado():
-                    print(f"[{self.id}] Simulacion finalizada, saliendo...")
+                    logger.info(f"[{self.id}] Simulacion finalizada, saliendo...")
                     break
 
                 yield self.env.timeout(0.5)  # V12: Reduced for fast termination detection
@@ -1285,7 +1289,7 @@ class Forklift(BaseOperator):
             work_orders = tour['work_orders']
             route_info = tour['route']
 
-            print(f"[{self.id}] t={self.env.now:.1f} Tour asignado: "
+            logger.info(f"[{self.id}] t={self.env.now:.1f} Tour asignado: "
                   f"{len(work_orders)} WOs, distancia: {tour['total_distance']:.1f}")
 
             if work_orders:
@@ -1313,7 +1317,7 @@ class Forklift(BaseOperator):
                         'cargo_volume': self.cargo_volume
                     })
 
-                    print(f"[{self.id}] t={self.env.now:.1f} Navegando a {wo.ubicacion} "
+                    logger.debug(f"[{self.id}] t={self.env.now:.1f} Navegando a {wo.ubicacion} "
                           f"(path: {len(segment_path)} pasos)")
 
                     def _on_before(step_idx, step_position):
@@ -1354,7 +1358,7 @@ class Forklift(BaseOperator):
                             })
 
                     def _on_after(step_idx, step_position):
-                        print(f"[{self.id}] t={self.env.now:.1f} Paso {step_idx}/{len(segment_path)-1}: {step_position}")
+                        logger.debug(f"[{self.id}] t={self.env.now:.1f} Paso {step_idx}/{len(segment_path)-1}: {step_position}")
 
                     yield from self._recorrer_tramo(
                         segment_path, self.default_speed,
@@ -1366,7 +1370,7 @@ class Forklift(BaseOperator):
                     self.total_distance_traveled += segment_distance
 
                 self.status = "lifting"
-                print(f"[{self.id}] t={self.env.now:.1f} Elevando horquilla")
+                logger.debug(f"[{self.id}] t={self.env.now:.1f} Elevando horquilla")
 
                 # Registrar evento con estado de lifting
                 self.almacen.registrar_evento('estado_agente', {
@@ -1383,7 +1387,7 @@ class Forklift(BaseOperator):
                 self.set_lift_height(1)
 
                 self.status = "picking"
-                print(f"[{self.id}] t={self.env.now:.1f} Picking en {wo.ubicacion}")
+                logger.debug(f"[{self.id}] t={self.env.now:.1f} Picking en {wo.ubicacion}")
 
                 # Registrar evento con estado de picking
                 self.almacen.registrar_evento('estado_agente', {
@@ -1400,7 +1404,7 @@ class Forklift(BaseOperator):
                 picking_duration = self.picking_time if self.picking_time is not None else self.discharge_time
                 yield self.env.timeout(picking_duration)
 
-                print(f"[{self.id}] t={self.env.now:.1f} Bajando horquilla")
+                logger.debug(f"[{self.id}] t={self.env.now:.1f} Bajando horquilla")
                 yield self.env.timeout(LIFT_TIME)
                 self.set_lift_height(0)
 
@@ -1461,9 +1465,9 @@ class Forklift(BaseOperator):
                     })
 
             # PASO 4: Agrupar WOs por staging y descargar en cada uno
-            print(f"[{self.id}] Agrupando WOs por staging para descarga multiple")
+            logger.debug(f"[{self.id}] Agrupando WOs por staging para descarga multiple")
             staging_groups = self._agrupar_wos_por_staging(work_orders)
-            print(f"[{self.id}] Tour requiere visitar {len(staging_groups)} stagings: {list(staging_groups.keys())}")
+            logger.debug(f"[{self.id}] Tour requiere visitar {len(staging_groups)} stagings: {list(staging_groups.keys())}")
 
             # Ordenar stagings por distancia desde posicion actual
             ordered_stagings = self._ordenar_stagings_por_distancia(staging_groups, self.current_position)
@@ -1480,7 +1484,7 @@ class Forklift(BaseOperator):
                 # IMPORTANTE: Usar cantidad_inicial * sku.volumen porque cantidad_restante ya es 0 despues del picking
                 volumen_staging = sum(wo.cantidad_inicial * wo.sku.volumen for wo in staging_wos)
 
-                print(f"[{self.id}] [{idx}/{len(ordered_stagings)}] Navegando a staging {staging_id} "
+                logger.debug(f"[{self.id}] [{idx}/{len(ordered_stagings)}] Navegando a staging {staging_id} "
                       f"en {staging_location} para descargar {len(staging_wos)} WOs ({volumen_staging}L)")
 
                 # Navegar al staging
@@ -1502,7 +1506,7 @@ class Forklift(BaseOperator):
                                 'cargo_volume': self.cargo_volume
                             })
 
-                            print(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
+                            logger.debug(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
                                   f"(path: {len(return_path)} pasos)")
 
                             def _on_before(step_idx, step_position):
@@ -1517,7 +1521,7 @@ class Forklift(BaseOperator):
 
                             def _on_after(step_idx, step_position):
                                 if step_idx % 5 == 0:
-                                    print(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
+                                    logger.debug(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
                                           f"paso {step_idx}/{len(return_path)-1}")
 
                             yield from self._recorrer_tramo(
@@ -1536,7 +1540,7 @@ class Forklift(BaseOperator):
                             if _exit_cell[1] >= 0:
                                 self._jump_to(_exit_cell)
                     except Exception as e:
-                        print(f"[{self.id}] ERROR en pathfinding a staging {staging_id}: {e}")
+                        logger.error(f"[{self.id}] ERROR en pathfinding a staging {staging_id}: {e}")
                         self._jump_to(staging_location)
                         # F2.d fix: staging no-walkable para A*; regresar al
                         # pasillo (y-1) antes de quedar idle para que el
@@ -1557,7 +1561,7 @@ class Forklift(BaseOperator):
                     'cargo_volume': self.cargo_volume
                 })
 
-                print(f"[{self.id}] t={self.env.now:.1f} Iniciando descarga granular en staging {staging_id} "
+                logger.debug(f"[{self.id}] t={self.env.now:.1f} Iniciando descarga granular en staging {staging_id} "
                       f"({len(staging_wos)} WOs)")
 
                 # V12 GRANULAR DISCHARGE: Descargar cada WO individualmente
@@ -1592,12 +1596,12 @@ class Forklift(BaseOperator):
                     # persistente que ocupa la posicion de aforo (no-op si off).
                     self._outbound_place_pallet(_ob_slot, wo, staging_id)
 
-                    print(f"[{self.id}] t={self.env.now:.1f} [{wo_idx}/{len(staging_wos)}] "
+                    logger.debug(f"[{self.id}] t={self.env.now:.1f} [{wo_idx}/{len(staging_wos)}] "
                           f"WO {wo.id} staged (-{wo_volume}L, cargo: {self.cargo_volume}L)")
 
             # PASO 5: Limpiar cargo final (por seguridad)
             self.cargo_volume = 0
-            print(f"[{self.id}] t={self.env.now:.1f} Descarga completa en todos los stagings")
+            logger.debug(f"[{self.id}] t={self.env.now:.1f} Descarga completa en todos los stagings")
 
             self.almacen.registrar_evento('estado_agente', {
                 'agent_id': self.id,
@@ -1622,7 +1626,7 @@ class Forklift(BaseOperator):
             self.almacen.dispatcher.finalizar_tour(self)
             self.tasks_completed += len(work_orders)
 
-            print(f"[{self.id}] t={self.env.now:.1f} Tour completado, "
+            logger.info(f"[{self.id}] t={self.env.now:.1f} Tour completado, "
                   f"total completadas: {self.tasks_completed}")
 
 
@@ -1646,7 +1650,7 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
         - procesos_operarios: List of SimPy processes
         - operarios: List of operator instances
     """
-    print("[OPERATORS] Creando operarios desde configuracion...")
+    logger.info("[OPERATORS] Creando operarios desde configuracion...")
 
     operarios: List[BaseOperator] = []
     procesos_operarios: List[Any] = []
@@ -1656,7 +1660,7 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
 
     if not agent_types_config:
         # Fallback: Create default agents from legacy config
-        print("[OPERATORS] No agent_types encontrado, usando configuracion legacy...")
+        logger.info("[OPERATORS] No agent_types encontrado, usando configuracion legacy...")
 
         num_terrestres = configuracion.get('num_operarios_terrestres', 2)
         num_montacargas = configuracion.get('num_montacargas', 1)
@@ -1703,7 +1707,7 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
 
     else:
         # Create agents from agent_types configuration
-        print(f"[OPERATORS] Creando {len(agent_types_config)} agentes desde agent_types...")
+        logger.info(f"[OPERATORS] Creando {len(agent_types_config)} agentes desde agent_types...")
 
         for idx, agent_config in enumerate(agent_types_config):
             agent_type = agent_config.get('type', 'GroundOperator')
@@ -1757,11 +1761,11 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
                 procesos_operarios.append(proceso)
 
             else:
-                print(f"[OPERATORS WARNING] Tipo de agente desconocido: {agent_type}")
+                logger.warning(f"[OPERATORS WARNING] Tipo de agente desconocido: {agent_type}")
 
-    print(f"[OPERATORS] Creados {len(operarios)} operarios:")
+    logger.info(f"[OPERATORS] Creados {len(operarios)} operarios:")
     for operario in operarios:
-        print(f"  - {operario.id} ({operario.type}) - Capacidad: {operario.capacity}")
+        logger.info(f"  - {operario.id} ({operario.type}) - Capacidad: {operario.capacity}")
 
     return procesos_operarios, operarios
 

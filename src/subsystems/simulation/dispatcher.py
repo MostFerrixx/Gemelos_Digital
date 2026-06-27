@@ -15,6 +15,10 @@ Version: V11 - Migration Phase 3
 """
 
 import simpy
+
+import logging
+
+logger = logging.getLogger(__name__)
 from typing import List, Dict, Optional, Any, Tuple
 import math
 
@@ -74,7 +78,7 @@ class DispatcherV11:
         self.operadores_activos: Dict[str, Any] = {}             # {operator_id: assigned_tour}
 
         # Dispatch Strategy (from config.json)
-        print(f"[DISPATCHER DEBUG] Configuracion recibida: {configuracion}")
+        logger.debug(f"[DISPATCHER DEBUG] Configuracion recibida: {configuracion}")
         # print(f"[DISPATCHER DEBUG] dispatch_strategy en config: '{configuracion.get('dispatch_strategy', 'NO ENCONTRADO')}'")
         self.estrategia = configuracion.get('dispatch_strategy', 'Optimizacion Global')
         # print(f"[DISPATCHER DEBUG] Estrategia asignada: '{self.estrategia}'")
@@ -103,8 +107,8 @@ class DispatcherV11:
         # Metrica de expansiones (diagnostico H-6)
         self.total_expansiones_radio = 0  # veces que un operario tuvo que expandir su radio
 
-        print(f"[DISPATCHER] Inicializado con estrategia: '{self.estrategia}'")
-        print(f"[DISPATCHER] Max WOs por tour: {self.max_wos_por_tour}, "
+        logger.info(f"[DISPATCHER] Inicializado con estrategia: '{self.estrategia}'")
+        logger.info(f"[DISPATCHER] Max WOs por tour: {self.max_wos_por_tour}, "
               f"Radio cercania: {self.radio_cercania} "
               f"(expansion paso={self.radio_expansion_paso}, max={self.radio_max_expansiones})")
 
@@ -178,7 +182,7 @@ class DispatcherV11:
             last_log_time = self._last_no_work_log.get(operator_key, 0)
             
             if self.env.now - last_log_time >= 10.0:
-                print(f"[DISPATCHER] {self.env.now:.2f} - No hay WorkOrders pendientes para "
+                logger.debug(f"[DISPATCHER] {self.env.now:.2f} - No hay WorkOrders pendientes para "
                       f"{operator.type}_{operator.id}")
                 self._last_no_work_log[operator_key] = self.env.now
             
@@ -192,7 +196,7 @@ class DispatcherV11:
         last_log_time = self._last_request_log.get(operator_key, 0)
         
         if self.env.now - last_log_time >= 5.0:
-            print(f"[DISPATCHER] {self.env.now:.2f} - Operador {operator.type}_{operator.id} "
+            logger.debug(f"[DISPATCHER] {self.env.now:.2f} - Operador {operator.type}_{operator.id} "
                   f"solicita asignacion (pos: {operator.current_position})")
             self._last_request_log[operator_key] = self.env.now
 
@@ -208,12 +212,12 @@ class DispatcherV11:
             last_log_time = self._last_no_candidates_log.get(operator_key, 0)
             
             if self.env.now - last_log_time >= 60.0:
-                print(f"[DISPATCHER] No hay candidatos viables para {operator.type}_{operator.id}")
+                logger.debug(f"[DISPATCHER] No hay candidatos viables para {operator.type}_{operator.id}")
                 self._last_no_candidates_log[operator_key] = self.env.now
             
             return None
 
-        print(f"[DISPATCHER] Estrategia '{self.estrategia}' selecciono {len(candidatos)} candidatos")
+        logger.debug(f"[DISPATCHER] Estrategia '{self.estrategia}' selecciono {len(candidatos)} candidatos")
 
         # Step 3: Select best batch based on strategy
         if self.estrategia in (
@@ -225,20 +229,20 @@ class DispatcherV11:
             # - Optimizacion Global: primera WO por costo, resto por pick_sequence
             # - Ejecucion de Plan: todo por pick_sequence desde la primera WO
             selected_work_orders = candidatos
-            print(f"[DISPATCHER] {self.estrategia}: usando tour construido por la estrategia ({len(selected_work_orders)} WOs)")
+            logger.debug(f"[DISPATCHER] {self.estrategia}: usando tour construido por la estrategia ({len(selected_work_orders)} WOs)")
         else:
             # Para otras estrategias, usar selección por costo
             selected_work_orders = self._seleccionar_mejor_batch(operator, candidatos)
 
         if not selected_work_orders:
-            print(f"[DISPATCHER] No se pudo seleccionar batch para {operator.type}_{operator.id}")
+            logger.debug(f"[DISPATCHER] No se pudo seleccionar batch para {operator.type}_{operator.id}")
             return None
 
         # Step 4: Build optimal tour
         tour = self._construir_tour(operator, selected_work_orders)
 
         if tour is None or not tour.get('success', False):
-            print(f"[DISPATCHER ERROR] Fallo al construir tour para {operator.type}_{operator.id}")
+            logger.error(f"[DISPATCHER ERROR] Fallo al construir tour para {operator.type}_{operator.id}")
             return None
 
         # Step 5: Update state - mark as assigned
@@ -256,7 +260,7 @@ class DispatcherV11:
         self.total_asignaciones += 1
         self.total_tours_creados += 1
 
-        print(f"[DISPATCHER] Tour asignado a {operator.type}_{operator.id}: "
+        logger.info(f"[DISPATCHER] Tour asignado a {operator.type}_{operator.id}: "
               f"{tour_result['num_stops']} WOs, "
               f"distancia: {tour_result['total_distance']:.1f}, "
               f"volumen: {tour_result['total_volume']}")
@@ -287,7 +291,7 @@ class DispatcherV11:
             return self._estrategia_cercania(operator)
         else:
             # Default to Optimizacion Global if unknown strategy
-            print(f"[DISPATCHER WARN] Estrategia desconocida '{self.estrategia}', usando Optimizacion Global")
+            logger.warning(f"[DISPATCHER WARN] Estrategia desconocida '{self.estrategia}', usando Optimizacion Global")
             return self._estrategia_optimizacion_global(operator)
 
     def _estrategia_fifo(self, operator: Any) -> List[Any]:
@@ -346,10 +350,10 @@ class DispatcherV11:
         # print(f"[DISPATCHER DEBUG] [Optimizacion Global] Evaluando mejor primera WO (area prioritaria) entre {len(candidatos_area_prioridad)} candidatos")
         best_first_wo = self._encontrar_mejor_primera_wo(operator, candidatos_area_prioridad)
         if not best_first_wo:
-            print(f"[DISPATCHER DEBUG] No se encontro mejor primera WO")
+            logger.debug(f"[DISPATCHER DEBUG] No se encontro mejor primera WO")
             return []
         
-        print(f"[DISPATCHER] [Optimizacion Global] Primera WO por costo: {best_first_wo.id} (seq={best_first_wo.pick_sequence}, area={best_first_wo.work_area})")
+        logger.debug(f"[DISPATCHER] [Optimizacion Global] Primera WO por costo: {best_first_wo.id} (seq={best_first_wo.pick_sequence}, area={best_first_wo.work_area})")
         
         # Paso 4: Construir tour siguiendo pick_sequence desde la primera WO
         # Preferir misma área, pero permitir cambio de área si se agota la secuencia
@@ -428,7 +432,7 @@ class DispatcherV11:
         best_area_wos = [wo for wo in candidatos 
                         if area_priorities[wo.work_area] == best_priority]
         
-        print(f"[DISPATCHER] Area con mejor prioridad: {best_priority}, "
+        logger.debug(f"[DISPATCHER] Area con mejor prioridad: {best_priority}, "
               f"WOs encontradas: {len(best_area_wos)}")
         
         return best_area_wos
@@ -511,14 +515,14 @@ class DispatcherV11:
         for wo, cost_result in costos:
             wo_volume = wo.calcular_volumen_restante()
             if wo_volume <= operator.capacity:
-                print(f"[DISPATCHER] Mejor primera WO: {wo.id} "
+                logger.debug(f"[DISPATCHER] Mejor primera WO: {wo.id} "
                       f"(costo: {cost_result.total_cost:.0f}, volumen: {wo_volume})")
                 return wo
         
         # Si ninguna WO cabe sola, retornar la mejor (será marcada como oversized)
         if costos:
             best_wo = costos[0][0]
-            print(f"[DISPATCHER] WARNING: Mejor WO {best_wo.id} excede capacidad "
+            logger.warning(f"[DISPATCHER] WARNING: Mejor WO {best_wo.id} excede capacidad "
                   f"({best_wo.calcular_volumen_restante()} > {operator.capacity})")
             return best_wo
         
@@ -572,7 +576,7 @@ class DispatcherV11:
             tour_wos.append(primera_wo)
             volume_acumulado += primera_volume
         else:
-            print(f"[DISPATCHER ERROR] Primera WO {primera_wo.id} excede capacidad")
+            logger.error(f"[DISPATCHER ERROR] Primera WO {primera_wo.id} excede capacidad")
             return []
         
         # ==================== PREPARAR ÁREAS ====================
@@ -593,21 +597,21 @@ class DispatcherV11:
         usadas = {primera_wo}  # Set de WOs ya agregadas
         
         # ==================== LOGGING INICIAL ====================
-        print(f"[DISPATCHER] ===== INICIO CONSTRUCCION TOUR =====")
-        print(f"[DISPATCHER] Primera WO: {primera_wo.id} (seq={primera_wo.pick_sequence}, area={primera_wo.work_area})")
-        print(f"[DISPATCHER] Capacidad disponible: {operator.capacity}L")
-        print(f"[DISPATCHER] Areas a procesar: {ordered_areas}")
-        print(f"[DISPATCHER] Tour type: {self.tour_type}")
+        logger.debug(f"[DISPATCHER] ===== INICIO CONSTRUCCION TOUR =====")
+        logger.debug(f"[DISPATCHER] Primera WO: {primera_wo.id} (seq={primera_wo.pick_sequence}, area={primera_wo.work_area})")
+        logger.debug(f"[DISPATCHER] Capacidad disponible: {operator.capacity}L")
+        logger.debug(f"[DISPATCHER] Areas a procesar: {ordered_areas}")
+        logger.debug(f"[DISPATCHER] Tour type: {self.tour_type}")
         
         # ==================== PROCESAR CADA ÁREA ====================
         for area in ordered_areas:
             # Verificar límites globales
             if len(tour_wos) >= self.max_wos_por_tour:
-                print(f"[DISPATCHER] Limite max_wos_por_tour alcanzado: {self.max_wos_por_tour}")
+                logger.debug(f"[DISPATCHER] Limite max_wos_por_tour alcanzado: {self.max_wos_por_tour}")
                 break
             
             if volume_acumulado >= operator.capacity:
-                print(f"[DISPATCHER] Capacidad llena: {volume_acumulado}/{operator.capacity}L")
+                logger.debug(f"[DISPATCHER] Capacidad llena: {volume_acumulado}/{operator.capacity}L")
                 break
             
             # Obtener WOs disponibles del área actual
@@ -620,7 +624,7 @@ class DispatcherV11:
                             if wo.staging_id == primera_wo.staging_id]
             
             if not area_wos:
-                print(f"[DISPATCHER] [{area}] No hay WOs disponibles")
+                logger.debug(f"[DISPATCHER] [{area}] No hay WOs disponibles")
                 continue
             
             # Ordenar por pick_sequence
@@ -632,13 +636,13 @@ class DispatcherV11:
             # seleccionada (ya sea por costo en Optimización Global o por seq en Ejecución de Plan)
             min_seq = ultimo_seq_agregado
             
-            print(f"\n[DISPATCHER] ===== PROCESANDO AREA: {area} =====")
-            print(f"[DISPATCHER] [{area}] WOs disponibles: {len(area_wos_sorted)}")
-            print(f"[DISPATCHER] [{area}] Capacidad restante: {operator.capacity - volume_acumulado}L")
-            print(f"[DISPATCHER] [{area}] Min sequence: {min_seq}")
+            logger.debug(f"\n[DISPATCHER] ===== PROCESANDO AREA: {area} =====")
+            logger.debug(f"[DISPATCHER] [{area}] WOs disponibles: {len(area_wos_sorted)}")
+            logger.debug(f"[DISPATCHER] [{area}] Capacidad restante: {operator.capacity - volume_acumulado}L")
+            logger.debug(f"[DISPATCHER] [{area}] Min sequence: {min_seq}")
             
             # ==================== BARRIDO 1: PRINCIPAL (PROGRESIVO) ====================
-            print(f"[DISPATCHER] [{area}] --- BARRIDO PRINCIPAL (seq >= {min_seq}) ---")
+            logger.debug(f"[DISPATCHER] [{area}] --- BARRIDO PRINCIPAL (seq >= {min_seq}) ---")
             
             wos_agregadas_barrido1 = 0
             volumen_barrido1 = 0
@@ -666,16 +670,16 @@ class DispatcherV11:
                     ultimo_seq_agregado = wo.pick_sequence  # ACTUALIZAR
                     wos_agregadas_barrido1 += 1
                     
-                    print(f"[DISPATCHER] [{area}]   + WO {wo.id} agregada "
+                    logger.debug(f"[DISPATCHER] [{area}]   + WO {wo.id} agregada "
                           f"(seq={wo.pick_sequence}, vol={wo_volume}L, "
                           f"acum={volume_acumulado}L)")
                 else:
                     # No cabe - seguir probando siguientes (pueden ser mas pequenas)
-                    print(f"[DISPATCHER] [{area}]   x WO {wo.id} no cabe "
+                    logger.debug(f"[DISPATCHER] [{area}]   x WO {wo.id} no cabe "
                           f"(seq={wo.pick_sequence}, vol={wo_volume}L, "
                           f"falta={wo_volume - (operator.capacity - volume_acumulado)}L)")
             
-            print(f"[DISPATCHER] [{area}] Barrido Principal completado: "
+            logger.debug(f"[DISPATCHER] [{area}] Barrido Principal completado: "
                   f"{wos_agregadas_barrido1} WOs, {volumen_barrido1}L")
             
             # ==================== BARRIDO 2: SECUNDARIO (CIRCULAR / LLENADO) ====================
@@ -687,8 +691,8 @@ class DispatcherV11:
             capacidad_restante = operator.capacity - volume_acumulado
             
             if capacidad_restante > 0 and len(tour_wos) < self.max_wos_por_tour:
-                print(f"[DISPATCHER] [{area}] --- BARRIDO SECUNDARIO (seq < {min_seq}) ---")
-                print(f"[DISPATCHER] [{area}] Capacidad restante: {capacidad_restante}L")
+                logger.debug(f"[DISPATCHER] [{area}] --- BARRIDO SECUNDARIO (seq < {min_seq}) ---")
+                logger.debug(f"[DISPATCHER] [{area}] Capacidad restante: {capacidad_restante}L")
                 
                 for wo in area_wos_sorted:
                     # Verificar límites
@@ -716,23 +720,23 @@ class DispatcherV11:
                         volumen_barrido2 += wo_volume
                         wos_agregadas_barrido2 += 1
                         
-                        print(f"[DISPATCHER] [{area}]   < WO {wo.id} agregada (RETROCESO) "
+                        logger.debug(f"[DISPATCHER] [{area}]   < WO {wo.id} agregada (RETROCESO) "
                               f"(seq={wo.pick_sequence}, vol={wo_volume}L, "
                               f"acum={volume_acumulado}L)")
                     else:
-                        print(f"[DISPATCHER] [{area}]   x WO {wo.id} no cabe "
+                        logger.debug(f"[DISPATCHER] [{area}]   x WO {wo.id} no cabe "
                               f"(seq={wo.pick_sequence}, vol={wo_volume}L)")
                 
-                print(f"[DISPATCHER] [{area}] Barrido Secundario completado: "
+                logger.debug(f"[DISPATCHER] [{area}] Barrido Secundario completado: "
                       f"{wos_agregadas_barrido2} WOs, {volumen_barrido2}L")
             else:
-                print(f"[DISPATCHER] [{area}] Barrido Secundario OMITIDO "
+                logger.debug(f"[DISPATCHER] [{area}] Barrido Secundario OMITIDO "
                       f"(capacidad restante: {capacidad_restante}L)")
             
             # Resumen del área
             total_wos_area = wos_agregadas_barrido1 + (wos_agregadas_barrido2 if capacidad_restante > 0 else 0)
             total_vol_area = volumen_barrido1 + (volumen_barrido2 if capacidad_restante > 0 else 0)
-            print(f"[DISPATCHER] [{area}] AREA COMPLETADA: "
+            logger.debug(f"[DISPATCHER] [{area}] AREA COMPLETADA: "
                   f"{total_wos_area} WOs totales, {total_vol_area}L totales")
         
         # ==================== RESUMEN FINAL ====================
@@ -740,13 +744,13 @@ class DispatcherV11:
         areas_usadas = set(wo.work_area for wo in tour_wos)
         stagings_usados = set(wo.staging_id for wo in tour_wos)
         
-        print(f"\n[DISPATCHER] ===== TOUR FINAL =====")
-        print(f"[DISPATCHER] Total WOs: {len(tour_wos)}")
-        print(f"[DISPATCHER] Volumen: {volume_acumulado}/{operator.capacity}L")
-        print(f"[DISPATCHER] Utilizacion: {utilizacion:.1f}%")
-        print(f"[DISPATCHER] Areas: {areas_usadas}")
-        print(f"[DISPATCHER] Stagings: {stagings_usados}")
-        print(f"[DISPATCHER] Secuencias: [{', '.join(str(wo.pick_sequence) for wo in tour_wos)}]")
+        logger.debug(f"\n[DISPATCHER] ===== TOUR FINAL =====")
+        logger.debug(f"[DISPATCHER] Total WOs: {len(tour_wos)}")
+        logger.debug(f"[DISPATCHER] Volumen: {volume_acumulado}/{operator.capacity}L")
+        logger.debug(f"[DISPATCHER] Utilizacion: {utilizacion:.1f}%")
+        logger.debug(f"[DISPATCHER] Areas: {areas_usadas}")
+        logger.debug(f"[DISPATCHER] Stagings: {stagings_usados}")
+        logger.debug(f"[DISPATCHER] Secuencias: [{', '.join(str(wo.pick_sequence) for wo in tour_wos)}]")
         
         return tour_wos
 
@@ -794,7 +798,7 @@ class DispatcherV11:
                 if candidatos:
                     self.total_expansiones_radio += 1
                     op_id = getattr(operator, 'operator_id', str(operator))
-                    print(f"[DISPATCHER] Radio expandido x{expansion} "
+                    logger.info(f"[DISPATCHER] Radio expandido x{expansion} "
                           f"({self.radio_cercania}->{radio_actual:.0f} celdas) "
                           f"para {op_id} -- encontrados {len(candidatos)} candidatos")
                     break
@@ -806,7 +810,7 @@ class DispatcherV11:
                               if operator.can_handle_work_area(wo.work_area)]
                 if candidatos:
                     op_id = getattr(operator, 'operator_id', str(operator))
-                    print(f"[DISPATCHER] Radio expandido al MAXIMO para {op_id} "
+                    logger.info(f"[DISPATCHER] Radio expandido al MAXIMO para {op_id} "
                           f"-- usando {len(candidatos)} WOs compatibles del almacen")
 
         # Limit to max_wos_por_tour
@@ -862,13 +866,13 @@ class DispatcherV11:
             elif len(selected) == 0 and wo_volume > operator.capacity:
                 # This WO is too big even by itself - skip it
                 skipped_oversized.append(wo)
-                print(f"[DISPATCHER] WARNING: WO {wo.id} volume ({wo_volume}) exceeds "
+                logger.warning(f"[DISPATCHER] WARNING: WO {wo.id} volume ({wo_volume}) exceeds "
                       f"{operator.type}_{operator.id} capacity ({operator.capacity}) - SKIPPING")
 
         # If we couldn't select any WOs, mark oversized ones as completed to avoid infinite loop
         if not selected and skipped_oversized:
-            print(f"[DISPATCHER] ERROR: {len(skipped_oversized)} WorkOrders too large for any operator!")
-            print(f"[DISPATCHER] Marking oversized WorkOrders as staged to avoid deadlock...")
+            logger.debug(f"[DISPATCHER] ERROR: {len(skipped_oversized)} WorkOrders too large for any operator!")
+            logger.debug(f"[DISPATCHER] Marking oversized WorkOrders as staged to avoid deadlock...")
             for wo in skipped_oversized:
                 wo.status = "staged"
                 wo.cantidad_restante = 0
@@ -928,11 +932,11 @@ class DispatcherV11:
             if route_result and route_result.get('success', False):
                 return route_result
             else:
-                print(f"[DISPATCHER ERROR] RouteCalculator fallo: {route_result.get('errors', [])}")
+                logger.error(f"[DISPATCHER ERROR] RouteCalculator fallo: {route_result.get('errors', [])}")
                 return None
 
         except Exception as e:
-            print(f"[DISPATCHER ERROR] Excepcion al calcular ruta: {e}")
+            logger.error(f"[DISPATCHER ERROR] Excepcion al calcular ruta: {e}")
             return None
 
     def _validar_tour_simple(self, work_orders: List[Any]) -> List[Any]:
@@ -952,12 +956,12 @@ class DispatcherV11:
         staging_ids = set(wo.staging_id for wo in work_orders)
         
         if len(staging_ids) > 1:
-            print(f"[DISPATCHER ERROR] Tour Simple requiere WOs de una sola ubicacion de staging")
-            print(f"[DISPATCHER ERROR] Encontradas ubicaciones: {staging_ids}")
-            print(f"[DISPATCHER ERROR] WOs: {[wo.id for wo in work_orders]}")
+            logger.error(f"[DISPATCHER ERROR] Tour Simple requiere WOs de una sola ubicacion de staging")
+            logger.error(f"[DISPATCHER ERROR] Encontradas ubicaciones: {staging_ids}")
+            logger.error(f"[DISPATCHER ERROR] WOs: {[wo.id for wo in work_orders]}")
             return []
         
-        print(f"[DISPATCHER DEBUG] Tour Simple validado: {len(work_orders)} WOs para staging {list(staging_ids)[0]}")
+        logger.debug(f"[DISPATCHER DEBUG] Tour Simple validado: {len(work_orders)} WOs para staging {list(staging_ids)[0]}")
         return work_orders
 
     def _marcar_asignados(self, operator: Any, work_orders: List[Any]) -> None:
@@ -1061,7 +1065,7 @@ class DispatcherV11:
             'tiempo_fin': getattr(work_order, 'tiempo_fin', None)
         })
 
-        print(f"[DISPATCHER] {self.env.now:.2f} - {operator_id} inicio WO {work_order.id}")
+        logger.debug(f"[DISPATCHER] {self.env.now:.2f} - {operator_id} inicio WO {work_order.id}")
 
     def notificar_completado(self, operator: Any, work_orders_completados: List[Any]) -> None:
         """
@@ -1138,7 +1142,7 @@ class DispatcherV11:
 
         tiempo_total = self.env.now - work_orders_completados[0].tiempo_inicio if work_orders_completados else 0
 
-        print(f"[DISPATCHER] {self.env.now:.2f} - {operator_id} completo {len(work_orders_completados)} WOs "
+        logger.debug(f"[DISPATCHER] {self.env.now:.2f} - {operator_id} completo {len(work_orders_completados)} WOs "
               f"en {tiempo_total:.2f}s simulados. "
               f"Total completados: {len(self.work_orders_completados)}/{len(self.lista_maestra_work_orders)}")
 
@@ -1212,7 +1216,7 @@ class DispatcherV11:
         # Increment counter
         self.almacen.incrementar_contador_workorders()
         
-        print(f"[DISPATCHER] {self.env.now:.2f} - {operator_id} staged WO {wo.id} "
+        logger.debug(f"[DISPATCHER] {self.env.now:.2f} - {operator_id} staged WO {wo.id} "
               f"({len(self.work_orders_completados)}/{len(self.lista_maestra_work_orders)})")
 
     def finalizar_tour(self, operator: Any) -> None:
@@ -1274,23 +1278,23 @@ class DispatcherV11:
         """Print current dispatcher state summary"""
         stats = self.obtener_estadisticas()
 
-        print("\n" + "="*70)
-        print(f"RESUMEN DISPATCHER - Tiempo Simulado: {self.env.now:.2f}s")
-        print("="*70)
-        print(f"WorkOrders:")
-        print(f"  Pendientes:    {stats['pendientes']:4d}")
-        print(f"  Asignados:     {stats['asignados']:4d}")
-        print(f"  En Progreso:   {stats['en_progreso']:4d}")
-        print(f"  Completados:   {stats['completados']:4d}")
-        print(f"  Total:         {stats['total']:4d}")
-        print(f"  % Completado:  {stats['porcentaje_completado']:5.1f}%")
-        print(f"\nOperadores:")
-        print(f"  Disponibles:   {stats['operadores_disponibles']:4d}")
-        print(f"  Activos:       {stats['operadores_activos']:4d}")
-        print(f"\nMetricas:")
-        print(f"  Asignaciones:  {stats['total_asignaciones']:4d}")
-        print(f"  Tours:         {stats['total_tours']:4d}")
-        print("="*70 + "\n")
+        logger.debug("\n" + "="*70)
+        logger.debug(f"RESUMEN DISPATCHER - Tiempo Simulado: {self.env.now:.2f}s")
+        logger.debug("="*70)
+        logger.debug(f"WorkOrders:")
+        logger.debug(f"  Pendientes:    {stats['pendientes']:4d}")
+        logger.debug(f"  Asignados:     {stats['asignados']:4d}")
+        logger.debug(f"  En Progreso:   {stats['en_progreso']:4d}")
+        logger.debug(f"  Completados:   {stats['completados']:4d}")
+        logger.debug(f"  Total:         {stats['total']:4d}")
+        logger.debug(f"  % Completado:  {stats['porcentaje_completado']:5.1f}%")
+        logger.debug(f"\nOperadores:")
+        logger.debug(f"  Disponibles:   {stats['operadores_disponibles']:4d}")
+        logger.debug(f"  Activos:       {stats['operadores_activos']:4d}")
+        logger.debug(f"\nMetricas:")
+        logger.debug(f"  Asignaciones:  {stats['total_asignaciones']:4d}")
+        logger.debug(f"  Tours:         {stats['total_tours']:4d}")
+        logger.debug("="*70 + "\n")
 
     def simulacion_ha_terminado(self) -> bool:
         """
@@ -1333,13 +1337,13 @@ class DispatcherV11:
         Yields:
             timeout events para permitir ejecucion de otros procesos
         """
-        print("[DISPATCHER-PROCESS] Iniciando proceso de coordinacion...")
-        print(f"[DISPATCHER-PROCESS] Operarios registrados: {len(operarios)}")
+        logger.debug("[DISPATCHER-PROCESS] Iniciando proceso de coordinacion...")
+        logger.debug(f"[DISPATCHER-PROCESS] Operarios registrados: {len(operarios)}")
 
         # Registrar todos los operarios como disponibles al inicio
         for operario in operarios:
             self.registrar_operador_disponible(operario)
-            print(f"[DISPATCHER-PROCESS] Operario {operario.id} registrado como disponible")
+            logger.debug(f"[DISPATCHER-PROCESS] Operario {operario.id} registrado como disponible")
 
         # Contadores para logging periodico
         ultimo_reporte = 0
@@ -1351,8 +1355,8 @@ class DispatcherV11:
 
             # Verificar si termino la simulacion
             if self.simulacion_ha_terminado():
-                print(f"[DISPATCHER-PROCESS] Simulacion finalizada en t={self.env.now:.2f}")
-                print(f"[DISPATCHER-PROCESS] WorkOrders completadas: {len(self.work_orders_completados)}/{len(self.lista_maestra_work_orders)}")
+                logger.debug(f"[DISPATCHER-PROCESS] Simulacion finalizada en t={self.env.now:.2f}")
+                logger.debug(f"[DISPATCHER-PROCESS] WorkOrders completadas: {len(self.work_orders_completados)}/{len(self.lista_maestra_work_orders)}")
                 break
 
             # Logging periodico del estado (cada intervalo_reporte segundos)
@@ -1360,14 +1364,14 @@ class DispatcherV11:
                 ultimo_reporte = self.env.now
                 stats = self.obtener_estadisticas()
 
-                print(f"[DISPATCHER] t={self.env.now:.1f}s | "
+                logger.debug(f"[DISPATCHER] t={self.env.now:.1f}s | "
                       f"Pending: {stats['pendientes']} | "
                       f"Assigned: {stats['asignados']} | "
                       f"InProgress: {stats['en_progreso']} | "
                       f"Completed: {stats['completados']}")
 
                 # Logging de operarios disponibles vs activos
-                print(f"[DISPATCHER]   Operarios disponibles: {len(self.operadores_disponibles)} | "
+                logger.debug(f"[DISPATCHER]   Operarios disponibles: {len(self.operadores_disponibles)} | "
                       f"Activos: {len(self.operadores_activos)}")
 
 
