@@ -767,55 +767,20 @@ class BaseOperator:
             yield from self._outbound_nav_to(exit_cell)
         zone.release_lane(lane)
 
-
-class GroundOperator(BaseOperator):
-    """
-    Ground Operator - Handles ground-level picking tasks
-    Uses pallet jacks for lighter cargo
-    """
-
-    def __init__(self, agent_id: str, env: simpy.Environment, almacen: Any,
-                 configuracion: Dict[str, Any], capacity: int, discharge_time: int,
-                 work_area_priorities: Dict[str, int],
-                 pathfinder: Any = None, layout_manager: Any = None,
-                 simulador: Any = None):
+    def _do_picking_at(self, wo):
         """
-        Initialize Ground Operator
-
-        Args:
-            Same as BaseOperator
+        Hook de picking en la ubicacion de la WorkOrder.
+        GroundOperator: timeout simple. Forklift: lift + pick + lower.
+        Generador SimPy; usar con `yield from self._do_picking_at(wo)`.
         """
-        super().__init__(
-            agent_id=agent_id,
-            agent_type="GroundOperator",
-            env=env,
-            almacen=almacen,
-            configuracion=configuracion,
-            capacity=capacity,
-            discharge_time=discharge_time,
-            work_area_priorities=work_area_priorities,
-            pathfinder=pathfinder,
-            layout_manager=layout_manager,
-            simulador=simulador
-        )
-
-        # Ground operator specific attributes
-        # C1: default_speed leido de config (speed_factor_ground); default 1.0
-        self.default_speed = self.speed_factor_ground
-        self.preferred_areas = ["Area_Ground", "Area_Piso_L1"]
+        raise NotImplementedError(
+            f"{self.__class__.__name__} debe implementar _do_picking_at")
+        yield  # hace que Python trate esto como generador
 
     def agent_process(self):
         """
-        BUGFIX FASE 2: SimPy process real para GroundOperator
-        Implementa ciclo pull-based de trabajo
-
-        Flujo:
-        1. Solicitar tour del dispatcher
-        2. Navegar a ubicaciones de picking
-        3. Simular picking en cada ubicacion
-        4. Agrupar por staging y descargar multiple (MULTI-STAGING SUPPORT)
-        5. Notificar completado
-        6. Repetir
+        Ciclo pull-based compartido (GroundOperator + Forklift).
+        El picking especifico de cada tipo se delega a _do_picking_at().
         """
         # Configuracion de simulacion
         # C1: TIME_PER_CELL leido de config; default 0.1 (escala actual)
@@ -945,82 +910,7 @@ class GroundOperator(BaseOperator):
                     self._jump_to(wo.ubicacion)
                     self.total_distance_traveled += segment_distance
 
-                self.almacen.registrar_evento('estado_agente', {
-                    'agent_id': self.id,
-                    'agent_type': self.type,
-                    'position': self.current_position,
-                    'status': self.status,
-                    'current_task': wo.id if wo else None,
-                    'current_work_area': wo.work_area if wo else None,
-                    'cargo_volume': self.cargo_volume
-                })
-
-                self.status = "picking"
-
-                # Registrar evento con estado de picking
-                self.almacen.registrar_evento('estado_agente', {
-                    'agent_id': self.id,
-                    'agent_type': self.type,
-                    'position': self.current_position,
-                    'status': self.status,
-                    'current_task': wo.id if wo else None,
-                    'current_work_area': wo.work_area if wo else None,
-                    'cargo_volume': self.cargo_volume
-                })
-
-                # C1: picking_time leido de config; None => usa discharge_time (compat)
-                picking_duration = self.picking_time if self.picking_time is not None else self.discharge_time
-                yield self.env.timeout(picking_duration)
-
-                self.almacen.registrar_evento('operation_completed', {
-                    'agent_id': self.id,
-                    'data': {
-                        'duration': picking_duration,
-                        'work_order_id': wo.id
-                    }
-                })
-                self.almacen.registrar_evento('task_completed', {
-                    'agent_id': self.id,
-                    'task_id': wo.id,
-                    'data': {
-                        'task_ubicacion': wo.ubicacion,
-                        'tiempo_picking': picking_duration
-                    }
-                })
-
-                # ACTUALIZAR CARGO_VOLUME ANTES de poner cantidad_restante = 0
-                if wo:
-                    # Sumar el volumen ANTES de modificar cantidad_restante
-                    self.cargo_volume += wo.calcular_volumen_restante()
-                    wo.status = 'picked'
-                    wo.cantidad_restante = 0
-                    # Fase 2: consume real stock at the picked location
-                    self.almacen.consumir_stock_picking(wo, self.env.now)
-                    progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
-                    self.almacen.registrar_evento('work_order_update', {
-                        'id': wo.id,
-                        'order_id': wo.order_id,
-                        'tour_id': getattr(wo, 'tour_id', None),
-                        'sku_id': wo.sku_id,
-                        'product': wo.sku_name,
-                        'status': 'picked',
-                        'assigned_agent_id': wo.assigned_agent_id,
-                        'priority': getattr(wo, 'priority', 99),
-                        'items': getattr(wo, 'items', 1),
-                        'total_qty': wo.cantidad_total,
-                        'qty_requested': wo.cantidad_inicial,
-                        'qty_picked': wo.cantidad_inicial - wo.cantidad_restante,
-                        'volume': getattr(wo, 'volume', wo.volumen_restante),
-                        'location': wo.ubicacion,
-                        'staging': wo.staging_id,
-                        'work_group': wo.work_group,
-                        'work_area': wo.work_area,
-                        'executions': getattr(wo, 'picking_executions', 0) + 1,
-                        'start_time': wo.tiempo_inicio,
-                        'progress': progress,
-                        'tiempo_fin': getattr(wo, 'tiempo_fin', None)
-                    })
-
+                yield from self._do_picking_at(wo)
             # PASO 4: Agrupar WOs por staging y descargar en cada uno
             logger.debug(f"[{self.id}] Agrupando WOs por staging para descarga multiple")
             staging_groups = self._agrupar_wos_por_staging(work_orders)
@@ -1185,6 +1075,121 @@ class GroundOperator(BaseOperator):
 
             logger.info(f"[{self.id}] t={self.env.now:.1f} Tour completado, "
                   f"total completadas: {self.tasks_completed}")
+
+
+class GroundOperator(BaseOperator):
+    """
+    Ground Operator - Handles ground-level picking tasks
+    Uses pallet jacks for lighter cargo
+    """
+
+    def __init__(self, agent_id: str, env: simpy.Environment, almacen: Any,
+                 configuracion: Dict[str, Any], capacity: int, discharge_time: int,
+                 work_area_priorities: Dict[str, int],
+                 pathfinder: Any = None, layout_manager: Any = None,
+                 simulador: Any = None):
+        """
+        Initialize Ground Operator
+
+        Args:
+            Same as BaseOperator
+        """
+        super().__init__(
+            agent_id=agent_id,
+            agent_type="GroundOperator",
+            env=env,
+            almacen=almacen,
+            configuracion=configuracion,
+            capacity=capacity,
+            discharge_time=discharge_time,
+            work_area_priorities=work_area_priorities,
+            pathfinder=pathfinder,
+            layout_manager=layout_manager,
+            simulador=simulador
+        )
+
+        # Ground operator specific attributes
+        # C1: default_speed leido de config (speed_factor_ground); default 1.0
+        self.default_speed = self.speed_factor_ground
+        self.preferred_areas = ["Area_Ground", "Area_Piso_L1"]
+
+    def _do_picking_at(self, wo):
+        """Secuencia de picking Ground: status -> timeout -> cargo."""
+        self.almacen.registrar_evento('estado_agente', {
+            'agent_id': self.id,
+            'agent_type': self.type,
+            'position': self.current_position,
+            'status': self.status,
+            'current_task': wo.id if wo else None,
+            'current_work_area': wo.work_area if wo else None,
+            'cargo_volume': self.cargo_volume
+        })
+
+        self.status = "picking"
+
+        # Registrar evento con estado de picking
+        self.almacen.registrar_evento('estado_agente', {
+            'agent_id': self.id,
+            'agent_type': self.type,
+            'position': self.current_position,
+            'status': self.status,
+            'current_task': wo.id if wo else None,
+            'current_work_area': wo.work_area if wo else None,
+            'cargo_volume': self.cargo_volume
+        })
+
+        # C1: picking_time leido de config; None => usa discharge_time (compat)
+        picking_duration = self.picking_time if self.picking_time is not None else self.discharge_time
+        yield self.env.timeout(picking_duration)
+
+        self.almacen.registrar_evento('operation_completed', {
+            'agent_id': self.id,
+            'data': {
+                'duration': picking_duration,
+                'work_order_id': wo.id
+            }
+        })
+        self.almacen.registrar_evento('task_completed', {
+            'agent_id': self.id,
+            'task_id': wo.id,
+            'data': {
+                'task_ubicacion': wo.ubicacion,
+                'tiempo_picking': picking_duration
+            }
+        })
+
+        # ACTUALIZAR CARGO_VOLUME ANTES de poner cantidad_restante = 0
+        if wo:
+            # Sumar el volumen ANTES de modificar cantidad_restante
+            self.cargo_volume += wo.calcular_volumen_restante()
+            wo.status = 'picked'
+            wo.cantidad_restante = 0
+            # Fase 2: consume real stock at the picked location
+            self.almacen.consumir_stock_picking(wo, self.env.now)
+            progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
+            self.almacen.registrar_evento('work_order_update', {
+                'id': wo.id,
+                'order_id': wo.order_id,
+                'tour_id': getattr(wo, 'tour_id', None),
+                'sku_id': wo.sku_id,
+                'product': wo.sku_name,
+                'status': 'picked',
+                'assigned_agent_id': wo.assigned_agent_id,
+                'priority': getattr(wo, 'priority', 99),
+                'items': getattr(wo, 'items', 1),
+                'total_qty': wo.cantidad_total,
+                'qty_requested': wo.cantidad_inicial,
+                'qty_picked': wo.cantidad_inicial - wo.cantidad_restante,
+                'volume': getattr(wo, 'volume', wo.volumen_restante),
+                'location': wo.ubicacion,
+                'staging': wo.staging_id,
+                'work_group': wo.work_group,
+                'work_area': wo.work_area,
+                'executions': getattr(wo, 'picking_executions', 0) + 1,
+                'start_time': wo.tiempo_inicio,
+                'progress': progress,
+                'tiempo_fin': getattr(wo, 'tiempo_fin', None)
+            })
 
 
 class Forklift(BaseOperator):
@@ -1230,404 +1235,103 @@ class Forklift(BaseOperator):
         """Set forklift lift height"""
         self.lift_height = height
 
-    def agent_process(self):
-        """
-        BUGFIX FASE 2: SimPy process real para Forklift
-        Implementa ciclo pull-based con mecanica de elevacion
-
-        Diferencias vs GroundOperator:
-        - Tiempo de elevacion/bajada de horquilla (LIFT_TIME)
-        - Velocidad diferente (default_speed = speed_factor_forklift de config)
-        - Descarga multiple en stagings (MULTI-STAGING SUPPORT)
-        """
-        # Configuracion de simulacion
-        # C1: TIME_PER_CELL y LIFT_TIME leidos de config; defaults = valores actuales
-        TIME_PER_CELL = self.time_per_cell
+    def _do_picking_at(self, wo):
+        """Secuencia de picking Forklift: lift + timeout + lower."""
         LIFT_TIME = self.lift_time
+        self.status = "lifting"
+        logger.debug(f"[{self.id}] t={self.env.now:.1f} Elevando horquilla")
 
-        # Inicializar posicion en depot
-        staging_locs = self.almacen.data_manager.get_outbound_staging_locations()
-        depot_location = staging_locs.get(1, (3, 29))  # Staging 1 como depot default
-        # Iniciativa #2 / Fase 2: dispersion espacial (anden distinto por agente).
-        spawn_cell = self._spawn_lane(depot_location)
-        self._set_pos(spawn_cell)
-        # Fase 3 (cell mode): reservar la celda de spawn (invariante de exclusion).
-        self._claim_spawn(spawn_cell)
+        # Registrar evento con estado de lifting
+        self.almacen.registrar_evento('estado_agente', {
+            'agent_id': self.id,
+            'agent_type': self.type,
+            'position': self.current_position,
+            'status': self.status,
+            'current_task': wo.id if wo else None,
+            'current_work_area': wo.work_area if wo else None,
+            'cargo_volume': self.cargo_volume
+        })
 
-        logger.info(f"[{self.id}] Proceso iniciado en depot {spawn_cell}")
+        yield self.env.timeout(LIFT_TIME)
+        self.set_lift_height(1)
 
-        # Iniciativa #2 / Fase 2: arranque escalonado (stagger temporal).
-        yield from self._spawn_stagger()
+        self.status = "picking"
+        logger.debug(f"[{self.id}] t={self.env.now:.1f} Picking en {wo.ubicacion}")
 
-        while True:
-            # PASO 1: Solicitar asignacion de tour
-            self.status = "idle"
+        # Registrar evento con estado de picking
+        self.almacen.registrar_evento('estado_agente', {
+            'agent_id': self.id,
+            'agent_type': self.type,
+            'position': self.current_position,
+            'status': self.status,
+            'current_task': wo.id if wo else None,
+            'current_work_area': wo.work_area if wo else None,
+            'cargo_volume': self.cargo_volume
+        })
 
-            self.almacen.registrar_evento('estado_agente', {
-                'agent_id': self.id,
-                'agent_type': self.type,
-                'position': self.current_position,
-                'status': self.status,
-                'current_task': None,
-                'cargo_volume': self.cargo_volume
+        # C1: picking_time leido de config; None => usa discharge_time (compat)
+        picking_duration = self.picking_time if self.picking_time is not None else self.discharge_time
+        yield self.env.timeout(picking_duration)
+
+        logger.debug(f"[{self.id}] t={self.env.now:.1f} Bajando horquilla")
+        yield self.env.timeout(LIFT_TIME)
+        self.set_lift_height(0)
+
+        total_operation_duration = LIFT_TIME + picking_duration + LIFT_TIME
+        self.almacen.registrar_evento('operation_completed', {
+            'agent_id': self.id,
+            'data': {
+                'duration': total_operation_duration,
+                'work_order_id': wo.id
+            }
+        })
+        self.almacen.registrar_evento('task_completed', {
+            'agent_id': self.id,
+            'task_id': wo.id,
+            'data': {
+                'task_ubicacion': wo.ubicacion,
+                'tiempo_picking': total_operation_duration
+            }
+        })
+
+        # ACTUALIZAR CARGO_VOLUME ANTES de poner cantidad_restante = 0
+        if wo:
+            # Sumar el volumen ANTES de modificar cantidad_restante
+            self.cargo_volume += wo.calcular_volumen_restante()
+            wo.cantidad_restante = 0
+            if hasattr(wo, 'picking_executions'):
+                wo.picking_executions += 1
+            else:
+                wo.picking_executions = 1
+
+        if wo:
+            wo.status = 'picked'
+            # Fase 2: consume real stock at the picked location
+            self.almacen.consumir_stock_picking(wo, self.env.now)
+            progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
+            self.almacen.registrar_evento('work_order_update', {
+                'id': wo.id,
+                'order_id': wo.order_id,
+                'tour_id': getattr(wo, 'tour_id', None),
+                'sku_id': wo.sku_id,
+                'product': wo.sku_name,
+                'status': 'picked',
+                'assigned_agent_id': wo.assigned_agent_id,
+                'priority': getattr(wo, 'priority', 99),
+                'items': getattr(wo, 'items', 1),
+                'total_qty': wo.cantidad_total,
+                'qty_requested': wo.cantidad_inicial,
+                'qty_picked': wo.cantidad_inicial - wo.cantidad_restante,
+                'volume': getattr(wo, 'volume', wo.volumen_restante),
+                'location': wo.ubicacion,
+                'staging': wo.staging_id,
+                'work_group': wo.work_group,
+                'work_area': wo.work_area,
+                'executions': getattr(wo, 'picking_executions', 0) + 1,
+                'start_time': wo.tiempo_inicio,
+                'progress': progress,
+                'tiempo_fin': getattr(wo, 'tiempo_fin', None)
             })
-
-            tour = self.almacen.dispatcher.solicitar_asignacion(self)
-
-            if tour is None:
-                if self.almacen.simulacion_ha_terminado():
-                    logger.info(f"[{self.id}] Simulacion finalizada, saliendo...")
-                    break
-
-                yield self.env.timeout(0.5)  # V12: Reduced for fast termination detection
-                continue
-
-            tour_start_time = self.env.now
-
-            # PASO 2: Procesar tour asignado
-            self.status = "working"
-            work_orders = tour['work_orders']
-            route_info = tour['route']
-
-            logger.info(f"[{self.id}] t={self.env.now:.1f} Tour asignado: "
-                  f"{len(work_orders)} WOs, distancia: {tour['total_distance']:.1f}")
-
-            if work_orders:
-                self.almacen.dispatcher.notificar_inicio_trabajo(self, work_orders[0])
-
-            # PASO 3: Visitar cada ubicacion de picking
-            visit_sequence = route_info['visit_sequence']
-            segment_paths = route_info['segment_paths']
-            segment_distances = route_info['segment_distances']
-
-            for idx, wo in enumerate(visit_sequence):
-                segment_path = segment_paths[idx] if idx < len(segment_paths) else []
-                segment_distance = segment_distances[idx] if idx < len(segment_distances) else 0
-
-                if segment_path and len(segment_path) > 1:
-                    self.status = "moving"
-
-                    self.almacen.registrar_evento('estado_agente', {
-                        'agent_id': self.id,
-                        'agent_type': self.type,
-                        'position': self.current_position,
-                        'status': self.status,
-                        'current_task': wo.id if wo else None,
-                        'current_work_area': wo.work_area if wo else None,
-                        'cargo_volume': self.cargo_volume
-                    })
-
-                    logger.debug(f"[{self.id}] t={self.env.now:.1f} Navegando a {wo.ubicacion} "
-                          f"(path: {len(segment_path)} pasos)")
-
-                    def _on_before(step_idx, step_position):
-                        self.almacen.registrar_evento('estado_agente', {
-                            'agent_id': self.id,
-                            'agent_type': self.type,
-                            'position': self.current_position,
-                            'status': self.status,
-                            'current_task': wo.id if wo else None,
-                            'current_work_area': wo.work_area if wo else None,
-                            'cargo_volume': self.cargo_volume
-                        })
-
-                        if wo:
-                            progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
-                            self.almacen.registrar_evento('work_order_update', {
-                                'id': wo.id,
-                                'order_id': wo.order_id,
-                                'tour_id': getattr(wo, 'tour_id', None),
-                                'sku_id': wo.sku_id,
-                                'product': wo.sku_name,
-                                'status': 'in_progress',
-                                'assigned_agent_id': wo.assigned_agent_id,
-                                'priority': getattr(wo, 'priority', 99),
-                                'items': getattr(wo, 'items', 1),
-                                'total_qty': wo.cantidad_total,
-                                'qty_requested': wo.cantidad_inicial,
-                                'qty_picked': wo.cantidad_inicial - wo.cantidad_restante,
-                                'volume': getattr(wo, 'volume', wo.volumen_restante),
-                                'location': wo.ubicacion,
-                                'staging': wo.staging_id,
-                                'work_group': wo.work_group,
-                                'work_area': wo.work_area,
-                                'executions': getattr(wo, 'picking_executions', 0),
-                                'start_time': wo.tiempo_inicio,
-                                'progress': progress,
-                                'tiempo_fin': getattr(wo, 'tiempo_fin', None)
-                            })
-
-                    def _on_after(step_idx, step_position):
-                        logger.debug(f"[{self.id}] t={self.env.now:.1f} Paso {step_idx}/{len(segment_path)-1}: {step_position}")
-
-                    yield from self._recorrer_tramo(
-                        segment_path, self.default_speed,
-                        on_before=_on_before, on_after=_on_after,
-                        time_per_cell=TIME_PER_CELL
-                    )
-                else:
-                    self._jump_to(wo.ubicacion)
-                    self.total_distance_traveled += segment_distance
-
-                self.status = "lifting"
-                logger.debug(f"[{self.id}] t={self.env.now:.1f} Elevando horquilla")
-
-                # Registrar evento con estado de lifting
-                self.almacen.registrar_evento('estado_agente', {
-                    'agent_id': self.id,
-                    'agent_type': self.type,
-                    'position': self.current_position,
-                    'status': self.status,
-                    'current_task': wo.id if wo else None,
-                    'current_work_area': wo.work_area if wo else None,
-                    'cargo_volume': self.cargo_volume
-                })
-
-                yield self.env.timeout(LIFT_TIME)
-                self.set_lift_height(1)
-
-                self.status = "picking"
-                logger.debug(f"[{self.id}] t={self.env.now:.1f} Picking en {wo.ubicacion}")
-
-                # Registrar evento con estado de picking
-                self.almacen.registrar_evento('estado_agente', {
-                    'agent_id': self.id,
-                    'agent_type': self.type,
-                    'position': self.current_position,
-                    'status': self.status,
-                    'current_task': wo.id if wo else None,
-                    'current_work_area': wo.work_area if wo else None,
-                    'cargo_volume': self.cargo_volume
-                })
-
-                # C1: picking_time leido de config; None => usa discharge_time (compat)
-                picking_duration = self.picking_time if self.picking_time is not None else self.discharge_time
-                yield self.env.timeout(picking_duration)
-
-                logger.debug(f"[{self.id}] t={self.env.now:.1f} Bajando horquilla")
-                yield self.env.timeout(LIFT_TIME)
-                self.set_lift_height(0)
-
-                total_operation_duration = LIFT_TIME + picking_duration + LIFT_TIME
-                self.almacen.registrar_evento('operation_completed', {
-                    'agent_id': self.id,
-                    'data': {
-                        'duration': total_operation_duration,
-                        'work_order_id': wo.id
-                    }
-                })
-                self.almacen.registrar_evento('task_completed', {
-                    'agent_id': self.id,
-                    'task_id': wo.id,
-                    'data': {
-                        'task_ubicacion': wo.ubicacion,
-                        'tiempo_picking': total_operation_duration
-                    }
-                })
-
-                # ACTUALIZAR CARGO_VOLUME ANTES de poner cantidad_restante = 0
-                if wo:
-                    # Sumar el volumen ANTES de modificar cantidad_restante
-                    self.cargo_volume += wo.calcular_volumen_restante()
-                    wo.cantidad_restante = 0
-                    if hasattr(wo, 'picking_executions'):
-                        wo.picking_executions += 1
-                    else:
-                        wo.picking_executions = 1
-
-                if wo:
-                    wo.status = 'picked'
-                    # Fase 2: consume real stock at the picked location
-                    self.almacen.consumir_stock_picking(wo, self.env.now)
-                    progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
-                    self.almacen.registrar_evento('work_order_update', {
-                        'id': wo.id,
-                        'order_id': wo.order_id,
-                        'tour_id': getattr(wo, 'tour_id', None),
-                        'sku_id': wo.sku_id,
-                        'product': wo.sku_name,
-                        'status': 'picked',
-                        'assigned_agent_id': wo.assigned_agent_id,
-                        'priority': getattr(wo, 'priority', 99),
-                        'items': getattr(wo, 'items', 1),
-                        'total_qty': wo.cantidad_total,
-                        'qty_requested': wo.cantidad_inicial,
-                        'qty_picked': wo.cantidad_inicial - wo.cantidad_restante,
-                        'volume': getattr(wo, 'volume', wo.volumen_restante),
-                        'location': wo.ubicacion,
-                        'staging': wo.staging_id,
-                        'work_group': wo.work_group,
-                        'work_area': wo.work_area,
-                        'executions': getattr(wo, 'picking_executions', 0) + 1,
-                        'start_time': wo.tiempo_inicio,
-                        'progress': progress,
-                        'tiempo_fin': getattr(wo, 'tiempo_fin', None)
-                    })
-
-            # PASO 4: Agrupar WOs por staging y descargar en cada uno
-            logger.debug(f"[{self.id}] Agrupando WOs por staging para descarga multiple")
-            staging_groups = self._agrupar_wos_por_staging(work_orders)
-            logger.debug(f"[{self.id}] Tour requiere visitar {len(staging_groups)} stagings: {list(staging_groups.keys())}")
-
-            # Ordenar stagings por distancia desde posicion actual
-            ordered_stagings = self._ordenar_stagings_por_distancia(staging_groups, self.current_position)
-            staging_locs = self.almacen.data_manager.get_outbound_staging_locations()
-
-            # Visitar cada staging en orden
-            for idx, (staging_id, staging_wos) in enumerate(ordered_stagings, 1):
-                if getattr(self.almacen, 'outbound_enabled', False):
-                    # F1.3: descarga realista por carriles (2 por staging, espera fuera,
-                    # llenado de atras hacia adelante). Reemplaza la descarga clasica.
-                    yield from self._outbound_discharge_lanes(staging_id, staging_wos)
-                    continue
-                staging_location = staging_locs.get(staging_id, (3, 29))
-                # IMPORTANTE: Usar cantidad_inicial * sku.volumen porque cantidad_restante ya es 0 despues del picking
-                volumen_staging = sum(wo.cantidad_inicial * wo.sku.volumen for wo in staging_wos)
-
-                logger.debug(f"[{self.id}] [{idx}/{len(ordered_stagings)}] Navegando a staging {staging_id} "
-                      f"en {staging_location} para descargar {len(staging_wos)} WOs ({volumen_staging}L)")
-
-                # Navegar al staging
-                if hasattr(self.almacen, 'route_calculator') and self.almacen.route_calculator:
-                    try:
-                        return_path = self.almacen.route_calculator.pathfinder.find_path(
-                            self.current_position, staging_location
-                        )
-
-                        if return_path and len(return_path) > 1:
-                            self.status = "moving"
-
-                            self.almacen.registrar_evento('estado_agente', {
-                                'agent_id': self.id,
-                                'agent_type': self.type,
-                                'position': self.current_position,
-                                'status': self.status,
-                                'current_task': None,
-                                'cargo_volume': self.cargo_volume
-                            })
-
-                            logger.debug(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
-                                  f"(path: {len(return_path)} pasos)")
-
-                            def _on_before(step_idx, step_position):
-                                self.almacen.registrar_evento('estado_agente', {
-                                    'agent_id': self.id,
-                                    'agent_type': self.type,
-                                    'position': self.current_position,
-                                    'status': self.status,
-                                    'current_task': None,
-                                    'cargo_volume': self.cargo_volume
-                                })
-
-                            def _on_after(step_idx, step_position):
-                                if step_idx % 5 == 0:
-                                    logger.debug(f"[{self.id}] t={self.env.now:.1f} Navegando a staging {staging_id} "
-                                          f"paso {step_idx}/{len(return_path)-1}")
-
-                            yield from self._recorrer_tramo(
-                                return_path, self.default_speed,
-                                on_before=_on_before, on_after=_on_after,
-                                time_per_cell=TIME_PER_CELL
-                            )
-
-                            self.total_distance_traveled += len(return_path) - 1
-                        else:
-                            self._jump_to(staging_location)
-                            # F2.d fix: staging no-walkable para A*; regresar al
-                            # pasillo (y-1) antes de quedar idle para que el
-                            # dispatcher pueda rutar desde una celda transitable.
-                            _exit_cell = (staging_location[0], staging_location[1] - 1)
-                            if _exit_cell[1] >= 0:
-                                self._jump_to(_exit_cell)
-                    except Exception as e:
-                        logger.error(f"[{self.id}] ERROR en pathfinding a staging {staging_id}: {e}")
-                        self._jump_to(staging_location)
-                        # F2.d fix: staging no-walkable para A*; regresar al
-                        # pasillo (y-1) antes de quedar idle para que el
-                        # dispatcher pueda rutar desde una celda transitable.
-                        _exit_cell = (staging_location[0], staging_location[1] - 1)
-                        if _exit_cell[1] >= 0:
-                            self._jump_to(_exit_cell)
-
-                # DESCARGAR GRANULAR en este staging (V12: Progreso visible por WO)
-                self.status = "unloading"
-
-                self.almacen.registrar_evento('estado_agente', {
-                    'agent_id': self.id,
-                    'agent_type': self.type,
-                    'position': self.current_position,
-                    'status': self.status,
-                    'current_task': None,
-                    'cargo_volume': self.cargo_volume
-                })
-
-                logger.debug(f"[{self.id}] t={self.env.now:.1f} Iniciando descarga granular en staging {staging_id} "
-                      f"({len(staging_wos)} WOs)")
-
-                # V12 GRANULAR DISCHARGE: Descargar cada WO individualmente
-                for wo_idx, wo in enumerate(staging_wos, 1):
-                    # Calcular volumen de esta WO especifica
-                    wo_volume = wo.cantidad_inicial * wo.sku.volumen
-
-                    # INICIATIVA #3 / F1.2a: backpressure - esperar una posicion
-                    # libre de la zona de aforo antes de depositar (no-op si off).
-                    _ob_slot = yield from self._outbound_wait_slot(staging_id, wo)
-
-                    # Timeout individual por WO
-                    yield self.env.timeout(self.discharge_time)
-
-                    # Actualizar cargo parcialmente
-                    self.cargo_volume -= wo_volume
-
-                    # Registrar evento de estado actualizado
-                    self.almacen.registrar_evento('estado_agente', {
-                        'agent_id': self.id,
-                        'agent_type': self.type,
-                        'position': self.current_position,
-                        'status': self.status,
-                        'current_task': wo.id,
-                        'cargo_volume': self.cargo_volume
-                    })
-
-                    # Notificar completion individual - esto emite work_order_update con status='staged'
-                    self.almacen.dispatcher.notificar_completado_individual(self, wo)
-
-                    # INICIATIVA #3 / F1.2a: el WO depositado se vuelve un Pallet
-                    # persistente que ocupa la posicion de aforo (no-op si off).
-                    self._outbound_place_pallet(_ob_slot, wo, staging_id)
-
-                    logger.debug(f"[{self.id}] t={self.env.now:.1f} [{wo_idx}/{len(staging_wos)}] "
-                          f"WO {wo.id} staged (-{wo_volume}L, cargo: {self.cargo_volume}L)")
-
-            # PASO 5: Limpiar cargo final (por seguridad)
-            self.cargo_volume = 0
-            logger.debug(f"[{self.id}] t={self.env.now:.1f} Descarga completa en todos los stagings")
-
-            self.almacen.registrar_evento('estado_agente', {
-                'agent_id': self.id,
-                'agent_type': self.type,
-                'position': self.current_position,
-                'status': 'idle',
-                'current_task': None,
-                'cargo_volume': self.cargo_volume
-            })
-
-            # PASO 6: Finalizar tour (ya no usamos notificar_completado batch)
-            tour_duration = self.env.now - tour_start_time
-            self.almacen.registrar_evento('trip_completed', {
-                'agent_id': self.id,
-                'data': {
-                    'duration': tour_duration,
-                    'num_work_orders': len(work_orders)
-                }
-            })
-
-            # V12: Usar finalizar_tour en lugar de notificar_completado batch
-            self.almacen.dispatcher.finalizar_tour(self)
-            self.tasks_completed += len(work_orders)
-
-            logger.info(f"[{self.id}] t={self.env.now:.1f} Tour completado, "
-                  f"total completadas: {self.tasks_completed}")
 
 
 def crear_operarios(env: simpy.Environment, almacen: Any,
