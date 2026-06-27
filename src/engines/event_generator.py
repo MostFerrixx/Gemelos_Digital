@@ -105,7 +105,16 @@ class EventGenerator:
         if not self.configuracion:
             logger.error("[EVENT-GENERATOR ERROR] No hay configuracion valida")
             return False
-        
+
+        # Semilla determinista via variable de entorno WAREHOUSE_SEED.
+        # Uso: SET WAREHOUSE_SEED=42 (Windows) / export WAREHOUSE_SEED=42 (Linux)
+        # Sin la variable -> comportamiento estocastico de produccion (sin cambios).
+        import random as _random
+        _seed_env = os.environ.get('WAREHOUSE_SEED')
+        if _seed_env is not None:
+            _random.seed(int(_seed_env))
+            logger.info(f"[EVENT-GENERATOR] Semilla fijada: WAREHOUSE_SEED={_seed_env} (modo determinista)")
+
         logger.info("[EVENT-GENERATOR] Inicializando arquitectura TMX...")
         
         # 1. Inicializar LayoutManager
