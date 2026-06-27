@@ -64,8 +64,6 @@ class WebConfigurator {
         }
 
         // Layout & Data buttons
-        document.getElementById('btn-generate-template').addEventListener('click', () => this.generateTemplate());
-        document.getElementById('btn-populate-skus').addEventListener('click', () => this.populateSKUs());
         document.getElementById('btn-load-work-areas').addEventListener('click', () => this.loadWorkAreas());
 
         // C5: Tiempos preset selector
@@ -823,27 +821,6 @@ class WebConfigurator {
                 this.showNotification('Error: ' + error.message, 'error');
             }
         }
-    }
-
-    generateTemplate() {
-        this.showNotification(
-            'Funcionalidad en desarrollo.\n\n' +
-            'Creará Warehouse_Logic.xlsx con:\n' +
-            '- Columnas de ubicaciones de picking\n' +
-            '- Datos por defecto para el simulador\n' +
-            '- Estructura lista para modificar',
-            'info'
-        );
-    }
-
-    populateSKUs() {
-        this.showNotification(
-            'Funcionalidad en desarrollo.\n\n' +
-            'Rellenará el CSV con:\n' +
-            '- SKUs aleatorios\n' +
-            '- Cantidades aleatorias',
-            'info'
-        );
     }
 
     setSelectValue(selectElement, value, normalizeFn) {

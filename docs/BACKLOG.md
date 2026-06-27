@@ -400,7 +400,28 @@ se quedaba dentro del motor.
 
 ---
 
+---
+
+## BK-05 — Botones E6/E7 ("Generar Plantilla TMX" / "Poblar SKUs Aleatorios")
+
+**Estado:** ELIMINADO — 2026-06-27
+**Motivo:** Eran stubs sin backend (mostraban un toast "Funcionalidad en desarrollo").
+El nombre "TMX" era incorrecto (hubieran generado un .xlsx, no un mapa Tiled).
+"Poblar SKUs" mencionaba CSV pero la fuente real es .xlsx. Specs incoherentes +
+cero implementacion = UI enganiosa. Eliminados limpiamente.
+
+**Lo que se quito:**
+- `index.html`: 2 elementos `<button disabled>` de la tarjeta "Acciones de Datos"
+- `app.js`: 2 `addEventListener` + 2 metodos `generateTemplate()` / `populateSKUs()`
+- Tarjeta queda con el unico boton funcional: `btn-load-work-areas`
+
+**Si en el futuro se decide construir algo equivalente:**
+- Definir spec claro primero (columnas del Excel, rangos de SKUs, etc.)
+- Crear endpoint FastAPI + funcion Python generadora
+- El frontend ya sabe que la fuente canonica es `layouts/Warehouse_Logic.xlsx`
+
+---
+
 *Este documento se actualiza al detectar nuevos items en sesiones de desarrollo.
-Para retomar BK-01, leer: `dispatcher.py` lineas 252-273 (router de estrategias) al detectar nuevos items en sesiones de desarrollo.
 Para retomar BK-01, leer: `dispatcher.py` lineas 252-273 (router de estrategias)
 y `web_prototype/static/web_configurator/index.html` (selector dispatch-strategy).*
