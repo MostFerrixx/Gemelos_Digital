@@ -1,12 +1,11 @@
 # HANDOFF — Gemelo Digital de Almacen
 # Estado operativo para nueva sesion de Cerebellum
 
-**Generado:** 2026-06-18  ·  **Actualizado:** 2026-06-19
+**Generado:** 2026-06-18  ·  **Actualizado:** 2026-06-27
 **Por:** Cerebellum (sesion de traspaso)
-**Rama activa:** `feature/allocation-layer-v12.1`  ·  **HEAD:** `ba55f27`
-**Estado:** rama PUSHEADA y MERGEADA a `main` (fast-forward, 2026-06-19); las 5 refs
-  (HEAD, feature local/remoto, main local/remoto) alineadas en `ba55f27`.
-**Proxima accion del Director:** elegir siguiente prioridad del backlog (ver seccion 5).
+**Rama activa:** `feature/allocation-layer-v12.1`  ·  **HEAD:** `41ddc22`
+**Estado:** 3 nuevos commits pendientes de push (ver seccion 3).
+**Proxima accion del Director:** `git push origin feature/allocation-layer-v12.1` + merge a main.
 
 ---
 
@@ -65,10 +64,24 @@ El arbol data/ es una migracion abandonada que solo lee codigo muerto.
 ## 3. GIT — ESTADO ACTUAL
 
 **Rama:** `feature/allocation-layer-v12.1`
-**HEAD local:** `ba55f27`  ·  **Remote:** `ba55f27` (sincronizado; push hecho 2026-06-19)
-**main:** `ba55f27` (local y remoto; merge por fast-forward, 0 commits divergentes)
+**HEAD local:** `41ddc22`  ·  **Remote:** `b990964` (3 commits pendientes de push)
+**main:** `ba55f27` (sincronizado con el ultimo push; pendiente fast-forward)
 
-### Historial de la rama (snapshot hasta dd5c729; ya consolidado en main via ba55f27):
+**Accion requerida (Director):**
+```
+git push origin feature/allocation-layer-v12.1
+# Luego merge a main (fast-forward server-side)
+```
+
+### Nuevos commits (sesion 2026-06-27):
+
+```
+41ddc22  refactor(p2): extraer agent_process a BaseOperator (Template Method)
+413888c  feat(gate): WAREHOUSE_SEED via env var para reproducibilidad determinista
+b990964  refactor(logging): print() -> logging por nivel en hot-path del motor
+```
+
+### Historial previo (ya en main via ba55f27):
 
 ```
 dd5c729  exp(p4-bk03): greedy NN descartado con evidencia
@@ -105,6 +118,34 @@ bcdb264  feat(ui): BK-01 Cercania + radio_cercania en configurador
 ---
 
 ## 4. LO QUE SE HIZO EN LAS ULTIMAS SESIONES
+
+### Punto 1 — prints del hot-path -> logging por nivel (commit b990964, 2026-06-27)
+186 prints convertidos a logging por nivel (DEBUG/INFO/WARNING/ERROR) en:
+- `src/engines/event_generator.py`: 58 prints (todos INFO)
+- `src/subsystems/simulation/dispatcher.py`: 86 prints (mayoria DEBUG, algunos INFO/WARNING/ERROR)
+- `src/subsystems/simulation/operators.py`: 42 prints (mayoria DEBUG, algunos INFO/WARNING)
+
+Resultado: la salida en produccion baja de miles de lineas a ~800 (solo milestones).
+La linea critica para Watch Replay (`[EVENT-GENERATOR] Archivo generado: output/.../replay_....jsonl`)
+queda como INFO. `logging.basicConfig(level=INFO)` en `event_generator.py`.
+
+### Gate de reproducibilidad — WAREHOUSE_SEED (commit 413888c, 2026-06-27)
+Variable de entorno `WAREHOUSE_SEED=42` fija el seed de `random` antes de la simulacion.
+Sin la variable: comportamiento estocastico de produccion (sin cambio).
+Gate verificado: dos corridas con semilla 42 -> SHA256 byte-identico (a4ae8d4e9f7dd444..., 5379372 bytes).
+
+### Punto 2 — Refactor Ground/Forklift agent_process (commit 41ddc22, 2026-06-27)
+Patron Template Method extraido:
+- `BaseOperator.agent_process()`: ciclo pull-based completo (setup + PASO 1-6). Llama `yield from self._do_picking_at(wo)`.
+- `BaseOperator._do_picking_at()`: stub abstracto (NotImplementedError).
+- `GroundOperator._do_picking_at()`: status="picking" -> timeout -> cargo update.
+- `Forklift._do_picking_at()`: status="lifting" -> lift + timeout + lower -> cargo update.
+- `GroundOperator.agent_process()` y `Forklift.agent_process()`: ELIMINADOS (heredan de BaseOperator).
+
+Resultado: -296 lineas en operators.py (1772 -> 1476, -16.7%).
+Gate byte-identico: SHA256 post-refactor = a4ae8d4e9f7dd444... = baseline.
+
+
 
 ### Allocation Layer V12.1 (base de la rama)
 Asignacion de stock real (FCFS) antes de crear WorkOrders.
