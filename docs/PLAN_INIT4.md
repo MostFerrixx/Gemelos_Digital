@@ -349,16 +349,23 @@ if priority_dispatch_enabled:
 - [x] PICK-1..6 PASAN (test unitario del metodo real, scratchpad/test_pick_time.py)
 - [ ] E2E con config activo (en curso) + Commit + push + sync main
 
-### C2 — Prioridad / SLA
-- [ ] Dataclasses + parser (priority/due_time)
-- [ ] `WorkOrder` extendida (+ to_dict)
-- [ ] Propagacion en generate_work_orders (ambos modos)
-- [ ] Flag `priority_dispatch_enabled` + validacion
-- [ ] Reordenamiento opt-in en dispatcher
-- [ ] REG-1 con flag OFF PASA
-- [ ] PRIO-1..7 PASAN
-- [ ] (Opcional) KPI de incumplimiento SLA en reporte
-- [ ] Commit + push + sync main
+### C2 — Prioridad / SLA — EN VALIDACION 2026-06-29
+- [x] Dataclasses + parser (priority/due_time/wave) con coercion defensiva
+- [x] `WorkOrder` extendida (priority default 99, due_time, wave_id) SIN tocar to_dict
+      (preserva byte-identico de initial_work_orders)
+- [x] Propagacion en generate_work_orders (determinista; estocastico -> defaults)
+- [x] Flag `priority_dispatch_enabled` (default False) en dispatcher
+- [x] `_aplicar_prioridad_pedido` opt-in en las 4 estrategias (D2-A: dentro de zona)
+- [x] REG-1 con flag OFF PASA -> SHA a4ae8d4e... byte-identico
+- [x] PRIO-1..7 PASAN (test unitario del metodo real + parser)
+- [x] E2E determinista realizado -- HALLAZGO: efecto MARGINAL (ON 70.2 vs OFF 71.2;
+      ranking urgentes casi igual). CAUSA (no es bug): la prioridad solo ANCLA la
+      primera WO; el doble barrido (`_construir_tour_por_secuencia`) llena el resto
+      con `candidatos_compatibles` (todos) por pick_sequence -> diluye la urgencia.
+      DECISION PENDIENTE DEL DIRECTOR: prioridad suave (actual) vs fuerte (priorizar
+      tambien el barrido dentro de zona, con costo de eficiencia de ruta). Ver reporte.
+- [ ] (Diferido) KPI de incumplimiento SLA en reporte
+- [x] Commit C2-base (mecanismo de anclaje, opt-in, no-regresion) -> push + sync
 
 ### C3 — Olas
 - [ ] Bloque `waves` en config + validacion

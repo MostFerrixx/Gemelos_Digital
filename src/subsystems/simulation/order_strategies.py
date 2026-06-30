@@ -19,6 +19,26 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field
 
 
+def _coerce_int(value):
+    """INIT-4: convierte a int de forma defensiva. Malformado/None -> None."""
+    if value is None or value == '':
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_float(value):
+    """INIT-4: convierte a float de forma defensiva. Malformado/None -> None."""
+    if value is None or value == '':
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 @dataclass
 class OrderItem:
     """Represents a single item within an order"""
@@ -33,6 +53,12 @@ class ParsedOrder:
     order_id: str
     items: List[OrderItem] = field(default_factory=list)
     staging_id: Optional[int] = None
+    # INIT-4 (C2): prioridad de pedido (menor = mas urgente) y SLA opcional.
+    # Default None -> el WorkOrder usa su default historico (99) -> no-regresion.
+    priority: Optional[int] = None
+    due_time: Optional[float] = None
+    # INIT-4 (C3): ola/wave a la que pertenece el pedido (None = sin ola).
+    wave: Optional[int] = None
 
 
 @dataclass
@@ -284,9 +310,14 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
         for order_data in orders_data:
             order = ParsedOrder(
                 order_id=str(order_data.get('order_id', '')),
-                staging_id=order_data.get('staging_id')
+                staging_id=order_data.get('staging_id'),
+                # INIT-4: campos opcionales por pedido. Coercion defensiva:
+                # valores malformados -> None (sin crash, cae al default historico).
+                priority=_coerce_int(order_data.get('priority')),
+                due_time=_coerce_float(order_data.get('due_time')),
+                wave=_coerce_int(order_data.get('wave')),
             )
-            
+
             items = order_data.get('items', [])
             for item_data in items:
                 item = OrderItem(
@@ -325,7 +356,11 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
                     staging_id = row.get('staging_id')
                     orders_dict[order_id] = ParsedOrder(
                         order_id=order_id,
-                        staging_id=int(staging_id) if staging_id and staging_id.strip() else None
+                        staging_id=int(staging_id) if staging_id and staging_id.strip() else None,
+                        # INIT-4: campos opcionales tomados de la primera fila del pedido.
+                        priority=_coerce_int(row.get('priority')),
+                        due_time=_coerce_float(row.get('due_time')),
+                        wave=_coerce_int(row.get('wave')),
                     )
                 
                 # Add item to order
@@ -504,8 +539,13 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
                             pick_sequence=pick_sequence,
                             staging_id=staging_id,
                             qty_requested=requested_qty,   # Original request for tracking
-                            location_id=location_id        # REAL inventory location
+                            location_id=location_id,       # REAL inventory location
+                            # INIT-4: prioridad/SLA/ola del pedido (None -> default historico)
+                            priority=order.priority,
+                            due_time=order.due_time,
                         )
+                        # INIT-4 (C3): propagar la ola del pedido a la WO (elegibilidad).
+                        work_order.wave_id = order.wave
                         all_work_orders.append(work_order)
 
                 self.validation_result.total_items_output += 1

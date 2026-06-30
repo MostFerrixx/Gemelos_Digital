@@ -28,7 +28,8 @@ class WorkOrder:
     def __init__(self, work_order_id: str, order_id: str, tour_id: str,
                  sku: SKU, cantidad: int, ubicacion: tuple,
                  work_area: str, pick_sequence: int, staging_id: int = 1,
-                 qty_requested: int = None, location_id: str = None):
+                 qty_requested: int = None, location_id: str = None,
+                 priority: int = 99, due_time: float = None):
         self.id = work_order_id
         self.order_id = order_id
         self.tour_id = tour_id
@@ -54,6 +55,18 @@ class WorkOrder:
         # ALLOCATION LAYER (V12.1 - Init #1): real picking location for this WO
         # (location_id from inventory; lets us trace/verify real-location picking)
         self.location_id = location_id
+
+        # INIT-4 (C2): prioridad de pedido y SLA (due_time).
+        # priority: int, MENOR = mas urgente. Default 99 == el fallback historico
+        # de getattr(wo,'priority',99) en los eventos -> sin prioridad explicita,
+        # los eventos y el .jsonl quedan IDENTICOS (no-regresion). due_time: segundos
+        # de sim como plazo objetivo (None = sin SLA). NO se agregan a to_dict() para
+        # preservar byte-identico de initial_work_orders.
+        self.priority = priority if priority is not None else 99
+        self.due_time = due_time
+        # INIT-4 (C3): ola/wave de la WO (None = elegible desde t=0). El generador
+        # determinista la setea desde el pedido; las WO estocasticas quedan en None.
+        self.wave_id = None
 
     @property
     def sku_id(self) -> str:

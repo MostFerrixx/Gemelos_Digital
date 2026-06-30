@@ -107,6 +107,28 @@ class DispatcherV11:
         # Metrica de expansiones (diagnostico H-6)
         self.total_expansiones_radio = 0  # veces que un operario tuvo que expandir su radio
 
+        # INIT-4 (C2): despacho por prioridad de pedido (opt-in). Default False ->
+        # comportamiento historico (orden por costo/pick_sequence) -> no-regresion.
+        # Cuando True, DENTRO de la zona del operario los pedidos mas urgentes
+        # (menor priority) se sirven primero, sin cruzar de area (decision D2-A).
+        self.priority_dispatch_enabled = bool(configuracion.get('priority_dispatch_enabled', False))
+        # INIT-4 (C3): olas. release_times mapea wave_id (str/int) -> segundos de sim
+        # a partir de los cuales sus WOs son elegibles. waves_enabled False -> todas
+        # elegibles desde t=0 (historico).
+        _waves = configuracion.get('waves', {}) if isinstance(configuracion.get('waves', {}), dict) else {}
+        self.waves_enabled = bool(_waves.get('enabled', False))
+        _rt = _waves.get('release_times', {}) if isinstance(_waves.get('release_times', {}), dict) else {}
+        # Normalizar claves a str para lookup robusto (JSON puede traer int o str).
+        self.wave_release_times = {}
+        for k, v in _rt.items():
+            fv = None
+            try:
+                fv = float(v)
+            except (TypeError, ValueError):
+                fv = None
+            if fv is not None:
+                self.wave_release_times[str(k)] = fv
+
         logger.info(f"[DISPATCHER] Inicializado con estrategia: '{self.estrategia}'")
         logger.info(f"[DISPATCHER] Max WOs por tour: {self.max_wos_por_tour}, "
               f"Radio cercania: {self.radio_cercania} "
@@ -308,6 +330,9 @@ class DispatcherV11:
         candidatos = [wo for wo in self.work_orders_pendientes
                      if operator.can_handle_work_area(wo.work_area)]
 
+        # INIT-4 (C2): priorizar pedidos urgentes (opt-in; no-op si flag off)
+        candidatos = self._aplicar_prioridad_pedido(candidatos)
+
         # Take up to max_wos_por_tour or until capacity filled
         selected = []
         volume_acumulado = 0
@@ -429,13 +454,36 @@ class DispatcherV11:
         best_priority = min(area_priorities.values())
         
         # Filtrar WOs del área con mejor prioridad
-        best_area_wos = [wo for wo in candidatos 
+        best_area_wos = [wo for wo in candidatos
                         if area_priorities[wo.work_area] == best_priority]
-        
+
+        # INIT-4 (C2): dentro de la zona, priorizar pedidos urgentes (opt-in).
+        best_area_wos = self._aplicar_prioridad_pedido(best_area_wos)
+
         logger.debug(f"[DISPATCHER] Area con mejor prioridad: {best_priority}, "
               f"WOs encontradas: {len(best_area_wos)}")
-        
+
         return best_area_wos
+
+    def _aplicar_prioridad_pedido(self, candidatos: List[Any]) -> List[Any]:
+        """
+        INIT-4 (C2): restringe los candidatos a los de mayor urgencia de PEDIDO.
+
+        Decision D2-A: opera DENTRO de la zona ya filtrada (no cruza de area).
+        Opt-in: con priority_dispatch_enabled=False devuelve la lista INTACTA
+        (garantiza el gate byte-identico). Con True, conserva solo las WOs con la
+        mejor (menor) priority; a igual priority, ordena por due_time ascendente
+        (SLA mas apremiante primero), dejando el desempate fino de costo/seq a la
+        estrategia. El orden es estable y determinista.
+        """
+        if not self.priority_dispatch_enabled or not candidatos:
+            return candidatos
+        best = min(getattr(wo, 'priority', 99) for wo in candidatos)
+        urgentes = [wo for wo in candidatos if getattr(wo, 'priority', 99) == best]
+        # Desempate por SLA: due_time menor primero (None -> al final).
+        urgentes.sort(key=lambda wo: (getattr(wo, 'due_time', None) is None,
+                                      getattr(wo, 'due_time', None) or 0.0))
+        return urgentes
 
     def _filtrar_por_staging_unico(self, operator: Any, work_orders: List[Any]) -> List[Any]:
         """
@@ -812,6 +860,9 @@ class DispatcherV11:
                     op_id = getattr(operator, 'operator_id', str(operator))
                     logger.info(f"[DISPATCHER] Radio expandido al MAXIMO para {op_id} "
                           f"-- usando {len(candidatos)} WOs compatibles del almacen")
+
+        # INIT-4 (C2): priorizar pedidos urgentes (opt-in; no-op si flag off)
+        candidatos = self._aplicar_prioridad_pedido(candidatos)
 
         # Limit to max_wos_por_tour
         return candidatos[:self.max_wos_por_tour * 2]
