@@ -110,7 +110,46 @@ class BaseOperator:
         self.picking_time = float(_pick) if _pick is not None else None
         self.lift_time = float(_tiempos.get("tiempo_horquilla", 2.0))
 
+        # INIT-4 (C1): modelo de tiempo de pick que escala con cantidad/volumen.
+        # Bloque OPCIONAL config["tiempos"]["pick_time_model"]. Defaults NEUTROS:
+        # con base=None y por_unidad=0 y por_volumen=0, _compute_pick_time()
+        # devuelve EXACTAMENTE el valor historico (picking_time o discharge_time),
+        # garantizando byte-identico con configs que NO traen el bloque.
+        _ptm = _tiempos.get("pick_time_model", {})
+        if not isinstance(_ptm, dict):
+            _ptm = {}
+        _ptm_base = _ptm.get("base", None)
+        self.pick_time_base = float(_ptm_base) if _ptm_base is not None else None
+        self.pick_time_por_unidad = float(_ptm.get("por_unidad", 0.0) or 0.0)
+        self.pick_time_por_volumen = float(_ptm.get("por_volumen", 0.0) or 0.0)
+        self.pick_time_minimo = float(_ptm.get("minimo", 0.0) or 0.0)
+
         logger.info(f"[AGENT] {self.id} ({self.type}) inicializado - Capacidad: {self.capacity}")
+
+    def _compute_pick_time(self, wo) -> float:
+        """
+        INIT-4 (C1): tiempo de pick, opcionalmente escalado por cantidad/volumen.
+
+        Rama de COMPATIBILIDAD (neutra): si no hay 'base' y los factores son 0,
+        devuelve EXACTAMENTE el valor historico (picking_time o discharge_time).
+        Esto garantiza el gate byte-identico con configs sin pick_time_model.
+
+        Rama ESCALADA: base + por_unidad*cantidad + por_volumen*volumen, acotado
+        por 'minimo'. 'base' en None reutiliza el tiempo historico como base.
+        El volumen se calcula sobre cantidad_inicial (estable, independiente del
+        estado de picking).
+        """
+        historico = self.picking_time if self.picking_time is not None else self.discharge_time
+        # Compat exacta: sin parametros activos -> comportamiento de hoy.
+        if (self.pick_time_base is None
+                and self.pick_time_por_unidad == 0.0
+                and self.pick_time_por_volumen == 0.0):
+            return historico
+        base = self.pick_time_base if self.pick_time_base is not None else historico
+        cantidad = wo.cantidad_inicial if wo else 0
+        volumen = (wo.cantidad_inicial * wo.sku.volumen) if (wo and wo.sku) else 0
+        t = base + self.pick_time_por_unidad * cantidad + self.pick_time_por_volumen * volumen
+        return max(t, self.pick_time_minimo)
 
     def get_priority_for_work_area(self, work_area: str) -> int:
         """
@@ -1138,8 +1177,9 @@ class GroundOperator(BaseOperator):
             'cargo_volume': self.cargo_volume
         })
 
-        # C1: picking_time leido de config; None => usa discharge_time (compat)
-        picking_duration = self.picking_time if self.picking_time is not None else self.discharge_time
+        # INIT-4 C1: tiempo de pick (escala con cantidad/volumen si esta activo;
+        # neutro -> picking_time o discharge_time, igual que antes).
+        picking_duration = self._compute_pick_time(wo)
         yield self.env.timeout(picking_duration)
 
         self.almacen.registrar_evento('operation_completed', {
@@ -1269,8 +1309,9 @@ class Forklift(BaseOperator):
             'cargo_volume': self.cargo_volume
         })
 
-        # C1: picking_time leido de config; None => usa discharge_time (compat)
-        picking_duration = self.picking_time if self.picking_time is not None else self.discharge_time
+        # INIT-4 C1: tiempo de pick (escala con cantidad/volumen si esta activo;
+        # neutro -> picking_time o discharge_time, igual que antes).
+        picking_duration = self._compute_pick_time(wo)
         yield self.env.timeout(picking_duration)
 
         logger.debug(f"[{self.id}] t={self.env.now:.1f} Bajando horquilla")

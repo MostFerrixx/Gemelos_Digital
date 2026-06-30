@@ -336,15 +336,18 @@ if priority_dispatch_enabled:
 > Se actualiza a medida que se avanza. Cada hito: commit + push + sync main + actualizar
 > este checklist, BACKLOG.md, HANDOFF.md y (si cambia el estado) CLAUDE.md.
 
-### C1 — Tiempos de pick
-- [ ] `pick_time_model` en config.json + `_get_default_config()`
-- [ ] Lectura en `BaseOperator.__init__`
-- [ ] `_compute_pick_time(wo)` con rama de compat exacta
-- [ ] Cableado en ambos `_do_picking_at`
-- [ ] Validacion en config_manager.py
-- [ ] REG-1 (gate byte-identico) PASA
-- [ ] PICK-1..6 PASAN
-- [ ] Commit + push + sync main
+### C1 — Tiempos de pick — COMPLETADO 2026-06-29
+- [N/A] `pick_time_model` en config.json canonico -> DECISION: NO se toca el config
+      canonico (el .jsonl serializa el config en SIMULATION_START; anadir el bloque
+      cambiaria el SHA solo por metadata). El bloque es OPCIONAL; el motor lo lee con
+      defaults neutros. Se prueba con config separado.
+- [x] Lectura en `BaseOperator.__init__` (operators.py:112-126)
+- [x] `_compute_pick_time(wo)` con rama de compat exacta (operators.py:129-153)
+- [x] Cableado en ambos `_do_picking_at` (Ground + Forklift)
+- [x] Validacion en config_manager.py (bloque pick_time_model opcional)
+- [x] REG-1 (gate byte-identico) PASA -> SHA a4ae8d4e..., 5.379.372 bytes
+- [x] PICK-1..6 PASAN (test unitario del metodo real, scratchpad/test_pick_time.py)
+- [ ] E2E con config activo (en curso) + Commit + push + sync main
 
 ### C2 — Prioridad / SLA
 - [ ] Dataclasses + parser (priority/due_time)

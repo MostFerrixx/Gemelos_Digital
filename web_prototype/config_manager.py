@@ -364,6 +364,29 @@ class WebConfigurationManager:
                         except (TypeError, ValueError):
                             errors.append("tiempos.tiempo_picking_por_linea must be a number or null")
 
+                    # INIT-4 C1: bloque OPCIONAL pick_time_model (escala de tiempo de pick).
+                    # Defaults neutros en el motor; aqui solo validamos si la UI lo envia.
+                    ptm = t.get('pick_time_model')
+                    if ptm is not None:
+                        if not isinstance(ptm, dict):
+                            errors.append("tiempos.pick_time_model must be an object or null")
+                        else:
+                            base = ptm.get('base')
+                            if base is not None:
+                                try:
+                                    if float(base) < 0:
+                                        errors.append("tiempos.pick_time_model.base must be >= 0 or null")
+                                except (TypeError, ValueError):
+                                    errors.append("tiempos.pick_time_model.base must be a number or null")
+                            for key in ('por_unidad', 'por_volumen', 'minimo'):
+                                val = ptm.get(key)
+                                if val is not None:
+                                    try:
+                                        if float(val) < 0:
+                                            errors.append(f"tiempos.pick_time_model.{key} must be >= 0")
+                                    except (TypeError, ValueError):
+                                        errors.append(f"tiempos.pick_time_model.{key} must be a number")
+
             is_valid = len(errors) == 0
 
             if is_valid:
