@@ -387,6 +387,36 @@ class WebConfigurationManager:
                                     except (TypeError, ValueError):
                                         errors.append(f"tiempos.pick_time_model.{key} must be a number")
 
+            # INIT-4 (C2): flag de despacho por prioridad de pedido (bool opcional)
+            if 'priority_dispatch_enabled' in config:
+                if not isinstance(config['priority_dispatch_enabled'], bool):
+                    errors.append("priority_dispatch_enabled must be a boolean")
+
+            # INIT-4 (C3): bloque de olas (waves) opcional
+            if 'waves' in config:
+                w = config['waves']
+                if not isinstance(w, dict):
+                    errors.append("waves must be an object")
+                else:
+                    if 'enabled' in w and not isinstance(w['enabled'], bool):
+                        errors.append("waves.enabled must be a boolean")
+                    rt = w.get('release_times')
+                    if rt is not None:
+                        if not isinstance(rt, dict):
+                            errors.append("waves.release_times must be an object (wave_id -> seconds)")
+                        else:
+                            # Acotar releases a un horizonte razonable para evitar hangs.
+                            MAX_RELEASE = 1_000_000.0
+                            for wid, sec in rt.items():
+                                try:
+                                    fv = float(sec)
+                                    if fv < 0:
+                                        errors.append(f"waves.release_times['{wid}'] must be >= 0")
+                                    elif fv > MAX_RELEASE:
+                                        errors.append(f"waves.release_times['{wid}'] exceeds max horizon ({MAX_RELEASE})")
+                                except (TypeError, ValueError):
+                                    errors.append(f"waves.release_times['{wid}'] must be a number")
+
             is_valid = len(errors) == 0
 
             if is_valid:

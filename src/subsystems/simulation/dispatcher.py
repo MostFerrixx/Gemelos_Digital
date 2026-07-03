@@ -326,9 +326,10 @@ class DispatcherV11:
         Returns:
             List[WorkOrder] - First N WOs that fit capacity
         """
-        # Filter by work area compatibility
+        # Filter by work area compatibility + INIT-4 (C3) elegibilidad por ola
         candidatos = [wo for wo in self.work_orders_pendientes
-                     if operator.can_handle_work_area(wo.work_area)]
+                     if operator.can_handle_work_area(wo.work_area)
+                     and self._wo_elegible_por_ola(wo)]
 
         # INIT-4 (C2): priorizar pedidos urgentes (opt-in; no-op si flag off)
         candidatos = self._aplicar_prioridad_pedido(candidatos)
@@ -354,10 +355,11 @@ class DispatcherV11:
         2. Usar AssignmentCostCalculator solo para la PRIMERA WO (minimizar desplazamiento desde posicion actual)
         3. Para el resto del tour, seguir pick_sequence del Excel (solo del mismo área que la primera WO)
         """
-        # Paso 1: Filtrar por compatibilidad de área de trabajo
+        # Paso 1: Filtrar por compatibilidad de área + INIT-4 (C3) elegibilidad por ola
         candidatos_compatibles = [wo for wo in self.work_orders_pendientes
-                                 if operator.can_handle_work_area(wo.work_area)]
-        
+                                 if operator.can_handle_work_area(wo.work_area)
+                                 and self._wo_elegible_por_ola(wo)]
+
         if not candidatos_compatibles:
             # Debug log to understand why no WOs are compatible
             if self.env.now % 60 == 0:  # Only log periodically
@@ -400,10 +402,11 @@ class DispatcherV11:
         - Selecciona la WO con el pick_sequence más pequeño del área con mayor prioridad
         - El resto del tour se construye igual que Optimización Global (doble barrido con todas las áreas)
         """
-        # Paso 1: Filtrar por compatibilidad de área de trabajo
+        # Paso 1: Filtrar por compatibilidad de área + INIT-4 (C3) elegibilidad por ola
         candidatos_compatibles = [wo for wo in self.work_orders_pendientes
-                                 if operator.can_handle_work_area(wo.work_area)]
-        
+                                 if operator.can_handle_work_area(wo.work_area)
+                                 and self._wo_elegible_por_ola(wo)]
+
         if not candidatos_compatibles:
             return []
         
@@ -509,6 +512,25 @@ class DispatcherV11:
         if p_ancla >= 99:
             return candidatos
         return [wo for wo in candidatos if getattr(wo, 'priority', 99) == p_ancla]
+
+    def _wo_elegible_por_ola(self, wo) -> bool:
+        """
+        INIT-4 (C3): elegibilidad por ola (release diferido).
+
+        Una WO cuya ola aun no se libero (release_time > env.now) NO es elegible:
+        el dispatcher la ignora hasta que el reloj alcanza su release. Con
+        waves_enabled=False, sin wave_id, o sin release definido para esa ola,
+        siempre elegible (no-regresion y defensivo).
+        """
+        if not self.waves_enabled:
+            return True
+        wid = getattr(wo, 'wave_id', None)
+        if wid is None:
+            return True
+        release = self.wave_release_times.get(str(wid))
+        if release is None:
+            return True
+        return self.env.now >= release
 
     def _filtrar_por_staging_unico(self, operator: Any, work_orders: List[Any]) -> List[Any]:
         """
@@ -885,6 +907,9 @@ class DispatcherV11:
                     op_id = getattr(operator, 'operator_id', str(operator))
                     logger.info(f"[DISPATCHER] Radio expandido al MAXIMO para {op_id} "
                           f"-- usando {len(candidatos)} WOs compatibles del almacen")
+
+        # INIT-4 (C3): descartar WOs cuya ola aun no se libero (no-op si waves off)
+        candidatos = [wo for wo in candidatos if self._wo_elegible_por_ola(wo)]
 
         # INIT-4 (C2): priorizar pedidos urgentes (opt-in; no-op si flag off)
         candidatos = self._aplicar_prioridad_pedido(candidatos)

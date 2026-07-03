@@ -373,15 +373,22 @@ if priority_dispatch_enabled:
 - [ ] (Diferido) KPI de incumplimiento SLA en reporte
 - [x] C2 COMPLETO (Opcion C) -> commit + push + sync
 
-### C3 — Olas
-- [ ] Bloque `waves` en config + validacion
-- [ ] `wave` en parser + `WorkOrder.wave_id`
-- [ ] Filtro de elegibilidad en dispatcher
-- [ ] Ajuste de `simulacion_ha_terminado()`
-- [ ] REG-1 con waves OFF PASA
-- [ ] WAVE-1..5 + WAVE-TERM PASAN
-- [ ] INT-1..5 PASAN
-- [ ] Commit + push + sync main
+### C3 — Olas — EN VALIDACION 2026-06-29
+- [x] Bloque `waves` (enabled + release_times) leido en dispatcher.__init__ +
+      validacion en config_manager (acota releases a <= 1.000.000 para evitar hangs)
+- [x] `wave` en parser (JSON+CSV, coercion defensiva) + `WorkOrder.wave_id`
+- [x] Filtro de elegibilidad `_wo_elegible_por_ola` en las 4 estrategias
+- [x] `simulacion_ha_terminado()` -- SIN CAMBIO: las WOs de olas futuras ya estan
+      en lista_maestra -> `completados >= total` es False hasta liberarlas y
+      completarlas. No hay terminacion prematura. Menos codigo, menos riesgo.
+- [x] REG-1 con waves OFF PASA -> SHA a4ae8d4e... byte-identico
+- [x] WAVE unitarios (elegibilidad: off, release futuro/pasado, sin wave_id, sin
+      release, lookup int/str) PASAN
+- [x] WAVE-1 E2E: ola2 (release 100) primer pick a t=106.6; 0 picks antes;
+      ola1 precede (t=7.8); 15/15 ola2 completados; sim termina.
+- [x] WAVE-TERM E2E (release 400 > fin natural): ola2 primer pick t=406.6; 0 antes;
+      15/15 completados; SIMULATION_END presente; sim termina t=520.6. NO cuelga.
+- [x] Commit + push + sync main
 
 ### Cierre
 - [ ] BACKLOG.md: INIT-4 marcado HECHO
