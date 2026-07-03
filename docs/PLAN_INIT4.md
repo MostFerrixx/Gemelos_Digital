@@ -390,10 +390,17 @@ if priority_dispatch_enabled:
       15/15 completados; SIMULATION_END presente; sim termina t=520.6. NO cuelga.
 - [x] Commit + push + sync main
 
-### Cierre
-- [ ] BACKLOG.md: INIT-4 marcado HECHO
-- [ ] HANDOFF.md + CLAUDE.md actualizados
-- [ ] docs/PRUEBAS_E2E_SISTEMA.md: anexar suites PRIO/WAVE/CAL-PICK si procede
+### Cierre — INIT-4 COMPLETO 2026-06-29
+- [x] INT-1 (composicion olas + prioridad): la ola manda sobre la prioridad
+      (un urgente de ola no liberada no se cuela; al liberarse, participa). PASA.
+- [x] BACKLOG.md: INIT-4 marcado HECHO
+- [x] HANDOFF.md + CLAUDE.md actualizados
+- [~] docs/PRUEBAS_E2E_SISTEMA.md: las suites PRIO/WAVE/CAL-PICK viven en este
+      plan (seccion 6); anexarlas al catalogo formal E2E queda como tarea menor.
+
+**Resumen de gate de no-regresion:** REG-1 byte-identico (SHA a4ae8d4e...,
+5.379.372 bytes) verificado al cierre de C1, C2 (base y Opcion C) y C3. Cada
+feature es opt-in; apagados, el motor reproduce el baseline exacto.
 
 ---
 

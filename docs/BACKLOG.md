@@ -479,31 +479,33 @@ Bajo-Medio (1 sesion para alineacion basica; otra para ampliar espacio).
 
 ## INIT-4 — Prioridad de ordenes / SLA / olas + fidelidad de tiempos de pick
 
-**Estado:** PENDIENTE — sin sprint asignado
+**Estado:** HECHO — 2026-06-29 (commits 91dd6c0, c27dacb, fd0a41d)
 **Prioridad:** Media
 **Origen:** docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md, item #4
+**Plan y pruebas:** docs/PLAN_INIT4.md (Fase A/B + checklist completo)
 
-### El problema
-- `WorkOrder.priority` siempre es 99 (placeholder via `getattr(wo,'priority',99)`).
-  Urgencias, SLAs y olas de picking no estan modelados.
-- Tiempo de picking = `discharge_time` FIJO, independiente de cantidad o volumen.
-  Una WO de 1 unidad tarda lo mismo que una de 200 → baja fidelidad.
+Implementado en 3 fases, cada una opt-in con defaults neutros y gate de
+no-regresion byte-identico (REG-1, WAREHOUSE_SEED=42 -> SHA a4ae8d4e...).
 
-### Que hay que hacer
-1. Agregar `priority` y opcionalmente `due_time`/`wave` a `WorkOrder`.
-2. Parsear prioridad desde el archivo de ordenes (JSON).
-3. Que el dispatcher respete la prioridad al seleccionar candidatos.
-4. Escalar el tiempo de picking/descarga por `cantidad * factor` en vez de valor fijo.
+- **C1 — Tiempos de pick realistas** (`91dd6c0`): `BaseOperator._compute_pick_time`
+  escala el tiempo por cantidad/volumen (`base + por_unidad*cant + por_volumen*vol`,
+  cota `minimo`). Bloque OPCIONAL `config["tiempos"]["pick_time_model"]`. Neutro ->
+  comportamiento historico. E2E: tiempo_picking varia 8..24 segun cantidad.
+- **C2 — Prioridad de pedido / SLA** (`c27dacb`, Opcion C del Director): `WorkOrder`
+  gana priority/due_time; parser JSON/CSV los lee (coercion defensiva). Flag
+  `priority_dispatch_enabled`. Prioridad fuerte "limpia": mientras haya urgentes,
+  el tour se arma solo con urgentes (no se diluyen). E2E: urgentes t_fin 18.8 vs
+  71.2 (~4x); ranking medio 5.6 vs 20.8. Costo: llenado -33%, throughput intacto.
+- **C3 — Olas (waves)** (`fd0a41d`): release diferido por ola. `WorkOrder.wave_id`;
+  bloque `config["waves"]` (enabled + release_times). `_wo_elegible_por_ola` en las
+  4 estrategias. Terminacion sin cambio (las WOs de olas futuras ya cuentan en
+  total). E2E: ola2 respeta release; WAVE-TERM (release>fin natural) no cuelga.
 
-### Archivos a tocar
-- `warehouse.py` (WorkOrder.priority/due_time)
-- `order_strategies.py` (parsear prioridad del JSON de ordenes)
-- `dispatcher.py` (ordenar candidatos por prioridad)
-- `operators.py` (tiempo de picking escalado)
-- `config.json` (factor de tiempo por unidad, opcional)
+Pruebas: REG-1 byte-identico en cada fase; PICK-1..6, PRIO-1..7, WAVE (unit+E2E),
+INT-1 (olas manda sobre prioridad) -- todas PASAN.
 
-### Estimacion de esfuerzo
-Medio (1-2 sesiones). No requiere cambios en el replay ni en la UI basica.
+**Diferido (no bloqueante):** KPI de incumplimiento de SLA (due_time vencido) en
+el reporte Excel/visor. La info existe en la WO; falta cablearla al reporte.
 
 ---
 

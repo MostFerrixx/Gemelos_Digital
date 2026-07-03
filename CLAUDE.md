@@ -129,6 +129,10 @@ estado operativo detallado.
   Gate byte-identico post-refactor confirmado.
 - **E6/E7 eliminados** (`f3a3ec5`): botones stub "Generar Plantilla TMX" /
   "Poblar SKUs Aleatorios" quitados del HTML y JS (BK-05 cerrado).
+- **INIT-4** (`91dd6c0`, `c27dacb`, `fd0a41d`): prioridad/SLA/olas + tiempos de
+  pick escalables. C1 tiempo por cantidad/volumen; C2 prioridad de pedido fuerte
+  "limpia" (opt-in); C3 olas por release diferido. Todo opt-in con gate
+  byte-identico. Ver docs/PLAN_INIT4.md.
 - **Limpieza** (`8fd8a3c`): 40+ archivos basura en basura/, .gitignore ampliado.
 
 ### Pendientes (ver docs/BACKLOG.md para detalle)
@@ -137,7 +141,6 @@ estado operativo detallado.
 - **INIT-1** — Inventario y picking por ubicacion real + reservas en BD
   (correctitud fundacional; hoy la WO va a ubicacion aleatoria del area).
 - **INIT-3** — Reparar optimizador Optuna (estrategias y parametros alineados).
-- **INIT-4** — Prioridad de ordenes / SLA / olas + tiempo de pick por volumen.
 - **WOs sobredimensionadas** — `_validar_y_ajustar_cantidad` en `warehouse.py`:
   si `sku.volumen > max_capacity` → WO se marca 'staged' con qty=0 (falsifica
   KPIs). Pendiente fix defensivo.

@@ -1,11 +1,12 @@
 # HANDOFF — Gemelo Digital de Almacen
 # Estado operativo para nueva sesion de Cerebellum
 
-**Generado:** 2026-06-18  ·  **Actualizado:** 2026-06-27
+**Generado:** 2026-06-18  ·  **Actualizado:** 2026-06-29
 **Por:** Cerebellum (sesion de traspaso)
-**Rama activa:** `feature/allocation-layer-v12.1`  ·  **HEAD:** `f3a3ec5`
+**Rama activa:** `feature/allocation-layer-v12.1`  ·  **HEAD:** `fd0a41d`
 **Estado:** Limpio — sincronizado con main. Sin commits pendientes.
-**Proxima accion sugerida:** Ver seccion 5 (pendientes de diseno/motor).
+**Ultimo hito:** INIT-4 COMPLETO (C1 tiempos de pick, C2 prioridad/SLA Opcion C,
+C3 olas). Ver docs/PLAN_INIT4.md. Proxima accion sugerida: seccion 5.
 
 ---
 
@@ -196,9 +197,10 @@ en warehouse.db ya tiene la informacion; falta usarla en `order_strategies.py`.
 Los nombres de estrategia y parametros del optimizador estan desalineados del motor
 real. Resultado: el optimizador puede estar probando configuraciones que el motor ignora.
 
-**INIT-4 — Prioridad de ordenes**
-`WorkOrder.priority` siempre es 99 (placeholder). Sin prioridad real, SLA ni olas.
-Tiempo de picking es `discharge_time` fijo, independiente del volumen.
+**INIT-4 — Prioridad / SLA / olas + tiempos de pick** — HECHO 2026-06-29
+Commits 91dd6c0 (C1 tiempos escalables), c27dacb (C2 prioridad Opcion C),
+fd0a41d (C3 olas). Todo opt-in con gate byte-identico. Ver docs/PLAN_INIT4.md.
+Diferido: KPI de SLA vencido en el reporte (no bloqueante).
 
 **WOs sobredimensionadas**
 En `warehouse.py::_validar_y_ajustar_cantidad`: si `sku.volumen > max_capacity`,
