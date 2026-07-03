@@ -382,7 +382,9 @@ class DispatcherV11:
         
         # Paso 4: Construir tour siguiendo pick_sequence desde la primera WO
         # Preferir misma área, pero permitir cambio de área si se agota la secuencia
-        tour_wos = self._construir_tour_por_secuencia(operator, best_first_wo, candidatos_compatibles)
+        # INIT-4 (C2 Opcion C): si hay urgentes, el barrido usa SOLO urgentes.
+        pool_barrido = self._pool_para_barrido(candidatos_compatibles, best_first_wo)
+        tour_wos = self._construir_tour_por_secuencia(operator, best_first_wo, pool_barrido)
         
         # Si es Tour Simple, filtrar por staging location
         if self.tour_type == "Tour Simple (Un Destino)":
@@ -420,7 +422,9 @@ class DispatcherV11:
         # Paso 4: Construir tour siguiendo pick_sequence desde la primera WO (igual que Optimización Global)
         # IMPORTANTE: Pasar candidatos_compatibles (todas las áreas) para que el doble barrido
         # pueda agregar WOs de otras áreas si es necesario
-        tour_wos = self._construir_tour_por_secuencia(operator, primera_wo, candidatos_compatibles)
+        # INIT-4 (C2 Opcion C): si hay urgentes, el barrido usa SOLO urgentes.
+        pool_barrido = self._pool_para_barrido(candidatos_compatibles, primera_wo)
+        tour_wos = self._construir_tour_por_secuencia(operator, primera_wo, pool_barrido)
         
         # Si es Tour Simple, filtrar por staging location
         if self.tour_type == "Tour Simple (Un Destino)":
@@ -484,6 +488,27 @@ class DispatcherV11:
         urgentes.sort(key=lambda wo: (getattr(wo, 'due_time', None) is None,
                                       getattr(wo, 'due_time', None) or 0.0))
         return urgentes
+
+    def _pool_para_barrido(self, candidatos: List[Any], ancla: Any) -> List[Any]:
+        """
+        INIT-4 (C2 Opcion C): pool de WOs que alimenta el doble barrido del tour.
+
+        Prioridad FUERTE "limpia": mientras haya urgentes, el tour se arma SOLO con
+        WOs tan urgentes como el ancla (misma priority que la primera WO), de modo
+        que los normales NO se cuelan por pick_sequence y la urgencia no se diluye.
+        Dentro de ese subconjunto se respeta el orden fisico (pick_sequence) del
+        barrido, sin cruzar de zona (mismo criterio que el resto de la seleccion).
+
+        Opt-in: con flag off devuelve TODOS los candidatos (barrido historico) ->
+        no-regresion. Si el ancla no es urgente (priority>=99), tampoco filtra:
+        cuando ya no quedan urgentes, los tours vuelven a llenarse normal.
+        """
+        if not self.priority_dispatch_enabled or not candidatos or ancla is None:
+            return candidatos
+        p_ancla = getattr(ancla, 'priority', 99)
+        if p_ancla >= 99:
+            return candidatos
+        return [wo for wo in candidatos if getattr(wo, 'priority', 99) == p_ancla]
 
     def _filtrar_por_staging_unico(self, operator: Any, work_orders: List[Any]) -> List[Any]:
         """

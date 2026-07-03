@@ -358,14 +358,20 @@ if priority_dispatch_enabled:
 - [x] `_aplicar_prioridad_pedido` opt-in en las 4 estrategias (D2-A: dentro de zona)
 - [x] REG-1 con flag OFF PASA -> SHA a4ae8d4e... byte-identico
 - [x] PRIO-1..7 PASAN (test unitario del metodo real + parser)
-- [x] E2E determinista realizado -- HALLAZGO: efecto MARGINAL (ON 70.2 vs OFF 71.2;
-      ranking urgentes casi igual). CAUSA (no es bug): la prioridad solo ANCLA la
-      primera WO; el doble barrido (`_construir_tour_por_secuencia`) llena el resto
-      con `candidatos_compatibles` (todos) por pick_sequence -> diluye la urgencia.
-      DECISION PENDIENTE DEL DIRECTOR: prioridad suave (actual) vs fuerte (priorizar
-      tambien el barrido dentro de zona, con costo de eficiencia de ruta). Ver reporte.
+- [x] E2E C2-base (suave) -> efecto MARGINAL (ON 70.2 vs OFF 71.2). Diagnostico:
+      la prioridad solo anclaba la primera WO; el barrido diluia con normales.
+- [x] DECISION DIRECTOR: Opcion C (prioridad fuerte "limpia").
+- [x] Opcion C implementada: `_pool_para_barrido(candidatos, ancla)` -> con flag on
+      y ancla urgente, el barrido usa SOLO WOs de la misma priority que el ancla
+      (no se cuelan normales); flag off -> todos (no-regresion). Aplicado en Opt
+      Global y Ejec Plan.
+- [x] REG-1 Opcion C (flag off) PASA -> SHA a4ae8d4e... byte-identico
+- [x] E2E Opcion C: EFECTO CLARO -- urgentes t_fin 18.8 vs 71.2 (~4x mas rapido);
+      ranking urgentes ON [1,3,5,8,11] vs OFF [10,18,23,24,29] (ranking medio 5.6 vs 20.8).
+      COSTO documentado: llenado medio 11.33 vs 17.00 (-33%, tours menos llenos),
+      +1 viaje al depot (3 vs 2), tiempo total sim SIN cambio (216.9 vs 216.6).
 - [ ] (Diferido) KPI de incumplimiento SLA en reporte
-- [x] Commit C2-base (mecanismo de anclaje, opt-in, no-regresion) -> push + sync
+- [x] C2 COMPLETO (Opcion C) -> commit + push + sync
 
 ### C3 — Olas
 - [ ] Bloque `waves` en config + validacion
