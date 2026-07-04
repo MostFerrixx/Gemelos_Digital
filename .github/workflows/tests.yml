@@ -37,4 +37,13 @@ jobs:
         run: python run_migration.py
 
       - name: Gate de regresion byte-identico
-        run: python scripts/regression_gate.py
+        run: |
+          set -o pipefail
+          python scripts/regression_gate.py | tee gate.log
+
+      # Diagnostico visible sin auth (anotacion publica) si el gate falla.
+      - name: Publicar detalle del fallo del gate
+        if: failure()
+        run: |
+          detalle=$(grep -E 'esperado|obtenido|WARN|FAIL' gate.log | tr '\n' ' | ' || true)
+          echo "::notice title=GATE DETAIL::${detalle}"
