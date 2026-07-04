@@ -31,12 +31,18 @@ ENTRY_POINT = os.path.join(PROJECT_ROOT, "entry_points", "run_generate_replay.py
 TIMEOUT_SECONDS = 600
 
 
-def sha256_of(path):
-    h = hashlib.sha256()
+def sha256_normalizado(path):
+    """SHA256 y tamano del contenido con fin de linea NORMALIZADO (CRLF -> LF).
+
+    El motor escribe el .jsonl en modo texto: Windows produce CRLF y Linux LF
+    con contenido logico identico (verificado 2026-07-04: delta de bytes ==
+    numero de lineas). Normalizar hace el gate valido en ambas plataformas
+    sin tocar el motor. El invariante es: byte-identico modulo EOL.
+    """
     with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
+        data = f.read()
+    data = data.replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest(), len(data)
 
 
 def run_simulation(seed):
@@ -114,9 +120,9 @@ def main():
         print("[FAIL] No se encontro replay_*.jsonl en %s" % sim_dir)
         return 1
 
-    sha = sha256_of(jsonl)
-    size = os.path.getsize(jsonl)
-    print("[GATE] Corrida: %.1f s | %s | %d bytes" % (elapsed, os.path.basename(jsonl), size))
+    sha, size = sha256_normalizado(jsonl)
+    print("[GATE] Corrida: %.1f s | %s | %d bytes (normalizado LF; en disco: %d)"
+          % (elapsed, os.path.basename(jsonl), size, os.path.getsize(jsonl)))
 
     if args.update_baseline:
         baseline.update({
