@@ -74,6 +74,15 @@ class ConfigurationManager:
                 # Sanitizar assignment_rules: convertir claves str a int
                 config = self._sanitize_assignment_rules(config)
 
+                # MEJ-3: chequeo contra el esquema unico (solo LOGUEA; no muta
+                # ni bloquea -> comportamiento del motor byte-identico).
+                # Detecta typos ('priority_dispatch_enable') y claves legacy.
+                try:
+                    from core.config_schema import log_schema_check
+                    log_schema_check(config, origin="CONFIG")
+                except ImportError:
+                    pass
+
                 print("[CONFIG] Configuracion cargada exitosamente desde archivo JSON")
                 return config
 

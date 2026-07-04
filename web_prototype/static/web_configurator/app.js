@@ -509,8 +509,8 @@ class WebConfigurator {
         document.getElementById('vol-pequeno').value = dist.pequeno?.volumen || 5;
         document.getElementById('vol-mediano').value = dist.mediano?.volumen || 25;
         document.getElementById('vol-grande').value = dist.grande?.volumen || 80;
-
-        document.getElementById('capacidad-carro').value = config.capacidad_carro || 150;
+        // MEJ-3: capacidad_carro eliminada (el motor nunca la leyo; la capacidad
+        // real es agent_types[].capacity, editable en Flota de Agentes).
 
         // Tab 2: Estrategias
         // Normalize strings to match HTML options (remove accents if present in JSON)
@@ -545,7 +545,7 @@ class WebConfigurator {
         // Tab 4: Layout y Datos
         document.getElementById('layout-file').value = config.layout_file || 'layouts/WH1.tmx';
         document.getElementById('sequence-file').value = config.sequence_file || 'layouts/Warehouse_Logic.xlsx';
-        document.getElementById('map-scale').value = config.map_scale || 1.3;
+        // MEJ-3: map_scale eliminada (sin lector desde que se archivo el viewer Pygame).
 
         // Tab 5: Outbound Staging
         const stagingDist = config.outbound_staging_distribution || {};
@@ -599,12 +599,11 @@ class WebConfigurator {
     // Se usan solo si el config en memoria no trae los bloques (config viejo).
     getDefaultAdvancedBlocks() {
         return {
+            // MEJ-3: solo claves VIVAS (las F3 del enfoque de exclusion por celda
+            // fueron purgadas; el motor usa sus defaults si algun modo las necesita).
             congestion: {
-                enabled: true, mode: 'timewindow', wait_timeout: 0.5,
-                wait_hard_cap: 30.0, backoff_base: 0.1, backoff_jitter: 0.1,
-                max_repath: 3, repath_cost_factor: 2.0, spawn_offset: 0.3,
-                watchdog_window: 5.0, allow_swap: false, aging_rate: 1.0,
-                staggered_start: true,
+                enabled: true, mode: 'timewindow',
+                spawn_offset: 0.3, staggered_start: true,
                 timewindow: {
                     shadow: false, clearance: 0.0, dt_wait: 0.1,
                     max_expansions: 20000, plan_horizon: 0.0, allow_diagonal: false
@@ -654,8 +653,6 @@ class WebConfigurator {
                     volumen: parseInt(document.getElementById('vol-grande').value)
                 }
             },
-            capacidad_carro: parseInt(document.getElementById('capacidad-carro').value),
-
             // Tab 2: Estrategias
             dispatch_strategy: document.getElementById('dispatch-strategy').value,
             radio_cercania: parseInt(document.getElementById('radio-cercania')?.value) || 100,
@@ -671,24 +668,17 @@ class WebConfigurator {
             // Tab 4: Layout y Datos
             layout_file: document.getElementById('layout-file').value,
             sequence_file: document.getElementById('sequence-file').value,
-            map_scale: parseFloat(document.getElementById('map-scale').value),
 
             // Tab 5: Outbound Staging
             outbound_staging_distribution: {},
 
-            // Legacy/compatibility fields
+            // Contadores de flota (fallback del motor cuando agent_types = [];
+            // num_operarios_total es legacy-informativo pero REQUIRED_KEYS lo exige).
+            // MEJ-3: purgadas las claves muertas (capacidad_carro/montacargas,
+            // tiempo_descarga_por_tarea, assignment_rules, tareas_zona_*, num_operarios).
             num_operarios_terrestres: 0,
             num_montacargas: 0,
-            num_operarios_total: 0,
-            capacidad_montacargas: 1000,
-            tiempo_descarga_por_tarea: 5,
-            assignment_rules: {
-                GroundOperator: {},
-                Forklift: {}
-            },
-            tareas_zona_a: 0,
-            tareas_zona_b: 0,
-            num_operarios: 0
+            num_operarios_total: 0
         };
 
         // Populate staging distribution
@@ -711,7 +701,6 @@ class WebConfigurator {
         config.num_operarios_terrestres = groundOperatorCount;
         config.num_montacargas = forkliftCount;
         config.num_operarios_total = groundOperatorCount + forkliftCount;
-        config.num_operarios = groundOperatorCount + forkliftCount;
 
         // Motor Avanzado (paso 2). REGLA CRITICA (merge superficial en backend):
         // siempre enviar el bloque COMPLETO. Base = bloque del config en memoria

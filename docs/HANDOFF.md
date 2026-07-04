@@ -152,6 +152,26 @@ HEADs corregidos) + 3 mejoras aprobadas por el Director (MEJ-1/2/3, ver BACKLOG)
 - Verificacion previa del baseline: corrida real reproduce el SHA historico en
   ~15-27 s (2 corridas del gate + 1 manual, 3/3 PASS).
 
+### Sesion 2026-07-04 (cont.) — MEJ-3: esquema unico de config (rama feature/mej-3-config-schema)
+
+- **`src/core/config_schema.py`** (pydantic): fuente de verdad de TODAS las
+  claves de config.json, cada una anotada con su lector real. Validacion-only
+  (no muta): typos -> WARNING con nombre, tipos invalidos -> ERROR.
+- **Integracion**: motor (`core/config_manager`) loguea `[CONFIG][SCHEMA][...]`
+  al cargar (no bloquea, byte-identico); web (`validate_config`) BLOQUEA el
+  guardado ante tipos invalidos y avisa claves desconocidas/legacy en el log.
+- **Purga** (config.json + defaults core/web + app.js serialize + index.html):
+  10 claves top-level muertas + 9 subclaves F3 de congestion. Se eliminaron DOS
+  CONTROLES DE UI SIN EFECTO: "Capacidad del Carro" y "Escala del Mapa" (el
+  motor nunca leyo `capacidad_carro` ni `map_scale`). Conservadas:
+  `num_operarios_terrestres`/`num_montacargas` (fallback vivo), `staggered_start`
+  + `spawn_offset` (spawn escalonado VIVO), `num_operarios_total` (REQUIRED_KEYS).
+- **El gate atrapo la purga** (FAIL esperado): el `.jsonl` incrusta el config en
+  la metadata SIMULATION_START. Evidencia de neutralidad: sha de los 11.879
+  eventos sin la linea 1 identico (`98cc021b…`) antes/despues. Baseline
+  regenerado: `662ed5e3…` (5.367.009 bytes).
+- Suite 67 passed (SC-01..09 nuevos) + gate PASS x2.
+
 ### Sesion 2026-06-29 — INIT-4 completo (commits 91dd6c0..edba925)
 
 Prioridad/SLA/olas + tiempos de pick realistas, en 3 fases, cada una opt-in con
@@ -256,8 +276,8 @@ colores de seccion, notificaciones. Cuarentena de 40+ archivos basura.
 | Item | Estado | Esfuerzo estimado |
 |------|--------|-------------------|
 | MEJ-1 — Red de seguridad (pytest + gate regresion) | HECHO 2026-07-04 (ver seccion 4) | — |
-| **MEJ-3** — Esquema unico de config (pydantic) + purga claves | APROBADA — SIGUIENTE | 1-2 sesiones |
-| **MEJ-4** — Completar anti-colisiones (dwell + fallback visible) | APROBADA (tras MEJ-3) — plan en docs/PLAN_MEJORA_4_ANTICOLISIONES.md | 1-2 sesiones |
+| MEJ-3 — Esquema unico de config (pydantic) + purga claves | HECHO 2026-07-04 (ver seccion 4) | — |
+| **MEJ-4** — Completar anti-colisiones (dwell + fallback visible) | APROBADA — SIGUIENTE — plan en docs/PLAN_MEJORA_4_ANTICOLISIONES.md | 1-2 sesiones |
 | **MEJ-2** — Experiment runner (replicas + A/B estadistico) | APROBADA (tras MEJ-4) | 2 sesiones |
 | **BK-02** — FIFO Estricto en UI | EN REPENSAR (diseno pendiente del Director) | ~15 min cuando se decida |
 | **`_legacy/web_dashboard/`** (puerto 8001) | PENDIENTE DECISION (Director quiere revisarla) | Depende de decision |

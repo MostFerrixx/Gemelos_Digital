@@ -230,9 +230,8 @@ class WebConfigurationManager:
             else:
                 errors.append("Missing distribucion_tipos")
             
-            # Validate capacidad_carro
-            if 'capacidad_carro' not in config or config['capacidad_carro'] <= 0:
-                errors.append("capacidad_carro must be greater than 0")
+            # MEJ-3: capacidad_carro ELIMINADA (el motor nunca la leyo; la
+            # capacidad real viene de agent_types[].capacity). Ya no se exige.
 
             # BK-01: Validate radio_cercania (optional, solo si viene en el config)
             if 'radio_cercania' in config:
@@ -416,6 +415,23 @@ class WebConfigurationManager:
                                         errors.append(f"waves.release_times['{wid}'] exceeds max horizon ({MAX_RELEASE})")
                                 except (TypeError, ValueError):
                                     errors.append(f"waves.release_times['{wid}'] must be a number")
+
+            # MEJ-3: chequeo contra el esquema unico (src/core/config_schema.py).
+            # Tipos invalidos en claves conocidas -> ERROR (bloquea el guardado,
+            # el motor fallaria o lo ignoraria en silencio). Claves desconocidas
+            # o legacy -> WARNING en el log del servidor (no bloquea).
+            try:
+                import sys as _sys
+                _src = os.path.join(self.project_root, "src")
+                if _src not in _sys.path:
+                    _sys.path.insert(0, _src)
+                from core.config_schema import validate_config_schema
+                schema_errors, schema_warnings = validate_config_schema(config)
+                for w in schema_warnings:
+                    print(f"[CONFIG_MANAGER][SCHEMA][WARN] {w}")
+                errors.extend(schema_errors)
+            except ImportError as _e:
+                print(f"[CONFIG_MANAGER][SCHEMA][WARN] esquema no disponible: {_e}")
 
             is_valid = len(errors) == 0
 
@@ -755,7 +771,6 @@ class WebConfigurationManager:
                 "mediano": {"porcentaje": 30, "volumen": 25},
                 "grande": {"porcentaje": 10, "volumen": 80}
             },
-            "capacidad_carro": 150,
             "dispatch_strategy": "Optimizacion Global",
             "radio_cercania": 100,
             "radio_expansion_paso": 50,
@@ -763,7 +778,6 @@ class WebConfigurationManager:
             "tour_type": "Tour Mixto (Multi-Destino)",
             "layout_file": "layouts/WH1.tmx",
             "sequence_file": "layouts/Warehouse_Logic.xlsx",
-            "map_scale": 1.3,
             "work_area_equipment": {
                 "Area_Ground": "GroundOperator",
                 "Area_High": "Forklift",
@@ -772,17 +786,8 @@ class WebConfigurationManager:
             "num_operarios_terrestres": 2,
             "num_montacargas": 1,
             "num_operarios_total": 3,
-            "capacidad_montacargas": 1000,
-            "tiempo_descarga_por_tarea": 5,
-            "assignment_rules": {
-                "GroundOperator": {},
-                "Forklift": {}
-            },
             "outbound_staging_distribution": {
                 "1": 100, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0
             },
-            "agent_types": [],
-            "tareas_zona_a": 0,
-            "tareas_zona_b": 0,
-            "num_operarios": 3
+            "agent_types": []
         }

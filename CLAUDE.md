@@ -191,11 +191,18 @@ desviación. Historia en `docs/antiguos/PLAN_INICIATIVA_2_OPCION_C.md`.
   (`python -m pytest -q`) + gate byte-identico (`python scripts/regression_gate.py`)
   + CI GitHub Actions EN VERDE. Usala en todo cambio de motor. El gate hashea el
   `.jsonl` con EOL normalizado (CRLF→LF): SHA `4a208831…` identico en Windows y
-  Linux; el historico `a4ae8d4e…` era el mismo archivo con CRLF. Quedan, en este
-  orden: **MEJ-3** (esquema unico de config con pydantic), **MEJ-4** (completar
-  anti-colisiones: cablear `reserve_dwell` — hoy hay 28 co-ocupaciones reales con
-  hotspot en staging, ver docs/PLAN_MEJORA_4_ANTICOLISIONES.md) y **MEJ-2**
-  (experiment runner con replicas/comparacion A/B). Detalle en BACKLOG.
+  Linux; el historico `a4ae8d4e…` era el mismo archivo con CRLF.
+- **MEJ-3 HECHA (2026-07-04)**: esquema unico de config en
+  `src/core/config_schema.py` (pydantic; cada clave anotada con su lector).
+  Motor y web detectan typos/claves legacy; la web bloquea tipos invalidos.
+  Purgadas 10 claves muertas + 9 subclaves F3 de congestion + 2 controles de UI
+  sin efecto (capacidad_carro, map_scale). Baseline actual: `662ed5e3…` (la
+  purga solo cambio la metadata del .jsonl; eventos identicos).
+  **Al anadir una clave nueva de config: registrala en config_schema.py.**
+  Quedan: **MEJ-4** (completar anti-colisiones: cablear `reserve_dwell` — hoy hay
+  28 co-ocupaciones reales con hotspot en staging, ver
+  docs/PLAN_MEJORA_4_ANTICOLISIONES.md) y **MEJ-2** (experiment runner con
+  replicas/comparacion A/B). Detalle en BACKLOG.
 - **BK-02** — FIFO Estricto en UI: EN REPENSAR (diseno pendiente del Director).
 - **`_legacy/web_dashboard/`** (puerto 8001): Director quiere revisarla antes de
   decidir (conservar / reparar / eliminar).

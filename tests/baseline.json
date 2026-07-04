@@ -1,8 +1,8 @@
 {
-    "description": "Baseline byte-identico (modulo EOL) de la simulacion canonica (config.json de la raiz, congestion timewindow ACTIVO), WAREHOUSE_SEED=42. El hash se computa con CRLF normalizado a LF: mismo SHA en Windows y Linux (verificado 2026-07-04: Windows local == CI ubuntu, Python 3.13.6 vs 3.13.14). Equivale al historico a4ae8d4e... (que era el archivo CRLF de Windows sin normalizar). Cambio de comportamiento INTENCIONAL: python scripts/regression_gate.py --update-baseline --yes",
+    "description": "Baseline byte-identico (modulo EOL) de la simulacion canonica (config.json de la raiz, congestion timewindow ACTIVO), WAREHOUSE_SEED=42, hash con CRLF normalizado a LF (mismo SHA en Windows y Linux). Actualizado en MEJ-3 (2026-07-04): la purga de claves muertas del config.json solo cambio la foto del config incrustada en la metadata SIMULATION_START; los 11.879 eventos son identicos al baseline anterior 4a208831... (verificado: sha sin linea 1 = 98cc021b... en ambos). Cambio de comportamiento INTENCIONAL: python scripts/regression_gate.py --update-baseline --yes",
     "seed": 42,
-    "sha256": "4a2088310d07c950a63cc1ec45d8c87e82506d6af74fc31880e64b6b9e70f8c4",
-    "size_bytes": 5367492,
+    "sha256": "662ed5e35dfeff48098114d11257e294710c82f4cec9a946b635f1a6c45f2071",
+    "size_bytes": 5367009,
     "python_version": "3.13.6",
     "updated": "2026-07-04"
 }

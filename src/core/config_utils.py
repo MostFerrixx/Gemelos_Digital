@@ -15,7 +15,6 @@ def get_default_config() -> dict:
             'mediano': {'porcentaje': 30, 'volumen': 25},
             'grande': {'porcentaje': 10, 'volumen': 80}
         },
-        'capacidad_carro': 150,
 
         # Configuracion de estrategias
         'dispatch_strategy': 'Ejecucion de Plan',  # alias corto (H-5)
@@ -25,23 +24,13 @@ def get_default_config() -> dict:
         'layout_file': 'layouts/WH1.tmx',
         'sequence_file': 'layouts/Warehouse_Logic.xlsx',
 
-        # Configuracion de operarios
+        # Configuracion de operarios (num_operarios_total: legacy-informativo,
+        # lo exige REQUIRED_KEYS; la flota real es agent_types)
         'num_operarios_terrestres': 2,
         'num_montacargas': 2,
         'num_operarios_total': 4,
-        'capacidad_montacargas': 1000,
 
-        # Configuracion de asignacion de recursos
-        'assignment_rules': {
-            "GroundOperator": {1: 1},
-            "Forklift": {1: 2, 2: 1, 3: 1, 4: 1, 5: 1}
-        },
 
-        # Compatibilidad con codigo existente
-        'tareas_zona_a': 0,
-        'tareas_zona_b': 0,
-        'num_operarios': 4,
-        
         # Agent types configuration
         'agent_types': [
             {

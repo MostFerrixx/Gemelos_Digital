@@ -22,7 +22,7 @@ Responsable: Cerebellum
 | **`_legacy/web_dashboard/`** — conservar/reparar/eliminar | **PENDIENTE DECISION** |
 | MEJ-1 — Red de seguridad automatizada (tests + gate) | HECHO (2026-07-04, F1-F5 completas) |
 | **MEJ-2 — Experiment runner con replicas + comparacion A/B** | **APROBADA** (2026-07-04, sin sprint) |
-| **MEJ-3 — Esquema unico de config (pydantic) + purga de claves** | **APROBADA** (2026-07-04, sin sprint) |
+| MEJ-3 — Esquema unico de config (pydantic) + purga de claves | HECHO (2026-07-04) |
 | **MEJ-4 — Completar anti-colisiones (dwell + fallback visible)** | **APROBADA** (2026-07-04, plan en docs/PLAN_MEJORA_4_ANTICOLISIONES.md) |
 
 ---
@@ -673,7 +673,31 @@ anecdota de N=1. El propio experimento BK-03 sufrio esto: con N=3 la conclusion 
 
 ## MEJ-3 — Esquema unico de configuracion (pydantic) + purga de claves duplicadas/muertas
 
-**Estado:** APROBADA por el Director — 2026-07-04. Sin sprint asignado (orden acordado: 1 -> 3 -> 2).
+**Estado:** HECHO — 2026-07-04 (rama `feature/mej-3-config-schema`).
+**Evidencia de cierre:**
+- `src/core/config_schema.py`: esquema pydantic unico con cada clave anotada con
+  su LECTOR real. Consumido por el motor (`core/config_manager.py`, loguea
+  `[CONFIG][SCHEMA][WARN/ERROR]`, no muta ni bloquea) y por la web
+  (`web_prototype/config_manager.validate_config`: tipos invalidos BLOQUEAN el
+  guardado; claves desconocidas/legacy -> warning en log).
+- Un typo tipo `priority_dispatch_enable` ya NO pasa en silencio.
+- **Purga ejecutada** (config.json + defaults core/web + app.js + index.html):
+  `num_operarios`, `num_ground_operators`, `num_forklifts`, `num_work_orders`,
+  `tareas_zona_a/b`, `assignment_rules`, `capacidad_montacargas`,
+  `tiempo_descarga_por_tarea`, y DOS CONTROLES DE UI QUE NO HACIAN NADA:
+  "Capacidad del Carro" (`capacidad_carro`) y "Escala del Mapa" (`map_scale`) —
+  el motor jamas los leyo. En `congestion`: purgadas las 9 claves F3 del enfoque
+  jubilado (`wait_timeout`, `wait_hard_cap`, `backoff_*`, `max_repath`,
+  `repath_cost_factor`, `watchdog_window`, `allow_swap`, `aging_rate`);
+  conservadas las vivas (`staggered_start`, `spawn_offset`, `timewindow.*`).
+- CONSERVADAS: `num_operarios_terrestres`/`num_montacargas` (fallback vivo del
+  motor con `agent_types: []`) y `num_operarios_total` (legacy-informativa,
+  exigida por `REQUIRED_KEYS`).
+- **El gate ATRAPO la purga** (FAIL inicial): el `.jsonl` incrusta el config en
+  la metadata `SIMULATION_START`. Verificado que los 11.879 eventos son
+  identicos (sha sin linea 1 = `98cc021b…` en ambos) -> cambio solo de metadata,
+  baseline regenerado (`662ed5e3…`) con el flujo documentado.
+- Suite: 67 passed (9 tests nuevos de esquema SC-01..09) + gate PASS.
 **Prioridad:** Media-Alta (correctitud: mata una clase entera de bugs silenciosos)
 **Origen:** Revision independiente de Cerebellum (2026-07-04). Es la causa raiz bajo INIT-3.
 
