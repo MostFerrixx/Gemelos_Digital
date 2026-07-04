@@ -627,3 +627,9 @@ do_commit.bat
 
 # Scripts de limpieza temporal
 LIMPIAR_TEMPORALES.bat
+
+# MEJ-1 (2026-07-04): la suite de red de seguridad SI se versiona.
+# Excepcion al patron global 'test_*.py' (linea ~92), que era para scripts
+# de debug sueltos en la raiz, no para la suite oficial de tests/.
+!tests/test_*.py
+!tests/unit/test_*.py

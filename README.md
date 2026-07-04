@@ -3,7 +3,7 @@
 **Version:** V12.1 (Allocation Layer + INIT-4)
 **Estado:** En desarrollo activo - rama `feature/allocation-layer-v12.1`
 **Arquitectura:** Headless (SimPy) + Replay + GUI web
-**Actualizado:** 2026-06-29
+**Actualizado:** 2026-07-04
 
 ---
 
@@ -173,6 +173,19 @@ URL: `http://localhost:8000`.
 python entry_points/run_optimization.py
 ```
 
+### Tests y gate de regresion (MEJ-1)
+
+```bash
+make test    # suite pytest de red de seguridad (~59 tests, <10 s)
+make gate    # gate byte-identico: corre la sim canonica con seed 42 y
+             # compara SHA256 contra tests/baseline.json (~30 s)
+```
+
+En Windows: `run test` / `run gate`. La CI (`.github/workflows/tests.yml`)
+ejecuta ambos en cada push. Correr SIEMPRE tras tocar el motor; si un cambio
+de comportamiento es intencional: `python scripts/regression_gate.py
+--update-baseline --yes` y commitear el baseline junto con el cambio.
+
 ---
 
 ## 6. Estructura de directorios
@@ -190,7 +203,9 @@ Gemelos Digital/
 │   ├── subsystems/
 │   │   ├── simulation/           # Nucleo: warehouse, dispatcher, operators,
 │   │   │                         #   order_strategies, data_manager,
-│   │   │                         #   pathfinder, route_calculator, layout_manager
+│   │   │                         #   pathfinder, route_calculator, layout_manager,
+│   │   │                         #   congestion_manager, reservation_table,
+│   │   │                         #   spacetime_planner (capa de congestion, activa)
 │   │   ├── database/             # Migracion Excel -> SQLite (warehouse.db)
 │   │   └── utils/                # Utilidades compartidas
 │   ├── core/                     # config_manager, replay_utils, config_utils
@@ -241,6 +256,11 @@ capacidad y prioridades de zona), `dispatch_strategy`, `tour_type`,
 Flags **opt-in** (ausentes del `config.json` canonico a proposito; el motor los lee
 con defaults neutros): `tiempos.pick_time_model`, `priority_dispatch_enabled`,
 `waves` (ver seccion 2.1). La variable de entorno `WAREHOUSE_SEED` fija la semilla.
+
+A diferencia de esos flags, el bloque **`congestion`** (evasion de colisiones /
+ruteo por reserva espacio-temporal, Iniciativa 2) SI esta presente y **activo**
+en el config canonico (`enabled: true`, `mode: "timewindow"`, `shadow: false`).
+Es parte del comportamiento de referencia del motor.
 
 Los **datos canonicos viven en la raiz**:
 

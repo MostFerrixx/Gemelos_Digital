@@ -26,6 +26,7 @@ Antes de mover cada elemento se verificó que **ningún archivo activo lo import
 | `config_optimized_20251128_154628.json`, `config_optimized_20251128_182004.json` | `_legacy/` | Salidas del optimizador Optuna commiteadas por error (deberían ir a `optimized_configs/`, que está en `.gitignore`). |
 | `files_to_delete.txt`, `generate_files_to_delete_list.py` | `_legacy/` | Restos de una herramienta de limpieza de una sesión pasada. |
 | 7 tests rotos (`tests/integration/` y `tests/manual/`) | `_legacy/tests_rotos/` | Importan módulos borrados (`simulation_engine`, `simulation_data_provider`, `replay_data_provider`, `ReplayEngineDataProvider`). No ejecutan. Se mantienen en `tests/` los que sí resuelven imports. |
+| `tests/` completo (bugfixes, integration, manual, unit) | `_legacy/tests_gui/` | **MEJ-1, 2026-07-04:** todo el `tests/` restante era legacy de las GUI archivadas (dashboard PyQt6, viewer Pygame, tecla "O") o de configs antiguas; no compilaba contra la cadena viva. Reemplazado por la suite pytest nueva en `tests/` (ver `docs/PLAN_MEJORA_1_RED_SEGURIDAD.md`). |
 
 ## Qué NO se movió (y por qué)
 - **`simulation_buffer.py` y `visualizer.py` (raíz):** parecen "sueltos" pero están **vivos** (los usa `event_generator` y `exporter_v2` por subprocess). Se quedan.

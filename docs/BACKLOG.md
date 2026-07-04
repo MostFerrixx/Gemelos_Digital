@@ -1,7 +1,7 @@
 # BACKLOG — Gemelo Digital de Almacen
 # Inventario de iniciativas: hechas y pendientes
 
-Documento creado: 2026-06-14 · Actualizado: 2026-06-29
+Documento creado: 2026-06-14 · Actualizado: 2026-07-04
 Responsable: Cerebellum
 
 ## Indice de estado (de un vistazo)
@@ -20,6 +20,9 @@ Responsable: Cerebellum
 | **INIT-3 — Reparar optimizador Optuna** | **PENDIENTE** (bajo-medio) |
 | **WOs sobredimensionadas** — fix defensivo | **PENDIENTE** (bajo) |
 | **`_legacy/web_dashboard/`** — conservar/reparar/eliminar | **PENDIENTE DECISION** |
+| MEJ-1 — Red de seguridad automatizada (tests + gate) | HECHO (2026-07-04, F1-F5 completas) |
+| **MEJ-2 — Experiment runner con replicas + comparacion A/B** | **APROBADA** (2026-07-04, sin sprint) |
+| **MEJ-3 — Esquema unico de config (pydantic) + purga de claves** | **APROBADA** (2026-07-04, sin sprint) |
 
 ---
 
@@ -597,6 +600,97 @@ que es una version peor y duplicada.
   alguna idea de presentacion que llevar al panel del viewer web; si no, fuera.
 
 El Director quiere revisarla antes de decidir. NO tocar sin su visto bueno.
+
+---
+
+## MEJ-1 — Red de seguridad automatizada: suite pytest + gate de regresion en un comando
+
+**Estado:** HECHO — 2026-07-04 (F1-F5 completas, rama `feature/mej-1-red-seguridad`).
+Plan: `docs/PLAN_MEJORA_1_RED_SEGURIDAD.md`.
+**Evidencia de cierre:**
+- `python -m pytest -q` -> 58 passed, 1 skipped (bug WOs sobredimensionadas
+  documentado), 1 deselected (gate), ~1.3 s.
+- `python scripts/regression_gate.py` -> `[OK] GATE PASS` byte-identico
+  (sha `a4ae8d4e…`, 5.379.372 bytes) en ~15-17 s.
+- Prueba de fuego (sabotaje `max_wos_por_tour` 20->19): suite en ROJO
+  (`assert 19 == 20`), revertido, verde de nuevo. El sabotaje ademas destapo y
+  corrigio un test debil (ES-01 ahora cubre defaults con config vacio).
+- `git diff src/` vacio: el motor NO se toco.
+**Piezas:** `pytest.ini`, `tests/conftest.py`, `tests/unit/*` (7 modulos, 59 tests),
+`tests/baseline.json`, `scripts/regression_gate.py`, `tests/test_gate_smoke.py`
+(marker `gate`), targets `make test` / `make gate` / `run test` / `run gate`,
+CI `.github/workflows/tests.yml` (F5). Legacy en `_legacy/tests_gui/`.
+**Prioridad:** Alta (protege todas las demas mejoras; primera en el orden acordado 1 -> 3 -> 2)
+**Origen:** Revision independiente de Cerebellum (2026-07-04), no derivada del backlog previo.
+
+### El problema
+El proyecto no tiene NINGUNA prueba automatizada funcional. `tests/` es 100% legacy
+(tests del dashboard PyQt6, del viewer Pygame y de la tecla "O" — todo archivado o
+borrado). La unica proteccion real es el gate byte-identico (`WAREHOUSE_SEED=42` ->
+SHA `a4ae8d4e…`) ejecutado A MANO cada vez. Todo el valor acumulado (Allocation Layer,
+INIT-4, capa de congestion) depende de disciplina manual: un refactor descuidado en
+`dispatcher.py` pasaria inadvertido.
+
+### Que se hara (resumen; detalle en el plan)
+1. Cuarentena del `tests/` legacy (git mv a `_legacy/tests_gui/`).
+2. Suite pytest nueva y minima pero real: unit tests de dispatcher (estrategias,
+   prioridad C2, olas C3), allocation (coerciones, asignacion multi-ubicacion),
+   validacion de config web.
+3. `scripts/regression_gate.py`: corre la sim con semilla 42 y compara SHA256 del
+   `.jsonl` contra el baseline registrado. Un comando, veredicto PASS/FAIL.
+4. (Opcional, decision del Director) workflow de GitHub Actions.
+
+---
+
+## MEJ-2 — Rigor estadistico: experiment runner con replicas y comparacion A/B
+
+**Estado:** APROBADA por el Director — 2026-07-04. Sin sprint asignado (orden acordado: 1 -> 3 -> 2).
+**Prioridad:** Alta (valor de producto: convierte corridas-anecdota en decisiones)
+**Origen:** Revision independiente de Cerebellum (2026-07-04).
+
+### El problema
+El proposito del producto es tomar decisiones (detectar cuellos de botella, comparar
+configuraciones), pero en modo produccion la sim es estocastica y cada corrida es una
+anecdota de N=1. El propio experimento BK-03 sufrio esto: con N=3 la conclusion quedo
+"dentro del ruido estadistico". Ademas el runner web mata la sim a los 600 s
+(`web_prototype/simulation_runner.py`, TIMEOUT_SECONDS), inservible para lotes.
+
+### Que se hara (a planificar cuando llegue su turno)
+- Experiment runner (CLI primero): correr N replicas de una config con semillas
+  distintas, agregar KPIs (media, desviacion, IC 95%).
+- Modo comparacion: dos configs (A/B), mismas semillas pareadas, veredicto
+  estadistico (diferencia significativa o ruido) por KPI.
+- Salida: tabla resumen (consola + Excel); integracion web despues (fuera del
+  timeout de 600 s del runner interactivo).
+- Reusar `WAREHOUSE_SEED` y `--config` / `--output-metrics` ya existentes en
+  `entry_points/run_generate_replay.py`.
+
+---
+
+## MEJ-3 — Esquema unico de configuracion (pydantic) + purga de claves duplicadas/muertas
+
+**Estado:** APROBADA por el Director — 2026-07-04. Sin sprint asignado (orden acordado: 1 -> 3 -> 2).
+**Prioridad:** Media-Alta (correctitud: mata una clase entera de bugs silenciosos)
+**Origen:** Revision independiente de Cerebellum (2026-07-04). Es la causa raiz bajo INIT-3.
+
+### El problema
+`config.json` arrastra claves solapadas y parcialmente muertas:
+`num_operarios_terrestres` vs `num_ground_operators` vs `num_operarios` vs
+`num_operarios_total`; `num_work_orders` vs `total_ordenes`; `tareas_zona_a/b`;
+`assignment_rules` vacio. El motor lee todo con `.get()` y defaults silenciosos.
+Consecuencias reales:
+- El optimizador Optuna solo ajusta claves legacy (`num_operarios_terrestres`)
+  mientras la UI escribe `agent_types` — la causa profunda de INIT-3.
+- Cualquier flag mal escrito (`priority_dispatch_enable` sin la "d") se ignora sin aviso.
+- Viola el espiritu de la Ley #3: una sola fuente de verdad, pero con cuatro dialectos.
+
+### Que se hara (a planificar cuando llegue su turno)
+- Modelo pydantic unico (pydantic ya esta en requirements por FastAPI) compartido
+  por motor (`core/config_manager.py`) y web (`web_prototype/config_manager.py`).
+- Warning (o rechazo) de claves desconocidas; inventario y purga de claves muertas
+  del `config.json` canonico.
+- Validado con el gate byte-identico de MEJ-1 (por eso va despues de MEJ-1).
+- Alinea de paso al optimizador con el esquema real (adelanta parte de INIT-3).
 
 ---
 

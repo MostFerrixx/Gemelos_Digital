@@ -1,0 +1,34 @@
+# MEJ-1 (F5): CI de red de seguridad.
+# Corre la suite pytest y el gate de regresion byte-identico en cada push/PR.
+# El baseline (tests/baseline.json) fue generado con Python 3.13 y es el mismo
+# SHA en Windows y Linux (verificado, ver docs/HANDOFF.md seccion 7).
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # pygame-ce solo se usa para leer el TMX (headless); sin display en CI.
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Suite de red de seguridad (unit)
+        run: python -m pytest -q
+
+      - name: Gate de regresion byte-identico
+        run: python scripts/regression_gate.py

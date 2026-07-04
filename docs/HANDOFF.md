@@ -1,12 +1,12 @@
 # HANDOFF — Gemelo Digital de Almacen
 # Estado operativo para nueva sesion de Cerebellum
 
-**Generado:** 2026-06-18  ·  **Actualizado:** 2026-06-29
+**Generado:** 2026-06-18  ·  **Actualizado:** 2026-07-04
 **Por:** Cerebellum (sesion de traspaso)
-**Rama activa:** `feature/allocation-layer-v12.1`  ·  **HEAD:** `fd0a41d`
-**Estado:** Limpio — sincronizado con main. Sin commits pendientes.
-**Ultimo hito:** INIT-4 COMPLETO (C1 tiempos de pick, C2 prioridad/SLA Opcion C,
-C3 olas). Ver docs/PLAN_INIT4.md. Proxima accion sugerida: seccion 5.
+**Rama activa:** `feature/mej-1-red-seguridad` (desde `0179539` = main)
+**Ultimo hito:** MEJ-1 COMPLETA (red de seguridad: pytest + gate byte-identico
++ CI). Ver docs/PLAN_MEJORA_1_RED_SEGURIDAD.md y seccion 4. Proxima accion
+sugerida: merge de MEJ-1 y arrancar MEJ-3 (seccion 5).
 
 ---
 
@@ -46,6 +46,11 @@ Nucleo de simulacion SANO: `src/subsystems/simulation/`
   warehouse.py, dispatcher.py (DispatcherV11), operators.py, order_strategies.py,
   data_manager.py, assignment_calculator.py, route_calculator.py,
   pathfinder.py, layout_manager.py, outbound.py
+  + capa de congestion (Iniciativa 2, VIVA y ACTIVA en config canonico):
+  congestion_manager.py, reservation_table.py, spacetime_planner.py.
+  `congestion.enabled: true, mode: "timewindow", shadow: false` en config.json
+  => los operarios EJECUTAN el plan espacio-temporal (Fase 2, fallback estatico).
+  El baseline byte-identico (a4ae8d4e...) se genero CON esta capa activa.
 
 Archivos VIVOS fuera de src/ (no borrar sin pensar):
   simulation_buffer.py, visualizer.py (heatmap por subprocess),
@@ -68,14 +73,22 @@ El arbol data/ es una migracion abandonada que solo lee codigo muerto.
 ## 3. GIT — ESTADO ACTUAL
 
 **Rama:** `feature/allocation-layer-v12.1`
-**HEAD:** `f3a3ec5` (local y remote identicos)
-**main:** `f3a3ec5` (sincronizado via fast-forward; `git rev-list --count main..feature` = 0)
+**HEAD:** `0179539` (local y remote identicos)
+**main:** `0179539` (sincronizado via fast-forward; divergencia 0/0, verificado 2026-07-04)
 
 No hay commits pendientes de push ni merge.
 
 ### Log completo de la rama (mas reciente primero)
 
 ```
+0179539  docs(backlog): inventario de iniciativas reconciliado + notas de arquitectura
+afe5602  docs(readme): al dia post-INIT-4 -- features opt-in y correcciones
+a70410e  docs: reconciliar arquitectura real + documentar flags opt-in (CLAUDE + HANDOFF)
+edba925  docs(init-4): cierre -- INIT-4 completo (C1+C2+C3), INT-1 ok, docs al dia
+fd0a41d  feat(init-4 C3): olas (waves) por release diferido (opt-in)
+c27dacb  feat(init-4 C2 Opcion C): prioridad fuerte "limpia" -- urgentes primero sin diluir
+0c1682c  feat(init-4 C2): prioridad de pedido / SLA en el despacho (opt-in, base)
+91dd6c0  feat(init-4 C1): tiempo de pick escalable por cantidad/volumen (opt-in, neutro)
 f3a3ec5  chore(ui): eliminar botones stub E6/E7 (BK-05 cerrado)
 7efc9c7  docs(handoff): actualizar estado post-sesion 2026-06-27
 41ddc22  refactor(p2): extraer agent_process a BaseOperator (Template Method)
@@ -98,6 +111,35 @@ ba55f27  chore(limpieza): sanear indice FUSE, borrar junk y actualizar docs desf
 ---
 
 ## 4. LO QUE SE HIZO (HISTORIAL POR SESION)
+
+### Sesion 2026-07-04 — MEJ-1: red de seguridad automatizada (rama feature/mej-1-red-seguridad)
+
+Revision general de docs (capa de congestion documentada como VIVA y ACTIVA;
+HEADs corregidos) + 3 mejoras aprobadas por el Director (MEJ-1/2/3, ver BACKLOG)
++ ejecucion completa de MEJ-1 (plan: docs/PLAN_MEJORA_1_RED_SEGURIDAD.md):
+
+- **F1**: `tests/` legacy completo archivado en `_legacy/tests_gui/` (git mv).
+- **F2**: pytest instalado; `pytest.ini` (excluye `_legacy/`, `basura/`, etc.;
+  marker `gate` deseleccionado por default); `tests/conftest.py` con fixtures
+  (FakeEnv/FakeWO/FakeOperator/make_dispatcher, sin SimPy real).
+- **F3**: 59 unit tests en `tests/unit/`: prioridad C2 (PR), olas C3 (OL),
+  estrategias+router H-5+radio blando H-6 (ES), allocation (AL), division de
+  cantidades en warehouse (WH, con el bug de WOs sobredimensionadas documentado
+  como skip), validacion web de config BK-04/QA (CF), nivel de servicio INIT-5 (SL).
+- **F4**: `tests/baseline.json` (sha completo `a4ae8d4e9f7dd444eb217aa60ac874cb
+  b5b062a3e8ccfaaa908cf9f7d1e86c6e`, 5.379.372 bytes, seed 42, Python 3.13.6) +
+  `scripts/regression_gate.py` (corre la sim canonica, compara SHA, PASS/FAIL,
+  `--update-baseline --yes` para cambios intencionales, limpia su corrida) +
+  smoke `tests/test_gate_smoke.py` (marker gate) + `make test`/`make gate` y
+  `run test`/`run gate`.
+- **F5**: CI `.github/workflows/tests.yml` (ubuntu, Python 3.13, SDL dummy):
+  pytest + gate en cada push/PR. Pendiente de validar en el primer push.
+- **Prueba de fuego**: sabotaje `max_wos_por_tour` 20->19 -> suite ROJA
+  (`assert 19 == 20`) -> revertido. El primer intento NO fallo y destapo un test
+  debil (fixture pasaba el valor explicito): se agrego ES-01b (defaults con
+  config vacio). `git diff src/` vacio al cierre: motor intacto.
+- Verificacion previa del baseline: corrida real reproduce el SHA historico en
+  ~15-27 s (2 corridas del gate + 1 manual, 3/3 PASS).
 
 ### Sesion 2026-06-29 — INIT-4 completo (commits 91dd6c0..edba925)
 
@@ -202,6 +244,9 @@ colores de seccion, notificaciones. Cuarentena de 40+ archivos basura.
 
 | Item | Estado | Esfuerzo estimado |
 |------|--------|-------------------|
+| MEJ-1 — Red de seguridad (pytest + gate regresion) | HECHO 2026-07-04 (ver seccion 4) | — |
+| **MEJ-3** — Esquema unico de config (pydantic) + purga claves | APROBADA — SIGUIENTE | 1-2 sesiones |
+| **MEJ-2** — Experiment runner (replicas + A/B estadistico) | APROBADA (tras MEJ-3) | 2 sesiones |
 | **BK-02** — FIFO Estricto en UI | EN REPENSAR (diseno pendiente del Director) | ~15 min cuando se decida |
 | **`_legacy/web_dashboard/`** (puerto 8001) | PENDIENTE DECISION (Director quiere revisarla) | Depende de decision |
 | **INIT-1** — Picking por ubicacion real + reservas en BD | Pendiente | Alto |
@@ -255,6 +300,7 @@ Fix: forzar minimo 1 unidad por viaje; marcar WOs imposibles como 'failed' (no '
 | `AUDITORIA.md` | Vigente (mayo 2026) | Diagnostico estructural completo del repo |
 | `docs/HANDOFF.md` | ACTUALIZADO 2026-06-29 | Este archivo — estado operativo para nueva sesion |
 | `docs/PLAN_INIT4.md` | Vigente (2026-06-29) | Plan + pruebas + checklist de INIT-4 (C1/C2/C3) |
+| `docs/PLAN_MEJORA_1_RED_SEGURIDAD.md` | Vigente (2026-07-04) | Plan aprobado de MEJ-1: suite pytest + gate de regresion |
 | `docs/BACKLOG.md` | ACTUALIZADO 2026-06-29 | INIT-4 + INIT-5 + BK cerrados; INIT-1/3/KPI-SLA/WOs pendientes |
 | `docs/VALIDACION_UI_WEB.md` | ACTUALIZADO 2026-06-27 | 60 controles; E6/E7 eliminados, D1 resuelto |
 | `docs/PROPUESTA_MEJORA_DISENO_UI.md` | ACTUALIZADO 2026-06-27 | D-01..D-16 implementadas |
@@ -322,3 +368,12 @@ mantiene el `.jsonl` byte-identico al baseline. Se activan en configs de prueba/
   deterministas/reproducibles. Gate byte-identico: SHA256 `a4ae8d4e…`, 5.379.372 bytes.
 - Validacion de estos bloques en `web_prototype/config_manager.py` (release_times
   acotado a <= 1.000.000 para evitar hangs). Detalle en `docs/PLAN_INIT4.md`.
+
+### Bloque `congestion` (Iniciativa 2) — PRESENTE y ACTIVO en el canonico
+A diferencia de los flags INIT-4 (ausentes/neutros), el bloque `congestion` SI
+esta en el config.json canonico y ACTIVO desde antes del baseline:
+`enabled: true`, `mode: "timewindow"`, `timewindow.shadow: false` => ruteo por
+reserva espacio-temporal EJECUTADO (Fase 2; fallback a ruta estatica si no hay
+plan). Modulos: congestion_manager.py, reservation_table.py, spacetime_planner.py.
+El gate byte-identico (`a4ae8d4e…`) incluye esta capa: NO desactivarla si se
+quiere reproducir el baseline. Historia: docs/antiguos/PLAN_INICIATIVA_2_OPCION_C.md.

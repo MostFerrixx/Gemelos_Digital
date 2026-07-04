@@ -1,0 +1,8 @@
+{
+    "description": "Baseline byte-identico de la simulacion canonica (config.json de la raiz, que incluye congestion timewindow ACTIVO). Generado con WAREHOUSE_SEED=42. Verificado 2026-07-04 (corrida real: 27.4 s). Si un cambio de comportamiento es INTENCIONAL, regenerar con: python scripts/regression_gate.py --update-baseline --yes",
+    "seed": 42,
+    "sha256": "a4ae8d4e9f7dd444eb217aa60ac874cbb5b062a3e8ccfaaa908cf9f7d1e86c6e",
+    "size_bytes": 5379372,
+    "python_version": "3.13.6",
+    "updated": "2026-07-04"
+}

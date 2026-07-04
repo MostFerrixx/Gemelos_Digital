@@ -56,7 +56,10 @@ Cadena viva (verificada por rastreo de imports):
 Núcleo de simulación (sano y principal): `src/subsystems/simulation/`
 (`warehouse.py`, `dispatcher.py` [DispatcherV11, doble barrido], `operators.py`,
 `order_strategies.py`, `data_manager.py`, `assignment_calculator.py`,
-`route_calculator.py`, `pathfinder.py`, `layout_manager.py`, `outbound.py`).
+`route_calculator.py`, `pathfinder.py`, `layout_manager.py`, `outbound.py`,
+más la capa de congestión de la Iniciativa 2: `congestion_manager.py`,
+`reservation_table.py`, `spacetime_planner.py` — VIVA y **ACTIVA** en el
+config canónico, ver §5).
 
 Stack VIGENTE: Python · SimPy · pytmx · pandas/openpyxl · Optuna · SQLite ·
 FastAPI/uvicorn/pydantic (web). `pygame-ce` sigue siendo dependencia del
@@ -90,8 +93,11 @@ MUERTO (confirmado sin imports de entrada) — ignóralo en features; candidato 
 poda en limpieza:
 - `_legacy/legacy/**` (sufijo _OLD), `_legacy/src_shared/**`, `_legacy/utils_root/**`,
   `_legacy/tools_duplicados/**`.
-- `_legacy/tests_rotos/` y gran parte de `tests/` importan módulos borrados
-  (`simulation_engine`, `simulation_data_provider`) → rota; no es red de seguridad.
+- `_legacy/tests_rotos/` y `_legacy/tests_gui/` (el viejo `tests/` completo,
+  archivado en MEJ-1): importan módulos borrados/archivados; NO ejecutan.
+  **El `tests/` actual SÍ es la red de seguridad viva (MEJ-1, 2026-07-04):**
+  `python -m pytest -q` (~59 unit tests, <10 s) + `python scripts/regression_gate.py`
+  (gate byte-idéntico, ~30 s). Córrelos tras cualquier cambio en el motor.
 
 Fuente de datos canónica = **la RAÍZ** (`config.json`, `layouts/WH1.tmx`,
 `layouts/Warehouse_Logic.xlsx`). El árbol `data/` es una migración abandonada que
@@ -100,12 +106,12 @@ NOTA: la simulación y `run_migration.py` leen ambos desde `layouts/`. El migrad
 usa `find_excel_file()` (busca `layouts/Warehouse_Logic_v2.xlsx`, luego
 `layouts/Warehouse_Logic.xlsx`); no existe copia en `data/layouts/`. Sin divergencia.
 
-## 5. ESTADO ACTUAL (actualizado 2026-06-29)
+## 5. ESTADO ACTUAL (actualizado 2026-07-04)
 
 ### Rama activa y estado de git
-`feature/allocation-layer-v12.1` sincronizada con `main`. HEAD: `edba925`.
-No hay commits pendientes de push ni merge. Lee `docs/HANDOFF.md` para el
-estado operativo detallado.
+`feature/allocation-layer-v12.1` sincronizada con `main`. HEAD: `0179539`
+(= main = origin/main, divergencia 0/0). No hay commits pendientes de push
+ni merge. Lee `docs/HANDOFF.md` para el estado operativo detallado.
 
 ### Lo que ya esta commiteado (todo en main via fast-forward)
 - **Allocation Layer V12.1** (base): asignacion de stock real FCFS antes de
@@ -170,7 +176,22 @@ defaults que reproducen el comportamiento histórico. Por eso una corrida sin el
   hook `_do_picking_at()` por subclase (Ground/Forklift). Logging por nivel en todo
   el hot-path (DEBUG silenciado en producción).
 
+**EXCEPCIÓN — `congestion` (Iniciativa 2) NO es opt-in ausente: está PRESENTE y
+ACTIVA en el `config.json` canónico** (`enabled: true`, `mode: "timewindow"`,
+`timewindow.shadow: false` → los operarios EJECUTAN el plan espacio-temporal,
+Fase 2, con fallback a ruta estática si no hay plan). Módulos:
+`congestion_manager.py`, `reservation_table.py`, `spacetime_planner.py`;
+integración en `warehouse.py` (crea manager/table/planner) y `operators.py`
+(`_timewindow_execute_plan`). El baseline byte-idéntico (`a4ae8d4e…`) se generó
+CON esta capa activa: es parte del comportamiento de referencia, no una
+desviación. Historia en `docs/antiguos/PLAN_INICIATIVA_2_OPCION_C.md`.
+
 ### Pendientes (ver docs/BACKLOG.md para detalle)
+- **MEJ-1 HECHA (2026-07-04)**: red de seguridad automatizada — suite pytest
+  (`python -m pytest -q`) + gate byte-identico (`python scripts/regression_gate.py`)
+  + CI GitHub Actions. Usala en todo cambio de motor. Quedan **MEJ-3** (esquema
+  unico de config con pydantic, siguiente) y **MEJ-2** (experiment runner con
+  replicas/comparacion A/B). Detalle en BACKLOG.
 - **BK-02** — FIFO Estricto en UI: EN REPENSAR (diseno pendiente del Director).
 - **`_legacy/web_dashboard/`** (puerto 8001): Director quiere revisarla antes de
   decidir (conservar / reparar / eliminar).
