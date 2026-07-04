@@ -257,7 +257,8 @@ colores de seccion, notificaciones. Cuarentena de 40+ archivos basura.
 |------|--------|-------------------|
 | MEJ-1 — Red de seguridad (pytest + gate regresion) | HECHO 2026-07-04 (ver seccion 4) | — |
 | **MEJ-3** — Esquema unico de config (pydantic) + purga claves | APROBADA — SIGUIENTE | 1-2 sesiones |
-| **MEJ-2** — Experiment runner (replicas + A/B estadistico) | APROBADA (tras MEJ-3) | 2 sesiones |
+| **MEJ-4** — Completar anti-colisiones (dwell + fallback visible) | APROBADA (tras MEJ-3) — plan en docs/PLAN_MEJORA_4_ANTICOLISIONES.md | 1-2 sesiones |
+| **MEJ-2** — Experiment runner (replicas + A/B estadistico) | APROBADA (tras MEJ-4) | 2 sesiones |
 | **BK-02** — FIFO Estricto en UI | EN REPENSAR (diseno pendiente del Director) | ~15 min cuando se decida |
 | **`_legacy/web_dashboard/`** (puerto 8001) | PENDIENTE DECISION (Director quiere revisarla) | Depende de decision |
 | **INIT-1** — Picking por ubicacion real + reservas en BD | Pendiente | Alto |

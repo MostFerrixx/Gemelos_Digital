@@ -23,6 +23,7 @@ Responsable: Cerebellum
 | MEJ-1 — Red de seguridad automatizada (tests + gate) | HECHO (2026-07-04, F1-F5 completas) |
 | **MEJ-2 — Experiment runner con replicas + comparacion A/B** | **APROBADA** (2026-07-04, sin sprint) |
 | **MEJ-3 — Esquema unico de config (pydantic) + purga de claves** | **APROBADA** (2026-07-04, sin sprint) |
+| **MEJ-4 — Completar anti-colisiones (dwell + fallback visible)** | **APROBADA** (2026-07-04, plan en docs/PLAN_MEJORA_4_ANTICOLISIONES.md) |
 
 ---
 
@@ -694,6 +695,33 @@ Consecuencias reales:
   del `config.json` canonico.
 - Validado con el gate byte-identico de MEJ-1 (por eso va despues de MEJ-1).
 - Alinea de paso al optimizador con el esquema real (adelanta parte de INIT-3).
+
+---
+
+## MEJ-4 — Completar el sistema anti-colisiones: dwell + fallback visible
+
+**Estado:** APROBADA por el Director — 2026-07-04. Plan y analisis completo:
+`docs/PLAN_MEJORA_4_ANTICOLISIONES.md`. **Orden acordado: MEJ-3 -> MEJ-4.**
+**Prioridad:** Alta (realismo del cuello de botella de staging/pasillos)
+**Origen:** Analisis independiente de Cerebellum del sistema anti-colisiones
+(Iniciativa 2 Opcion C), pedido por el Director el 2026-07-04.
+
+### Resumen del diagnostico
+La arquitectura (Cooperative A* + tabla de reservas espacio-temporales) es la
+CORRECTA para esta escala — no se reemplaza. Pero esta incompleta: modela el
+transito y NO la permanencia (dwell). Evidencia (corrida canonica seed 42):
+**28 co-ocupaciones reales**; el staging 1 (celda 3,29) acumula 22 con hasta
+los 4 agentes superpuestos descargando a la vez. `reserve_dwell()` existe en
+`spacetime_planner.py` pero NO tiene callers (nunca se cableo). Consecuencia de
+negocio: la congestion de staging — el cuello de botella mas realista — es
+invisible y el throughput se sobreestima.
+
+### Que se hara (detalle en el plan)
+1. Cablear `reserve_dwell()` en picking/descarga/lifting (F1).
+2. Fallback estatico visible: reserva best-effort + WARN (F2).
+3. Spawn reservado (F3) y `clearance` expuesto en UI (F4, opcional).
+4. Validacion: co-ocupaciones 28 -> ~0, cola visible en staging, baseline
+   actualizado con el flujo del gate (F5).
 
 ---
 
