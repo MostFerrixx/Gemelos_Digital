@@ -74,6 +74,30 @@ class ReservationTable:
                 break
         return True
 
+    def earliest_free(self, cell: Cell, t_from: float, dur: float,
+                      ignore_agent: Optional[str] = None) -> Optional[float]:
+        """
+        MEJ-4 (salto SIPP): primer instante t >= t_from tal que [t, t+dur] esta
+        libre de reservas ajenas en `cell`. Permite al planner ESPERAR el fin de
+        una permanencia larga (descarga de decenas de segundos) con UN estado en
+        vez de miles de pasos dt_wait (que reventaban max_expansions).
+        Devuelve None si no hay hueco (no ocurre con intervalos finitos).
+        """
+        ivs = self.reservations.get(cell)
+        if not ivs:
+            return float(t_from)
+        cl = self.clearance
+        t = float(t_from)
+        # Intervalos ordenados por t_in: avanzar t hasta salir de cada bloqueo.
+        for (e_in, e_out, e_agent) in ivs:
+            if e_agent == ignore_agent:
+                continue
+            if e_in - cl >= t + dur:
+                return t  # hueco suficiente antes de este intervalo
+            if t < (e_out + cl) and (e_in - cl) < t + dur:
+                t = e_out + cl  # saltar al final del bloqueo (con margen)
+        return t
+
     def can_swap(self, frm: Cell, to: Cell, t_in: float, t_out: float,
                  agent_id: str) -> bool:
         """

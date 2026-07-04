@@ -50,7 +50,7 @@
         "staggered_start": true,
         "timewindow": {
             "shadow": false,
-            "clearance": 0,
+            "clearance": 0.05,
             "dt_wait": 0.1,
             "max_expansions": 20000,
             "plan_horizon": 0,

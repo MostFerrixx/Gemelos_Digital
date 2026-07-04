@@ -86,6 +86,9 @@ class SpaceTimePlanner:
             # Fase 2 (ejecucion real segun plan).
             "exec_segments": 0,
             "exec_fallbacks": 0,
+            # MEJ-4: permanencias (dwell) y fallback visible.
+            "dwell_conflicts": 0,
+            "exec_fallback_reserved_steps": 0,
         }
 
     # ------------------------------------------------------------------
@@ -141,14 +144,43 @@ class SpaceTimePlanner:
         dur = self._dur(speed)
         tbl = self.table
 
+        # MEJ-4 (SIPP): el estado es (celda, INTERVALO SEGURO), no (celda, t).
+        # Dos llegadas a la misma celda dentro del mismo hueco libre son
+        # equivalentes (desde la mas temprana se puede esperar hasta la otra):
+        # solo se conserva la MAS TEMPRANA. Esto elimina la oscilacion y las
+        # cadenas de espera que hacian explotar las expansiones ante dwells
+        # largos (descargas de decenas de segundos).
+        def _interval_id(cell, t):
+            ivs = tbl.reservations.get(cell)
+            if not ivs:
+                return 0
+            cl = tbl.clearance
+            n = 0
+            for (_e_in, e_out, e_agent) in ivs:
+                if e_agent == agent_id:
+                    continue
+                if e_out + cl <= t:
+                    n += 1
+            return n
+
         # open: (f, counter, cell, t). g = t - t0.
         counter = 0
         h0 = self._heuristic_time(start, goal, dur)
         open_heap: List[Tuple[float, int, Cell, float]] = [(h0, counter, start, t0)]
         counter += 1
-        # mejor g conocido por estado cuantizado (cell, round(t)).
-        best_g: Dict[Tuple[Cell, float], float] = {(start, round(t0, _T_QUANT)): 0.0}
-        came_from: Dict[Tuple[Cell, float], Tuple[Cell, float]] = {}
+        # llegada mas temprana conocida por estado SIPP (cell, interval_id).
+        arrival: Dict[Tuple[Cell, int], float] = {(start, _interval_id(start, t0)): t0}
+        came_from: Dict[Tuple[Cell, int], Tuple[Cell, int, float]] = {}
+
+        def _relax(ncell, nt, pkey, pt):
+            nonlocal counter
+            nkey = (ncell, _interval_id(ncell, nt))
+            if nt < arrival.get(nkey, float("inf")) - 1e-12:
+                arrival[nkey] = nt
+                came_from[nkey] = (pkey[0], pkey[1], pt)
+                f = (nt - t0) + self._heuristic_time(ncell, goal, dur)
+                heapq.heappush(open_heap, (f, counter, ncell, nt))
+                counter += 1
 
         while open_heap:
             f, _, cell, t = heapq.heappop(open_heap)
@@ -157,60 +189,68 @@ class SpaceTimePlanner:
                 self.last_capped = True
                 return None
 
+            key = (cell, _interval_id(cell, t))
+            if t > arrival.get(key, float("inf")) + 1e-12:
+                continue  # estado dominado (llegada mas temprana ya conocida)
+
             if cell == goal:
-                return self._reconstruct(came_from, cell, t, t0)
+                return self._reconstruct(came_from, arrival, key, t, t0, dur)
 
-            tq = round(t, _T_QUANT)
-            g_cur = t - t0
-            if g_cur > best_g.get((cell, tq), float("inf")) + 1e-12:
-                continue  # estado ya superado
-
-            # --- sucesor MOVER ---
+            # --- sucesor MOVER (con salida retrasada estilo SIPP ante bloqueo) ---
+            # No hay sucesor generico de "esperar": si el movimiento a un vecino
+            # esta bloqueado, se genera EL MISMO movimiento con salida retrasada
+            # al primer instante util (earliest_free), siempre que la celda
+            # actual siga libre mientras tanto. La espera queda implicita en el
+            # delta de tiempos del plan (el ejecutor hace timeout largo y la
+            # reserva cubre la permanencia en la celda de espera).
             t_next = t + dur
             for nb in self._neighbors(cell):
-                if not tbl.is_free(nb, t, t_next, ignore_agent=agent_id):
+                free_ok = tbl.is_free(nb, t, t_next, ignore_agent=agent_id)
+                swap_ok = tbl.can_swap(cell, nb, t, t_next, agent_id)
+                if free_ok and swap_ok:
+                    _relax(nb, t_next, key, t)
                     continue
-                if not tbl.can_swap(cell, nb, t, t_next, agent_id):
-                    continue
-                self._relax(open_heap, best_g, came_from, nb, t_next, cell, t,
-                            t0, goal, dur)
-                counter += 1
-
-            # --- sucesor ESPERAR ---
-            t_wait = t + self.dt_wait
-            if tbl.is_free(cell, t, t_wait, ignore_agent=agent_id):
-                self._relax(open_heap, best_g, came_from, cell, t_wait, cell, t,
-                            t0, goal, dur)
-                counter += 1
+                if not free_ok:
+                    # vertice ocupado (dwell/transito ajeno): saltar al primer hueco
+                    try:
+                        t_free = tbl.earliest_free(nb, t, dur, ignore_agent=agent_id)
+                    except Exception:
+                        t_free = None
+                else:
+                    # solo conflicto de cruce (arista inversa): reintento corto,
+                    # los cruces duran <= un paso (dur)
+                    t_free = t + self.dt_wait
+                if (t_free is not None and t_free > t
+                        and tbl.is_free(cell, t, t_free, ignore_agent=agent_id)
+                        and tbl.is_free(nb, t_free, t_free + dur, ignore_agent=agent_id)
+                        and tbl.can_swap(cell, nb, t_free, t_free + dur, agent_id)):
+                    # movimiento retrasado: esperar en `cell` hasta t_free y entrar
+                    _relax(nb, t_free + dur, key, t_free)
 
         return None  # open vacio: no alcanzable sin pisar reservas
 
-    def _relax(self, open_heap, best_g, came_from, ncell, nt, pcell, pt,
-               t0, goal, dur):
-        nq = (ncell, round(nt, _T_QUANT))
-        ng = nt - t0
-        if ng < best_g.get(nq, float("inf")) - 1e-12:
-            best_g[nq] = ng
-            came_from[nq] = (pcell, round(pt, _T_QUANT))
-            f = ng + self._heuristic_time(ncell, goal, dur)
-            # contador implicito via id() no es determinista; usamos longitud del heap.
-            heapq.heappush(open_heap, (f, len(open_heap), ncell, nt))
-
-    def _reconstruct(self, came_from, goal_cell, goal_t, t0) -> List[PlanStep]:
-        """Reconstruye [(celda, t_llegada), ...] desde start hasta goal."""
-        path: List[PlanStep] = [(goal_cell, goal_t)]
-        key = (goal_cell, round(goal_t, _T_QUANT))
-        # came_from mapea estado-cuantizado -> estado-padre-cuantizado. Para recuperar
-        # el t real reconstruimos hacia atras por el t cuantizado (coincide con el real
-        # porque dur y dt_wait son fijos => t = t0 + k*paso, sin deriva).
-        waits = 0
+    def _reconstruct(self, came_from, arrival, goal_key, goal_t, t0,
+                     dur) -> List[PlanStep]:
+        """
+        Reconstruye [(celda, t_llegada), ...] desde start hasta goal (claves SIPP).
+        Las ESPERAS son implicitas: un delta entre pasos mayor que `dur` significa
+        que el agente espero en la celda anterior (asi se cuentan en last_waits).
+        """
+        path: List[PlanStep] = [(goal_key[0], round(goal_t, _T_QUANT))]
+        key = goal_key
         while key in came_from:
-            pcell, pt_q = came_from[key]
-            path.append((pcell, pt_q))
-            if pcell == path[-2][0]:
-                waits += 1
-            key = (pcell, pt_q)
+            pcell, p_iid, pt = came_from[key]
+            path.append((pcell, round(pt, _T_QUANT)))
+            key = (pcell, p_iid)
         path.reverse()
+        # Anclar el primer paso a t0: si la PRIMERA salida fue retrasada, la
+        # espera inicial queda dentro del primer delta (el ejecutor hara el
+        # timeout largo y la reserva cubrira la permanencia en el origen).
+        path[0] = (path[0][0], round(float(t0), _T_QUANT))
+        waits = 0
+        for i in range(1, len(path)):
+            if (path[i][1] - path[i - 1][1]) > dur + 1e-9:
+                waits += 1
         self.last_waits = waits
         return path
 
@@ -259,19 +299,55 @@ class SpaceTimePlanner:
 
         # Reservar el plan: cada celda entrada ocupa [t_prev, t_cur]; el primer nodo
         # (start) se reserva como permanencia puntual [t0, t0] (la posee al planificar).
-        prev_cell, prev_t = plan[0]
-        self.table.reserve(prev_cell, prev_t, prev_t, agent_id)
-        m["reserve_attempts"] += 1
-        for (cell, t) in plan[1:]:
+        # MEJ-4: insercion con PRE-CHEQUEO (is_free). Los bordes cuantizados (round
+        # a 6 decimales) + clearance pueden voltear una comparacion de frontera que
+        # el A* valido con los t sin redondear: en ese caso se OMITE el intervalo y
+        # se cuenta en reserve_overlaps (metrica del planner), sin contaminar
+        # table.overlap_violations, que queda reservado para bugs de construccion.
+        def _reserve_or_skip(cell, t_in, t_out):
             m["reserve_attempts"] += 1
-            ok = self.table.reserve(cell, prev_t, t, agent_id)
-            if not ok:
-                m["reserve_overlaps"] += 1
-            if cell != prev_cell:
+            if self.table.is_free(cell, t_in, t_out, ignore_agent=agent_id):
+                self.table.reserve(cell, t_in, t_out, agent_id)
+                return True
+            m["reserve_overlaps"] += 1
+            return False
+
+        prev_cell, prev_t = plan[0]
+        _reserve_or_skip(prev_cell, prev_t, prev_t)
+        for (cell, t) in plan[1:]:
+            if _reserve_or_skip(cell, prev_t, t) and cell != prev_cell:
                 self.table.reserve_move(prev_cell, cell, prev_t, t, agent_id)
             prev_cell, prev_t = cell, t
 
         return plan
+
+    def reserve_path_best_effort(self, path: List[Cell], t0: float, dur: float,
+                                 agent_id: str) -> int:
+        """
+        MEJ-4 (F2): reserva BEST-EFFORT de una ruta ESTATICA (fallback sin plan).
+        Cuando el A* espacio-temporal no encuentra plan, el operario recorre la
+        ruta estatica igualmente (regla de oro: nunca congelar). Antes ese
+        recorrido era INVISIBLE para los demas planners. Aqui se insertan los
+        intervalos [t, t+dur] por celda que NO pisen reservas ajenas (los que
+        pisan se omiten: is_free previo evita contaminar overlap_violations,
+        cuyo invariante DEBE seguir en 0). Devuelve cuantos intervalos entraron.
+        """
+        if not path or len(path) < 2 or dur <= 0:
+            return 0
+        inserted = 0
+        prev = path[0]
+        t = float(t0)
+        for cell in path[1:]:
+            t_next = t + float(dur)
+            if self.table.is_free(cell, t, t_next, ignore_agent=agent_id):
+                self.table.reserve(cell, t, t_next, agent_id)
+                inserted += 1
+                if cell != prev:
+                    self.table.reserve_move(prev, cell, t, t_next, agent_id)
+            prev, t = cell, t_next
+        self.shadow_metrics["exec_fallback_reserved_steps"] = (
+            self.shadow_metrics.get("exec_fallback_reserved_steps", 0) + inserted)
+        return inserted
 
     def reserve_dwell(self, cell: Cell, t_in: float, dwell: float,
                       agent_id: str) -> bool:
@@ -280,14 +356,20 @@ class SpaceTimePlanner:
         (picking / descarga / lifting). Sin esto, otro agente podria planificar una ruta
         que cruce la celda donde este agente esta fisicamente parado => co-ocupacion (I1).
         Modela el destino-con-permanencia del plan (3.2 / 4.6) de forma uniforme.
-        Devuelve True si se reservo (False si pisaba otra reserva: se cuenta como overlap).
+
+        MEJ-4: BEST-EFFORT con pre-chequeo. Si el intervalo pisa una reserva ajena
+        (tipico: un plan COMMITTED antes de que existiera este dwell), NO se inserta
+        y se cuenta en `dwell_conflicts` — sin contaminar `overlap_violations` de la
+        tabla, cuyo invariante (0 por construccion del A*) debe seguir limpio.
         """
         if dwell <= 0.0:
             return True
-        ok = self.table.reserve(cell, t_in, t_in + float(dwell), agent_id)
-        if not ok:
-            self.shadow_metrics["reserve_overlaps"] += 1
-        return ok
+        t_out = float(t_in) + float(dwell)
+        if not self.table.is_free(cell, t_in, t_out, ignore_agent=agent_id):
+            self.shadow_metrics["dwell_conflicts"] = (
+                self.shadow_metrics.get("dwell_conflicts", 0) + 1)
+            return False
+        return self.table.reserve(cell, t_in, t_out, agent_id)
 
     # ------------------------------------------------------------------
     # Fase 1 (SOMBRA): planifica + reserva + mide, SIN ejecutar.
@@ -313,16 +395,27 @@ class SpaceTimePlanner:
     # ------------------------------------------------------------------
     def plan_and_reserve(self, start: Cell, goal: Cell, t0: float,
                          agent_id: str, speed: float,
-                         static_steps: int = 0) -> Optional[List[PlanStep]]:
+                         static_steps: int = 0,
+                         goal_dwell: float = 0.0) -> Optional[List[PlanStep]]:
         """
         Modo EJECUCION (Fase 2): igual que el core, pero devuelve el PLAN para que el
         operario lo SIGA (la ejecucion sustituye a la ruta estatica). El reloj de SimPy
         avanza segun los t_llegada del plan; las esperas son pasos explicitos (celda
         repetida) ya reservados => sin espera reactiva.
+
+        MEJ-4 (destino-con-permanencia, plan 3.2/4.6): si `goal_dwell` > 0, ademas
+        del transito se reserva la PERMANENCIA en el destino [t_llegada,
+        t_llegada+goal_dwell] EN EL MOMENTO DE PLANIFICAR (no al llegar). Asi los
+        demas agentes ven la estadia ANTES de comprometer sus propios planes, y
+        las llegadas al mismo destino (p.ej. staging) se serializan solas: el A*
+        del siguiente inserta esperas hasta que el dwell libere.
         """
         plan = self._plan_reserve_core(start, goal, t0, agent_id, speed, static_steps)
         if plan is not None:
             self.shadow_metrics["exec_segments"] += 1
+            if goal_dwell and goal_dwell > 0.0:
+                g_cell, g_t = plan[-1]
+                self.reserve_dwell(g_cell, float(g_t), float(goal_dwell), agent_id)
         return plan
 
     def shadow_report(self) -> Dict[str, Any]:

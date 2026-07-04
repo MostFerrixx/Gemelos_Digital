@@ -172,6 +172,32 @@ HEADs corregidos) + 3 mejoras aprobadas por el Director (MEJ-1/2/3, ver BACKLOG)
   regenerado: `662ed5e3…` (5.367.009 bytes).
 - Suite 67 passed (SC-01..09 nuevos) + gate PASS x2.
 
+### Sesion 2026-07-04 (cont. 2) — MEJ-4: anti-colisiones completado (rama feature/mej-4-anticolisiones)
+
+Ver `docs/PLAN_MEJORA_4_ANTICOLISIONES.md` (analisis §1-2, resultados §4). Resumen:
+- **Cableado del dwell** (la pieza que faltaba): picking (Ground y Forklift con
+  lift), descarga granular, y **destino-con-permanencia** — el dwell del destino
+  se reserva AL PLANIFICAR el tramo (`plan_and_reserve(goal_dwell=...)`), no al
+  llegar, para que los demas lo vean antes de comprometer sus planes.
+- **Planner reescrito estilo SIPP** (`spacetime_planner.py`): `earliest_free`
+  en la tabla, movimientos con salida retrasada (la espera queda implicita en
+  el delta y RESERVADA), y dominancia por (celda, intervalo seguro) — sin esto
+  los dwells largos del staging reventaban max_expansions (17 planes fallidos
+  en la iteracion intermedia). Resultado: 0 fallos y coste 0.7 ms/plan (mejor
+  que los 2.4 ms originales).
+- **Fallback visible**: sin plan -> reserva best-effort de la ruta estatica +
+  WARN (antes el agente degradado era invisible).
+- **clearance 0.05** en el canonico (mata las carreras de relevo instantaneas)
+  y **parking idle disperso** post-descarga (reusa `_spawn_lane`).
+- **Resultados**: co-ocupaciones 28 -> 9 (todas pares instantaneos; max 2 por
+  celda, antes 4), hotspot staging 22 -> 2, invariante de tabla 0, esperas
+  planificadas 0.095/plan. Tests: +6 TW (suite 73 passed). Baseline nuevo
+  `c6f129ef…` via --update-baseline.
+- **HALLAZGO ABIERTO**: makespan 2011 -> 3121 s (+55%). Es la cola REAL del
+  staging unico (antes 4 agentes descargaban superpuestos = fisica imposible
+  que inflaba el throughput). Decision del Director pendiente: reequilibrar
+  el escenario (repartir staging / discharge_time) o aceptar los KPIs reales.
+
 ### Sesion 2026-06-29 — INIT-4 completo (commits 91dd6c0..edba925)
 
 Prioridad/SLA/olas + tiempos de pick realistas, en 3 fases, cada una opt-in con
@@ -277,8 +303,9 @@ colores de seccion, notificaciones. Cuarentena de 40+ archivos basura.
 |------|--------|-------------------|
 | MEJ-1 — Red de seguridad (pytest + gate regresion) | HECHO 2026-07-04 (ver seccion 4) | — |
 | MEJ-3 — Esquema unico de config (pydantic) + purga claves | HECHO 2026-07-04 (ver seccion 4) | — |
-| **MEJ-4** — Completar anti-colisiones (dwell + fallback visible) | APROBADA — SIGUIENTE — plan en docs/PLAN_MEJORA_4_ANTICOLISIONES.md | 1-2 sesiones |
-| **MEJ-2** — Experiment runner (replicas + A/B estadistico) | APROBADA (tras MEJ-4) | 2 sesiones |
+| MEJ-4 — Completar anti-colisiones (dwell + fallback visible) | HECHO 2026-07-04 — HALLAZGO makespan +55% pendiente de decision | — |
+| **MEJ-2** — Experiment runner (replicas + A/B estadistico) | APROBADA — SIGUIENTE | 2 sesiones |
+| **Makespan +55% post-MEJ-4** — reequilibrar escenario canonico? | PENDIENTE DECISION Director (PLAN_MEJORA_4 §4) | Bajo |
 | **BK-02** — FIFO Estricto en UI | EN REPENSAR (diseno pendiente del Director) | ~15 min cuando se decida |
 | **`_legacy/web_dashboard/`** (puerto 8001) | PENDIENTE DECISION (Director quiere revisarla) | Depende de decision |
 | **INIT-1** — Picking por ubicacion real + reservas en BD | Pendiente | Alto |

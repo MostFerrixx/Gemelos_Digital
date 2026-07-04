@@ -199,10 +199,14 @@ desviación. Historia en `docs/antiguos/PLAN_INICIATIVA_2_OPCION_C.md`.
   sin efecto (capacidad_carro, map_scale). Baseline actual: `662ed5e3…` (la
   purga solo cambio la metadata del .jsonl; eventos identicos).
   **Al anadir una clave nueva de config: registrala en config_schema.py.**
-  Quedan: **MEJ-4** (completar anti-colisiones: cablear `reserve_dwell` — hoy hay
-  28 co-ocupaciones reales con hotspot en staging, ver
-  docs/PLAN_MEJORA_4_ANTICOLISIONES.md) y **MEJ-2** (experiment runner con
-  replicas/comparacion A/B). Detalle en BACKLOG.
+- **MEJ-4 HECHA (2026-07-04)**: anti-colisiones completado — dwell reservado al
+  PLANIFICAR (destino-con-permanencia), planner estilo SIPP (salto al primer
+  hueco + dominancia por intervalo), fallback visible, clearance 0.05, parking
+  idle disperso. Co-ocupaciones 28→9 (max 2/celda). Baseline: `c6f129ef…`.
+  **OJO — HALLAZGO ABIERTO**: makespan +55% (2011→3121 s): es la cola REAL del
+  staging unico que antes se ocultaba (4 agentes superpuestos). Decision del
+  Director pendiente (ver PLAN_MEJORA_4 §4). Queda **MEJ-2** (experiment runner
+  con replicas/comparacion A/B). Detalle en BACKLOG.
 - **BK-02** — FIFO Estricto en UI: EN REPENSAR (diseno pendiente del Director).
 - **`_legacy/web_dashboard/`** (puerto 8001): Director quiere revisarla antes de
   decidir (conservar / reparar / eliminar).

@@ -413,8 +413,53 @@ class BaseOperator:
             # El modo sombra JAMAS debe romper la simulacion real (es un observador).
             logger.warning(f"[TIMEWINDOW][SHADOW][WARN] plan fallo para {self.id}: {e}")
 
+    def _tw_exec_active(self) -> bool:
+        """MEJ-4: True si el ruteo timewindow esta en EJECUCION (Fase 2, no sombra)."""
+        cm = getattr(self.almacen, 'congestion_manager', None)
+        return (cm is not None and getattr(cm, 'timewindow_active', False)
+                and not bool(getattr(self.almacen, 'timewindow_shadow', True)))
+
+    def _pick_dwell_estimate(self, wo) -> float:
+        """
+        MEJ-4: duracion estimada de la PERMANENCIA en el punto de picking.
+        Base: tiempo de pick (puro, sin RNG). Forklift lo redefine sumando los
+        dos movimientos de horquilla. Se usa para el destino-con-permanencia.
+        """
+        try:
+            return float(self._compute_pick_time(wo))
+        except Exception:
+            return 0.0
+
+    def _tw_reserve_dwell(self, duration):
+        """
+        MEJ-4 (F1): reservar la PERMANENCIA del agente en su celda actual en la
+        ReservationTable, para que los planes de OTROS agentes no atraviesen a un
+        operario parado (picking / descarga / lifting). Antes de esto, el planner
+        solo modelaba el transito: la estadia era invisible y producia
+        co-ocupaciones reales (28 en la corrida canonica, hotspot en staging).
+
+        Sin yields (no toca el reloj de SimPy). No-op si timewindow esta inactivo,
+        no hay planner, o la duracion no es positiva. Las reservas propias se
+        liberan solas al planificar el siguiente tramo (release_agent) o por purga.
+        """
+        if not duration or duration <= 0:
+            return
+        cm = getattr(self.almacen, 'congestion_manager', None)
+        planner = getattr(self.almacen, 'spacetime_planner', None)
+        if planner is None or cm is None or not getattr(cm, 'timewindow_active', False):
+            return
+        pos = self.current_position
+        if pos is None:
+            return
+        try:
+            planner.reserve_dwell(tuple(pos), float(self.env.now),
+                                  float(duration), self.id)
+        except Exception as e:
+            logger.warning(f"[TIMEWINDOW][DWELL][WARN] {self.id}: reserva de "
+                           f"permanencia fallo: {e}")
+
     def _timewindow_execute_plan(self, segment_path, speed, on_before, on_after,
-                                 time_per_cell):
+                                 time_per_cell, goal_dwell=0.0):
         """
         OPCION C (time-window) - Fase 2: EJECUCION segun el plan espacio-temporal.
         Planifica+reserva la ruta libre de conflicto y la SIGUE celda a celda,
@@ -436,13 +481,27 @@ class BaseOperator:
         t0 = float(self.env.now)
         try:
             plan = planner.plan_and_reserve(
-                start, goal, t0, self.id, speed, static_steps=len(segment_path))
+                start, goal, t0, self.id, speed, static_steps=len(segment_path),
+                goal_dwell=float(goal_dwell or 0.0))
         except Exception as e:
             logger.warning(f"[TIMEWINDOW][EXEC][WARN] plan fallo para {self.id}: {e}")
             return False
         if not plan or len(plan) < 2:
             try:
                 planner.shadow_metrics["exec_fallbacks"] += 1
+            except Exception:
+                pass
+            # MEJ-4 (F2): fallback VISIBLE. La ruta estatica que va a recorrer el
+            # llamador se reserva best-effort en la tabla, para que los demas
+            # planners puedan esquivar al agente degradado (antes era invisible).
+            try:
+                dur = float(time_per_cell) * float(speed)
+                reservados = planner.reserve_path_best_effort(
+                    segment_path, t0, dur, self.id)
+                logger.warning(
+                    f"[TIMEWINDOW][EXEC][WARN] {self.id}: sin plan para tramo de "
+                    f"{len(segment_path)} pasos en t={t0:.1f}; fallback ESTATICO "
+                    f"con reserva best-effort ({reservados} intervalos)")
             except Exception:
                 pass
             return False
@@ -463,7 +522,7 @@ class BaseOperator:
         return True
 
     def _recorrer_tramo(self, segment_path, speed, on_before=None, on_after=None,
-                        time_per_cell: float = 0.1):
+                        time_per_cell: float = 0.1, goal_dwell: float = 0.0):
         """
         Helper compartido (Ground + Forklift) que recorre un tramo celda a celda.
 
@@ -509,8 +568,11 @@ class BaseOperator:
                 else:
                     # Fase 2: EJECUTA el plan espacio-temporal (sin espera reactiva).
                     # Si hay plan, recorre y retorna; si no, cae al estatico (fallback).
+                    # MEJ-4: goal_dwell = permanencia esperada en el destino, que se
+                    # reserva EN el plan (destino-con-permanencia, 3.2/4.6).
                     executed = yield from self._timewindow_execute_plan(
-                        segment_path, speed, on_before, on_after, time_per_cell)
+                        segment_path, speed, on_before, on_after, time_per_cell,
+                        goal_dwell=goal_dwell)
                     if executed:
                         return
             for step_idx, step_position in enumerate(segment_path[1:], 1):
@@ -943,7 +1005,8 @@ class BaseOperator:
                     yield from self._recorrer_tramo(
                         segment_path, self.default_speed,
                         on_before=_on_before, on_after=_on_after,
-                        time_per_cell=TIME_PER_CELL
+                        time_per_cell=TIME_PER_CELL,
+                        goal_dwell=self._pick_dwell_estimate(wo)
                     )
                 else:
                     self._jump_to(wo.ubicacion)
@@ -1013,7 +1076,8 @@ class BaseOperator:
                             yield from self._recorrer_tramo(
                                 return_path, self.default_speed,
                                 on_before=_on_before, on_after=_on_after,
-                                time_per_cell=TIME_PER_CELL
+                                time_per_cell=TIME_PER_CELL,
+                                goal_dwell=float(self.discharge_time) * len(staging_wos)
                             )
 
                             self.total_distance_traveled += len(return_path) - 1
@@ -1059,6 +1123,9 @@ class BaseOperator:
                     # libre de la zona de aforo antes de depositar (no-op si off).
                     _ob_slot = yield from self._outbound_wait_slot(staging_id, wo)
 
+                    # MEJ-4 (F1): reservar la permanencia de la descarga (era la
+                    # fuga principal: hotspot staging con 4 agentes superpuestos).
+                    self._tw_reserve_dwell(self.discharge_time)
                     # Timeout individual por WO
                     yield self.env.timeout(self.discharge_time)
 
@@ -1084,6 +1151,23 @@ class BaseOperator:
 
                     logger.debug(f"[{self.id}] t={self.env.now:.1f} [{wo_idx}/{len(staging_wos)}] "
                           f"WO {wo.id} staged (-{wo_volume}L, cargo: {self.cargo_volume}L)")
+
+                # MEJ-4 (F3b): con timewindow en EJECUCION, salir del staging al
+                # pasillo antes de quedar idle o seguir al proximo staging.
+                # Un agente estacionado en la celda de descarga es invisible para
+                # la tabla (estadia sin fin conocido) y producia co-ocupaciones
+                # con el siguiente que llegaba a descargar. El punto de
+                # estacionamiento se DISPERSA por agente (reusa _spawn_lane, BFS
+                # determinista) para que los idle no se apilen en la misma celda.
+                if self._tw_exec_active():
+                    _exit_cell = (staging_location[0], staging_location[1] - 1)
+                    if _exit_cell[1] >= 0:
+                        try:
+                            _park = tuple(self._spawn_lane(_exit_cell))
+                        except Exception:
+                            _park = _exit_cell
+                        if tuple(self.current_position) != _park:
+                            yield from self._outbound_nav_to(_park)
 
             # PASO 5: Limpiar cargo final (por seguridad)
             self.cargo_volume = 0
@@ -1180,6 +1264,8 @@ class GroundOperator(BaseOperator):
         # INIT-4 C1: tiempo de pick (escala con cantidad/volumen si esta activo;
         # neutro -> picking_time o discharge_time, igual que antes).
         picking_duration = self._compute_pick_time(wo)
+        # MEJ-4 (F1): la permanencia del picking se reserva en la tabla.
+        self._tw_reserve_dwell(picking_duration)
         yield self.env.timeout(picking_duration)
 
         self.almacen.registrar_evento('operation_completed', {
@@ -1275,9 +1361,19 @@ class Forklift(BaseOperator):
         """Set forklift lift height"""
         self.lift_height = height
 
+    def _pick_dwell_estimate(self, wo) -> float:
+        """MEJ-4: la permanencia del Forklift incluye subir y bajar la horquilla."""
+        base = super()._pick_dwell_estimate(wo)
+        return base + 2.0 * float(self.lift_time)
+
     def _do_picking_at(self, wo):
         """Secuencia de picking Forklift: lift + timeout + lower."""
         LIFT_TIME = self.lift_time
+        # MEJ-4 (F1): reservar la permanencia COMPLETA (lift + pick + lower) de
+        # una vez. _compute_pick_time es puro (sin RNG): calcularlo aqui no
+        # altera el comportamiento.
+        _pick_est = self._compute_pick_time(wo)
+        self._tw_reserve_dwell(LIFT_TIME + _pick_est + LIFT_TIME)
         self.status = "lifting"
         logger.debug(f"[{self.id}] t={self.env.now:.1f} Elevando horquilla")
 

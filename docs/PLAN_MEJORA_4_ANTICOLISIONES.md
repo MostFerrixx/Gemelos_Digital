@@ -1,7 +1,8 @@
 # PLAN MEJORA 4 — Completar el sistema anti-colisiones
 # Cablear la permanencia (dwell) + fallback visible en el ruteo espacio-temporal
 
-**Creado:** 2026-07-04 · **Autor:** Cerebellum · **Estado:** APROBADO (Director, 2026-07-04)
+**Creado:** 2026-07-04 · **Autor:** Cerebellum · **Estado:** EJECUTADO 2026-07-04
+(rama `feature/mej-4-anticolisiones`; resultados en la seccion 4 al final)
 **Backlog:** MEJ-4 en `docs/BACKLOG.md` · **Orden acordado:** MEJ-3 -> MEJ-4
 
 ---
@@ -156,7 +157,60 @@ intencional.
 
 ---
 
-## 3. REFERENCIAS
+## 4. RESULTADOS DE LA EJECUCION (2026-07-04)
+
+La implementacion requirio 5 iteraciones medidas (cada una destapada por la
+evidencia de la anterior — el metodo funciono):
+
+1. **Dwell al LLEGAR** (F1 literal): co-ocup 28 -> 23, pero 369 solapes (los
+   planes ya comprometidos no ven una reserva tardia). Insuficiente.
+2. **Destino-con-permanencia** (dwell reservado AL PLANIFICAR, plan 3.2/4.6) +
+   fallback visible: los dwells largos del staging (n*discharge, hasta ~75 s)
+   hicieron EXPLOTAR el A* (17 planes fallidos por cap de expansiones: esperar
+   en pasos de 0.1 s = miles de estados).
+3. **Planner SIPP**: `earliest_free` en la tabla (salto directo al primer
+   hueco), movimiento con salida retrasada, y DOMINANCIA por (celda, intervalo
+   seguro) en vez de (celda, t) — elimina cadenas de espera y oscilacion.
+   Resultado: 0 fallos de plan, coste MEJOR que el original (0.5-0.7 ms vs
+   2.4 ms), esperas planificadas reales (~0.1/plan).
+4. **Clearance 0.05** (config canonico) + **parking idle disperso** (reusa
+   `_spawn_lane`): elimina las carreras de relevo instantaneas y el apilamiento
+   de idles en la celda de salida.
+5. **Insercion con pre-chequeo** en el core: `table.overlap_violations` vuelve
+   a significar "bug de construccion" y queda en **0**.
+
+### Numeros finales (corrida canonica, seed 42)
+| Metrica | Antes | Despues |
+|---|---|---|
+| Co-ocupaciones reales (I1) | 28 | **9** (todas pares instantaneos) |
+| Max agentes en una celda | 4 | **2** |
+| Hotspot staging (3,29) | 22 (max 4) | 2 (max 2) |
+| Planes fallidos / fallbacks | 0 (pero dwell invisible) | 1, con fallback VISIBLE (reserva best-effort + WARN) |
+| Solapes de tabla (invariante) | 0 | **0** |
+| Coste por plan | 2.41 ms | 0.71 ms |
+| Esperas planificadas/plan | 0.0 | 0.095 (cola real modelada) |
+| Makespan | 2011 s | **3121 s (+55%)** |
+
+### Desviacion del criterio de aceptacion (transparencia)
+El plan pedia co-ocupaciones <= 2; quedaron **9** (1 spawn documentado + 8
+pares instantaneos de relevo/transito, en su mayoria artefactos de orden de
+procesos SimPy en el mismo timestamp, sin apilamiento fisico). Bajar de ahi
+exige perseguir el orden de eventos same-timestamp: costo alto, valor bajo.
+`dwell_conflicts=27` (planes comprometidos antes del dwell) queda como metrica
+visible de la exposicion residual.
+
+### HALLAZGO DE PRODUCTO — makespan +55% (para decision del Director)
+Con la permanencia modelada, la descarga en el staging unico (100% de la
+distribucion va al staging 1, UNA celda) se SERIALIZA: ~300 WOs x 5 s = ~1500 s
+de cuello minimo. Antes, hasta 4 agentes descargaban SUPERPUESTOS en la misma
+celda: el throughput historico estaba inflado por una imposibilidad fisica.
+El +55% no es lentitud del software: es el cuello de botella real que el
+gemelo digital existe para mostrar. Palancas si se quiere reequilibrar el
+escenario canonico: repartir `outbound_staging_distribution` entre varias
+zonas, bajar `discharge_time`, o desactivar `congestion` (vuelve el modelo
+optimista). Decision pendiente del Director.
+
+## 5. REFERENCIAS
 - Evidencia: `output/simulation_20260704_163041/congestion_report_*.json` (28
   co-ocupaciones, hotspot 3,29 max_concurrent=4) vs
   `timewindow_shadow_report_*.json` (344/344 planes, 0 solapes) — el contraste

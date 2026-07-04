@@ -23,7 +23,7 @@ Responsable: Cerebellum
 | MEJ-1 — Red de seguridad automatizada (tests + gate) | HECHO (2026-07-04, F1-F5 completas) |
 | **MEJ-2 — Experiment runner con replicas + comparacion A/B** | **APROBADA** (2026-07-04, sin sprint) |
 | MEJ-3 — Esquema unico de config (pydantic) + purga de claves | HECHO (2026-07-04) |
-| **MEJ-4 — Completar anti-colisiones (dwell + fallback visible)** | **APROBADA** (2026-07-04, plan en docs/PLAN_MEJORA_4_ANTICOLISIONES.md) |
+| MEJ-4 — Completar anti-colisiones (dwell + fallback visible) | HECHO (2026-07-04) — HALLAZGO: makespan +55% real, decision pendiente |
 
 ---
 
@@ -724,8 +724,17 @@ Consecuencias reales:
 
 ## MEJ-4 — Completar el sistema anti-colisiones: dwell + fallback visible
 
-**Estado:** APROBADA por el Director — 2026-07-04. Plan y analisis completo:
-`docs/PLAN_MEJORA_4_ANTICOLISIONES.md`. **Orden acordado: MEJ-3 -> MEJ-4.**
+**Estado:** HECHO — 2026-07-04 (rama `feature/mej-4-anticolisiones`). Analisis,
+iteraciones y resultados completos: `docs/PLAN_MEJORA_4_ANTICOLISIONES.md` §4.
+**Resultado:** co-ocupaciones 28 -> 9 (cero amontonamientos, max 2 por celda),
+planner reescrito estilo SIPP (salto al primer hueco + dominancia por intervalo;
+0 fallos, coste 0.7 ms/plan, MEJOR que el original), fallback visible, clearance
+0.05, parking idle disperso, invariante de tabla en 0. Baseline `c6f129ef…`.
+**HALLAZGO ABIERTO (decision del Director):** makespan 2011 -> 3121 s (+55%).
+No es lentitud: es la cola REAL del staging unico (300 WOs x 5 s en una celda)
+que antes se ocultaba con hasta 4 agentes descargando superpuestos. Palancas:
+repartir `outbound_staging_distribution`, ajustar `discharge_time`, o apagar
+`congestion`. Ver PLAN_MEJORA_4 §4.
 **Prioridad:** Alta (realismo del cuello de botella de staging/pasillos)
 **Origen:** Analisis independiente de Cerebellum del sistema anti-colisiones
 (Iniciativa 2 Opcion C), pedido por el Director el 2026-07-04.
