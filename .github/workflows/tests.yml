@@ -30,5 +30,11 @@ jobs:
       - name: Suite de red de seguridad (unit)
         run: python -m pytest -q
 
+      # warehouse.db NO se versiona (Ley 7): se regenera desde el Excel canonico.
+      # Verificado 2026-07-04: una BD recien migrada reproduce el baseline
+      # byte-identico (sin ella, el motor cae al fallback Excel y el SHA difiere).
+      - name: Migrar Excel -> SQLite (warehouse.db)
+        run: python run_migration.py
+
       - name: Gate de regresion byte-identico
         run: python scripts/regression_gate.py
