@@ -1,9 +1,9 @@
 # Gemelo Digital de Almacen
 
-**Version:** V12.1 (Allocation Layer)
+**Version:** V12.1 (Allocation Layer + INIT-4)
 **Estado:** En desarrollo activo - rama `feature/allocation-layer-v12.1`
 **Arquitectura:** Headless (SimPy) + Replay + GUI web
-**Actualizado:** 2026-05
+**Actualizado:** 2026-06-29
 
 ---
 
@@ -46,6 +46,31 @@ realidad del inventario.
 
 Toca principalmente `data_manager.py` (`get_available_stock`), `warehouse.py`
 (campos de la WorkOrder), `order_strategies.py` y `config.json`.
+
+---
+
+## 2.1 Capacidades adicionales del motor (opt-in)
+
+Sobre la base V12.1 se anadieron features **opt-in con defaults neutros**: si no
+se activan, el motor se comporta como antes (corrida con `WAREHOUSE_SEED=42`
+byte-identica al baseline). Se activan desde `config.json`.
+
+- **Tiempos de pick realistas** (INIT-4 C1): el tiempo de recogida puede escalar
+  con la cantidad/volumen de la WorkOrder en vez de ser fijo
+  (`tiempos.pick_time_model`).
+- **Prioridad de pedido / SLA** (INIT-4 C2): los pedidos pueden traer `priority` y
+  `due_time`; con `priority_dispatch_enabled` los urgentes se sirven primero
+  (Opcion C "fuerte limpia": el tour se arma solo con urgentes, sin diluir, sin
+  cruzar de zona).
+- **Olas de picking** (INIT-4 C3): agrupar pedidos por `wave` y liberarlos por
+  horario (`waves.release_times`); una WO no es elegible hasta su release.
+- **Nivel de servicio / backorders** (INIT-5): fill-rate y demanda no cubierta en
+  el visor web, la API y una hoja Excel.
+- **Reproducibilidad** (`WAREHOUSE_SEED`): semilla determinista via variable de
+  entorno para corridas comparables.
+
+Detalle e implementacion: `docs/PLAN_INIT4.md` y la seccion "Flags opt-in" de
+`CLAUDE.md` / `docs/HANDOFF.md`.
 
 ---
 
@@ -213,16 +238,21 @@ Parametros tipicos: `total_ordenes`, `agent_types` (operarios y montacargas con
 capacidad y prioridades de zona), `dispatch_strategy`, `tour_type`,
 `fulfillment_policy`, `layout_file`, `sequence_file`.
 
+Flags **opt-in** (ausentes del `config.json` canonico a proposito; el motor los lee
+con defaults neutros): `tiempos.pick_time_model`, `priority_dispatch_enabled`,
+`waves` (ver seccion 2.1). La variable de entorno `WAREHOUSE_SEED` fija la semilla.
+
 Los **datos canonicos viven en la raiz**:
 
 - `layouts/WH1.tmx` - layout activo (mapa Tiled).
 - `layouts/Warehouse_Logic.xlsx` - logica/secuencia de racks y zonas.
 - `config.json` - configuracion de la simulacion.
 
-> **Bug conocido (pendiente):** existe un arbol `data/` con copias duplicadas de
-> layouts y datos. La simulacion lee `layouts/Warehouse_Logic.xlsx` (raiz) pero
-> `run_migration.py` lee `data/layouts/Warehouse_Logic.xlsx`, por lo que la base
-> de datos y la simulacion pueden divergir. Unificar en una sesion dedicada.
+> **Nota (sin divergencia):** existe un arbol `data/` con copias duplicadas, pero
+> tanto la simulacion como `run_migration.py` leen de `layouts/` (la raiz). El
+> migrador usa `find_excel_file()` (busca `layouts/Warehouse_Logic_v2.xlsx` y luego
+> `layouts/Warehouse_Logic.xlsx`); no existe copia en `data/layouts/`. El arbol
+> `data/` es una migracion abandonada que solo lee codigo muerto/roto.
 
 ---
 
@@ -239,12 +269,16 @@ Cada simulacion crea una carpeta `output/simulation_YYYYMMDD_HHMMSS/` con:
 
 ## 9. Documentacion y repositorio
 
-- `CLAUDE.md` - manual operativo del proyecto (arquitectura real, vivo vs muerto, leyes).
-- `AUDITORIA.md` - diagnostico completo y plan de limpieza por fases.
+- `CLAUDE.md` - manual operativo del proyecto (arquitectura real, flags, leyes).
+- `docs/HANDOFF.md` - estado operativo al dia (arquitectura, historial, flags, pendientes).
+- `docs/BACKLOG.md` - inventario de iniciativas (hechas y pendientes).
+- `docs/PLAN_INIT4.md` - plan + pruebas de INIT-4 (prioridad/SLA/olas + tiempos).
+- `AUDITORIA.md` - diagnostico estructural completo (mayo 2026).
 - `_legacy/README.md` - que se archivo, por que y como revertirlo.
+- `docs/antiguos/` - planes/bitacoras de iniciativas ya cerradas (historico).
 
-> Aviso: `INSTRUCCIONES.md` y `HANDOFF.md` son **documentos historicos (V11)** y
-> no reflejan el estado actual. La referencia vigente es este `README.md`.
+> `CLAUDE.md`, este `README.md` y `docs/HANDOFF.md` se mantienen al dia y son la
+> referencia vigente. Los documentos en `docs/antiguos/` son historicos.
 
 Repositorio: https://github.com/MostFerrixx/Gemelos_Digital
 
