@@ -14,6 +14,10 @@
 > **ACTUALIZACION 2026-06-27:** E6 y E7 ("Generar Plantilla TMX" / "Poblar SKUs Aleatorios")
 > fueron ELIMINADOS del HTML y JS en commit `f3a3ec5` (BK-05). No son controles validos
 > en la UI actual. El total pasa de 62 a 60 controles. D1 resuelto con modal (H-2).
+>
+> **NOTA 2026-06-29 (arquitectura):** las menciones al "visor Pygame" y al servidor
+> `:8001` (web_dashboard) son de GUIs ya archivadas en `_legacy/` (commit `3cd37e6`).
+> El frontend vigente es solo el viewer web `web_prototype` (:8000).
 
 ---
 

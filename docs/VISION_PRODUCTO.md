@@ -81,9 +81,10 @@ Estos principios ya rigen el codigo y deben sobrevivir a cualquier evolucion:
   hay un scaffold temporal). Detalle vivo en docs/PROGRESO_INICIATIVA_3.md.
 - **Layout**: de juguete (WH1, 30x30). Suficiente para validar mecanismos, lejos
   de una instalacion real.
-- **Herramientas**: optimizador (Optuna), configurador web (FastAPI), viewer
-  (Pygame), reportes Excel + heatmap. Conviven codigo vivo y muerto (ver
-  `AUDITORIA.md`); la verdad es el codigo en `main` + working dir.
+- **Herramientas**: optimizador (Optuna), configurador + **viewer web** (FastAPI,
+  unico frontend), reportes Excel + heatmap. Las GUI de escritorio (viewer Pygame,
+  dashboard PyQt6, configurador Tkinter) fueron archivadas en
+  `_legacy/gui_escritorio/`. La verdad es el codigo en `main` + working dir.
 
 ---
 

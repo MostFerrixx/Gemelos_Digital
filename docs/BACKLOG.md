@@ -1,8 +1,25 @@
 # BACKLOG — Gemelo Digital de Almacen
-# Items pendientes de implementacion (no urgentes, sin sprint asignado)
+# Inventario de iniciativas: hechas y pendientes
 
-Documento creado: 2026-06-14
+Documento creado: 2026-06-14 · Actualizado: 2026-06-29
 Responsable: Cerebellum
+
+## Indice de estado (de un vistazo)
+
+| Item | Estado |
+|------|--------|
+| BK-01 — Estrategias ocultas (Cercania) en UI | HECHO (2026-06-14) |
+| BK-02 — FIFO Estricto en UI | EN REPENSAR (Director) |
+| BK-03 — Greedy nearest-neighbor en Cercania | DESCARTADO con evidencia |
+| BK-04 — Flota sin work_area + outbound colgado | RESUELTO (2026-06-20) |
+| BK-05 — Botones E6/E7 stub | ELIMINADO (2026-06-27) |
+| INIT-4 — Prioridad/SLA/olas + tiempos de pick | HECHO (2026-06-29) |
+| INIT-5 — Nivel de servicio / backorders | RESUELTO (2026-06-21) |
+| **INIT-4 → KPI de SLA vencido** | **PENDIENTE** (diferido de INIT-4) |
+| **INIT-1 — Picking por ubicacion real + reservas** | **PENDIENTE** (alto) |
+| **INIT-3 — Reparar optimizador Optuna** | **PENDIENTE** (bajo-medio) |
+| **WOs sobredimensionadas** — fix defensivo | **PENDIENTE** (bajo) |
+| **`_legacy/web_dashboard/`** — conservar/reparar/eliminar | **PENDIENTE DECISION** |
 
 ---
 
@@ -532,6 +549,54 @@ Consecuencia:
 ### Archivos a tocar
 - `warehouse.py`: `_validar_y_ajustar_cantidad()`
 - `order_strategies.py`: registrar WO imposible como backorder
+
+---
+
+## INIT-4b — KPI de SLA vencido en el reporte/visor (unico punto diferido de INIT-4)
+
+**Estado:** PENDIENTE — diferido de INIT-4 (no bloqueante)
+**Prioridad:** Baja
+**Origen:** INIT-4 C2 (prioridad/SLA). Ver docs/PLAN_INIT4.md.
+
+### Que es y por que queda
+INIT-4 C2 anadio `due_time` (plazo de entrega) a la WorkOrder y lo usa como
+criterio de desempate, pero **no se mide ni se muestra** cuantos pedidos incumplen
+su SLA (se completan despues de su `due_time`). El dato ya existe en la WO; falta
+cablearlo a la salida. Se difirio para cerrar INIT-4 sin ampliar el alcance.
+
+### Que hay que hacer
+1. Al completar cada pedido, comparar tiempo de completado vs `due_time`.
+2. Agregar un resumen (pedidos a tiempo / vencidos / % cumplimiento SLA).
+3. Exponerlo en el reporte Excel y en el visor web, reusando el patron de INIT-5
+   (`core/replay_utils.build_service_level_summary` + metadata del `.jsonl`).
+
+### Archivos a tocar
+- `core/replay_utils.py` (resumen SLA), `event_generator.py` (metadata),
+  `web_prototype/server.py` (API), `static/app.js` (KPI), `analytics/exporter_v2.py` (hoja).
+
+---
+
+## web_dashboard — Decision: conservar / reparar / eliminar
+
+**Estado:** PENDIENTE DECISION DEL DIRECTOR
+**Prioridad:** Baja (no afecta la cadena viva)
+**Ubicacion:** `_legacy/web_dashboard/` (archivada, no en la raiz)
+
+### Contexto
+App web independiente (FastAPI, puerto 8001) que mostraba una **tabla de
+WorkOrders** del replay. Esta **huerfana y rota**: apunta a un `.jsonl` de prueba
+que ya no existe (hardcodeado, nov-2025) y usa rutas viejas. Su funcion ya la
+cubre el panel de WorkOrders del **viewer web vigente** (`web_prototype`), por lo
+que es una version peor y duplicada.
+
+### Opciones (recomendacion de Cerebellum: eliminar)
+- **Conservar** tal cual: no aporta (rota + duplicada); ya aislada en `_legacy/`.
+- **Reparar**: arreglar rutas es rapido, pero mantendria dos UIs que hacen lo
+  mismo -> esfuerzo sin premio. No recomendado.
+- **Eliminar** (recomendado): antes, un vistazo de 2 min a su tabla por si hay
+  alguna idea de presentacion que llevar al panel del viewer web; si no, fuera.
+
+El Director quiere revisarla antes de decidir. NO tocar sin su visto bueno.
 
 ---
 

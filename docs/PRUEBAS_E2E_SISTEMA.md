@@ -2,6 +2,13 @@
 # Versión de referencia: V12.1 (rama feature/allocation-layer-v12.1)
 # Última actualización: 2026-06-13
 
+> **NOTA 2026-06-29 (arquitectura):** este catálogo se redactó cuando el visor
+> Pygame (`run_replay_viewer.py`) aún era cadena viva. Desde el commit `3cd37e6`
+> las 3 GUI de escritorio están archivadas en `_legacy/gui_escritorio/`; el único
+> frontend vigente es el **viewer web** (`web_prototype`, :8000). Los casos que
+> mencionan el visor Pygame aplican solo a esa GUI ya deprecada. Para las features
+> nuevas (INIT-4: prioridad/olas/tiempos de pick) ver `docs/PLAN_INIT4.md`.
+
 ---
 
 ## TABLA DE CONTENIDOS
