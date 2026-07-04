@@ -610,8 +610,11 @@ Plan: `docs/PLAN_MEJORA_1_RED_SEGURIDAD.md`.
 **Evidencia de cierre:**
 - `python -m pytest -q` -> 58 passed, 1 skipped (bug WOs sobredimensionadas
   documentado), 1 deselected (gate), ~1.3 s.
-- `python scripts/regression_gate.py` -> `[OK] GATE PASS` byte-identico
-  (sha `a4ae8d4e…`, 5.379.372 bytes) en ~15-17 s.
+- `python scripts/regression_gate.py` -> `[OK] GATE PASS` byte-identico modulo
+  EOL (sha normalizado `4a208831…`, 5.367.492 bytes; equivale al historico
+  `a4ae8d4e…` con CRLF) en ~13-17 s.
+- CI GitHub Actions EN VERDE (ubuntu): pytest + run_migration + gate. El SHA
+  normalizado de Windows == el de Linux (determinismo multiplataforma probado).
 - Prueba de fuego (sabotaje `max_wos_por_tour` 20->19): suite en ROJO
   (`assert 19 == 20`), revertido, verde de nuevo. El sabotaje ademas destapo y
   corrigio un test debil (ES-01 ahora cubre defaults con config vacio).

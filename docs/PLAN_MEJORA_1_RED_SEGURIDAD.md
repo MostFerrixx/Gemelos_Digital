@@ -199,14 +199,20 @@ SimPy real** (solo CF-01/CF-05 leen archivos del repo).
    (excluido del run default via `-m "not gate"` en `pytest.ini` -> addopts).
 4. Atajos: target `make test` / `make gate` en `Makefile` y comandos en `run.bat`.
 
-### F5 — CI GitHub Actions  [OPCIONAL — decision del Director]
+### F5 — CI GitHub Actions  [APROBADA por el Director y VALIDADA EN VERDE 2026-07-04]
 `.github/workflows/tests.yml`: en cada push/PR -> `pip install -r requirements.txt`
-+ `pytest -m "not gate"` + `python scripts/regression_gate.py`.
-- Nota a favor: HANDOFF §7 documenta que el SHA es el mismo en Windows y Linux.
-- Riesgos CI: (a) `pygame-ce` en runner Linux headless puede requerir
-  `SDL_VIDEODRIVER=dummy`; (b) version de Python del runner debe fijarse (3.13)
-  porque el baseline se pineo con 3.13.6. Si F5 se aprueba, se valida en una
-  rama antes de darlo por bueno.
++ `pytest` + `python run_migration.py` + `python scripts/regression_gate.py`.
+Validacion real destapo (y se corrigio) dos supuestos falsos del plan original:
+- `warehouse.db` no existe en CI (no se versiona, Ley 7): sin ella el motor cae
+  al fallback Excel y el SHA difiere -> la CI corre `run_migration.py` antes del
+  gate. Verificado ademas que una BD recien migrada reproduce el baseline (sin
+  deriva BD local vs Excel canonico).
+- El supuesto "mismo SHA en Windows y Linux" era FALSO en crudo: el .jsonl se
+  escribe en modo texto (CRLF vs LF; delta 11.880 bytes = numero de lineas).
+  Fix: el gate hashea con EOL normalizado (CRLF->LF); el SHA normalizado de
+  Windows coincidio EXACTO con el de ubuntu (`4a208831…`) -> determinismo
+  multiplataforma probado (Python 3.13.6 local vs 3.13.14 CI). El motor NO se
+  toco; el invariante del gate es "byte-identico modulo EOL".
 
 ---
 

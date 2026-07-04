@@ -133,7 +133,18 @@ HEADs corregidos) + 3 mejoras aprobadas por el Director (MEJ-1/2/3, ver BACKLOG)
   smoke `tests/test_gate_smoke.py` (marker gate) + `make test`/`make gate` y
   `run test`/`run gate`.
 - **F5**: CI `.github/workflows/tests.yml` (ubuntu, Python 3.13, SDL dummy):
-  pytest + gate en cada push/PR. Pendiente de validar en el primer push.
+  pytest + migracion Excel->SQLite + gate en cada push/PR. **VALIDADA EN VERDE**
+  (run `9f57bea` conclusion=success) tras resolver dos fallos reales:
+  1. `warehouse.db` no se versiona (Ley 7) -> sin ella el motor cae al fallback
+     Excel y el SHA difiere. Fix: la CI corre `run_migration.py` antes del gate.
+     Bonus verificado: una BD recien migrada reproduce el baseline byte-identico
+     (NO hay deriva entre la BD local y el Excel canonico).
+  2. El `.jsonl` se escribe en modo texto: CRLF (Windows) vs LF (Linux), delta
+     11.880 bytes = numero exacto de lineas. Fix: el gate hashea con EOL
+     normalizado (CRLF->LF). El SHA normalizado de Windows coincidio EXACTO con
+     el de ubuntu (`4a208831…`), probando determinismo multiplataforma incluso
+     entre Python 3.13.6 y 3.13.14. Baseline regenerado (equivale al historico
+     `a4ae8d4e…` con CRLF). El motor NO se toco.
 - **Prueba de fuego**: sabotaje `max_wos_por_tour` 20->19 -> suite ROJA
   (`assert 19 == 20`) -> revertido. El primer intento NO fallo y destapo un test
   debil (fixture pasaba el valor explicito): se agrego ES-01b (defaults con
@@ -330,8 +341,12 @@ git rev-list --count main..feature/...           # verificar divergencia 0
 Verificar siempre divergencia 0/0 tras el push.
 
 > Nota de entorno: `git` puede avisar "LF will be replaced by CRLF"; es esperado
-> en Windows y no afecta el contenido. El gate byte-identico usa `WAREHOUSE_SEED=42`
-> y compara SHA256 del `.jsonl` (mismo resultado en Windows y Linux: `a4ae8d4e…`).
+> en Windows y no afecta el contenido. OJO: el `.jsonl` se escribe en modo texto,
+> asi que Windows produce CRLF y Linux LF con contenido logico IDENTICO (delta =
+> numero de lineas). Por eso el gate (MEJ-1) normaliza EOL antes de hashear:
+> SHA256 normalizado `4a208831…` (5.367.492 bytes) identico en Windows y CI
+> ubuntu (verificado 2026-07-04). El SHA historico `a4ae8d4e…` (5.379.372 bytes)
+> era el MISMO archivo con CRLF sin normalizar.
 
 ---
 

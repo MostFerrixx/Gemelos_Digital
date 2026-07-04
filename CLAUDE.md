@@ -189,9 +189,11 @@ desviación. Historia en `docs/antiguos/PLAN_INICIATIVA_2_OPCION_C.md`.
 ### Pendientes (ver docs/BACKLOG.md para detalle)
 - **MEJ-1 HECHA (2026-07-04)**: red de seguridad automatizada — suite pytest
   (`python -m pytest -q`) + gate byte-identico (`python scripts/regression_gate.py`)
-  + CI GitHub Actions. Usala en todo cambio de motor. Quedan **MEJ-3** (esquema
-  unico de config con pydantic, siguiente) y **MEJ-2** (experiment runner con
-  replicas/comparacion A/B). Detalle en BACKLOG.
+  + CI GitHub Actions EN VERDE. Usala en todo cambio de motor. El gate hashea el
+  `.jsonl` con EOL normalizado (CRLF→LF): SHA `4a208831…` identico en Windows y
+  Linux; el historico `a4ae8d4e…` era el mismo archivo con CRLF. Quedan **MEJ-3**
+  (esquema unico de config con pydantic, siguiente) y **MEJ-2** (experiment
+  runner con replicas/comparacion A/B). Detalle en BACKLOG.
 - **BK-02** — FIFO Estricto en UI: EN REPENSAR (diseno pendiente del Director).
 - **`_legacy/web_dashboard/`** (puerto 8001): Director quiere revisarla antes de
   decidir (conservar / reparar / eliminar).
