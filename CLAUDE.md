@@ -29,31 +29,39 @@ Simulador de operaciones logísticas de almacén (Warehouse Digital Twin).
   SKU de un rack a una zona de staging; con volumen, prioridad y secuencia),
   Layout (mapas TMX de Tiled).
 - **Flujo central:** motor headless → archivo `.jsonl` de eventos → visualización
-  y analítica (viewer web + Pygame, reportes Excel + heatmap). La simulación "en
-  vivo" (live) fue ELIMINADA a propósito; **no la reintroduzcas**.
+  y analítica (**viewer web**, reportes Excel + heatmap). La simulación "en vivo"
+  (live) fue ELIMINADA a propósito; **no la reintroduzcas**. Las GUI de escritorio
+  (viewer Pygame, dashboard PyQt6, configurador Tkinter) fueron **archivadas** en
+  `_legacy/gui_escritorio/` (commit `3cd37e6`); el frontend vigente es solo la web.
 
-## 3. ARQUITECTURA REAL  ⚠️ EL CÓDIGO VA POR V12.1; LOS DOCS DICEN V11
-No confíes en README.md / HANDOFF.md / INSTRUCCIONES.md / .cursorrules: están
-desactualizados (hablan de V11, mencionan archivos inexistentes como
-ACTIVE_SESSION_STATE.md). **La verdad es el código en `main` + el working dir.**
+## 3. ARQUITECTURA REAL (V12.1, verificada 2026-06-29)
+La verdad es el código en `main` + el working dir. `README.md` (raíz) y
+`docs/HANDOFF.md` están **al día** y son referencia válida; los archivos históricos
+en `docs/antiguos/` NO (describen fases ya cerradas). Ante cualquier duda, rastrea
+imports en el working dir antes de afirmar.
 
 Cadena viva (verificada por rastreo de imports):
 - `entry_points/run_generate_replay.py` → `src/engines/event_generator.py`
   (headless: SimPy puro → `.jsonl` + Excel + heatmap).
-- `entry_points/run_replay_viewer.py` → `src/engines/replay_engine.py` (Pygame).
 - `entry_points/run_optimization.py` → `src/tools/optimizer.py` (Optuna).
 - `web_prototype/server.py` (FastAPI, puerto 8000): configurador web + runner +
-  viewer. Se lanza con `start_server.bat` / `server_manager.py` / `start_hidden.py`.
+  **viewer web** (único frontend). Se lanza con `start_server.bat` /
+  `server_manager.py` / `start_hidden.py`.
 - `run_migration.py` → `src/subsystems/database/` (Excel → SQLite `warehouse.db`).
+
+**El viewer Pygame ya NO es cadena viva:** `run_replay_viewer.py` y
+`replay_engine.py` se archivaron en `_legacy/gui_escritorio/` (commit `3cd37e6`).
+`src/engines/` solo contiene `event_generator.py` y `analytics_engine.py`.
 
 Núcleo de simulación (sano y principal): `src/subsystems/simulation/`
 (`warehouse.py`, `dispatcher.py` [DispatcherV11, doble barrido], `operators.py`,
 `order_strategies.py`, `data_manager.py`, `assignment_calculator.py`,
-`route_calculator.py`, `pathfinder.py`, `layout_manager.py`).
+`route_calculator.py`, `pathfinder.py`, `layout_manager.py`, `outbound.py`).
 
-Stack: Python · SimPy · Pygame/pygame_gui · PyQt6 (dashboard WO por IPC) · pytmx ·
-pandas/openpyxl · Optuna · SQLite · FastAPI/uvicorn/pydantic (web).
-FastAPI/uvicorn/pydantic YA están en requirements.txt (líneas 24-27).
+Stack VIGENTE: Python · SimPy · pytmx · pandas/openpyxl · Optuna · SQLite ·
+FastAPI/uvicorn/pydantic (web). `pygame-ce` sigue siendo dependencia del
+**headless** (lo usa `layout_manager.py` para leer el TMX), NO por GUI. `PyQt6` y
+`pygame_gui` solo los usan las GUI archivadas en `_legacy/gui_escritorio/`.
 
 ## 4. MAPA DE CÓDIGO VIVO vs MUERTO (no confundas uno con otro)
 La regla de oro: **distinguir vivo de muerto, y no mezclarlos sin querer.**
@@ -66,21 +74,24 @@ La regla de oro: **distinguir vivo de muerto, y no mezclarlos sin querer.**
 
 VIVO fuera de `src/` (cuidado, es real, no lo borres "por limpieza" sin pensar):
 `simulation_buffer.py` (lo usa event_generator), `visualizer.py` (heatmap por
-subprocess), `configurator.py` (configurador escritorio), `server_manager.py`,
-`start_hidden.py`.
+subprocess), `server_manager.py`, `start_hidden.py`. (El configurador de escritorio
+`configurator.py` ya NO está aquí: se archivó en `_legacy/gui_escritorio/`.)
+
+ARCHIVADO en `_legacy/` (deprecado, reversible por `git mv`, NO borrar sin avisar):
+- `_legacy/gui_escritorio/` (commit `3cd37e6`): las 3 GUI de escritorio —
+  viewer Pygame (`run_replay_viewer.py`, `replay_engine.py`), dashboard PyQt6
+  (`visualization/`, IPC en `communication/`), configurador Tkinter
+  (`configurator.py`). Reemplazadas por el frontend web.
+- `_legacy/web_dashboard/` (puerto 8001, huérfana, apunta a un replay inexistente):
+  tabla de WorkOrders redundante con el panel del viewer web. **Pendiente decisión
+  del Director** (conservar / reparar / eliminar) — NO tocar sin avisar.
 
 MUERTO (confirmado sin imports de entrada) — ignóralo en features; candidato a
 poda en limpieza:
-- `legacy/**` (sufijo _OLD), `src/shared/**`, `utils/**` (raíz),
-  `tools/configurator.py`, `tools/visualizer.py`, `tools/inspect_tmx.py`
-  (duplicado byte-idéntico de `inspector_tmx.py`).
-- `web_dashboard/` (huérfana, puerto 8001, ruta de replay rota) → NO la des por
-  muerta sin avisar; el Director quiere revisarla antes de decidir.
-- Gran parte de `tests/` importa módulos borrados (`simulation_engine`,
-  `simulation_data_provider`) → está rota; no la uses como red de seguridad.
-- Dashboards: el vivo de replay es `dashboard_world_class.py::DashboardWorldClass`;
-  `DashboardOriginal` (en `dashboard.py`) lo usa el renderer. `ModernDashboard` y
-  `DashboardGUI` se importan pero no se instancian (muertos probables).
+- `_legacy/legacy/**` (sufijo _OLD), `_legacy/src_shared/**`, `_legacy/utils_root/**`,
+  `_legacy/tools_duplicados/**`.
+- `_legacy/tests_rotos/` y gran parte de `tests/` importan módulos borrados
+  (`simulation_engine`, `simulation_data_provider`) → rota; no es red de seguridad.
 
 Fuente de datos canónica = **la RAÍZ** (`config.json`, `layouts/WH1.tmx`,
 `layouts/Warehouse_Logic.xlsx`). El árbol `data/` es una migración abandonada que
@@ -89,10 +100,10 @@ NOTA: la simulación y `run_migration.py` leen ambos desde `layouts/`. El migrad
 usa `find_excel_file()` (busca `layouts/Warehouse_Logic_v2.xlsx`, luego
 `layouts/Warehouse_Logic.xlsx`); no existe copia en `data/layouts/`. Sin divergencia.
 
-## 5. ESTADO ACTUAL (actualizado 2026-06-27)
+## 5. ESTADO ACTUAL (actualizado 2026-06-29)
 
 ### Rama activa y estado de git
-`feature/allocation-layer-v12.1` sincronizada con `main`. HEAD: `f3a3ec5`.
+`feature/allocation-layer-v12.1` sincronizada con `main`. HEAD: `edba925`.
 No hay commits pendientes de push ni merge. Lee `docs/HANDOFF.md` para el
 estado operativo detallado.
 
@@ -135,16 +146,44 @@ estado operativo detallado.
   byte-identico. Ver docs/PLAN_INIT4.md.
 - **Limpieza** (`8fd8a3c`): 40+ archivos basura en basura/, .gitignore ampliado.
 
+### Flags y features opt-in (todos leídos de `config.json`; defaults NEUTROS)
+Estos flags NO están en el `config.json` canónico: el motor los lee con `.get()` y
+defaults que reproducen el comportamiento histórico. Por eso una corrida sin ellos
++ `WAREHOUSE_SEED=42` da el `.jsonl` **byte-idéntico** al baseline (`a4ae8d4e…`).
+- **`tiempos.pick_time_model`** (INIT-4 C1): `{base, por_unidad, por_volumen, minimo}`.
+  Tiempo de pick = `base + por_unidad·cantidad + por_volumen·volumen`, acotado por
+  `minimo`. `base=null` y factores 0 → tiempo histórico (`picking_time`/`discharge_time`).
+  Lo consume `BaseOperator._compute_pick_time()` en `operators.py`.
+- **`priority_dispatch_enabled`** (INIT-4 C2, bool, default `false`): prioridad de
+  pedido en el despacho, **Opción C (fuerte "limpia")**: mientras haya urgentes, el
+  tour se arma solo con urgentes (misma `priority` que el ancla), sin diluir con
+  normales, sin cruzar de zona. La prioridad/SLA vienen del **archivo de órdenes**
+  (`priority`, `due_time` por pedido). Lógica en `dispatcher._aplicar_prioridad_pedido`
+  y `_pool_para_barrido`.
+- **`waves`** (INIT-4 C3): `{enabled: bool, release_times: {wave_id: segundos}}`.
+  Cada pedido lleva `wave`; una WO no es elegible hasta que `env.now >= release`.
+  `enabled=false` → todas elegibles desde t=0. Filtro en `dispatcher._wo_elegible_por_ola`.
+- **`WAREHOUSE_SEED`** (env var, no config): fija `random.seed()` para corridas
+  deterministas/reproducibles. Sin ella, comportamiento estocástico de producción.
+- **`cercania_tour_mode`** ("cost" default / "greedy_nn"): BK-03; greedy descartado.
+- Refactor **Template Method** en `operators.py`: `BaseOperator.agent_process()` +
+  hook `_do_picking_at()` por subclase (Ground/Forklift). Logging por nivel en todo
+  el hot-path (DEBUG silenciado en producción).
+
 ### Pendientes (ver docs/BACKLOG.md para detalle)
 - **BK-02** — FIFO Estricto en UI: EN REPENSAR (diseno pendiente del Director).
-- **web_dashboard/** (puerto 8001): Director quiere revisarla antes de decidir.
+- **`_legacy/web_dashboard/`** (puerto 8001): Director quiere revisarla antes de
+  decidir (conservar / reparar / eliminar).
 - **INIT-1** — Inventario y picking por ubicacion real + reservas en BD
   (correctitud fundacional; hoy la WO va a ubicacion aleatoria del area).
 - **INIT-3** — Reparar optimizador Optuna (estrategias y parametros alineados).
+- **INIT-4 → KPI de SLA vencido** (único punto diferido de INIT-4): mostrar en el
+  reporte/visor los pedidos que pasan su `due_time`. El dato existe en la WO; falta
+  cablearlo (reusar el patrón de INIT-5).
 - **WOs sobredimensionadas** — `_validar_y_ajustar_cantidad` en `warehouse.py`:
   si `sku.volumen > max_capacity` → WO se marca 'staged' con qty=0 (falsifica
   KPIs). Pendiente fix defensivo.
-- Ver `docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md` para detalle de INIT-1/3/4.
+- Ver `docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md` para detalle de INIT-1/3.
 
 ### Bugs conocidos (no criticos)
 - `warehouse.db-shm` y `warehouse.db-wal`: archivos WAL de SQLite, aparecen

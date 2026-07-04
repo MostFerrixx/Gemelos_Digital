@@ -13,49 +13,52 @@ C3 olas). Ver docs/PLAN_INIT4.md. Proxima accion sugerida: seccion 5.
 ## 1. QUE ES EL PROYECTO
 
 Simulador de gemelo digital de almacen (Warehouse Digital Twin).
-- **Motor:** SimPy (eventos discretos, headless) -> archivo `.jsonl` -> visualizador Pygame + analitica Excel.
-- **Web:** FastAPI en puerto 8000 — configurador + runner + visor de replay.
+- **Motor:** SimPy (eventos discretos, headless) -> archivo `.jsonl` -> analitica Excel + heatmap.
+- **Web:** FastAPI en puerto 8000 — configurador + runner + **visor de replay web (unico frontend)**.
 - **Entidades:** GroundOperator (picking manual), Forklift (carga pesada), WorkOrders (SKU de rack a staging).
 - **NO hay simulacion en vivo**: el flujo siempre es headless -> jsonl -> replay.
 
-Stack: Python / SimPy / Pygame / PyQt6 / pytmx / pandas / Optuna / FastAPI / SQLite.
-> NOTA: FastAPI/uvicorn/pydantic YA estan en requirements.txt (lineas 24-27); un pip install limpio levanta el servidor web.
+Stack: Python / SimPy / pytmx / pandas+openpyxl / Optuna / FastAPI+uvicorn+pydantic / SQLite.
+`pygame-ce` es dependencia del headless (lectura del TMX en layout_manager), no de GUI.
+> NOTA: FastAPI/uvicorn/pydantic YA estan en requirements.txt; un pip install limpio levanta el servidor web.
 
 ---
 
-## 2. ARQUITECTURA — CADENA VIVA
+## 2. ARQUITECTURA — CADENA VIVA (verificada 2026-06-29)
 
 ```
 entry_points/run_generate_replay.py
   -> src/engines/event_generator.py          (headless SimPy -> .jsonl + Excel + heatmap)
 
-entry_points/run_replay_viewer.py
-  -> src/engines/replay_engine.py            (Pygame viewer)
-
 entry_points/run_optimization.py
   -> src/tools/optimizer.py                  (Optuna)
 
-web_prototype/server.py  (FastAPI :8000)     (configurador web + runner + viewer web)
-  -> start_server.bat / server_manager.py / start_hidden.py
+web_prototype/server.py  (FastAPI :8000)     (configurador web + runner + VIEWER WEB)
+  -> start_server.bat / server_manager.py / start_hidden.py   (unico frontend vigente)
 
 run_migration.py
   -> src/subsystems/database/               (Excel -> SQLite warehouse.db)
 ```
 
+`src/engines/` solo contiene `event_generator.py` y `analytics_engine.py`.
+
 Nucleo de simulacion SANO: `src/subsystems/simulation/`
   warehouse.py, dispatcher.py (DispatcherV11), operators.py, order_strategies.py,
   data_manager.py, assignment_calculator.py, route_calculator.py,
-  pathfinder.py, layout_manager.py
+  pathfinder.py, layout_manager.py, outbound.py
 
 Archivos VIVOS fuera de src/ (no borrar sin pensar):
-  simulation_buffer.py, visualizer.py, configurator.py,
+  simulation_buffer.py, visualizer.py (heatmap por subprocess),
   server_manager.py, start_hidden.py
 
-Codigo MUERTO (ignorar en features; objetivo en limpieza futura):
-  legacy/**, src/shared/**, utils/ (raiz), tools/configurator.py,
-  tools/visualizer.py, tools/inspect_tmx.py, gran parte de tests/
-
-web_dashboard/ (puerto 8001): HUERFANA pero el Director quiere revisarla antes de decidir.
+ARCHIVADO en `_legacy/` (deprecado, reversible, NO borrar sin avisar):
+  - `_legacy/gui_escritorio/` (commit 3cd37e6): las 3 GUI de escritorio —
+    viewer Pygame (run_replay_viewer.py + replay_engine.py), dashboard PyQt6
+    (visualization/ + IPC), configurador Tkinter (configurator.py). Reemplazadas
+    por el frontend web. **La live simulation Pygame ya no forma parte de la cadena.**
+  - `_legacy/web_dashboard/` (puerto 8001): tabla de WOs huerfana (apunta a un
+    replay inexistente), redundante con el panel del viewer web. PENDIENTE decision.
+  - `_legacy/legacy|src_shared|utils_root|tools_duplicados|tests_rotos/`: codigo muerto.
 
 Fuente de datos canonica = RAIZ (config.json, layouts/WH1.tmx, layouts/Warehouse_Logic.xlsx).
 El arbol data/ es una migracion abandonada que solo lee codigo muerto.
@@ -95,6 +98,34 @@ ba55f27  chore(limpieza): sanear indice FUSE, borrar junk y actualizar docs desf
 ---
 
 ## 4. LO QUE SE HIZO (HISTORIAL POR SESION)
+
+### Sesion 2026-06-29 — INIT-4 completo (commits 91dd6c0..edba925)
+
+Prioridad/SLA/olas + tiempos de pick realistas, en 3 fases, cada una opt-in con
+gate de no-regresion byte-identico (REG-1, `WAREHOUSE_SEED=42` → SHA `a4ae8d4e…`).
+Plan y pruebas en `docs/PLAN_INIT4.md`.
+
+**C1 — Tiempos de pick realistas** (`91dd6c0`)
+`BaseOperator._compute_pick_time()` escala el tiempo por cantidad/volumen
+(`base + por_unidad*cant + por_volumen*vol`, cota `minimo`). Bloque OPCIONAL
+`config["tiempos"]["pick_time_model"]`; neutro → tiempo historico. E2E:
+tiempo_picking varia 8..24 segun cantidad. PICK-1..6 pasan.
+
+**C2 — Prioridad de pedido / SLA (Opcion C)** (`c27dacb`, base en `0c1682c`)
+`WorkOrder` gana priority/due_time (leidos del archivo de ordenes, coercion
+defensiva). Flag `priority_dispatch_enabled` (default off). Opcion C "fuerte limpia":
+mientras haya urgentes, el tour se arma solo con urgentes (no se diluyen), sin
+cruzar de zona (`_pool_para_barrido`). E2E: urgentes t_fin 18.8 vs 71.2 (~4x);
+ranking medio 5.6 vs 20.8. Costo: llenado -33%, throughput intacto. PRIO-1..7 pasan.
+
+**C3 — Olas (waves)** (`fd0a41d`)
+Release diferido por ola: `WorkOrder.wave_id`; bloque `config["waves"]`
+(enabled + release_times). `_wo_elegible_por_ola` en las 4 estrategias.
+`simulacion_ha_terminado()` sin cambio (las WOs de olas futuras ya cuentan en el
+total). E2E: WAVE-1 (ola2 respeta release 100), WAVE-TERM (release 400 > fin
+natural: no cuelga, termina t=520.6). WAVE unit + INT-1 (ola manda sobre prioridad) pasan.
+
+**Cierre** (`edba925`): BACKLOG/HANDOFF/CLAUDE al dia; INT-1 ok.
 
 ### Sesion 2026-06-27 (commits f3a3ec5..b990964)
 
@@ -172,13 +203,15 @@ colores de seccion, notificaciones. Cuarentena de 40+ archivos basura.
 | Item | Estado | Esfuerzo estimado |
 |------|--------|-------------------|
 | **BK-02** — FIFO Estricto en UI | EN REPENSAR (diseno pendiente del Director) | ~15 min cuando se decida |
-| **web_dashboard/** (puerto 8001) | PENDIENTE DECISION (Director quiere revisarla) | Depende de decision |
+| **`_legacy/web_dashboard/`** (puerto 8001) | PENDIENTE DECISION (Director quiere revisarla) | Depende de decision |
 | **INIT-1** — Picking por ubicacion real + reservas en BD | Pendiente | Alto |
 | **INIT-3** — Reparar optimizador Optuna | Pendiente | Bajo-Medio |
-| **INIT-4** — Prioridad de ordenes / SLA / olas | Pendiente | Medio |
+| **INIT-4 → KPI de SLA vencido** | Pendiente (unico punto diferido de INIT-4) | Bajo |
 | **WOs sobredimensionadas** | Pendiente (falsifica KPIs) | Bajo (fix defensivo) |
 
-Ver `docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md` para descripcion completa de INIT-1/3/4.
+INIT-4 (C1 tiempos, C2 prioridad Opcion C, C3 olas) esta HECHO (ver seccion 4 y
+docs/PLAN_INIT4.md); solo queda diferido el KPI de SLA vencido en el reporte.
+Ver `docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md` para descripcion de INIT-1/3.
 
 **BK-02 — FIFO Estricto en UI** (EN REPENSAR)
 El motor lo implementa correctamente. No se expone porque el Director quiere redefinir
@@ -217,10 +250,12 @@ Fix: forzar minimo 1 unidad por viaje; marcar WOs imposibles como 'failed' (no '
 
 | Archivo | Estado | Descripcion |
 |---|---|---|
-| `CLAUDE.md` | ACTUALIZADO 2026-06-27 | Identidad, arquitectura, leyes, estado actual |
+| `README.md` (raiz) | ACTUALIZADO 2026-06-29 | Vision, arquitectura, instalacion y uso; frontend web |
+| `CLAUDE.md` | ACTUALIZADO 2026-06-29 | Identidad, arquitectura, flags opt-in, leyes, estado |
 | `AUDITORIA.md` | Vigente (mayo 2026) | Diagnostico estructural completo del repo |
-| `docs/HANDOFF.md` | ACTUALIZADO 2026-06-27 | Este archivo — estado operativo para nueva sesion |
-| `docs/BACKLOG.md` | ACTUALIZADO 2026-06-27 | BK-01..BK-05 + INIT-5 cerrados; BK-02/INIT-1/3/4/WOs pendientes |
+| `docs/HANDOFF.md` | ACTUALIZADO 2026-06-29 | Este archivo — estado operativo para nueva sesion |
+| `docs/PLAN_INIT4.md` | Vigente (2026-06-29) | Plan + pruebas + checklist de INIT-4 (C1/C2/C3) |
+| `docs/BACKLOG.md` | ACTUALIZADO 2026-06-29 | INIT-4 + INIT-5 + BK cerrados; INIT-1/3/KPI-SLA/WOs pendientes |
 | `docs/VALIDACION_UI_WEB.md` | ACTUALIZADO 2026-06-27 | 60 controles; E6/E7 eliminados, D1 resuelto |
 | `docs/PROPUESTA_MEJORA_DISENO_UI.md` | ACTUALIZADO 2026-06-27 | D-01..D-16 implementadas |
 | `docs/PRUEBAS_E2E_SISTEMA.md` | Referencia (2026-06-13) | Catalogo de 53 casos E2E |
@@ -233,35 +268,24 @@ Fix: forzar minimo 1 unidad por viaje; marcar WOs imposibles como 'failed' (no '
 
 ---
 
-## 7. PROTOCOLO ANTI-FUSE (para Cerebellum)
+## 7. FLUJO DE TRABAJO GIT (Windows nativo)
 
-El sandbox corre en Linux pero el proyecto esta en un mount FUSE de Windows.
-Restricciones del mount:
-- `rm` / `os.remove()` -> "Operation not permitted"
-- `git` normal (add/commit/push) -> bloqueado por index.lock / HEAD.lock
-- Escritura: SOLO funciona con `shutil.copy2(src, dst)` (sobreescritura)
-
-Solucion para commits (bypass de bajo nivel):
+Cerebellum corre en **Windows nativo** con acceso directo a git y a la red
+(el viejo protocolo anti-FUSE del sandbox Linux ya NO aplica). Flujo por hito:
 ```bash
-git hash-object -w <archivo>           # genera blob hash
-export GIT_INDEX_FILE=/tmp/idx_xx
-git read-tree <parent-commit-hash>     # carga arbol del padre en indice temporal
-git update-index --cacheinfo 100644,<hash>,<ruta>   # actualiza entradas
-TREE=$(git write-tree)
-COMMIT=$(echo "mensaje" | git commit-tree $TREE -p <parent-hash>)
-echo $COMMIT > .git/refs/heads/<branch>   # actualiza rama directamente
-unset GIT_INDEX_FILE
+git add <archivos>
+git commit -m "..."                              # co-autoria al pie
+git push origin feature/allocation-layer-v12.1   # push de la rama
+git push origin HEAD:refs/heads/main             # fast-forward de main server-side
+git fetch origin main:main                       # sincronizar main local
+git rev-list --count main..feature/...           # verificar divergencia 0
 ```
+`main` se sincroniza por **fast-forward server-side** (sin checkout de main).
+Verificar siempre divergencia 0/0 tras el push.
 
-Solucion para edicion de archivos:
-```python
-# En /tmp (Linux nativo):
-# 1. Editar el archivo
-# 2. shutil.copy2('/tmp/archivo', '/sessions/.../mnt/Gemelos Digital/archivo')
-```
-
-Para push a GitHub: el sandbox no tiene red saliente. El Director debe hacer el push
-desde su terminal Windows.
+> Nota de entorno: `git` puede avisar "LF will be replaced by CRLF"; es esperado
+> en Windows y no afecta el contenido. El gate byte-identico usa `WAREHOUSE_SEED=42`
+> y compara SHA256 del `.jsonl` (mismo resultado en Windows y Linux: `a4ae8d4e…`).
 
 ---
 
@@ -281,3 +305,20 @@ desde su terminal Windows.
 ```
 `cercania_tour_mode: "cost"` es el default seguro post-BK-03. El valor `"greedy_nn"`
 existe como opcion pero no se recomienda (ver BK-03 descartado).
+
+### Flags OPT-IN de INIT-4 (AUSENTES del config canonico a proposito)
+El motor los lee con `.get()` + defaults neutros. Por eso el canonico NO los trae:
+mantiene el `.jsonl` byte-identico al baseline. Se activan en configs de prueba/UI.
+```jsonc
+// Tiempo de pick escalable (C1). Neutro = tiempo historico fijo.
+"tiempos": { "pick_time_model": { "base": null, "por_unidad": 0.0,
+                                   "por_volumen": 0.0, "minimo": 0.0 } },
+// Prioridad de pedido en el despacho (C2, Opcion C fuerte "limpia"). Default off.
+"priority_dispatch_enabled": false,   // priority/due_time vienen del archivo de ordenes
+// Olas por release diferido (C3). Default off -> todo elegible desde t=0.
+"waves": { "enabled": false, "release_times": { "1": 0, "2": 300 } }
+```
+- `WAREHOUSE_SEED` (variable de entorno, NO config): fija la semilla para corridas
+  deterministas/reproducibles. Gate byte-identico: SHA256 `a4ae8d4e…`, 5.379.372 bytes.
+- Validacion de estos bloques en `web_prototype/config_manager.py` (release_times
+  acotado a <= 1.000.000 para evitar hangs). Detalle en `docs/PLAN_INIT4.md`.
