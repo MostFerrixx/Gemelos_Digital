@@ -6,8 +6,6 @@ MEJ-1 / WH-xx: caracterizacion de warehouse._validar_y_ajustar_cantidad
 Se instancia AlmacenMejorado sin __init__ (el metodo solo usa
 operator_capacities y max_operator_capacity).
 """
-import pytest
-
 from subsystems.simulation.warehouse import SKU, AlmacenMejorado
 
 
@@ -43,12 +41,16 @@ def test_wh03_usa_capacidad_del_area_si_existe():
     assert alm._validar_y_ajustar_cantidad(sku, 3, "Area_High") == [3]
 
 
-@pytest.mark.skip(reason="BUG CONOCIDO (BACKLOG: WOs sobredimensionadas): si "
-                         "sku.volumen > max_capacity, unidades_por_viaje = 0 y el "
-                         "while nunca decrementa -> bucle infinito. NO ejecutar "
-                         "hasta aplicar el fix defensivo; entonces convertir este "
-                         "skip en el test del comportamiento corregido.")
-def test_wh04_sku_mas_grande_que_capacidad():
+def test_wh04_sku_mas_grande_que_capacidad_no_cuelga():
+    """Fix WOs sobredimensionadas: sku.volumen > max_capacity ya no crea WOs
+    fantasma (qty=0) ni entra en bucle infinito -- devuelve [] (backorder
+    implicito, sin WorkOrder)."""
     alm = _almacen(max_capacity=150)
     sku = SKU("SKU-T5", volumen=200)
-    alm._validar_y_ajustar_cantidad(sku, 1, "Area_Ground")
+    assert alm._validar_y_ajustar_cantidad(sku, 1, "Area_Ground") == []
+
+
+def test_wh04b_borde_exacto_sku_igual_a_capacidad_no_es_imposible():
+    alm = _almacen(max_capacity=150)
+    sku = SKU("SKU-T6", volumen=150)
+    assert alm._validar_y_ajustar_cantidad(sku, 2, "Area_Ground") == [1, 1]

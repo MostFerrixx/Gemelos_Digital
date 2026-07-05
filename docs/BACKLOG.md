@@ -18,7 +18,7 @@ Responsable: Cerebellum
 | **INIT-4 → KPI de SLA vencido** | **PENDIENTE** (diferido de INIT-4) |
 | **INIT-1 — Picking por ubicacion real + reservas** | **PENDIENTE** (alto) |
 | **INIT-3 — Reparar optimizador Optuna** | **PENDIENTE** (bajo-medio) |
-| **WOs sobredimensionadas** — fix defensivo | **PENDIENTE** (bajo) |
+| WOs sobredimensionadas — fix defensivo | HECHO (2026-07-05) |
 | **`_legacy/web_dashboard/`** — conservar/reparar/eliminar | **PENDIENTE DECISION** |
 | MEJ-1 — Red de seguridad automatizada (tests + gate) | HECHO (2026-07-04, F1-F5 completas) |
 | MEJ-2 — Experiment runner con replicas + comparacion A/B | HECHO v1 (2026-07-04) — v2 (nivel de servicio) diferido |
@@ -533,27 +533,48 @@ el reporte Excel/visor. La info existe en la WO; falta cablearla al reporte.
 
 ## WOs sobredimensionadas — Fix defensivo en _validar_y_ajustar_cantidad
 
-**Estado:** PENDIENTE — sin sprint asignado
-**Prioridad:** Baja-Media (falsifica KPIs silenciosamente)
+**Estado:** HECHO — 2026-07-05 (en `main`).
+**Prioridad:** Baja-Media (falsificaba KPIs silenciosamente)
 **Origen:** docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md, Apendice quick-fixes
 
-### El problema
+### El problema (ya resuelto)
 En `warehouse.py::_validar_y_ajustar_cantidad`:
-Si `sku.volumen > max_capacity_del_operario`, entonces `unidades_por_viaje = 0`.
-Consecuencia:
-- La WO se marca como 'staged' con `qty_picked = 0`.
-- Cuenta como "completada" en los KPIs aunque no se pikeara nada.
-- Puede causar bucle infinito si el fallback no es robusto.
+Si `sku.volumen > max_capacity_del_operario`, `unidades_por_viaje` truncaba a 0
+y el `while` de division nunca decrementaba `cantidad_restante` -> **bucle
+infinito** (peor de lo documentado originalmente: no solo "cuenta como
+completada", podia colgar la simulacion entera). `tests/unit/test_warehouse_cantidades.py::test_wh04` lo tenia
+documentado como `@pytest.mark.skip` para no ejecutarlo hasta el fix.
 
-### Fix propuesto
-1. Forzar `unidades_por_viaje = max(1, unidades_por_viaje)` para evitar division por cero.
-2. Si `sku.volumen > capacidad_maxima_de_todos_los_operarios_del_area`, marcar la WO
-   como 'failed' (no 'staged') y registrar un backorder explicito.
-3. Log de WARNING cuando se detecte WO imposible de servir por volumen.
+### Fix aplicado
+Guard temprano en `_validar_y_ajustar_cantidad`: si `sku.volumen > max_capacity`
+(imposible de cargar aunque sea 1 unidad, dado que `work_area_equipment`
+asigna un unico tipo de equipo por area -- MEJ-3 QA-3 -- no hace falta
+comparar contra "todos los operarios del area", `max_capacity` YA es esa cota),
+loguea `[ALMACEN][WARN]` con el detalle y devuelve `[]` (no se crea ninguna
+WorkOrder para esa cantidad; queda como backorder implicito, sin qty=0 fantasma
+ni bucle). Ambos callers (`order_strategies.py`, generacion sintetica y
+allocation layer) ya iteran la lista devuelta con un `for`, por lo que una
+lista vacia no crea WOs sin requerir cambios adicionales alli.
 
-### Archivos a tocar
-- `warehouse.py`: `_validar_y_ajustar_cantidad()`
-- `order_strategies.py`: registrar WO imposible como backorder
+**No se implemento** la opcion "marcar como 'failed' + registrar backorder
+explicito" (item 2 del plan original) porque el guard ya elimina el daño real
+(bucle infinito + KPI falso) sin necesidad de tocar `order_strategies.py`;
+esa pieza queda disponible para retomar si el Director quiere que este caso
+aparezca en el resumen de nivel de servicio (INIT-5) junto a los backorders
+por falta de stock.
+
+### Validacion
+- `test_wh04_sku_mas_grande_que_capacidad_no_cuelga` (unskipped) +
+  `test_wh04b_borde_exacto_sku_igual_a_capacidad_no_es_imposible` (nuevo,
+  caracteriza el borde `volumen == max_capacity`, que SI debe procesarse).
+  Suite: **82 passed, 0 skipped** (antes 1 skip documentado).
+- Gate de regresion: PASS, byte-identico (`c6f129ef...`) -- el escenario
+  canonico nunca dispara este path (SKU max 80 < capacidad default 150), asi
+  que no hizo falta actualizar el baseline.
+
+### Archivos tocados
+- `src/subsystems/simulation/warehouse.py`: `_validar_y_ajustar_cantidad()`.
+- `tests/unit/test_warehouse_cantidades.py`: test WH04 unskipped + WH04b nuevo.
 
 ---
 

@@ -10,11 +10,13 @@ El hallazgo de makespan +55% de MEJ-4 fue REDEFINIDO por el Director como
 **INIT-6** (staging multi-destino por ruta: los pedidos deberian tener destino
 real -- tienda o domicilio -- y consolidarse en staging por grupo de ruta de
 camion/reparto, no en una celda unica). Ver `docs/BACKLOG.md` seccion INIT-6.
-**Hecho en esta sesion:** MEJ-2 v1 completado y validado -- ver seccion 4.
-**Proxima accion sugerida:** (1) decidir si se retoma MEJ-2 v2 (KPI de nivel
-de servicio en el experiment runner, diferido) o se pasa a otro pendiente;
-(2) INIT-6 (staging por ruta/destino) queda pendiente de su propia sesion de
-diseño (no es un tuning rapido). Ver seccion 5.
+**Hecho en esta sesion:** MEJ-2 v1 completado, mergeado a main; fix de WOs
+sobredimensionadas (bug de bucle infinito + KPI falso) tambien mergeado --
+ver seccion 4.
+**Proxima accion sugerida:** **INIT-1** (picking por ubicacion real), elegida
+por el Director 2026-07-05 como siguiente prioridad -- requiere Analisis de
+Causa Raiz + Plan (Ley #1) antes de codigo. INIT-6 (staging por ruta/destino)
+sigue pendiente de su propia sesion de diseño con el Director. Ver seccion 5.
 
 ---
 
@@ -132,6 +134,20 @@ ba55f27  chore(limpieza): sanear indice FUSE, borrar junk y actualizar docs desf
 ---
 
 ## 4. LO QUE SE HIZO (HISTORIAL POR SESION)
+
+### Sesion 2026-07-05 — Fix WOs sobredimensionadas (en `main`)
+
+`warehouse.py::_validar_y_ajustar_cantidad`: guard temprano si
+`sku.volumen > max_capacity` -> loguea `[ALMACEN][WARN]` y devuelve `[]` en vez
+de truncar `unidades_por_viaje` a 0 (que colgaba el `while` en bucle infinito;
+peor que lo documentado originalmente, que solo hablaba de KPI falso). No se
+implemento el backorder explicito propuesto originalmente (item 2 del plan):
+el guard ya elimina el daño real sin tocar `order_strategies.py`; queda anotado
+en BACKLOG.md para retomar si se quiere ese caso en el resumen INIT-5. Test
+`WH04` (antes `@pytest.mark.skip`) ahora corre y pasa + `WH04b` nuevo (borde
+`volumen == max_capacity`). Suite: 82 passed, 0 skipped (antes 1 skip). Gate
+re-verificado PASS, sin cambio de baseline (el escenario canonico nunca
+dispara este path). Detalle: `docs/BACKLOG.md`.
 
 ### Sesion 2026-07-04 (cont. 3) — MEJ-2 v1: experiment runner (en `main`, post-merge)
 
@@ -338,14 +354,14 @@ colores de seccion, notificaciones. Cuarentena de 40+ archivos basura.
 | MEJ-1 — Red de seguridad (pytest + gate regresion) | HECHO 2026-07-04 (ver seccion 4) | — |
 | MEJ-3 — Esquema unico de config (pydantic) + purga claves | HECHO 2026-07-04 (ver seccion 4) | — |
 | MEJ-4 — Completar anti-colisiones (dwell + fallback visible) | HECHO y MERGEADO a main 2026-07-04 | — |
-| **MEJ-2** — Experiment runner (replicas + A/B estadistico) | APROBADA — EN CURSO (prioridad elegida por el Director) | 2 sesiones |
+| MEJ-2 — Experiment runner (replicas + A/B estadistico) | HECHO v1, MERGEADO a main 2026-07-04 (v2 nivel de servicio diferido) | — |
+| WOs sobredimensionadas — fix defensivo | HECHO 2026-07-05, MERGEADO a main | — |
 | **INIT-6** — Staging multi-destino por ruta (redefine el hallazgo makespan +55%) | PENDIENTE — decision del Director: es problema de modelado (destino/ruta), no de tuning. Ver BACKLOG.md | Alto |
+| **INIT-1** — Picking por ubicacion real + reservas en BD | **PENDIENTE — SIGUIENTE** (elegida por el Director 2026-07-05) | Alto |
 | **BK-02** — FIFO Estricto en UI | EN REPENSAR (diseno pendiente del Director) | ~15 min cuando se decida |
 | **`_legacy/web_dashboard/`** (puerto 8001) | PENDIENTE DECISION (Director quiere revisarla) | Depende de decision |
-| **INIT-1** — Picking por ubicacion real + reservas en BD | Pendiente | Alto |
-| **INIT-3** — Reparar optimizador Optuna | Pendiente | Bajo-Medio |
+| **INIT-3** — Reparar optimizador Optuna | Pendiente (tiene mas sentido despues de INIT-1) | Bajo-Medio |
 | **INIT-4 → KPI de SLA vencido** | Pendiente (unico punto diferido de INIT-4) | Bajo |
-| **WOs sobredimensionadas** | Pendiente (falsifica KPIs) | Bajo (fix defensivo) |
 
 INIT-4 (C1 tiempos, C2 prioridad Opcion C, C3 olas) esta HECHO (ver seccion 4 y
 docs/PLAN_INIT4.md); solo queda diferido el KPI de SLA vencido en el reporte.
@@ -373,10 +389,11 @@ Commits 91dd6c0 (C1 tiempos escalables), c27dacb (C2 prioridad Opcion C),
 fd0a41d (C3 olas). Todo opt-in con gate byte-identico. Ver docs/PLAN_INIT4.md.
 Diferido: KPI de SLA vencido en el reporte (no bloqueante).
 
-**WOs sobredimensionadas**
-En `warehouse.py::_validar_y_ajustar_cantidad`: si `sku.volumen > max_capacity`,
-`unidades_por_viaje = 0` → bucle infinito (o la WO se marca 'staged' con qty=0).
-Fix: forzar minimo 1 unidad por viaje; marcar WOs imposibles como 'failed' (no 'staged').
+**WOs sobredimensionadas** — HECHO 2026-07-05
+`_validar_y_ajustar_cantidad` ahora corta temprano si `sku.volumen > max_capacity`:
+loguea WARN y devuelve `[]` (sin WorkOrder fantasma, sin bucle infinito). Detalle
+completo y decision de alcance (no se agrego backorder explicito, ver por que)
+en `docs/BACKLOG.md`.
 
 ### Issues conocidos (no criticos)
 - `warehouse.db-shm` / `warehouse.db-wal`: archivos WAL de SQLite, aparecen como

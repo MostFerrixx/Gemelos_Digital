@@ -511,6 +511,19 @@ class AlmacenMejorado:
             self.max_operator_capacity  # Fallback to global max
         )
 
+        # BUGFIX WOs sobredimensionadas: si una sola unidad del SKU ya excede
+        # la capacidad del area (work_area_equipment asigna un unico tipo de
+        # equipo por area, ver MEJ-3 QA-3), es fisicamente imposible de
+        # transportar por ningun operario de esa area. Sin este guard,
+        # unidades_por_viaje truncaba a 0 y el while de abajo no decrementaba
+        # cantidad_restante -> bucle infinito (ver tests/unit/test_warehouse_cantidades.py WH04).
+        if sku.volumen > max_capacity:
+            print(f"[ALMACEN][WARN] SKU {sku.id} (volumen={sku.volumen}) excede la "
+                  f"capacidad maxima de '{work_area}' ({max_capacity}); "
+                  f"cantidad {cantidad_original} descartada (backorder implicito, "
+                  f"no se genera WorkOrder).")
+            return []
+
         # Calculate units that fit per trip
         unidades_por_viaje = max_capacity // sku.volumen
 
