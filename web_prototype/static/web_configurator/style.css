@@ -445,6 +445,39 @@ body {
     color: var(--color-text-secondary);
 }
 
+/* Guia sutil por pestaña: 1 parrafo corto arriba de las cards, contexto
+   general (el "por que"), no un manual. Detalle especifico va en .help-text
+   (por campo) o .description-text (por card). */
+.tab-intro {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    background-color: var(--color-bg-app);
+    border-left: 3px solid var(--color-primary, #2563eb);
+    border-radius: 0.25rem;
+    padding: 0.625rem 0.875rem;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+
+.tab-intro strong {
+    color: var(--color-text-main);
+}
+
+.destino-staging-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.destino-staging-row input[type="text"] {
+    flex: 2;
+}
+
+.destino-staging-row input[type="number"] {
+    flex: 1;
+}
+
 .input-group {
     display: flex;
     gap: 0.5rem;

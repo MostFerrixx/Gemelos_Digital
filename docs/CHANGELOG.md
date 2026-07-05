@@ -10,6 +10,31 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-05 (cont. 4)
+
+- **INIT-6 — UI web para configurar staging por destino + capacidad de
+  camion.** Auditoria (a pedido del Director) encontro 2 huecos reales: la
+  UI no tenia forma de editar `destino_staging_map` (INIT-6 Opcion B, sin
+  riesgo de perdida de datos -- `save_config` hace merge y preserva claves
+  que la UI no gestiona, pero tampoco era EDITABLE desde el navegador) ni
+  `outbound.truck_capacity` (ya se guardaba/preservaba, pero sin campo para
+  cambiarlo). Se agrego: editor de filas destino->zona (tab "Outbound
+  Staging", mismo patron visual que "Prioridades de Work Area" de
+  fleet-manager) + campo `truck-capacity` junto a `truck-interval` (visible
+  solo con outbound activo). **Guia sutil en la UI** (a pedido del Director,
+  "profesional, sin ambiguedad, sin manual gigante"): se identifico que el
+  patron ya existia parcialmente (`help-text` por campo) y se formalizo en 2
+  niveles -- `.tab-intro` (1 parrafo corto arriba de cada pestaña, el "por
+  que" general, nuevo) + `.description-text` (contexto por card, ya
+  existia) + `.help-text` (detalle por campo, ya existia). Aplicado a la
+  pestaña Staging explicando la precedencia real (zona explicita en el
+  archivo > destino mapeado > reparto aleatorio). Validado en navegador real
+  (Preview): agregar/quitar filas, guardar y verificar el round-trip completo
+  en `config.json` (incluyo confirmar que `save_config` no descarta la clave
+  nueva). `config.json` restaurado a su estado original tras la prueba (no
+  se dejo data de prueba commiteada). Suite 104 passed, gate PASS sin cambio
+  de baseline (solo archivos estaticos web).
+
 ## 2026-07-05 (cont. 3)
 
 - **INIT-6 (Opciones A + B) — staging multi-destino por ruta.** RCA en codigo

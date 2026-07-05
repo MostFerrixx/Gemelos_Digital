@@ -13,8 +13,8 @@
   (confirmado 2026-07-05 tras un bloqueo del clasificador de permisos).
 - Baseline byte-identico vigente: `sha256=5f1f4adcd2a288d2...`, 4.919.513 bytes,
   seed 42, Python 3.13.6 (`tests/baseline.json`). Sin cambios desde INIT-1 --
-  todo lo posterior (MEJ-2 v2, INIT-3 v2, INIT-6) no toca el escenario
-  canonico (outbound deshabilitado ahi) ni el motor de picking.
+  todo lo posterior (MEJ-2 v2, INIT-3 v2, INIT-6 + su UI) no toca el
+  escenario canonico (outbound deshabilitado ahi) ni el motor de picking.
 
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
@@ -37,14 +37,24 @@ python scripts/regression_gate.py  # GATE PASS esperado
   antes de paralelizar (bug real de perdida de trials si no).
 - INIT-1: `StochasticOrderStrategy` asigna cada WO a ubicacion REAL de su SKU.
 - `export_optimization_metrics()` expone `fill_rate_pct`/`service_level`.
-- **INIT-6 (nuevo)**: `OutboundProcess` (outbound.py) ahora sirve UNA zona de
-  staging por camion (la del pallet mas antiguo), no mezcla zonas/rutas. Los
-  pedidos en modo archivo (Deterministic) pueden traer `destino` (string) que
-  se resuelve a `staging_id` via `config["destino_staging_map"]`
-  (`AlmacenMejorado._resolver_staging_id`). Existen 7 zonas fisicas reales
-  (`Warehouse_Logic.xlsx`, hoja `OutboundStaging`); el `config.json` canonico
-  sigue mandando 100% a la zona 1 (decision de negocio separada, no tocada).
-  `outbound.enabled: false` en el canonico -- todo esto esta dormido ahi.
+- **INIT-6**: `OutboundProcess` (outbound.py) sirve UNA zona de staging por
+  camion (la del pallet mas antiguo), no mezcla zonas/rutas. Pedidos en modo
+  archivo (Deterministic) pueden traer `destino` (string) que se resuelve a
+  `staging_id` via `config["destino_staging_map"]`
+  (`AlmacenMejorado._resolver_staging_id`). 7 zonas fisicas reales
+  (`Warehouse_Logic.xlsx`, hoja `OutboundStaging`); el canonico sigue
+  mandando 100% a zona 1 (decision de negocio separada). **UI web completa**
+  (tab "Outbound Staging" del configurador): editor de filas
+  destino->zona + campo `truck_capacity` (visible con outbound activo).
+  Validado en navegador real: guardar persiste `destino_staging_map`
+  correctamente (`save_config` hace merge, no descarta claves que la UI no
+  gestiona explicitamente).
+- **Patron de guia en la UI** (formalizado a pedido del Director): 3 niveles,
+  todos ya en uso -- `.tab-intro` (1 parrafo arriba de la pestaña, el "por
+  que" general de la seccion, NUEVO), `.description-text` (contexto por
+  card), `.help-text` (detalle por campo, bajo cada input). Aplicarlo a
+  cualquier control nuevo que se agregue de aca en mas -- ya esta en
+  `style.css` listo para reusar.
 
 ## Decisiones del Director pendientes
 

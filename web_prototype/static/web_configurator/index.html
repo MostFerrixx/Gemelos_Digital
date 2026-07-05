@@ -340,12 +340,18 @@
                                     1 operario por columna, llenado de atrás hacia adelante. Apagado = descarga
                                     clásica en el ancla.</span>
                             </div>
-                            <!-- truck_interval: visible solo cuando outbound esta activo -->
+                            <!-- truck_interval / truck_capacity: visibles solo cuando outbound esta activo -->
                             <div id="truck-interval-group" class="form-group" style="display:none;">
                                 <label>Intervalo de camión (s)</label>
                                 <input type="number" id="truck-interval" min="1" max="3600" value="90">
                                 <span class="help-text">Cada cuántos segundos llega un camión a retirar pallets
                                     del muelle. Más bajo = más camiones. Default: 90 s.</span>
+                            </div>
+                            <div id="truck-capacity-group" class="form-group" style="display:none;">
+                                <label>Capacidad del camión (pallets)</label>
+                                <input type="number" id="truck-capacity" min="1" max="100" value="8">
+                                <span class="help-text">Cuántos pallets se lleva un camión por viaje, siempre de
+                                    la MISMA zona de staging (ver pestaña Outbound Staging). Default: 8.</span>
                             </div>
                         </div>
                     </div>
@@ -465,13 +471,23 @@
 
                 <!-- Tab 5: Outbound Staging -->
                 <div id="tab-staging" class="tab-content">
+                    <p class="tab-intro">
+                        Cada camión se lleva pallets de UNA sola zona de staging por viaje
+                        (nunca mezcla rutas). Un pedido elige su zona en este orden:
+                        <strong>1)</strong> zona explícita en el archivo de órdenes,
+                        <strong>2)</strong> destino mapeado abajo,
+                        <strong>3)</strong> reparto aleatorio por porcentaje.
+                    </p>
+
                     <div class="card">
                         <div class="card-header">
-                            <h3>Distribución por Zonas</h3>
+                            <h3>Reparto Aleatorio por Zona</h3>
                             <span id="validation-staging" class="badge badge-success">✓ 100%</span>
                         </div>
                         <div class="card-body">
-                            <p class="description-text">Defina el porcentaje de órdenes que van a cada zona de salida.
+                            <p class="description-text">Último recurso: se usa solo si el pedido no trae
+                                zona explícita ni un destino mapeado. Útil en modo Estocástico, donde no hay
+                                destinos reales.
                             </p>
                             <div class="staging-grid">
                                 <div class="staging-item">
@@ -502,6 +518,27 @@
                                     <label>Staging 7</label>
                                     <input type="number" id="staging-7" class="staging-input" value="0">
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Destino → Zona (por pedido)</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Asigná cada destino de negocio (tienda, zona de
+                                reparto) a una zona de staging fija. Solo tiene efecto en modo
+                                <strong>Determinista</strong> (archivo de órdenes) cuando el pedido incluye el
+                                campo <code>destino</code>. Pedidos con ese destino siempre salen agrupados,
+                                sin importar el reparto aleatorio de arriba.
+                            </p>
+                            <div class="work-area-priorities-section">
+                                <div class="work-area-priorities-header">
+                                    <div class="work-area-priorities-title">Mapeo de destinos</div>
+                                    <button id="btn-add-destino-staging" class="btn-add-priority">+ Añadir</button>
+                                </div>
+                                <div id="destino-staging-list"></div>
                             </div>
                         </div>
                     </div>

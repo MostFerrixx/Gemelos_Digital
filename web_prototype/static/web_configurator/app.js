@@ -67,6 +67,12 @@ class WebConfigurator {
         // Layout & Data buttons
         document.getElementById('btn-load-work-areas').addEventListener('click', () => this.loadWorkAreas());
 
+        // INIT-6 Opcion B: agregar fila de destino_staging_map
+        const addDestinoBtn = document.getElementById('btn-add-destino-staging');
+        if (addDestinoBtn) {
+            addDestinoBtn.addEventListener('click', () => this._addDestinoStagingRow());
+        }
+
         // C5: Tiempos preset selector
         const tiemposPreset = document.getElementById('tiempos-preset');
         if (tiemposPreset) {
@@ -117,8 +123,53 @@ class WebConfigurator {
     _updateOutboundVisibility() {
         const tog = document.getElementById('toggle-outbound');
         const group = document.getElementById('truck-interval-group');
+        const capGroup = document.getElementById('truck-capacity-group');
         if (!tog || !group) return;
         group.style.display = tog.checked ? 'block' : 'none';
+        if (capGroup) capGroup.style.display = tog.checked ? 'block' : 'none';
+    }
+
+    // INIT-6 Opcion B: editor de destino_staging_map (destino -> staging_id).
+    _renderDestinoStagingRows(map) {
+        const container = document.getElementById('destino-staging-list');
+        if (!container) return;
+        container.innerHTML = '';
+        const entries = Object.entries(map || {});
+        if (entries.length === 0) {
+            this._addDestinoStagingRow();
+        } else {
+            entries.forEach(([destino, stagingId]) => this._addDestinoStagingRow(destino, stagingId));
+        }
+    }
+
+    _addDestinoStagingRow(destino = '', stagingId = '') {
+        const container = document.getElementById('destino-staging-list');
+        if (!container) return;
+        const row = document.createElement('div');
+        row.className = 'destino-staging-row';
+        row.innerHTML = `
+            <input type="text" class="destino-staging-name" placeholder="Ej: TIENDA_NORTE">
+            <input type="number" class="destino-staging-zone" min="1" max="7" placeholder="Zona (1-7)">
+            <button class="btn-remove-priority" title="Quitar">✕</button>
+        `;
+        row.querySelector('.destino-staging-name').value = destino;
+        row.querySelector('.destino-staging-zone').value = stagingId;
+        row.querySelector('.btn-remove-priority').addEventListener('click', () => row.remove());
+        container.appendChild(row);
+    }
+
+    _serializeDestinoStagingRows() {
+        const container = document.getElementById('destino-staging-list');
+        const map = {};
+        if (!container) return map;
+        container.querySelectorAll('.destino-staging-row').forEach(row => {
+            const name = row.querySelector('.destino-staging-name').value.trim();
+            const zone = parseInt(row.querySelector('.destino-staging-zone').value, 10);
+            if (name && !isNaN(zone) && zone >= 1 && zone <= 7) {
+                map[name] = zone;
+            }
+        });
+        return map;
     }
 
     // C5: determina si los valores actuales coinciden con un preset conocido.
@@ -704,14 +755,23 @@ class WebConfigurator {
         if (twToggle) twToggle.checked = twChecked;
         if (obToggle) obToggle.checked = obChecked;
 
-        // Outbound: cargar truck_interval y mostrar/ocultar su campo segun el toggle
+        // Outbound: cargar truck_interval/truck_capacity y mostrar/ocultar segun el toggle
         const truckIntervalEl = document.getElementById('truck-interval');
         if (truckIntervalEl) {
             const ti = (config.outbound && config.outbound.truck_interval != null)
                 ? config.outbound.truck_interval : 90;
             truckIntervalEl.value = ti;
         }
+        const truckCapacityEl = document.getElementById('truck-capacity');
+        if (truckCapacityEl) {
+            const tc = (config.outbound && config.outbound.truck_capacity != null)
+                ? config.outbound.truck_capacity : 8;
+            truckCapacityEl.value = tc;
+        }
         this._updateOutboundVisibility();
+
+        // INIT-6 Opcion B: destino -> staging_id
+        this._renderDestinoStagingRows(config.destino_staging_map || {});
 
         // C5: Tiempos de Operacion — cargar bloque tiempos desde config.
         // Ausencia del bloque = usar defaults demo (comportamiento actual).
@@ -863,15 +923,22 @@ class WebConfigurator {
             baseCong.timewindow.shadow = false;
         }
         baseOb.enabled = obOn;
-        // Outbound: la UI tambien controla truck_interval (resto de claves se preservan)
+        // Outbound: la UI tambien controla truck_interval/truck_capacity (resto de claves se preservan)
         const tiEl = document.getElementById('truck-interval');
         if (tiEl && tiEl.value !== '') {
             const tiVal = parseInt(tiEl.value);
             if (!isNaN(tiVal) && tiVal >= 1) baseOb.truck_interval = tiVal;
         }
+        const tcEl = document.getElementById('truck-capacity');
+        if (tcEl && tcEl.value !== '') {
+            const tcVal = parseInt(tcEl.value);
+            if (!isNaN(tcVal) && tcVal >= 1) baseOb.truck_capacity = tcVal;
+        }
 
         config.congestion = baseCong;
         config.outbound = baseOb;
+        // INIT-6 Opcion B: destino -> staging_id
+        config.destino_staging_map = this._serializeDestinoStagingRows();
 
         // C5: bloque tiempos completo. Mismo patron que congestion/outbound:
         // base = bloque en memoria (para preservar cell_size_m y speed_factor_ground
