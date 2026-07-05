@@ -8,10 +8,9 @@
 
 ## Git
 
-- `main` = pendiente del commit de este cierre (INIT-4b). Working tree limpio
-  salvo eso. Sin ramas feature pendientes de merge. Push directo a main
-  autorizado por el Director para esta sesion (confirmado 2026-07-05 tras un
-  bloqueo del clasificador de permisos).
+- `main` = `5840a06`. Working tree limpio. Sin ramas feature pendientes de
+  merge. Push directo a main autorizado por el Director para esta sesion
+  (confirmado 2026-07-05 tras un bloqueo del clasificador de permisos).
 - Baseline byte-identico vigente: `sha256=38419bb375cd3dcb...`, 4.919.657 bytes,
   seed 42, Python 3.13.6 (`tests/baseline.json`). Actualizado en INIT-4b:
   SOLO metadata nueva (`sla_summary` en `SIMULATION_START`) -- verificado que
