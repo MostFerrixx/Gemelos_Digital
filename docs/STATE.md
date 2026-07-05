@@ -8,18 +8,19 @@
 
 ## Git
 
-- `main` = `062921c`. Working tree limpio. Sin ramas feature pendientes de
-  merge. Push directo a main autorizado por el Director para esta sesion
-  (confirmado 2026-07-05 tras un bloqueo del clasificador de permisos).
-- Baseline byte-identico vigente: `sha256=5f1f4adcd2a288d2...`, 4.919.513 bytes,
-  seed 42, Python 3.13.6 (`tests/baseline.json`). Sin cambios desde INIT-1 --
-  todo lo posterior (MEJ-2 v2, INIT-3 v2, INIT-6 + su UI) no toca el
-  escenario canonico (outbound deshabilitado ahi) ni el motor de picking.
+- `main` = pendiente del commit de este cierre (INIT-4b). Working tree limpio
+  salvo eso. Sin ramas feature pendientes de merge. Push directo a main
+  autorizado por el Director para esta sesion (confirmado 2026-07-05 tras un
+  bloqueo del clasificador de permisos).
+- Baseline byte-identico vigente: `sha256=38419bb375cd3dcb...`, 4.919.657 bytes,
+  seed 42, Python 3.13.6 (`tests/baseline.json`). Actualizado en INIT-4b:
+  SOLO metadata nueva (`sla_summary` en `SIMULATION_START`) -- verificado que
+  los eventos (linea 2+) son byte-identicos al baseline anterior de INIT-1.
 
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 104 passed, 1 deselected (~7s)
+python -m pytest -q                # 112 passed, 1 deselected (~7s)
 python scripts/regression_gate.py  # GATE PASS esperado
 ```
 
@@ -55,6 +56,11 @@ python scripts/regression_gate.py  # GATE PASS esperado
   card), `.help-text` (detalle por campo, bajo cada input). Aplicarlo a
   cualquier control nuevo que se agregue de aca en mas -- ya esta en
   `style.css` listo para reusar.
+- **INIT-4b**: KPI "SLA" (cumplimiento de `due_time`) en visor/API/Excel,
+  mismo patron que INIT-5 (`build_sla_summary()` en `core/replay_utils.py`).
+  N/A si ninguna WO completada trae `due_time` (INIT-4 C2 apagado o modo
+  Stochastic). Un pedido cuenta "a tiempo" si TODAS sus WOs terminan antes de
+  su `due_time` (se usa el MAX `tiempo_fin` del pedido).
 
 ## Decisiones del Director pendientes
 
@@ -69,9 +75,9 @@ python scripts/regression_gate.py  # GATE PASS esperado
 
 ## Siguiente prioridad sugerida (sin decidir aun)
 
-INIT-3 v3 (capacidades por agente en el optimizador), INIT-4b (KPI de SLA
-vencido), o alguna de las decisiones de arriba. Ver `docs/BACKLOG.md` para el
-resto del inventario abierto.
+INIT-3 v3 (capacidades por agente en el optimizador), o alguna de las
+decisiones de arriba. Ver `docs/BACKLOG.md` para el resto del inventario
+abierto.
 
 ## Bugs conocidos (no criticos)
 

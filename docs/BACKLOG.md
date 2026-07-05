@@ -9,7 +9,6 @@ Actualizado: 2026-07-05 · Responsable: Cerebellum
 |------|--------|-----------|----------|---------|
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
-| INIT-4b — KPI de SLA vencido en reporte/visor | PENDIENTE | Baja | Bajo | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
 | Distribucion real de `outbound_staging_distribution` en config canonico | PENDIENTE DECISION | -- | Trivial (config) | Decision de negocio del Director, no un bug |
 
@@ -58,16 +57,6 @@ trial en vez de usar el fallback legacy (`num_operarios_terrestres`/
 `num_montacargas`), ya que la capacidad esta hardcodeada en el fallback de
 `operators.py` (150 ground / 1000 forklift, no leida de config). Cambio de
 representacion mas grande, no un fix.
-
----
-
-## INIT-4b — KPI de SLA vencido en el reporte/visor
-
-**Origen:** unico punto diferido de INIT-4 (ver CHANGELOG 2026-06-29).
-`WorkOrder.due_time` existe pero no se mide/muestra cuantos pedidos incumplen
-su SLA. Reusar el patron de INIT-5: al completar cada pedido comparar tiempo
-de completado vs `due_time`; agregar resumen (a tiempo/vencidos/% cumplimiento)
-en `core/replay_utils.py`, metadata del `.jsonl`, API, visor y hoja Excel.
 
 ---
 

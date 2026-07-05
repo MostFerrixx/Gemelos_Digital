@@ -10,6 +10,28 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-05 (cont. 6)
+
+- **INIT-4b — KPI de SLA vencido en reporte/visor.** Ultimo punto diferido de
+  INIT-4. Reusa el patron exacto de INIT-5 (build_service_level_summary):
+  nuevo `build_sla_summary()` en `core/replay_utils.py` agrupa las
+  WorkOrders completadas por `order_id`, usa el MAX `tiempo_fin` del pedido
+  (no esta completo hasta que TODAS sus WOs lo estan) y lo compara contra
+  `due_time` (INIT-4 C2, opt-in). Si ninguna WO completada trae `due_time` ->
+  `available=False` (N/A), igual que nivel de servicio en modo Stochastic.
+  Cableado en las 4 capas: metadata `SIMULATION_START` del `.jsonl`
+  (`sla_summary`), 3 endpoints de `server.py` (`/api/snapshot`, `/api/state`,
+  `/api/metrics`), KPI "SLA" en la barra de metricas del visor
+  (`static/app.js`), hoja Excel nueva "Cumplimiento SLA" (`exporter_v2.py`,
+  mismo patron que "Nivel de servicio"). Cambio de metadata en el `.jsonl`
+  (nueva clave) -- verificado que los eventos son byte-identicos (sha256
+  sin la linea 1 identico antes/despues, solo +144 bytes del campo nuevo);
+  baseline actualizado con `--update-baseline --yes`. 8 tests nuevos
+  (`tests/unit/test_sla_summary.py`: a tiempo, vencido, multi-WO usa MAX
+  tiempo_fin, borde exacto, mezcla, sin due_time, sin WOs, almacen None).
+  Validado end-to-end: corrida real con `due_time=1s` detecto correctamente
+  "50% a tiempo (1 de 2 pedidos vencidos)". Suite: 112 passed.
+
 ## 2026-07-05 (cont. 5)
 
 - **Eliminacion de `_legacy/web_dashboard/`.** A pedido del Director: auditar

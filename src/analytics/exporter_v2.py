@@ -154,6 +154,8 @@ class AnalyticsExporter:
                     print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
                     # INIT-5: anexar hoja 'Nivel de servicio' (backorders) al reporte.
                     self._append_service_level_sheet(archivo_excel)
+                    # INIT-4b: anexar hoja 'Cumplimiento SLA' (due_time) al reporte.
+                    self._append_sla_summary_sheet(archivo_excel)
 
                 if archivo_json:
                     result.add_file(archivo_json)
@@ -241,6 +243,40 @@ class AnalyticsExporter:
         except Exception as e:
             print(f"[3/4] WARNING: no se pudo anexar hoja de nivel de servicio: {e}")
 
+    def _append_sla_summary_sheet(self, excel_path):
+        """INIT-4b: anexa una hoja 'Cumplimiento SLA' (due_time) al reporte Excel
+        ya generado, reabriendolo (mismo patron que _append_service_level_sheet).
+        Solo con pedidos que tengan due_time (INIT-4 C2 activo); si ninguno lo
+        tiene, anota N/A. No rompe el resto del reporte."""
+        try:
+            import openpyxl
+            from core.replay_utils import build_sla_summary
+            sla = build_sla_summary(self.context.almacen)
+            wb = openpyxl.load_workbook(excel_path)
+            if 'Cumplimiento SLA' in wb.sheetnames:
+                del wb['Cumplimiento SLA']
+            ws = wb.create_sheet('Cumplimiento SLA')
+            if not sla.get('available'):
+                ws.append(['Cumplimiento SLA'])
+                ws.append(['Ningun pedido completado trae due_time (INIT-4 C2 desactivado) -> N/A'])
+                wb.save(excel_path)
+                return
+            ws.append(['Cumplimiento SLA (due_time)'])
+            ws.append([])
+            ws.append(['Pedidos con SLA', sla['total_orders_with_sla']])
+            ws.append(['A tiempo', sla['orders_on_time']])
+            ws.append(['Vencidos', sla['orders_late']])
+            ws.append(['Cumplimiento (%)', sla['on_time_pct']])
+            ws.append([])
+            ws.append(['Order ID', 'Due time (s)', 'Completado (s)', 'Retraso (s)'])
+            for o in sla.get('late_orders', []):
+                ws.append([o.get('order_id'), o.get('due_time'), o.get('completion_time'),
+                           o.get('delay_seconds')])
+            wb.save(excel_path)
+            print("[3/4] Hoja 'Cumplimiento SLA' anexada al Excel")
+        except Exception as e:
+            print(f"[3/4] WARNING: no se pudo anexar hoja de cumplimiento SLA: {e}")
+
     def export_complete_analytics_with_buffer(self, buffer_eventos=None) -> ExportResult:
         """
         Pipeline completo con buffer especifico - Version mejorada con ExportResult.
@@ -320,6 +356,8 @@ class AnalyticsExporter:
                     print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
                     # INIT-5: anexar hoja 'Nivel de servicio' (backorders) al reporte.
                     self._append_service_level_sheet(archivo_excel)
+                    # INIT-4b: anexar hoja 'Cumplimiento SLA' (due_time) al reporte.
+                    self._append_sla_summary_sheet(archivo_excel)
 
                 if archivo_json:
                     result.add_file(archivo_json)

@@ -915,6 +915,14 @@ const ControlsModule = {
         } else {
             this.setMetricValue('metric-service', 'N/A');
         }
+
+        // INIT-4b: cumplimiento de SLA (due_time). N/A si ningun pedido completado trae SLA.
+        const sla = metrics.sla_summary;
+        if (sla && sla.available && sla.on_time_pct != null) {
+            this.setMetricValue('metric-sla', sla.on_time_pct + '%');
+        } else {
+            this.setMetricValue('metric-sla', 'N/A');
+        }
     },
 
     async renderEventMarkers(maxTime) {
@@ -1142,7 +1150,9 @@ const MetricsModule = {
             { id: 'metric-trucks', label: 'Trucks', class: 'trucks' },
             { id: 'metric-shipped', label: 'Shipped', class: 'shipped' },
             // INIT-5: nivel de servicio (fill-rate). N/A en modo estocastico.
-            { id: 'metric-service', label: 'Servicio', class: 'service' }
+            { id: 'metric-service', label: 'Servicio', class: 'service' },
+            // INIT-4b: cumplimiento de SLA (due_time). N/A si INIT-4 C2 esta apagado.
+            { id: 'metric-sla', label: 'SLA', class: 'sla' }
         ];
 
         metricsBar.innerHTML = '';

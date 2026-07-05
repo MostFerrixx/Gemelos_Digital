@@ -47,6 +47,64 @@ def build_service_level_summary(almacen):
     }
 
 
+def build_sla_summary(almacen):
+    """INIT-4b: resumen de cumplimiento de SLA (due_time) por pedido, a partir
+    de las WorkOrders completadas (dispatcher.work_orders_completados).
+    Mismo patron/plomeria que build_service_level_summary: NO calcula SLA
+    nuevo, solo agrega lo que ya trae cada WO (due_time viene de INIT-4 C2,
+    opt-in). Un pedido cuenta como "a tiempo" si TODAS sus WOs terminaron
+    (tiempo_fin) antes o en su due_time -- se usa el MAX tiempo_fin del
+    pedido, porque el pedido no esta completo hasta que lo estan todas sus WOs.
+    Si ninguna WO completada trae due_time (INIT-4 C2 desactivado, o modo
+    Stochastic que no lo asigna), available=False (la UI muestra N/A)."""
+    dispatcher = getattr(almacen, 'dispatcher', None)
+    completadas = getattr(dispatcher, 'work_orders_completados', None) if dispatcher else None
+
+    orders = {}
+    for wo in (completadas or []):
+        due = getattr(wo, 'due_time', None)
+        if due is None:
+            continue
+        order_id = getattr(wo, 'order_id', None)
+        tiempo_fin = getattr(wo, 'tiempo_fin', None) or 0.0
+        entry = orders.setdefault(order_id, {'due_time': due, 'completion_time': tiempo_fin})
+        if tiempo_fin > entry['completion_time']:
+            entry['completion_time'] = tiempo_fin
+
+    if not orders:
+        return {
+            'available': False,
+            'total_orders_with_sla': 0,
+            'orders_on_time': 0,
+            'orders_late': 0,
+            'on_time_pct': None,
+            'late_orders': [],
+        }
+
+    late_orders = []
+    on_time = 0
+    for order_id, data in orders.items():
+        if data['completion_time'] <= data['due_time']:
+            on_time += 1
+        else:
+            late_orders.append({
+                'order_id': order_id,
+                'due_time': data['due_time'],
+                'completion_time': data['completion_time'],
+                'delay_seconds': data['completion_time'] - data['due_time'],
+            })
+
+    total = len(orders)
+    return {
+        'available': True,
+        'total_orders_with_sla': total,
+        'orders_on_time': on_time,
+        'orders_late': len(late_orders),
+        'on_time_pct': round(on_time / total * 100.0, 1) if total else None,
+        'late_orders': late_orders,
+    }
+
+
 def agregar_evento_replay(buffer, evento):
     """Agrega un evento al bufer de replay"""
     buffer.add_event(evento)
@@ -98,6 +156,13 @@ def volcar_replay_a_archivo(buffer, archivo_salida, configuracion, almacen=None,
             if service.get('available'):
                 print(f"[REPLAY-METADATA] Nivel de servicio: {service['fill_rate_pct']}% "
                       f"(deuda {service['total_unfilled']} u / {service['orders_short']} pedidos)")
+
+            # INIT-4b: resumen de cumplimiento de SLA (due_time) en la metadata del replay.
+            sla = build_sla_summary(almacen)
+            metadata['sla_summary'] = sla
+            if sla.get('available'):
+                print(f"[REPLAY-METADATA] SLA: {sla['on_time_pct']}% a tiempo "
+                      f"({sla['orders_late']} de {sla['total_orders_with_sla']} pedidos vencidos)")
 
             f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
 
