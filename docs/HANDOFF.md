@@ -10,13 +10,13 @@ El hallazgo de makespan +55% de MEJ-4 fue REDEFINIDO por el Director como
 **INIT-6** (staging multi-destino por ruta: los pedidos deberian tener destino
 real -- tienda o domicilio -- y consolidarse en staging por grupo de ruta de
 camion/reparto, no en una celda unica). Ver `docs/BACKLOG.md` seccion INIT-6.
-**Hecho en esta sesion:** MEJ-2 v1 completado, mergeado a main; fix de WOs
-sobredimensionadas (bug de bucle infinito + KPI falso) tambien mergeado --
-ver seccion 4.
-**Proxima accion sugerida:** **INIT-1** (picking por ubicacion real), elegida
-por el Director 2026-07-05 como siguiente prioridad -- requiere Analisis de
-Causa Raiz + Plan (Ley #1) antes de codigo. INIT-6 (staging por ruta/destino)
-sigue pendiente de su propia sesion de diseño con el Director. Ver seccion 5.
+**Hecho en esta sesion:** MEJ-2 v1, fix de WOs sobredimensionadas, e INIT-1
+(picking por ubicacion real en modo Stochastic) -- los tres mergeados a main.
+Baseline actualizado a `5f1f4adc...` (4.919.513 bytes). Ver seccion 4.
+**Proxima accion sugerida:** decidir siguiente prioridad con el Director --
+candidatos: INIT-3 (optimizador Optuna), INIT-6 (staging por ruta/destino,
+necesita su propia sesion de diseño), o MEJ-2 v2 (KPI de nivel de servicio).
+Ver seccion 5.
 
 ---
 
@@ -134,6 +134,26 @@ ba55f27  chore(limpieza): sanear indice FUSE, borrar junk y actualizar docs desf
 ---
 
 ## 4. LO QUE SE HIZO (HISTORIAL POR SESION)
+
+### Sesion 2026-07-05 (cont.) — INIT-1: picking por ubicacion real en modo Stochastic (en `main`)
+
+RCA revelo que el alcance original del backlog estaba desactualizado: el modo
+por archivo (`DeterministicOrderStrategy`) ya usaba la Allocation Layer V12.1
+(ubicaciones reales via `data_manager.get_inventory_by_location()`); el bug
+vivia solo en `StochasticOrderStrategy` (modo default de `config.json`), que
+elegia SKU y ubicacion de forma independiente (round-robin ciego). Fix:
+`points_by_sku` indexa `puntos_de_picking_ordenados` por `sku_initial`; la WO
+ahora elige entre los puntos reales de SU sku. Fallback (round-robin + WARN)
+solo si un SKU no tiene ningun punto real (dato inconsistente). Cambio
+incondicional (bug de correctitud, no feature) por decision del Director.
+`_get_location_for_area`/`_get_default_work_area`/`_build_picking_points_index`
+resultaron ser codigo muerto (sin callers) -- no se tocaron, candidato a poda
+futura. 3 tests nuevos (`tests/unit/test_stochastic_location.py`), suite 85
+passed. Gate: cambio detectado (esperado), baseline actualizado a
+`5f1f4adc...` (4.919.513 bytes, -3.9% vs el anterior; makespan practicamente
+igual, 3122s vs 3121s). Nota de transparencia: 1 plan fallido de 348 (antes 0),
+resuelto por el fallback visible de MEJ-4 -- no bloqueante. Detalle completo:
+`docs/BACKLOG.md`.
 
 ### Sesion 2026-07-05 — Fix WOs sobredimensionadas (en `main`)
 
@@ -356,11 +376,11 @@ colores de seccion, notificaciones. Cuarentena de 40+ archivos basura.
 | MEJ-4 — Completar anti-colisiones (dwell + fallback visible) | HECHO y MERGEADO a main 2026-07-04 | — |
 | MEJ-2 — Experiment runner (replicas + A/B estadistico) | HECHO v1, MERGEADO a main 2026-07-04 (v2 nivel de servicio diferido) | — |
 | WOs sobredimensionadas — fix defensivo | HECHO 2026-07-05, MERGEADO a main | — |
+| INIT-1 — Picking por ubicacion real (alcance redefinido tras RCA: solo modo Stochastic) | HECHO 2026-07-05, MERGEADO a main (baseline actualizado) | — |
 | **INIT-6** — Staging multi-destino por ruta (redefine el hallazgo makespan +55%) | PENDIENTE — decision del Director: es problema de modelado (destino/ruta), no de tuning. Ver BACKLOG.md | Alto |
-| **INIT-1** — Picking por ubicacion real + reservas en BD | **PENDIENTE — SIGUIENTE** (elegida por el Director 2026-07-05) | Alto |
 | **BK-02** — FIFO Estricto en UI | EN REPENSAR (diseno pendiente del Director) | ~15 min cuando se decida |
 | **`_legacy/web_dashboard/`** (puerto 8001) | PENDIENTE DECISION (Director quiere revisarla) | Depende de decision |
-| **INIT-3** — Reparar optimizador Optuna | Pendiente (tiene mas sentido despues de INIT-1) | Bajo-Medio |
+| **INIT-3** — Reparar optimizador Optuna | Pendiente | Bajo-Medio |
 | **INIT-4 → KPI de SLA vencido** | Pendiente (unico punto diferido de INIT-4) | Bajo |
 
 INIT-4 (C1 tiempos, C2 prioridad Opcion C, C3 olas) esta HECHO (ver seccion 4 y
@@ -375,10 +395,15 @@ primero que deberia hacer FIFO operacionalmente.
 Puerto 8001. Ruta de replay rota. Parece huerfana; el Director quiere revisarla
 antes de decidir si se conserva, se repara o se elimina.
 
-**INIT-1 — Picking por ubicacion real**
-Hoy el allocation layer asigna la WO a una ubicacion de picking elegida al azar
-dentro del area, aunque ese SKU no este ahi. La tabla `inventory(location_id, ...)`
-en warehouse.db ya tiene la informacion; falta usarla en `order_strategies.py`.
+**INIT-1 — Picking por ubicacion real** — HECHO 2026-07-05
+El RCA revelo que el problema NO estaba donde el backlog decia: el modo por
+archivo (`DeterministicOrderStrategy`) ya usaba la Allocation Layer V12.1 con
+ubicaciones reales. El bug real estaba en `StochasticOrderStrategy` (modo
+default de `config.json`): elegia SKU y ubicacion por separado, sin relacion
+entre ambos. Fix: indice `points_by_sku` (campo `sku_initial` ya existente en
+`puntos_de_picking_ordenados`) para que la WO use una ubicacion real de SU SKU.
+Cambio incondicional (bug real, no feature), baseline actualizado
+(`5f1f4adc...`, 4.919.513 bytes). Detalle completo en `docs/BACKLOG.md`.
 
 **INIT-3 — Optimizador Optuna**
 Los nombres de estrategia y parametros del optimizador estan desalineados del motor

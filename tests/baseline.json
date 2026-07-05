@@ -1,8 +1,8 @@
 {
-    "description": "Baseline byte-identico (modulo EOL) de la simulacion canonica (config.json de la raiz, congestion timewindow ACTIVO), WAREHOUSE_SEED=42, hash con CRLF normalizado a LF (mismo SHA en Windows y Linux). Actualizado en MEJ-4 (2026-07-04): anti-colisiones completado -- dwell de picking/descarga reservado (destino-con-permanencia), planner SIPP (salto al primer hueco + dominancia por intervalo), fallback visible, clearance 0.05, parking idle disperso. CAMBIO DE COMPORTAMIENTO REAL: co-ocupaciones 28 -> 9 (sin amontonamientos, max 2), makespan 2011 -> 3121 s (+55%: la cola serializada del staging unico ahora es visible; antes 4 agentes descargaban superpuestos en la misma celda). Cambio intencional: python scripts/regression_gate.py --update-baseline --yes",
+    "description": "Baseline byte-identico (modulo EOL) de la simulacion canonica (config.json de la raiz, congestion timewindow ACTIVO), WAREHOUSE_SEED=42, hash con CRLF normalizado a LF (mismo SHA en Windows y Linux). Actualizado en INIT-1 (2026-07-05): StochasticOrderStrategy ahora asigna cada WO a una ubicacion de picking REAL de su propio SKU (indice points_by_sku sobre sku_initial), en vez de un round-robin ciego desconectado del SKU elegido. CAMBIO DE COMPORTAMIENTO REAL: tamaño 5.118.303 -> 4.919.513 bytes (-3.9%); makespan practicamente igual (3121 -> 3122 s). Cambio intencional: python scripts/regression_gate.py --update-baseline --yes",
     "seed": 42,
-    "sha256": "c6f129ef77d6082ea2311b6d59a286e4195cf2d833a0fbe85220d6e94d977400",
-    "size_bytes": 5118303,
+    "sha256": "5f1f4adcd2a288d2ca6886087488832ca2cdaf6cdbefb6773ca1fb61c6d208b9",
+    "size_bytes": 4919513,
     "python_version": "3.13.6",
-    "updated": "2026-07-04"
+    "updated": "2026-07-05"
 }

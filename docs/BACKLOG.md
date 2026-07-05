@@ -16,7 +16,7 @@ Responsable: Cerebellum
 | INIT-4 — Prioridad/SLA/olas + tiempos de pick | HECHO (2026-06-29) |
 | INIT-5 — Nivel de servicio / backorders | RESUELTO (2026-06-21) |
 | **INIT-4 → KPI de SLA vencido** | **PENDIENTE** (diferido de INIT-4) |
-| **INIT-1 — Picking por ubicacion real + reservas** | **PENDIENTE** (alto) |
+| INIT-1 — Picking por ubicacion real (alcance redefinido: solo modo Stochastic) | HECHO (2026-07-05) |
 | **INIT-3 — Reparar optimizador Optuna** | **PENDIENTE** (bajo-medio) |
 | WOs sobredimensionadas — fix defensivo | HECHO (2026-07-05) |
 | **`_legacy/web_dashboard/`** — conservar/reparar/eliminar | **PENDIENTE DECISION** |
@@ -443,29 +443,73 @@ cero implementacion = UI enganiosa. Eliminados limpiamente.
 
 ## INIT-1 — Inventario y picking por ubicacion real + reservas
 
-**Estado:** PENDIENTE — sin sprint asignado
+**Estado:** HECHO (alcance real) — 2026-07-05, en `main`.
 **Prioridad:** Alta (correctitud fundacional del simulador)
 **Origen:** docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md, item #1
 
-### El problema
-El allocation layer agrupa stock por SKU (`SUM(qty_available) GROUP BY sku_code`)
-y asigna la WO a una ubicacion de picking **elegida al azar** dentro del area
-(`random.choice` en `_get_location_for_area`). Esa ubicacion puede no tener el SKU.
-Resultado: rutas, distancias, heatmaps y el optimizador miden sobre ubicaciones ficticias.
+### Root cause real (revision 2026-07-05) -- el alcance original estaba desactualizado
+Al investigar, el problema descrito NO aplicaba donde el backlog decia:
+- **`DeterministicOrderStrategy`** (pedidos por archivo, `order_generation_mode`
+  != stochastic) **YA usaba ubicacion real**: la Allocation Layer V12.1
+  (`data_manager.get_inventory_by_location()` + `_allocate_across_locations()`)
+  asigna cada WO a una ubicacion real con stock real de ese SKU. Nada que hacer aca.
+- **`StochasticOrderStrategy`** (modo default de `config.json`, el que genera
+  el baseline byte-identico) SI tenia el bug: elegia un SKU al azar por
+  categoria de tamaño, y por separado elegia la ubicacion via round-robin
+  sobre TODOS los puntos de picking mezclados -- sin relacion con el SKU
+  elegido. El catalogo de SKUs y el inventario agregado SI eran reales (de
+  BD/Excel); la ubicacion de cada WO, no.
+- `_get_location_for_area()` / `_get_default_work_area()` /
+  `_build_picking_points_index()` (mencionados en el plan original) resultaron
+  ser **codigo muerto** dentro de `DeterministicOrderStrategy` -- sin
+  callers, remanente de una implementacion anterior a la Allocation Layer.
+  No se tocaron (candidato a poda en una fase de limpieza futura).
 
-### La oportunidad
-La tabla `inventory(location_id, sku_code, qty_available, qty_reserved)` ya existe
-en `warehouse.db` (y las vistas `v_inventory_status`). La infraestructura esta lista;
-solo falta usarla en `order_strategies.py` y registrar `qty_reserved`.
+### Fix aplicado
+En `StochasticOrderStrategy.generate_work_orders()` (`order_strategies.py`):
+indice `points_by_sku` construido desde `data_manager.puntos_de_picking_ordenados`
+(campo `sku_initial`, que ya existia). Al elegir el SKU de la WO, se busca entre
+SUS puntos reales (`random.choice` sobre esos, no sobre todos) y se usa la
+`ubicacion_grilla` / `WorkArea` / `pick_sequence` real de ese punto. Fallback
+(round-robin viejo + `[STOCHASTIC][WARN]`) solo si el SKU no tiene ningun punto
+real asociado (dato inconsistente; no ocurre en el catalogo real).
 
-### Archivos a tocar
-- `order_strategies.py`: `_get_location_for_area()` y `generate_work_orders()`.
-- `data_manager.py`: consultas por ubicacion en vez de agrupadas.
-- `warehouse.py`: usar `qty_reserved` de la BD.
-- `schema.sql` / `importer.py`: verificar que el importador llena `qty_available` por ubicacion.
+**Cambio incondicional** (no opt-in): es la correccion de un bug de
+correctitud, no una feature nueva -- decision del Director, mismo criterio que
+MEJ-4. Baseline actualizado con `--update-baseline --yes`.
 
-### Estimacion de esfuerzo
-Medio (1-2 sesiones). No toca la logica de simulacion, solo la asignacion previa.
+### Validacion
+- 3 tests nuevos (`tests/unit/test_stochastic_location.py`): WO va a la unica
+  ubicacion real del SKU; con multiples puntos del mismo SKU, siempre elige
+  entre esos (nunca el de otro SKU); fallback no crashea si un SKU no tiene
+  punto real. Suite: **85 passed, 0 skipped**.
+- Gate de regresion: cambio detectado (esperado) -- sha256 nuevo
+  `5f1f4adc...`, tamaño 4.919.513 bytes (antes 5.118.303, -3.9%). Makespan
+  se mantuvo practicamente igual (3122s vs 3121s del baseline MEJ-4) --
+  el fix cambia QUE ubicaciones exactas se visitan, no la dinamica general
+  del sistema. Baseline actualizado y gate re-verificado PASS.
+- **Nota de transparencia:** el reporte del planner mostro 1 plan fallido de
+  348 (antes 0 en el baseline MEJ-4), resuelto por el fallback visible que
+  ya construyo MEJ-4 (reserva best-effort + WARN, no crashea). Es esperable:
+  el patron espacial cambio (WOs de un mismo SKU ahora se concentran en sus
+  puntos reales en vez de dispersarse), lo que puede generar picos de
+  conflicto puntuales distintos a los del baseline anterior. No bloqueante.
+
+### Diferido / fuera de alcance de este fix
+- `qty_reserved` explicito por ubicacion en modo Stochastic: el modo
+  estocastico sigue tratando el inventario como "suficiente" (no consume
+  stock real por WO, a diferencia del modo Deterministico que si lo hace via
+  Allocation Layer). Si se quiere que Stochastic tambien refleje agotamiento
+  de stock por ubicacion, es una ampliacion futura a evaluar con el Director
+  (cambia la semantica de "modo estocastico" de forma mas profunda).
+- Poda del codigo muerto (`_get_location_for_area` y compañia) -- candidato
+  para una fase de limpieza explicita, no se toco aqui.
+
+### Archivos tocados
+- `src/subsystems/simulation/order_strategies.py`:
+  `StochasticOrderStrategy.generate_work_orders()`.
+- `tests/unit/test_stochastic_location.py` (nuevo).
+- `tests/baseline.json` (actualizado).
 
 ---
 

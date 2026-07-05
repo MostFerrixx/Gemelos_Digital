@@ -164,19 +164,30 @@ class StochasticOrderStrategy(OrderGenerationStrategy):
             print("[STOCHASTIC] WARNING: No hay puntos de picking disponibles - usando ubicaciones dummy")
             picking_points = [(10, 10), (15, 15), (20, 20)]
             work_areas = ["Area_Ground", "Area_High", "Area_Special"]
+            points_by_sku: Dict[str, List[Dict[str, Any]]] = {}
         else:
             # Mix picking points randomly to ensure fair distribution across areas
             mixed_points = almacen.data_manager.puntos_de_picking_ordenados.copy()
             random.shuffle(mixed_points)
-            
+
             picking_points = [pp['ubicacion_grilla'] for pp in mixed_points]
             work_areas = [pp.get('WorkArea', 'Area_Ground') for pp in mixed_points]
+
+            # INIT-1: indice SKU -> puntos reales donde ese SKU efectivamente
+            # esta (sku_initial), para que la WO no vaya a una ubicacion al
+            # azar desconectada del SKU que dice transportar.
+            points_by_sku = {}
+            for pp in almacen.data_manager.puntos_de_picking_ordenados:
+                sku_code = pp.get('sku_initial')
+                if sku_code:
+                    points_by_sku.setdefault(sku_code, []).append(pp)
 
         # Generate work orders
         wo_counter = 0
         order_counter = 1
         all_work_orders = []
         wo_adjusted_count = 0
+        sku_sin_ubicacion_count = 0
 
         for order_num in range(1, almacen.total_ordenes + 1):
             # Determine order type based on distribution
@@ -202,10 +213,23 @@ class StochasticOrderStrategy(OrderGenerationStrategy):
             num_wos = random.randint(1, 3)
 
             for wo_num in range(num_wos):
-                # Select picking location
-                pick_idx = order_counter % len(picking_points)
-                ubicacion = picking_points[pick_idx]
-                work_area = work_areas[pick_idx] if pick_idx < len(work_areas) else "Area_Ground"
+                # INIT-1: elegir una ubicacion REAL donde el SKU seleccionado
+                # efectivamente esta (sku_initial), en vez de un round-robin
+                # ciego sobre todos los puntos de picking.
+                sku_points = points_by_sku.get(sku.id)
+                if sku_points:
+                    punto = random.choice(sku_points)
+                    ubicacion = punto['ubicacion_grilla']
+                    work_area = punto.get('WorkArea', 'Area_Ground')
+                    pick_sequence_real = punto.get('pick_sequence')
+                else:
+                    # Fallback (SKU sin punto de picking conocido, no deberia
+                    # pasar en un catalogo real): round-robin como antes + WARN.
+                    sku_sin_ubicacion_count += 1
+                    pick_idx = order_counter % len(picking_points)
+                    ubicacion = picking_points[pick_idx]
+                    work_area = work_areas[pick_idx] if pick_idx < len(work_areas) else "Area_Ground"
+                    pick_sequence_real = None
 
                 # Validate and potentially divide quantity
                 cantidad_solicitada = random.randint(1, 5)
@@ -233,7 +257,8 @@ class StochasticOrderStrategy(OrderGenerationStrategy):
                         cantidad=cantidad,
                         ubicacion=ubicacion,
                         work_area=work_area,
-                        pick_sequence=almacen._obtener_pick_sequence_real(ubicacion, work_area),
+                        pick_sequence=(pick_sequence_real if pick_sequence_real is not None
+                                       else almacen._obtener_pick_sequence_real(ubicacion, work_area)),
                         staging_id=staging_id
                     )
                     all_work_orders.append(work_order)
@@ -245,6 +270,10 @@ class StochasticOrderStrategy(OrderGenerationStrategy):
 
         if wo_adjusted_count > 0:
             print(f"[STOCHASTIC] {wo_adjusted_count} WorkOrders ajustadas por capacidad")
+
+        if sku_sin_ubicacion_count > 0:
+            print(f"[STOCHASTIC][WARN] {sku_sin_ubicacion_count} WorkOrders sin punto de "
+                  f"picking real para su SKU -- se uso ubicacion de fallback (round-robin).")
 
         return all_work_orders
     
