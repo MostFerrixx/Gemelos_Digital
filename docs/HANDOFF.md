@@ -10,13 +10,14 @@ El hallazgo de makespan +55% de MEJ-4 fue REDEFINIDO por el Director como
 **INIT-6** (staging multi-destino por ruta: los pedidos deberian tener destino
 real -- tienda o domicilio -- y consolidarse en staging por grupo de ruta de
 camion/reparto, no en una celda unica). Ver `docs/BACKLOG.md` seccion INIT-6.
-**Hecho en esta sesion:** MEJ-2 v1, fix de WOs sobredimensionadas, e INIT-1
-(picking por ubicacion real en modo Stochastic) -- los tres mergeados a main.
-Baseline actualizado a `5f1f4adc...` (4.919.513 bytes). Ver seccion 4.
+**Hecho en esta sesion:** MEJ-2 v1, fix de WOs sobredimensionadas, INIT-1
+(picking real en modo Stochastic) e INIT-3 (optimizador ampliado + expuesto en
+la web) -- los cuatro mergeados a main. Baseline actualizado a `5f1f4adc...`
+(4.919.513 bytes; INIT-3 no toco el motor). Ver seccion 4.
 **Proxima accion sugerida:** decidir siguiente prioridad con el Director --
-candidatos: INIT-3 (optimizador Optuna), INIT-6 (staging por ruta/destino,
-necesita su propia sesion de diseño), o MEJ-2 v2 (KPI de nivel de servicio).
-Ver seccion 5.
+candidatos: INIT-6 (staging por ruta/destino, necesita su propia sesion de
+diseño), MEJ-2 v2 (KPI de nivel de servicio), UI minima para el optimizador
+web, o `_legacy/web_dashboard/` (decision pendiente). Ver seccion 5.
 
 ---
 
@@ -134,6 +135,41 @@ ba55f27  chore(limpieza): sanear indice FUSE, borrar junk y actualizar docs desf
 ---
 
 ## 4. LO QUE SE HIZO (HISTORIAL POR SESION)
+
+### Sesion 2026-07-05 (cont. 2) — INIT-3: optimizador ampliado + expuesto en la web (en `main`)
+
+RCA (correr una optimizacion real de 3 trials antes de asumir que algo estaba
+roto) mostro que los 3 problemas originales del backlog ((a) nombres de
+estrategia desalineados, (b) parametros mapeados a claves que el motor ignora,
+(c) resource_costs en 0) YA NO EXISTIAN -- resueltos por trabajo previo no
+documentado como tal. `num_operarios_terrestres`/`num_montacargas` resultaron
+ser el fallback VIVO de `operators.py` (crea la flota directamente cuando
+`agent_types` esta vacio), exactamente como el optimizador arma sus trials.
+
+Lo que si faltaba (items 3 y 4 del plan original) se implemento:
+- Espacio de busqueda ampliado (`src/tools/optimizer.py`): `max_wos_por_tour`
+  (siempre) + `radio_cercania` (solo si estrategia == "Cercania", condicional
+  para no inflar el espacio con un parametro sin efecto en 3/4 estrategias).
+- Expuesto en la web: `web_prototype/optimization_runner.py` (singleton,
+  mismo patron que `SimulationRunner` pero sin streaming) + 3 endpoints
+  (`POST /api/optimization/start`, `GET /api/optimization/status`,
+  `POST /api/optimization/stop`). Fire-and-forget (subprocess Popen) con
+  polling de progreso via `optuna.load_study()` directo a la BD SQLite --
+  necesario porque un estudio de N trials excede largamente el timeout de
+  600s de una simulacion individual, y sobrevive a un reinicio del servidor
+  porque el estado vive en la BD, no en memoria del proceso.
+
+Capacidades por agente + prioridades de zona en el espacio de busqueda quedan
+DIFERIDAS (requieren cambiar de representacion legacy a `agent_types`
+explicito, cambio de diseño mas grande). UI visual en el configurador tambien
+diferida (los endpoints ya funcionan via HTTP directo).
+
+Validado: 3 tests nuevos (`tests/unit/test_optimizer_search_space.py`, usan
+`FixedTrial` + mock de subprocess, suite 88 passed) + smoke end-to-end del
+espacio ampliado (5 trials reales) + smoke de los 3 endpoints con servidor
+real (start/status con progreso en vivo/stop, doble-start rechazado con 409).
+Sin cambios al motor (gate PASS, mismo baseline de INIT-1). Detalle completo:
+`docs/BACKLOG.md`.
 
 ### Sesion 2026-07-05 (cont.) — INIT-1: picking por ubicacion real en modo Stochastic (en `main`)
 
@@ -380,7 +416,7 @@ colores de seccion, notificaciones. Cuarentena de 40+ archivos basura.
 | **INIT-6** — Staging multi-destino por ruta (redefine el hallazgo makespan +55%) | PENDIENTE — decision del Director: es problema de modelado (destino/ruta), no de tuning. Ver BACKLOG.md | Alto |
 | **BK-02** — FIFO Estricto en UI | EN REPENSAR (diseno pendiente del Director) | ~15 min cuando se decida |
 | **`_legacy/web_dashboard/`** (puerto 8001) | PENDIENTE DECISION (Director quiere revisarla) | Depende de decision |
-| **INIT-3** — Reparar optimizador Optuna | Pendiente | Bajo-Medio |
+| INIT-3 — Optimizador Optuna (alcance redefinido: core ya andaba, se amplio espacio + web) | HECHO 2026-07-05, MERGEADO a main | — |
 | **INIT-4 → KPI de SLA vencido** | Pendiente (unico punto diferido de INIT-4) | Bajo |
 
 INIT-4 (C1 tiempos, C2 prioridad Opcion C, C3 olas) esta HECHO (ver seccion 4 y
@@ -405,9 +441,14 @@ entre ambos. Fix: indice `points_by_sku` (campo `sku_initial` ya existente en
 Cambio incondicional (bug real, no feature), baseline actualizado
 (`5f1f4adc...`, 4.919.513 bytes). Detalle completo en `docs/BACKLOG.md`.
 
-**INIT-3 — Optimizador Optuna**
-Los nombres de estrategia y parametros del optimizador estan desalineados del motor
-real. Resultado: el optimizador puede estar probando configuraciones que el motor ignora.
+**INIT-3 — Optimizador Optuna** — HECHO 2026-07-05
+El RCA (correr una optimizacion real antes de asumir) mostro que el
+desalineamiento descrito ya NO existia: nombres de estrategia correctos,
+`num_operarios_terrestres`/`num_montacargas` son el fallback vivo (no
+ignorado). Se amplio el espacio de busqueda (`max_wos_por_tour`,
+`radio_cercania` condicional) y se expuso en la web
+(`web_prototype/optimization_runner.py` + `POST/GET /api/optimization/*`,
+fire-and-forget con polling via la BD de Optuna). Detalle en `docs/BACKLOG.md`.
 
 **INIT-4 — Prioridad / SLA / olas + tiempos de pick** — HECHO 2026-06-29
 Commits 91dd6c0 (C1 tiempos escalables), c27dacb (C2 prioridad Opcion C),

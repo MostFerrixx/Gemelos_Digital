@@ -121,13 +121,28 @@ class SimulationOptimizer:
                 "Cercania",
             ]
         )
-        
+
+        # INIT-3: ampliar espacio de busqueda mas alla de la flota.
+        # max_wos_por_tour es global (dispatcher.py); afecta a toda estrategia.
+        max_wos_por_tour = trial.suggest_int("max_wos_por_tour", 5, 40)
+
+        # radio_cercania solo tiene efecto cuando la estrategia es "Cercania"
+        # (dispatcher._estrategia_cercania); en las demas se ignora, asi que
+        # solo lo sugerimos condicionalmente para no inflar el espacio de
+        # busqueda con un parametro sin efecto en 3 de 4 estrategias.
+        radio_cercania = None
+        if dispatch_strategy == "Cercania":
+            radio_cercania = trial.suggest_int("radio_cercania", 20, 300)
+
         # 2. Generar config temporal
         trial_config = self.base_config.copy()
         trial_config["num_operarios_terrestres"] = n_ground
         trial_config["num_montacargas"] = n_forklifts
         trial_config["dispatch_strategy"] = dispatch_strategy
-        
+        trial_config["max_wos_por_tour"] = max_wos_por_tour
+        if radio_cercania is not None:
+            trial_config["radio_cercania"] = radio_cercania
+
         # Ajustar num_operarios_total (suma de terrestres + montacargas)
         trial_config["num_operarios_total"] = n_ground + n_forklifts
         
@@ -143,7 +158,9 @@ class SimulationOptimizer:
             json.dump(trial_config, f, indent=2, ensure_ascii=False)
         
         # 3. Ejecutar simulación headless
-        print(f"\n[OPTIMIZER] Trial {trial.number}: Ground={n_ground}, Forklifts={n_forklifts}, Strategy={dispatch_strategy}")
+        radio_info = f", Radio={radio_cercania}" if radio_cercania is not None else ""
+        print(f"\n[OPTIMIZER] Trial {trial.number}: Ground={n_ground}, Forklifts={n_forklifts}, "
+              f"Strategy={dispatch_strategy}, MaxWOs/tour={max_wos_por_tour}{radio_info}")
         
         cmd = [
             sys.executable,  # Usar el mismo intérprete Python

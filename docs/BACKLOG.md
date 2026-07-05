@@ -17,7 +17,7 @@ Responsable: Cerebellum
 | INIT-5 — Nivel de servicio / backorders | RESUELTO (2026-06-21) |
 | **INIT-4 → KPI de SLA vencido** | **PENDIENTE** (diferido de INIT-4) |
 | INIT-1 — Picking por ubicacion real (alcance redefinido: solo modo Stochastic) | HECHO (2026-07-05) |
-| **INIT-3 — Reparar optimizador Optuna** | **PENDIENTE** (bajo-medio) |
+| INIT-3 — Reparar y ampliar optimizador Optuna (alcance redefinido: core ya andaba) | HECHO (2026-07-05) |
 | WOs sobredimensionadas — fix defensivo | HECHO (2026-07-05) |
 | **`_legacy/web_dashboard/`** — conservar/reparar/eliminar | **PENDIENTE DECISION** |
 | MEJ-1 — Red de seguridad automatizada (tests + gate) | HECHO (2026-07-04, F1-F5 completas) |
@@ -515,31 +515,88 @@ MEJ-4. Baseline actualizado con `--update-baseline --yes`.
 
 ## INIT-3 — Reparar y ampliar el optimizador Optuna
 
-**Estado:** PENDIENTE — sin sprint asignado
-**Prioridad:** Media-Alta (feature estrella del producto, hoy posiblemente no-op)
+**Estado:** HECHO — 2026-07-05, en `main`.
+**Prioridad:** Media-Alta (feature estrella del producto)
 **Origen:** docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md, item #3
 
-### El problema
-El optimizador (`src/tools/optimizer.py`) puede estar probando:
-(a) Nombres de estrategia que no coinciden con los del dispatcher.
-(b) Parametros que se mapean a claves legacy que el motor ignora (p.ej.
-    `num_operarios_terrestres` en vez de `agent_types`).
-(c) `export_optimization_metrics` lee `num_operarios_terrestres`/`num_montacargas`
-    para `resource_costs`; si el config usa `agent_types`, esos contadores son 0.
+### Root cause real (revision 2026-07-05) -- (a)/(b)/(c) ya NO aplicaban
+Al correr una optimizacion real de punta a punta (3 trials) antes de asumir
+que algo estaba roto, se confirmo que los 3 problemas originales del backlog
+ya estaban resueltos por trabajo previo (no documentado como tal en su momento):
+- **(a) nombres de estrategia:** el optimizador YA sugiere exactamente los 4
+  strings que el dispatcher reconoce (`Optimizacion Global`, `FIFO Estricto`,
+  `Ejecucion de Plan`, `Cercania`) -- el codigo trae un comentario explicito
+  de cuando se limpiaron los nombres fantasma "FIFO Simple"/"Proximity-Based"
+  y se aplico el alias corto de H-5.
+- **(b) claves legacy ignoradas:** `num_operarios_terrestres`/`num_montacargas`
+  **no son ignoradas** -- son el fallback VIVO de `operators.py` (crea la
+  flota directamente) cuando `agent_types` esta vacio, que es exactamente como
+  el optimizador arma su config de trial (nunca toca `agent_types`). Traducir
+  a `agent_types` real no hacia falta.
+- **(c) resource_costs en 0:** no ocurre porque el optimizador nunca escribe
+  `agent_types` en el trial_config -- `export_optimization_metrics` lee las
+  mismas claves que el optimizador escribe.
 
-### Que hay que hacer
-1. Alinear nombres de `dispatch_strategy` con los del dispatcher (Fix H-5 ya lo hizo para la UI; revisar si el optimizador lo heredo).
-2. Traducir los parametros sugeridos a `agent_types` reales.
-3. Ampliar el espacio de busqueda: capacidades, `max_wos_por_tour`, prioridades de zona.
-4. Exponer el mejor resultado en la web (`/api/optimization`).
+Prueba empirica: 3 trials reales (15 ordenes) dieron scores economicamente
+coherentes (mas operarios sin mas throughput proporcional = score mas bajo).
+El optimizador YA funcionaba de punta a punta antes de esta sesion.
 
-### Archivos a tocar
-- `src/tools/optimizer.py`
-- `src/engines/event_generator.py` (export_optimization_metrics)
-- `web_prototype/server.py` (endpoint de resultado)
+### Lo que si faltaba (items 3 y 4 del plan original) -- implementado ahora
+- **Espacio de busqueda ampliado** (`src/tools/optimizer.py`): agregados
+  `max_wos_por_tour` (int, 5-40, siempre sugerido -- parametro global del
+  dispatcher) y `radio_cercania` (int, 20-300, sugerido SOLO si
+  `dispatch_strategy == "Cercania"`, ya que no tiene efecto en las otras 3
+  estrategias -- evita inflar el espacio de busqueda con un parametro sin
+  efecto en 3/4 de los trials). Capacidades por tipo de agente y prioridades
+  de zona quedan DIFERIDAS (ver abajo): requieren cambiar la representacion
+  del trial de `num_operarios_terrestres/num_montacargas` (fallback legacy) a
+  `agent_types` explicito, un cambio de diseño mas grande.
+- **Exposicion en la web** (`web_prototype/optimization_runner.py` nuevo +
+  3 endpoints en `server.py`): `POST /api/optimization/start` (lanza
+  `entry_points/run_optimization.py` como subprocess fire-and-forget --
+  un estudio de N trials puede tardar mucho mas que los 600s de timeout de
+  una simulacion individual, por eso NO es sincrono ni streameado),
+  `GET /api/optimization/status` (progreso leido directamente de la BD SQLite
+  de Optuna via `optuna.load_study()` -- funciona por polling, sobrevive a un
+  reinicio del servidor porque el estado vive en la BD, no en memoria),
+  `POST /api/optimization/stop` (termina el subprocess). Singleton
+  `OptimizationRunner` (mismo patron que `SimulationRunner`, pero mas simple:
+  sin streaming de logs, solo Popen + polling de estado).
 
-### Estimacion de esfuerzo
-Bajo-Medio (1 sesion para alineacion basica; otra para ampliar espacio).
+### Validacion
+- 3 tests nuevos (`tests/unit/test_optimizer_search_space.py`): usan
+  `optuna.trial.FixedTrial` + mock de `subprocess.run` para verificar la
+  CONSTRUCCION del trial_config (max_wos_por_tour siempre presente,
+  radio_cercania presente solo con Cercania, ausente en las otras 3
+  estrategias) sin correr una simulacion real. Suite: **88 passed**.
+- Smoke test end-to-end del espacio ampliado: 5 trials reales, `radio_cercania`
+  aparecio correctamente solo en el trial con estrategia Cercania.
+- Smoke test de los 3 endpoints web (servidor real en puerto de prueba):
+  `start` devuelve `study_name`/`pid`; `status` muestra progreso en vivo
+  (best_score/best_params actualizandose con trials completados) y
+  `n_trials_completed` correcto; doble `start` mientras corre devuelve 409
+  con mensaje claro; `stop` termina el subprocess y un segundo `stop` sin
+  nada corriendo devuelve 409. Sin cambios al motor (gate PASS, sin tocar
+  baseline).
+
+### Diferido (item 2 del plan original, redefinido)
+- **Capacidades por tipo de agente + prioridades de zona** en el espacio de
+  busqueda: requiere que el optimizador arme un `agent_types` explicito por
+  trial en vez de usar el fallback legacy (`num_operarios_terrestres`/
+  `num_montacargas`), ya que la capacidad esta hardcodeada en el fallback de
+  `operators.py` (150 ground / 1000 forklift, no leida de config). Es un
+  cambio de representacion mas grande, no un fix -- evaluar en una sesion
+  futura si el Director quiere ese nivel de detalle en la busqueda.
+- UI minima en el configurador para lanzar/ver el estudio desde el navegador
+  (hoy los 3 endpoints existen pero sin panel visual -- se puede invocar con
+  curl/Postman o un cliente HTTP). El backlog original solo pedia el endpoint;
+  la UI es una ampliacion futura opcional.
+
+### Archivos tocados
+- `src/tools/optimizer.py`: espacio de busqueda ampliado.
+- `web_prototype/optimization_runner.py` (nuevo).
+- `web_prototype/server.py`: 3 endpoints + `StartOptimizationRequest`.
+- `tests/unit/test_optimizer_search_space.py` (nuevo).
 
 ---
 

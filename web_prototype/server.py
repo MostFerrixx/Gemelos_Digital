@@ -3,7 +3,7 @@ import os
 import json
 import math
 import time
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +20,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 # Import configuration manager
 from web_prototype.config_manager import WebConfigurationManager
 from web_prototype.simulation_runner import SimulationRunner
+from web_prototype.optimization_runner import OptimizationRunner
 
 # Initialize configuration manager
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -38,6 +39,15 @@ class SaveConfigurationRequest(BaseModel):
     description: str = ""
     config: Dict[str, Any]
     is_default: bool = False
+
+class StartOptimizationRequest(BaseModel):
+    """INIT-3: parametros para lanzar un estudio de optimizacion Optuna"""
+    n_trials: int = 50
+    n_jobs: int = 2
+    study_name: Optional[str] = None
+    cost_ground: float = 15.0
+    cost_forklift: float = 50.0
+    penalty_failed: float = 100.0
 
 
 app = FastAPI()
@@ -1127,6 +1137,52 @@ def get_simulation_status():
     return {
         "running": runner.is_running()
     }
+
+
+@app.post("/api/optimization/start")
+def start_optimization(request: StartOptimizationRequest):
+    """
+    INIT-3: lanza un estudio de optimizacion Optuna en background (subprocess
+    fire-and-forget) usando el config.json canonico como template. Un estudio
+    de N trials puede tardar mucho mas que el timeout de 600s de una
+    simulacion individual, por eso NO es sincrono: se lanza y se consulta el
+    progreso via /api/optimization/status.
+    """
+    runner = OptimizationRunner()
+    try:
+        result = runner.start(
+            config_path=os.path.join(PROJECT_ROOT, "config.json"),
+            n_trials=request.n_trials,
+            n_jobs=request.n_jobs,
+            study_name=request.study_name,
+            cost_ground=request.cost_ground,
+            cost_forklift=request.cost_forklift,
+            penalty_failed=request.penalty_failed,
+        )
+        return {"started": True, **result}
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.get("/api/optimization/status")
+def get_optimization_status(study_name: Optional[str] = None, storage: Optional[str] = None):
+    """
+    Progreso del estudio (trials completados, mejor score/params hasta ahora).
+    Lee directamente la BD SQLite de Optuna -- funciona aunque el servidor se
+    haya reiniciado desde que se lanzo el estudio, pasando study_name/storage.
+    """
+    runner = OptimizationRunner()
+    return runner.status(study_name=study_name, storage=storage)
+
+
+@app.post("/api/optimization/stop")
+def stop_optimization():
+    """Cancela el estudio de optimizacion en curso (si lo hay)."""
+    runner = OptimizationRunner()
+    stopped = runner.stop()
+    if not stopped:
+        raise HTTPException(status_code=409, detail="No hay ninguna optimizacion en curso.")
+    return {"stopped": True}
 
 
 @app.get("/api/validate-replay")
