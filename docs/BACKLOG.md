@@ -8,7 +8,6 @@ Actualizado: 2026-07-05 · Responsable: Cerebellum
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
-| `_legacy/web_dashboard/` — conservar/reparar/eliminar | PENDIENTE DECISION | Baja | Depende | Director quiere revisarla primero |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-4b — KPI de SLA vencido en reporte/visor | PENDIENTE | Baja | Bajo | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
@@ -47,16 +46,6 @@ Hay que redefinir que deberia hacer FIFO operacionalmente antes de mostrarlo
 en el configurador. El motor ya lo implementa correctamente
 (`dispatcher._estrategia_fifo`, string `"FIFO Estricto"`); es una decision de
 diseño de uso, no un problema tecnico.
-
----
-
-## `_legacy/web_dashboard/` — decision pendiente
-
-Puerto 8001, app FastAPI independiente con tabla de WorkOrders. Huerfana y
-rota (apunta a un `.jsonl` de prueba que ya no existe). Su funcion ya la cubre
-el panel de WorkOrders del viewer web vigente. Recomendacion de Cerebellum:
-eliminar (revisar 2 min por si hay alguna idea de presentacion que rescatar
-primero). El Director quiere revisarla antes de decidir.
 
 ---
 

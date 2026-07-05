@@ -60,12 +60,10 @@ python scripts/regression_gate.py  # GATE PASS esperado
 
 1. **BK-02 — FIFO Estricto en UI.** El Director quiere redefinir que deberia
    hacer FIFO operacionalmente antes de exponerlo.
-2. **`_legacy/web_dashboard/`** (puerto 8001, huerfano/roto). Conservar /
-   reparar / eliminar — el Director queria revisarlo primero.
-3. **INIT-6 Opcion C (clustering geografico)** -- solo si el negocio va a
+2. **INIT-6 Opcion C (clustering geografico)** -- solo si el negocio va a
    tener datos reales de geolocalizacion de clientes. No es bloqueante, es
    una decision de producto a futuro, no de esta semana.
-4. **Distribucion real de `outbound_staging_distribution`** en el config
+3. **Distribucion real de `outbound_staging_distribution`** en el config
    canonico: ¿repartir el trafico entre las 7 zonas ahora que el mecanismo
    funciona, o mantener 100% en zona 1? Es tuning de negocio, no un bug.
 

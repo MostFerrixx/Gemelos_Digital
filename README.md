@@ -257,7 +257,6 @@ Gemelos Digital/
     ├── src_shared/               # src/shared/ muerto (superado por simulation_buffer.py)
     ├── utils_root/               # utils/ de la raiz (isla muerta)
     ├── tools_duplicados/         # Duplicados de configurator/visualizer/inspector
-    ├── web_dashboard/            # App web huerfana (puerto 8001), revivible
     ├── communication_raiz/       # communication/ huerfano de la raiz (roto)
     └── data/                     # Arbol data/ duplicado, migracion abandonada
 ```

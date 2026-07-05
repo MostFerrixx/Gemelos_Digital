@@ -85,9 +85,6 @@ ARCHIVADO en `_legacy/` (deprecado, reversible por `git mv`, NO borrar sin avisa
   viewer Pygame (`run_replay_viewer.py`, `replay_engine.py`), dashboard PyQt6
   (`visualization/`, IPC en `communication/`), configurador Tkinter
   (`configurator.py`). Reemplazadas por el frontend web.
-- `_legacy/web_dashboard/` (puerto 8001, huérfana, apunta a un replay inexistente):
-  tabla de WorkOrders redundante con el panel del viewer web. **Pendiente decisión
-  del Director** (conservar / reparar / eliminar) — NO tocar sin avisar.
 
 MUERTO (confirmado sin imports de entrada) — ignóralo en features; candidato a
 poda en limpieza:

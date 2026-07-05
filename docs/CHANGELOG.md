@@ -10,6 +10,22 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-05 (cont. 5)
+
+- **Eliminacion de `_legacy/web_dashboard/`.** A pedido del Director: auditar
+  si valia la pena rescatar alguna idea antes de descartar. Comparacion
+  exhaustiva (README, HTML, JS, CSS, servidor) contra el viewer web vigente
+  (`web_prototype/static/`) confirmo que el viewer actual es una evolucion
+  directa de este codigo, no algo distinto: mismas 18 columnas de la tabla
+  de WorkOrders (el viewer actual tiene 2 mas: `qty_requested`/`qty_picked`),
+  mismos codigos de color hex exactos por estado (`#FFC107`/`#007BFF`/
+  `#28A745`), mismo sistema de sorting por click, mismo scrubber+playback
+  (mas desarrollado, integrado con el mapa 2D). El backend estaba ademas
+  roto (ruta de replay hardcodeada e inexistente). Nada que rescatar ->
+  eliminado (no archivado de nuevo, ya estaba en `_legacy/` desde
+  2026-05-31). Referencias actualizadas en `CLAUDE.md`, `README.md`,
+  `_legacy/README.md`, `docs/BACKLOG.md`, `docs/STATE.md`.
+
 ## 2026-07-05 (cont. 4)
 
 - **INIT-6 — UI web para configurar staging por destino + capacidad de
