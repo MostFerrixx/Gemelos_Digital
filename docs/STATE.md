@@ -8,7 +8,7 @@
 
 ## Git
 
-- `main` = `3b0af80`. Working tree limpio. Sin ramas feature pendientes de
+- `main` = `b259880`. Working tree limpio. Sin ramas feature pendientes de
   merge. Push directo a main autorizado por el Director para esta sesion
   (confirmado 2026-07-05 tras un bloqueo del clasificador de permisos).
 - Baseline byte-identico vigente: `sha256=5f1f4adcd2a288d2...`, 4.919.513 bytes,
