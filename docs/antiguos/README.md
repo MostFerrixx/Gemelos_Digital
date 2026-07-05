@@ -51,13 +51,34 @@ Movidos con `git mv` en sesion 2026-06-27 (auditoria documental post-V12.1).
 
 ---
 
+## Lote 3 — 2026-07-05: Reestructuracion de documentacion (ver `docs/META_DOCUMENTACION.md`)
+
+Consolidacion de las 3 ubicaciones de archivo historico en una sola
+(`docs/antiguos/`), y democion de planes ya ejecutados / docs auto-descritos
+como "referencia" que seguian viviendo en `docs/` activo.
+
+| Documento/carpeta | Por que se archiva |
+|---|---|
+| `archived_root/` (22 archivos) | Contenido completo del ex `archived/` (raiz del repo) — segunda ubicacion de archivo historico que existia en paralelo a esta. Consolidado aca via `git mv`. |
+| `eliminacion_live_simulation/` (5 archivos) | Idem, subcarpeta del ex `archived/` sobre la eliminacion de la simulacion en vivo (2025-10-27). |
+| `PLAN_MEJORA_1_RED_SEGURIDAD.md` | MEJ-1 (red de seguridad: pytest + gate + CI) HECHA y en `main`. Plan ejecutado. |
+| `PLAN_MEJORA_4_ANTICOLISIONES.md` | MEJ-4 (anti-colisiones completo) HECHA y en `main`. Plan ejecutado; el hallazgo de makespan +55% quedo redefinido como INIT-6 (ver BACKLOG.md). |
+| `PLAN_INIT4.md` | INIT-4 (prioridad/SLA/olas + tiempos de pick) HECHA. Plan ejecutado. |
+| `VALIDACION_UI_WEB.md` | Auto-descrito como validacion puntual de 60 controles UI (2026-06-27); no vigente, historico. |
+| `PRUEBAS_E2E_SISTEMA.md` | Catalogo formal de 53 casos E2E (2026-06-13); referencia puntual, no vigente. |
+| `RESULTADOS_PRUEBAS_E2E.md` | Resultados de esa bateria (2026-06-13); referencia puntual, no vigente. |
+
+El detalle de iniciativas cerradas DESDE 2026-07-04 en adelante ya no vive en
+docs individuales por sesion — vive en `docs/CHANGELOG.md` (formato terso,
+append-only). Este README sigue documentando los lotes historicos previos a
+esa convencion.
+
 ## Que NO se archiva (sigue vigente en `docs/`)
 
-- `HANDOFF.md` — estado operativo para nueva sesion; actualizado 2026-06-27.
-- `BACKLOG.md` — items pendientes con INIT-1/3/4 y WOs sobredimensionadas activos.
-- `PRUEBAS_E2E_SISTEMA.md` — catalogo formal de 53 casos E2E; referencia viva.
-- `RESULTADOS_PRUEBAS_E2E.md` — resultados mas recientes (40 PASS, 0 FAIL; 2026-06-13).
-- `VALIDACION_UI_WEB.md` — validacion de 60 controles UI; actualizado 2026-06-27.
+- `docs/STATE.md` — foto del presente; se reescribe entera cada sesion.
+- `docs/CHANGELOG.md` — historial de iniciativas cerradas (append-only).
+- `docs/BACKLOG.md` — solo items pendientes/abiertos.
+- `docs/META_DOCUMENTACION.md` — por que la documentacion esta organizada asi.
 - `PROPUESTA_MEJORA_DISENO_UI.md` — D-01..D-16 implementadas; actualizado 2026-06-27.
 - `VISION_PRODUCTO.md` — norte estrategico del producto; atemporal.
 - `COMO_FUNCIONA_EL_PROGRAMA.md` — guia practica de como funciona el simulador.

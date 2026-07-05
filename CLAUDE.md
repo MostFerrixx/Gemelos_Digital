@@ -36,7 +36,7 @@ Simulador de operaciones logísticas de almacén (Warehouse Digital Twin).
 
 ## 3. ARQUITECTURA REAL (V12.1, verificada 2026-07-04)
 La verdad es el código en `main` + el working dir. `README.md` (raíz) y
-`docs/HANDOFF.md` están **al día** y son referencia válida; los archivos históricos
+`docs/STATE.md` están **al día** y son referencia válida; los archivos históricos
 en `docs/antiguos/` NO (describen fases ya cerradas). Ante cualquier duda, rastrea
 imports en el working dir antes de afirmar.
 
@@ -106,67 +106,30 @@ NOTA: la simulación y `run_migration.py` leen ambos desde `layouts/`. El migrad
 usa `find_excel_file()` (busca `layouts/Warehouse_Logic_v2.xlsx`, luego
 `layouts/Warehouse_Logic.xlsx`); no existe copia en `data/layouts/`. Sin divergencia.
 
-## 5. ESTADO ACTUAL (actualizado 2026-07-04)
+## 4.5 MAPA DE DOCUMENTACION (donde vive cada tipo de informacion)
+Cada hecho tiene UN solo lugar donde vive; evita duplicar el mismo dato en dos
+archivos (fue la causa de contradicciones reales en 2026-07-04/05: BACKLOG
+decia "pendiente" algo que ya estaba resuelto). Ver `docs/META_DOCUMENTACION.md`
+para el razonamiento completo detras de esta estructura.
 
-### Rama activa y estado de git (2026-07-04, post MEJ-1/3/4)
-`main` = `093b8c9` (incluye MEJ-1). Cadena lineal pendiente de merge (CI verde
-en todas): `f9c6000` (docs MEJ-4 plan, en rama mej-1) -> `e4db0ab` (MEJ-3, rama
-`feature/mej-3-config-schema`) -> `d1fec07` (MEJ-4, rama
-`feature/mej-4-anticolisiones`). **Un solo fast-forward de
-`feature/mej-4-anticolisiones` lleva todo a main** — pendiente del OK del
-Director. La rama historica `feature/allocation-layer-v12.1` quedo en `0179539`
-(ya contenida en main). Lee `docs/HANDOFF.md` para el detalle operativo.
+| Archivo | Que contiene | Se edita... |
+|---|---|---|
+| `CLAUDE.md` (este) | Identidad, leyes, arquitectura viva/muerta, flags opt-in estables | Rara vez — solo si cambia una regla o la arquitectura de fondo |
+| `docs/STATE.md` | Foto del presente: rama, SHA, baseline, decisiones pendientes del Director | Se REESCRIBE ENTERO cada sesion |
+| `docs/CHANGELOG.md` | Historial de iniciativas cerradas, terso, con sha de commit | Solo se AGREGA arriba, nunca se edita lo viejo |
+| `docs/BACKLOG.md` | Solo lo pendiente/abierto, con lo minimo para retomarlo | Se recorta cuando algo pasa a CHANGELOG |
+| `docs/antiguos/` | Planes ya ejecutados + docs de referencia puntual (no vigentes) | Solo se agrega (git mv), no se edita |
+| `README.md` (raiz) | Onboarding para un humano nuevo: vision, instalacion, uso | Cuando cambia el flujo de instalacion/uso real |
+| `AUDITORIA.md` | Snapshot puntual (mayo 2026) del diagnostico estructural | Nunca (es historico a proposito) |
 
-### Lo que ya esta commiteado (todo en main via fast-forward)
-- **Allocation Layer V12.1** (base): asignacion de stock real FCFS antes de
-  crear WorkOrders. `data_manager.py`, `warehouse.py`
-  (`qty_requested/qty_allocated/is_partial`), `order_strategies.py`.
-- **Fix H-5** (`c4c772f`): dispatcher reconoce alias corto "Ejecucion de Plan"
-  de la UI (antes caia silenciosamente a Optimizacion Global).
-- **Fix H-6** (`8a2fe86`): radio blando en `_estrategia_cercania()` — expande
-  radio por pasos en lugar de retornar lista vacia y causar deadlock.
-- **BK-01** (`bcdb264`): Cercania + radio_cercania + radio_expansion_paso +
-  radio_max_expansiones expuestos en configurador web. Fix H-5 incluido.
-- **BK-03 descartado** (`dd5c729`): greedy nearest-neighbor — -1.54% distancia/WO
-  (ruido estadistico); throughput baja -3.8%. Flag `cercania_tour_mode="cost"`.
-- **BK-04** (`1bb24a3`, `e2c6293`, `19e8829`): areas sin agente → fallo al
-  arrancar. Flota por defecto con work_areas validas. Mapa explicito
-  `work_area_equipment`. QA-1/2/3 cerradas.
-- **truck_interval en UI** (`0fa64e3`): expuesto en configurador, default 90.
-- **INIT-5** (`8cc7f8d`): nivel de servicio / backorders en visor web, API y
-  hoja Excel. Fuente: `core/replay_utils.build_service_level_summary()`.
-- **anti-cache estaticos** (`23b374b`): query string `?v=` en CSS/JS del front.
-- **D-13..D-16** (`902877a`, `0e6d3dd`): stepper numerado de tabs, design
-  tokens compartidos configurador/viewer, event markers en scrubber,
-  fix diferenciacion de estado accesible (no-color, WCAG AA).
-- **D-03..D-12** (sesiones anteriores): sidebar colapsable/iconos, fleet cards,
-  inline validation, jerarquia KPIs, colores de seccion, notificaciones.
-- **Logging refactor** (`b990964`): ~186 prints → logging por nivel en
-  hot-path (dispatcher, operators, event_generator). DEBUG off en produccion.
-- **WAREHOUSE_SEED** (`413888c`): semilla determinista via env var. Gate
-  byte-identico (SHA256=a4ae8d4e..., 5379372 bytes) verificado dos veces.
-- **Template Method** (`41ddc22`): BaseOperator.agent_process() + hooks
-  `_do_picking_at()` por subclase. -296 lineas en operators.py (-16.7%).
-  Gate byte-identico post-refactor confirmado.
-- **E6/E7 eliminados** (`f3a3ec5`): botones stub "Generar Plantilla TMX" /
-  "Poblar SKUs Aleatorios" quitados del HTML y JS (BK-05 cerrado).
-- **INIT-4** (`91dd6c0`, `c27dacb`, `fd0a41d`): prioridad/SLA/olas + tiempos de
-  pick escalables. C1 tiempo por cantidad/volumen; C2 prioridad de pedido fuerte
-  "limpia" (opt-in); C3 olas por release diferido. Todo opt-in con gate
-  byte-identico. Ver docs/PLAN_INIT4.md.
-- **Limpieza** (`8fd8a3c`): 40+ archivos basura en basura/, .gitignore ampliado.
-- **MEJ-1** (`6b0b438`..`093b8c9`, en main): red de seguridad — suite pytest en
-  `tests/` (fixtures en conftest, ~73 tests), `scripts/regression_gate.py`
-  (byte-identico modulo EOL, `--update-baseline --yes` para cambios
-  intencionales), `tests/baseline.json`, CI `.github/workflows/tests.yml`
-  (pytest + run_migration + gate en ubuntu). `make test` / `make gate` /
-  `run test` / `run gate`. El viejo tests/ legacy esta en `_legacy/tests_gui/`.
-- **MEJ-3** (`e4db0ab`, rama mej-3): `src/core/config_schema.py` (esquema unico
-  pydantic, validacion-only), integrado en motor (warnings) y web (bloquea tipos
-  invalidos); purga de claves muertas en config.json/defaults/app.js/index.html.
-- **MEJ-4** (`d1fec07`, rama mej-4): anti-colisiones completo — dwell reservado
-  al planificar, planner SIPP, fallback visible, clearance 0.05, parking
-  disperso. Co-ocupaciones 28→9, makespan +55% (hallazgo abierto).
+## 5. ESTADO ACTUAL
+
+**El estado operativo (rama, SHA de main, baseline vigente, pendientes y
+decisiones del Director) vive en `docs/STATE.md` — se reescribe entero cada
+sesion, NUNCA en este archivo.** El historial de iniciativas cerradas vive en
+`docs/CHANGELOG.md` (append-only). Los pendientes abiertos viven en
+`docs/BACKLOG.md`. Esta seccion (5) documenta solo lo que NO cambia sesion a
+sesion: los flags/features opt-in y las excepciones arquitectonicas de fondo.
 
 ### Flags y features opt-in (todos leídos de `config.json`; defaults NEUTROS)
 Estos flags NO están en el `config.json` canónico: el motor los lee con `.get()` y
@@ -202,47 +165,8 @@ integración en `warehouse.py` (crea manager/table/planner) y `operators.py`
 CON esta capa activa: es parte del comportamiento de referencia, no una
 desviación. Historia en `docs/antiguos/PLAN_INICIATIVA_2_OPCION_C.md`.
 
-### Pendientes (ver docs/BACKLOG.md para detalle)
-- **MEJ-1 HECHA (2026-07-04)**: red de seguridad automatizada — suite pytest
-  (`python -m pytest -q`) + gate byte-identico (`python scripts/regression_gate.py`)
-  + CI GitHub Actions EN VERDE. Usala en todo cambio de motor. El gate hashea el
-  `.jsonl` con EOL normalizado (CRLF→LF): SHA `4a208831…` identico en Windows y
-  Linux; el historico `a4ae8d4e…` era el mismo archivo con CRLF.
-- **MEJ-3 HECHA (2026-07-04)**: esquema unico de config en
-  `src/core/config_schema.py` (pydantic; cada clave anotada con su lector).
-  Motor y web detectan typos/claves legacy; la web bloquea tipos invalidos.
-  Purgadas 10 claves muertas + 9 subclaves F3 de congestion + 2 controles de UI
-  sin efecto (capacidad_carro, map_scale). Baseline actual: `662ed5e3…` (la
-  purga solo cambio la metadata del .jsonl; eventos identicos).
-  **Al anadir una clave nueva de config: registrala en config_schema.py.**
-- **MEJ-4 HECHA (2026-07-04)**: anti-colisiones completado — dwell reservado al
-  PLANIFICAR (destino-con-permanencia), planner estilo SIPP (salto al primer
-  hueco + dominancia por intervalo), fallback visible, clearance 0.05, parking
-  idle disperso. Co-ocupaciones 28→9 (max 2/celda). Baseline: `c6f129ef…`.
-  **OJO — HALLAZGO ABIERTO**: makespan +55% (2011→3121 s): es la cola REAL del
-  staging unico que antes se ocultaba (4 agentes superpuestos). Decision del
-  Director pendiente (ver PLAN_MEJORA_4 §4). Queda **MEJ-2** (experiment runner
-  con replicas/comparacion A/B). Detalle en BACKLOG.
-- **BK-02** — FIFO Estricto en UI: EN REPENSAR (diseno pendiente del Director).
-- **`_legacy/web_dashboard/`** (puerto 8001): Director quiere revisarla antes de
-  decidir (conservar / reparar / eliminar).
-- **INIT-1** — Inventario y picking por ubicacion real + reservas en BD
-  (correctitud fundacional; hoy la WO va a ubicacion aleatoria del area).
-- **INIT-3** — Reparar optimizador Optuna (estrategias y parametros alineados).
-- **INIT-4 → KPI de SLA vencido** (único punto diferido de INIT-4): mostrar en el
-  reporte/visor los pedidos que pasan su `due_time`. El dato existe en la WO; falta
-  cablearlo (reusar el patrón de INIT-5).
-- **WOs sobredimensionadas** — `_validar_y_ajustar_cantidad` en `warehouse.py`:
-  si `sku.volumen > max_capacity` → WO se marca 'staged' con qty=0 (falsifica
-  KPIs). Pendiente fix defensivo.
-- Ver `docs/antiguos/ANALISIS_PROFUNDO_INICIATIVAS.md` para detalle de INIT-1/3.
-
-### Bugs conocidos (no criticos)
-- `warehouse.db-shm` y `warehouse.db-wal`: archivos WAL de SQLite, aparecen
-  como untracked (ya en .gitignore).
-
-Existe `AUDITORIA.md` con el diagnostico estructural completo (mayo 2026).
-Lee `docs/HANDOFF.md` para el estado operativo actualizado.
+Existe `AUDITORIA.md` con el diagnostico estructural completo (mayo 2026, no
+se actualiza — es una foto puntual, ver `docs/STATE.md` para lo vigente).
 
 ## 6. LAS LEYES (CEREBELLUM PROTOCOL) — innegociables
 1. **PLAN ANTES QUE CÓDIGO.** Ante cualquier tarea no trivial: primero
@@ -287,10 +211,15 @@ Sé directo y técnico; explica el "porqué" de las decisiones de arquitectura.
    Tras CUALQUIER cambio de motor: además `python scripts/regression_gate.py`
    (PASS = comportamiento intacto; cambio intencional = `--update-baseline --yes`
    y commitear el baseline JUNTO con la feature).
-3. Lee `docs/HANDOFF.md` (estado operativo) y `docs/BACKLOG.md` (pendientes).
-   `AUDITORIA.md` solo si necesitas el mapa estructural completo (mayo 2026).
+3. Lee `docs/STATE.md` (estado operativo, se reescribe cada sesion) y
+   `docs/BACKLOG.md` (pendientes). `docs/CHANGELOG.md` solo si necesitas el
+   "por que" de algo ya cerrado. `AUDITORIA.md` solo para el mapa estructural
+   completo (mayo 2026, no se actualiza).
 4. Clave nueva de config → regístrala en `src/core/config_schema.py` (MEJ-3).
 5. Resume al Director el estado real y la próxima acción sugerida, y pregunta la
    prioridad. No empieces a cambiar nada sin su luz verde.
+6. Al cerrar la sesion: reescribir `docs/STATE.md` entero (no acumular),
+   agregar una entrada nueva arriba de `docs/CHANGELOG.md` (nunca editar las
+   viejas), y recortar `docs/BACKLOG.md` a lo que sigue pendiente.
 
 — Cerebellum sincronizado. ¿Cuál es la siguiente prioridad, Director?

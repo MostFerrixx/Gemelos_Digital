@@ -1,10 +1,10 @@
 # Gemelo Digital de Almacen
 
-**Version:** V12.1 (Allocation Layer + INIT-4 + MEJ-1/3/4)
-**Estado:** En desarrollo activo - ramas `feature/mej-3-config-schema` y
-`feature/mej-4-anticolisiones` con CI verde, pendientes de merge a `main`
+**Version:** V12.1 (Allocation Layer + INIT-1/3/4 + MEJ-1/2/3/4)
+**Estado:** En desarrollo activo - todo en `main`, ver `docs/STATE.md` para
+el detalle operativo vigente (rama, baseline, decisiones pendientes)
 **Arquitectura:** Headless (SimPy) + Replay + GUI web
-**Actualizado:** 2026-07-04
+**Actualizado:** 2026-07-05
 
 ---
 
@@ -70,8 +70,8 @@ byte-identica al baseline). Se activan desde `config.json`.
 - **Reproducibilidad** (`WAREHOUSE_SEED`): semilla determinista via variable de
   entorno para corridas comparables.
 
-Detalle e implementacion: `docs/PLAN_INIT4.md` y la seccion "Flags opt-in" de
-`CLAUDE.md` / `docs/HANDOFF.md`.
+Detalle e implementacion: `docs/antiguos/PLAN_INIT4.md` y la seccion "Flags opt-in" de
+`CLAUDE.md` / `docs/STATE.md`.
 
 ---
 
@@ -94,7 +94,7 @@ Detalle e implementacion: `docs/PLAN_INIT4.md` y la seccion "Flags opt-in" de
   **colas reales visibles en el staging**. NOTA: el makespan canonico subio
   ~55% porque la cola del staging unico ahora se modela de verdad (antes el
   throughput estaba inflado por descargas fisicamente imposibles). Detalle:
-  `docs/PLAN_MEJORA_4_ANTICOLISIONES.md`.
+  `docs/antiguos/PLAN_MEJORA_4_ANTICOLISIONES.md`.
 
 ---
 
@@ -316,17 +316,16 @@ Cada simulacion crea una carpeta `output/simulation_YYYYMMDD_HHMMSS/` con:
 ## 9. Documentacion y repositorio
 
 - `CLAUDE.md` - manual operativo del proyecto (arquitectura real, flags, leyes).
-- `docs/HANDOFF.md` - estado operativo al dia (arquitectura, historial, flags, pendientes).
-- `docs/BACKLOG.md` - inventario de iniciativas (hechas y pendientes).
-- `docs/PLAN_INIT4.md` - plan + pruebas de INIT-4 (prioridad/SLA/olas + tiempos).
-- `docs/PLAN_MEJORA_1_RED_SEGURIDAD.md` - MEJ-1: suite pytest + gate + CI (ejecutado).
-- `docs/PLAN_MEJORA_4_ANTICOLISIONES.md` - MEJ-4: analisis del sistema
-  anti-colisiones, iteraciones y resultados, incl. el hallazgo del makespan (+55%).
-- `AUDITORIA.md` - diagnostico estructural completo (mayo 2026).
+- `docs/STATE.md` - foto del presente (rama, baseline, pendientes); se reescribe cada sesion.
+- `docs/CHANGELOG.md` - historial de iniciativas cerradas (append-only).
+- `docs/BACKLOG.md` - solo lo pendiente/abierto.
+- `docs/META_DOCUMENTACION.md` - por que la documentacion esta organizada asi.
+- `AUDITORIA.md` - diagnostico estructural completo (mayo 2026, no se actualiza).
 - `_legacy/README.md` - que se archivo, por que y como revertirlo.
-- `docs/antiguos/` - planes/bitacoras de iniciativas ya cerradas (historico).
+- `docs/antiguos/` - archivo frio unico: planes ya ejecutados, docs de
+  referencia puntual, analisis historicos (incluye el ex `archived/` de raiz).
 
-> `CLAUDE.md`, este `README.md` y `docs/HANDOFF.md` se mantienen al dia y son la
+> `CLAUDE.md`, este `README.md` y `docs/STATE.md` se mantienen al dia y son la
 > referencia vigente. Los documentos en `docs/antiguos/` son historicos.
 
 Repositorio: https://github.com/MostFerrixx/Gemelos_Digital
