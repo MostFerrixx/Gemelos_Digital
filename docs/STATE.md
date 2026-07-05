@@ -8,8 +8,7 @@
 
 ## Git
 
-- `main` = pendiente del commit de este cierre (INIT-3 v2 + fix warm-start).
-  Working tree limpio salvo eso. Sin ramas feature pendientes de merge.
+- `main` = `b71caf2`. Working tree limpio. Sin ramas feature pendientes de merge.
 - Baseline byte-identico vigente: `sha256=5f1f4adcd2a288d2...`, 4.919.513 bytes,
   seed 42, Python 3.13.6 (`tests/baseline.json`). Sin cambios en esta sesion
   (ningun item toco el motor de simulacion, solo optimizer/web/experiment runner).
