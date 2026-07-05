@@ -8,6 +8,7 @@ pytmx>=3.31
 numpy>=1.21.0
 openpyxl>=3.0.9
 pandas>=2.0.0
+scipy>=1.10.0  # MEJ-2: IC 95% (t-Student) y t-test pareado en scripts/experiment_runner.py
 
 
 # Optional dependencies

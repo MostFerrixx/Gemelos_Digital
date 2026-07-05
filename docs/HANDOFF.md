@@ -1,15 +1,20 @@
 # HANDOFF — Gemelo Digital de Almacen
 # Estado operativo para nueva sesion de Cerebellum
 
-**Generado:** 2026-06-18  ·  **Actualizado:** 2026-07-04 (fin de sesion MEJ-1/3/4)
+**Generado:** 2026-06-18  ·  **Actualizado:** 2026-07-04 (merge MEJ-3+MEJ-4 a main + inicio MEJ-2)
 **Por:** Cerebellum (sesion de traspaso)
-**Rama activa:** `feature/mej-4-anticolisiones` (HEAD `d1fec07`, CI verde)
-**Ultimo hito:** MEJ-1 (red de seguridad, YA en main), MEJ-3 (esquema de config)
-y MEJ-4 (anti-colisiones completo) EJECUTADAS con CI verde.
-**Proxima accion sugerida:** (1) merge fast-forward de
-`feature/mej-4-anticolisiones` a main (trae MEJ-3+MEJ-4, pendiente OK Director);
-(2) decision del Director sobre el HALLAZGO makespan +55% (PLAN_MEJORA_4 §4);
-(3) arrancar MEJ-2 (experiment runner con replicas). Ver seccion 5.
+**Rama activa (post-merge):** `main` = `82f1487` (fast-forward desde
+`feature/mej-4-anticolisiones`, autorizado por el Director; incluye MEJ-1+3+4).
+**Ultimo hito:** MEJ-1, MEJ-3, MEJ-4 EJECUTADAS, CI verde y **mergeadas a main**.
+El hallazgo de makespan +55% de MEJ-4 fue REDEFINIDO por el Director como
+**INIT-6** (staging multi-destino por ruta: los pedidos deberian tener destino
+real -- tienda o domicilio -- y consolidarse en staging por grupo de ruta de
+camion/reparto, no en una celda unica). Ver `docs/BACKLOG.md` seccion INIT-6.
+**Hecho en esta sesion:** MEJ-2 v1 completado y validado -- ver seccion 4.
+**Proxima accion sugerida:** (1) decidir si se retoma MEJ-2 v2 (KPI de nivel
+de servicio en el experiment runner, diferido) o se pasa a otro pendiente;
+(2) INIT-6 (staging por ruta/destino) queda pendiente de su propia sesion de
+diseño (no es un tuning rapido). Ver seccion 5.
 
 ---
 
@@ -75,16 +80,16 @@ El arbol data/ es una migracion abandonada que solo lee codigo muerto.
 
 ## 3. GIT — ESTADO ACTUAL
 
-**Estado 2026-07-04 (fin de sesion):**
-- `main` = `093b8c9` (contiene MEJ-1 completa; fast-forward hecho con OK del Director).
-- Cadena lineal POSTERIOR a main, toda pusheada y con CI verde, PENDIENTE DE
-  MERGE (requiere OK del Director; el clasificador de permisos bloquea pushes a
-  main sin autorizacion explicita):
-  `093b8c9 (main)` -> `f9c6000` (docs plan MEJ-4, rama mej-1) -> `e4db0ab`
-  (MEJ-3, rama `feature/mej-3-config-schema`) -> `d1fec07` (MEJ-4, rama
-  `feature/mej-4-anticolisiones`).
-  **Un solo `git push origin feature/mej-4-anticolisiones:main` (ff) lleva todo.**
+**Estado 2026-07-04 (post-merge, mismo dia):**
+- `main` = `82f1487` (fast-forward ejecutado: `git push origin
+  feature/mej-4-anticolisiones:main`, autorizado por el Director). Contiene
+  MEJ-1 + MEJ-3 + MEJ-4 + docs completas. Divergencia verificada 0/0 tras el push.
+- Cadena que se mergeo: `093b8c9` -> `f9c6000` (docs plan MEJ-4) -> `e4db0ab`
+  (MEJ-3) -> `d1fec07` (MEJ-4) -> `82f1487` (docs finales).
 - Rama historica `feature/allocation-layer-v12.1` = `0179539` (ya en main).
+- Ramas feature `feature/mej-3-config-schema` y `feature/mej-4-anticolisiones`
+  quedan mergeadas (contenido identico a main); se pueden borrar cuando el
+  Director lo pida, no se tocaron en esta sesion.
 
 ### Log de la sesion 2026-07-04 (mas reciente primero)
 
@@ -127,6 +132,19 @@ ba55f27  chore(limpieza): sanear indice FUSE, borrar junk y actualizar docs desf
 ---
 
 ## 4. LO QUE SE HIZO (HISTORIAL POR SESION)
+
+### Sesion 2026-07-04 (cont. 3) — MEJ-2 v1: experiment runner (en `main`, post-merge)
+
+`scripts/experiment_runner.py`: modo `run` (N replicas, media/std/IC95% via
+`scipy.stats.t`) y modo `compare` (dos configs, semillas pareadas,
+`scipy.stats.ttest_rel`, veredicto SIGNIFICATIVO/RUIDO/IDENTICO). Reusa
+`WAREHOUSE_SEED` + `--output-metrics` ya existentes; subprocess aislado por
+replica igual que `regression_gate.py`; limpia `output/simulation_*` salvo
+`--keep-output`. KPIs v1 = los que ya exporta `export_optimization_metrics()`
+(cero cambios al motor). Nueva dependencia `scipy>=1.10.0`. Test:
+`tests/unit/test_experiment_runner.py` (7 tests, suite 80 passed). Gate
+re-verificado PASS (motor intacto). Diferido a v2: KPI de nivel de servicio
+(toca el motor + gate). Detalle: `docs/BACKLOG.md` seccion MEJ-2.
 
 ### Sesion 2026-07-04 — MEJ-1: red de seguridad automatizada (rama feature/mej-1-red-seguridad)
 
@@ -319,9 +337,9 @@ colores de seccion, notificaciones. Cuarentena de 40+ archivos basura.
 |------|--------|-------------------|
 | MEJ-1 — Red de seguridad (pytest + gate regresion) | HECHO 2026-07-04 (ver seccion 4) | — |
 | MEJ-3 — Esquema unico de config (pydantic) + purga claves | HECHO 2026-07-04 (ver seccion 4) | — |
-| MEJ-4 — Completar anti-colisiones (dwell + fallback visible) | HECHO 2026-07-04 — HALLAZGO makespan +55% pendiente de decision | — |
-| **MEJ-2** — Experiment runner (replicas + A/B estadistico) | APROBADA — SIGUIENTE | 2 sesiones |
-| **Makespan +55% post-MEJ-4** — reequilibrar escenario canonico? | PENDIENTE DECISION Director (PLAN_MEJORA_4 §4) | Bajo |
+| MEJ-4 — Completar anti-colisiones (dwell + fallback visible) | HECHO y MERGEADO a main 2026-07-04 | — |
+| **MEJ-2** — Experiment runner (replicas + A/B estadistico) | APROBADA — EN CURSO (prioridad elegida por el Director) | 2 sesiones |
+| **INIT-6** — Staging multi-destino por ruta (redefine el hallazgo makespan +55%) | PENDIENTE — decision del Director: es problema de modelado (destino/ruta), no de tuning. Ver BACKLOG.md | Alto |
 | **BK-02** — FIFO Estricto en UI | EN REPENSAR (diseno pendiente del Director) | ~15 min cuando se decida |
 | **`_legacy/web_dashboard/`** (puerto 8001) | PENDIENTE DECISION (Director quiere revisarla) | Depende de decision |
 | **INIT-1** — Picking por ubicacion real + reservas en BD | Pendiente | Alto |

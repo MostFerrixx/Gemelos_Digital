@@ -21,9 +21,10 @@ Responsable: Cerebellum
 | **WOs sobredimensionadas** — fix defensivo | **PENDIENTE** (bajo) |
 | **`_legacy/web_dashboard/`** — conservar/reparar/eliminar | **PENDIENTE DECISION** |
 | MEJ-1 — Red de seguridad automatizada (tests + gate) | HECHO (2026-07-04, F1-F5 completas) |
-| **MEJ-2 — Experiment runner con replicas + comparacion A/B** | **APROBADA** (2026-07-04, sin sprint) |
+| MEJ-2 — Experiment runner con replicas + comparacion A/B | HECHO v1 (2026-07-04) — v2 (nivel de servicio) diferido |
 | MEJ-3 — Esquema unico de config (pydantic) + purga de claves | HECHO (2026-07-04) |
-| MEJ-4 — Completar anti-colisiones (dwell + fallback visible) | HECHO (2026-07-04) — HALLAZGO: makespan +55% real, decision pendiente |
+| MEJ-4 — Completar anti-colisiones (dwell + fallback visible) | HECHO (2026-07-04) |
+| **INIT-6 — Staging multi-destino por ruta (redefine el hallazgo makespan +55%)** | **PENDIENTE** (alto, sin sprint asignado) |
 
 ---
 
@@ -648,7 +649,47 @@ INIT-4, capa de congestion) depende de disciplina manual: un refactor descuidado
 
 ## MEJ-2 — Rigor estadistico: experiment runner con replicas y comparacion A/B
 
-**Estado:** APROBADA por el Director — 2026-07-04. Sin sprint asignado (orden acordado: 1 -> 3 -> 2).
+**Estado:** HECHO (v1) — 2026-07-04, en `main`. `scripts/experiment_runner.py`.
+**Evidencia de cierre v1:**
+- Modo `run`: N replicas (default 5, `--base-seed` default 1000) via subprocess
+  aislado a `entry_points/run_generate_replay.py` (mismo patron que
+  `regression_gate.py`), cada una con `WAREHOUSE_SEED` distinto y
+  `--output-metrics`. Agrega media/desviacion muestral/IC 95% (t-Student,
+  `scipy.stats.t`) por KPI.
+- Modo `compare`: dos configs (A/B), semillas pareadas, `scipy.stats.ttest_rel`
+  por KPI -> veredicto "DIFERENCIA SIGNIFICATIVA" (p<0.05) / "RUIDO" / caso
+  borde "IDENTICO" o "constante" cuando la varianza de las diferencias es 0
+  (el t-test da 0/0=nan; se detecta explicitamente para no reportar "ruido"
+  de forma enganosa).
+- KPIs v1 (cero cambios al motor, cero riesgo de gate): reusa literal
+  `export_optimization_metrics()` ya existente — completadas, fallidas,
+  tiempo de simulacion, tiempo promedio de completado; agrega
+  `throughput_wo_per_s` derivado.
+- Salida: tabla ASCII en consola + `--output archivo.xlsx` opcional (hojas
+  Replicas_A/B, Resumen_A, Comparacion_AB via pandas/openpyxl).
+- Limpieza automatica de `output/simulation_*` por replica (salvo
+  `--keep-output`), igual que el gate.
+- Dependencia nueva: `scipy>=1.10.0` (requirements.txt) para IC 95%/t-test
+  real (decision del Director: preferido sobre implementar tablas t a mano).
+- Tests: `tests/unit/test_experiment_runner.py` (7 tests, agregacion
+  estadistica con datos sinteticos, sin correr la sim). Suite 80 passed.
+  Gate re-verificado PASS (`c6f129ef…`, motor intacto).
+- Validado manualmente: `run` con 3 replicas de una config reducida (20
+  ordenes) y `compare` con dos variantes (una identica -> "IDENTICO"; una con
+  menos operarios -> diferencia real detectada, p>0.05 a N=4 replicas — el
+  caso de uso exacto que BK-03 necesitaba y no tuvo).
+
+**Diferido a v2 (decision del Director, 2026-07-04):** extender
+`export_optimization_metrics()` con `service_level` (fill-rate/backorders,
+mismo patron que INIT-5) para que `compare` pueda dar veredicto estadistico
+tambien sobre nivel de servicio, no solo throughput/tiempo. No se hizo en v1
+porque toca el motor (nuevo campo en el .jsonl via metadata) y dispara el
+gate/baseline; v1 se mantuvo deliberadamente sin riesgo para el motor.
+Cuando se retome: reusar `core/replay_utils.build_service_level_summary()`
+dentro de `export_optimization_metrics()`, actualizar baseline con
+`--update-baseline --yes`, y agregar la clave a `ALL_KPI_KEYS` en
+`experiment_runner.py`.
+
 **Prioridad:** Alta (valor de producto: convierte corridas-anecdota en decisiones)
 **Origen:** Revision independiente de Cerebellum (2026-07-04).
 
@@ -724,17 +765,21 @@ Consecuencias reales:
 
 ## MEJ-4 — Completar el sistema anti-colisiones: dwell + fallback visible
 
-**Estado:** HECHO — 2026-07-04 (rama `feature/mej-4-anticolisiones`). Analisis,
-iteraciones y resultados completos: `docs/PLAN_MEJORA_4_ANTICOLISIONES.md` §4.
+**Estado:** HECHO — 2026-07-04 (rama `feature/mej-4-anticolisiones`, mergeada a
+`main` por fast-forward el mismo dia). Analisis, iteraciones y resultados
+completos: `docs/PLAN_MEJORA_4_ANTICOLISIONES.md` §4.
 **Resultado:** co-ocupaciones 28 -> 9 (cero amontonamientos, max 2 por celda),
 planner reescrito estilo SIPP (salto al primer hueco + dominancia por intervalo;
 0 fallos, coste 0.7 ms/plan, MEJOR que el original), fallback visible, clearance
 0.05, parking idle disperso, invariante de tabla en 0. Baseline `c6f129ef…`.
-**HALLAZGO ABIERTO (decision del Director):** makespan 2011 -> 3121 s (+55%).
-No es lentitud: es la cola REAL del staging unico (300 WOs x 5 s en una celda)
-que antes se ocultaba con hasta 4 agentes descargando superpuestos. Palancas:
-repartir `outbound_staging_distribution`, ajustar `discharge_time`, o apagar
-`congestion`. Ver PLAN_MEJORA_4 §4.
+**HALLAZGO makespan +55% (2011 -> 3121 s): REDEFINIDO como INIT-6, no como
+tuning.** El Director aclaro (2026-07-04) que la causa raiz no es "un unico
+staging mal dimensionado" sino que **el dominio no modela destino/ruta**: cada
+pedido deberia tener destino real (tienda o domicilio) y el staging deberia
+consolidar por grupo de ruta (tiendas cercanas para un camion, o domicilios
+para una ruta de reparto), no volcar todo a una celda unica. Ver **INIT-6**
+mas abajo para el detalle. No se ataca con `outbound_staging_distribution` ni
+`discharge_time` sueltos — esos serian parches sobre un modelo incompleto.
 **Prioridad:** Alta (realismo del cuello de botella de staging/pasillos)
 **Origen:** Analisis independiente de Cerebellum del sistema anti-colisiones
 (Iniciativa 2 Opcion C), pedido por el Director el 2026-07-04.
@@ -755,6 +800,64 @@ invisible y el throughput se sobreestima.
 3. Spawn reservado (F3) y `clearance` expuesto en UI (F4, opcional).
 4. Validacion: co-ocupaciones 28 -> ~0, cola visible en staging, baseline
    actualizado con el flujo del gate (F5).
+
+---
+
+## INIT-6 — Staging multi-destino por ruta (redefine el hallazgo makespan +55% de MEJ-4)
+
+**Estado:** PENDIENTE — sin sprint asignado. Requiere Analisis de Causa Raiz +
+Plan de Implementacion propios antes de tocar codigo (Ley #1).
+**Prioridad:** Alta (correctitud fundacional del modelo de negocio outbound)
+**Origen:** Decision del Director (2026-07-04) al cerrar el hallazgo de
+makespan +55% de MEJ-4.
+
+### El problema real (segun el Director)
+El makespan +55% post-MEJ-4 no es un problema de tuning de congestion: es sintoma
+de que **el dominio no modela destino ni ruta de entrega**. Hoy (verificar en
+`outbound.py` / `order_strategies.py`) todo pedido completado va a un staging
+unico e indiferenciado, sin importar a donde deberia salir fisicamente.
+
+En un almacen real:
+- Cada pedido tiene un **destino especifico**: una tienda (reposicion B2B) o el
+  domicilio de un cliente (ultima milla B2C).
+- El staging existe para **consolidar por ruta de camion**: pedidos de tiendas
+  geograficamente cercanas se agrupan para que un solo camion las recorra en una
+  ruta; pedidos de domicilios se agrupan por zona de reparto.
+- Consecuencia: **no deberia existir "el staging"**, sino tantas
+  zonas/colas de consolidacion como rutas activas, y la asignacion pedido ->
+  staging deberia depender del destino/ruta asociado al pedido, no ser fija.
+
+### Por que importa
+Sin esto, cualquier metrica de staging (makespan, colas, co-ocupaciones) mide
+un cuello de botella artificial (un solo punto de consolidacion) en vez del
+cuello de botella real de un almacen con logistica de ultima milla o distribucion
+a tiendas. Es una precondicion de correctitud para cualquier conclusion futura
+sobre outbound, no solo un ajuste de KPI.
+
+### Que hay que investigar antes de plantear el plan (Analisis de Causa Raiz)
+1. `order_strategies.py` / archivo de ordenes: ¿existe ya algun campo de
+   destino (tienda/domicilio/direccion) en los pedidos de entrada, o hay que
+   incorporarlo al esquema?
+2. `outbound.py`: como se define hoy el/los staging (¿celda fija en el TMX?
+   ¿configuracion?) y como se le asigna una WO/pedido completado.
+3. Layout (`layouts/WH1.tmx`): ¿hay mas de una zona de staging fisica ya
+   dibujada en el mapa, o solo una?
+4. Que se entiende operativamente por "ruta": ¿un agrupamiento estatico
+   (config) de destinos, o algo que se calcula (clustering geografico) por
+   corrida? Esto lo debe definir el Director antes de disenar el mecanismo de
+   asignacion pedido -> staging.
+
+### Que NO hacer todavia
+No implementar parches sueltos (`outbound_staging_distribution`, `discharge_time`)
+como sustituto de esto: serian curitas sobre un modelo que no tiene el concepto
+de destino/ruta. Ese tipo de ajuste solo tiene sentido *despues* de decidir el
+diseño de consolidacion multi-staging.
+
+### Estimacion de esfuerzo
+Alto — toca esquema de pedidos (destino), `outbound.py` (multi-staging),
+posiblemente el layout TMX (nuevas zonas de staging), y la logica de asignacion
+pedido->ruta->staging. Necesita su propia sesion de diseño con el Director antes
+de estimar en detalle.
 
 ---
 
