@@ -8,9 +8,8 @@
 
 ## Git
 
-- `main` = pendiente de commit de este cierre (ver commit mas reciente en
-  `git log -1`). Working tree limpio salvo lo de esta sesion. Sin ramas
-  feature pendientes de merge.
+- `main` = `e7bc74a`. Working tree limpio. Sin ramas feature pendientes de
+  merge.
 - Baseline byte-identico vigente: `sha256=5f1f4adcd2a288d2...`, 4.919.513 bytes,
   seed 42, Python 3.13.6 (`tests/baseline.json`). Sin cambios desde INIT-1
   (MEJ-2 v2 no toca el `.jsonl`, solo el archivo separado de metricas).
