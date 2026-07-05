@@ -8,10 +8,9 @@
 
 ## Git
 
-- `main` = pendiente del commit de este cierre (INIT-6 Opciones A+B). Working
-  tree limpio salvo eso. Sin ramas feature pendientes de merge. Push directo
-  a main autorizado por el Director para esta sesion (confirmado 2026-07-05
-  tras un bloqueo del clasificador de permisos).
+- `main` = `6092f1f`. Working tree limpio. Sin ramas feature pendientes de
+  merge. Push directo a main autorizado por el Director para esta sesion
+  (confirmado 2026-07-05 tras un bloqueo del clasificador de permisos).
 - Baseline byte-identico vigente: `sha256=5f1f4adcd2a288d2...`, 4.919.513 bytes,
   seed 42, Python 3.13.6 (`tests/baseline.json`). Sin cambios desde INIT-1 --
   todo lo posterior (MEJ-2 v2, INIT-3 v2, INIT-6) no toca el escenario
