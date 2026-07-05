@@ -252,9 +252,21 @@ class WebConfigurationManager:
             if 'outbound_staging_distribution' in config:
                 staging_dist = config['outbound_staging_distribution']
                 total_staging = sum(staging_dist.values())
-                
+
                 if total_staging != 100:
                     errors.append(f"Staging distribution must sum to 100% (current: {total_staging}%)")
+
+            # INIT-6 Opcion B: destino_staging_map (destino de negocio -> staging_id 1-7)
+            if 'destino_staging_map' in config:
+                dsm = config['destino_staging_map']
+                if not isinstance(dsm, dict):
+                    errors.append("destino_staging_map debe ser un objeto destino->staging_id.")
+                else:
+                    for destino, staging_id in dsm.items():
+                        if not isinstance(staging_id, int) or not (1 <= staging_id <= 7):
+                            errors.append(
+                                "destino_staging_map['" + str(destino) + "'] = '" + str(staging_id)
+                                + "' debe ser un staging_id entero entre 1 y 7.")
             
             # Validate agent_types if present
             if 'agent_types' in config:

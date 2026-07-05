@@ -239,7 +239,13 @@ class OutboundProcess:
 
         Ciclo:
           1. Esperar truck_interval segundos de simulacion.
-          2. Tomar hasta truck_capacity pallets FIFO de almacen.staged_pallets.
+          2. Elegir la zona de staging del pallet mas antiguo en espera (FIFO
+             global) y tomar hasta truck_capacity pallets de ESA MISMA zona
+             (INIT-6 Opcion A: un camion no mezcla pallets de zonas/rutas
+             distintas -- antes tomaba FIFO de TODO staged_pallets sin mirar
+             staging_id, mezclando pedidos de rutas distintas en un mismo
+             camion). Los pallets de otras zonas quedan en cola y se sirven
+             cuando les toque ser los mas antiguos -- no hay inanicion.
           3. Si n==0: emitir truck_arrived+truck_departed y continuar.
           4. Si n>0: yield timeout(loading_time * n) [per-pallet].
           5. Liberar DockSlot + RT de cada pallet; marcarlo 'shipped'.
@@ -260,10 +266,24 @@ class OutboundProcess:
             truck_num += 1
             truck_id = "TRUCK-" + str(truck_num)
             staged = getattr(self.almacen, 'staged_pallets', [])
-            n = min(self.truck_capacity, len(staged))
+
+            # INIT-6 Opcion A: staged esta ordenado por (t_staged, id) global;
+            # el pallet mas antiguo define la zona que este camion sirve, y
+            # solo se cargan pallets de ESA zona (antes tomaba FIFO de TODO
+            # staged_pallets sin mirar staging_id, mezclando pedidos de rutas
+            # distintas en un mismo camion). Los pallets de otras zonas quedan
+            # en cola y se sirven cuando les toque ser los mas antiguos.
+            if staged:
+                target_staging_id = staged[0].staging_id
+                same_zone = [p for p in staged if p.staging_id == target_staging_id]
+            else:
+                target_staging_id = None
+                same_zone = []
+            n = min(self.truck_capacity, len(same_zone))
 
             self.almacen.registrar_evento('truck_arrived', {
                 'truck_id': truck_id,
+                'staging_id': target_staging_id,
                 'n_queued': len(staged),
                 'n_to_load': n,
             })
@@ -282,9 +302,8 @@ class OutboundProcess:
                 })
                 continue
 
-            # FIFO: staged ya esta ordenado por (t_staged, id); tomar los primeros n.
-            to_load = staged[:n]
-            del staged[:n]
+            to_load = same_zone[:n]
+            staged[:] = [p for p in staged if p not in to_load]
 
             # Carga: loading_time POR PALLET (decision F2.a / C4).
             yield self.env.timeout(self.loading_time * n)
@@ -328,10 +347,12 @@ class OutboundProcess:
                 _m['trucks_dispatched'] = _m.get('trucks_dispatched', 0) + 1
                 _m['pallets_shipped_by_truck'] = (
                     _m.get('pallets_shipped_by_truck', 0) + n)
-            print(f"[OUTBOUND] {truck_id} despacha {n} pallets en "
-                  f"{self.loading_time * n:.1f}s. Backlog={backlog}.")
+            print(f"[OUTBOUND] {truck_id} despacha {n} pallets de staging="
+                  f"{target_staging_id} en {self.loading_time * n:.1f}s. "
+                  f"Backlog={backlog}.")
             self.almacen.registrar_evento('truck_departed', {
                 'truck_id': truck_id,
+                'staging_id': target_staging_id,
                 'pallets_loaded': n,
                 'backlog': backlog,
             })

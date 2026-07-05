@@ -163,6 +163,8 @@ class WarehouseConfig(BaseModel):
     # --- Outbound / staging (warehouse.py, outbound.py) ---
     outbound_staging_distribution: Optional[Dict[str, float]] = None
     outbound: Optional[OutboundConfig] = None
+    # INIT-6 Opcion B: destino de negocio -> staging_id (warehouse._resolver_staging_id)
+    destino_staging_map: Optional[Dict[str, int]] = None
 
     # --- Congestion (Iniciativa 2, ACTIVA) ---
     congestion: Optional[CongestionConfig] = None

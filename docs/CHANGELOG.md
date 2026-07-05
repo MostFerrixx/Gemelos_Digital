@@ -10,6 +10,27 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-05 (cont. 3)
+
+- **INIT-6 (Opciones A + B) — staging multi-destino por ruta.** RCA en codigo
+  (no supuesto) revelo que ya existian 7 zonas fisicas reales de staging
+  (`Warehouse_Logic.xlsx`, hoja `OutboundStaging`) e infraestructura parcial
+  (`ParsedOrder.staging_id`), pero el config canonico manda 100% a una sola
+  zona, y el hallazgo mas importante: `OutboundProcess` tomaba pallets FIFO
+  de una cola GLOBAL sin filtrar por `staging_id`, mezclando pedidos de
+  zonas/rutas distintas en un mismo camion -- el eslabon perdido real.
+  **Opcion A**: `OutboundProcess.run()` ahora sirve una sola zona por camion
+  (la del pallet mas antiguo en espera); sin inanicion, sin cambio al
+  baseline (outbound esta deshabilitado en el canonico). **Opcion B**: campo
+  `destino` opcional en pedidos (JSON/CSV) + `destino_staging_map` en config
+  (mismo patron que `work_area_equipment`) resuelto via nuevo
+  `AlmacenMejorado._resolver_staging_id()` (precedencia: staging_id explicito
+  > destino mapeado > fallback aleatorio, sin regresion). Opcion C
+  (clustering geografico automatico) diferida -- requiere datos de
+  geolocalizacion de clientes inexistentes hoy. 9 tests nuevos + 3 de
+  validacion web. Suite: 104 passed. Gate PASS sin cambio de baseline (ningun
+  cambio toca el escenario canonico, que tiene outbound deshabilitado).
+
 ## 2026-07-05 (cont. 2)
 
 - **INIT-3 v2 — UI web del optimizador + fix de bug de concurrencia real

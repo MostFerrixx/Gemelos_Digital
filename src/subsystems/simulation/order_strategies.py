@@ -59,6 +59,10 @@ class ParsedOrder:
     due_time: Optional[float] = None
     # INIT-4 (C3): ola/wave a la que pertenece el pedido (None = sin ola).
     wave: Optional[int] = None
+    # INIT-6 Opcion B: destino de negocio (tienda/zona de reparto). Se resuelve
+    # a staging_id via destino_staging_map (almacen._resolver_staging_id).
+    # None -> sin efecto, se usa staging_id explicito o el fallback aleatorio.
+    destino: Optional[str] = None
 
 
 @dataclass
@@ -345,6 +349,8 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
                 priority=_coerce_int(order_data.get('priority')),
                 due_time=_coerce_float(order_data.get('due_time')),
                 wave=_coerce_int(order_data.get('wave')),
+                # INIT-6 Opcion B: destino de negocio (opcional).
+                destino=(str(order_data['destino']) if order_data.get('destino') else None),
             )
 
             items = order_data.get('items', [])
@@ -365,24 +371,25 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
         """
         Parse CSV order file with intelligent grouping.
         
-        CSV format: order_id,sku_id,quantity,work_area,staging_id
+        CSV format: order_id,sku_id,quantity,work_area,staging_id,destino
         Rows with same order_id are grouped into a single order.
         """
         print(f"[DETERMINISTIC] Parsing CSV file: {self.file_path}")
-        
+
         orders_dict: Dict[str, ParsedOrder] = {}
-        
+
         with open(self.file_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
-            
+
             for row in reader:
                 order_id = str(row.get('order_id', '')).strip()
                 if not order_id:
                     continue
-                
+
                 # Create or get existing order
                 if order_id not in orders_dict:
                     staging_id = row.get('staging_id')
+                    destino = (row.get('destino') or '').strip()
                     orders_dict[order_id] = ParsedOrder(
                         order_id=order_id,
                         staging_id=int(staging_id) if staging_id and staging_id.strip() else None,
@@ -390,6 +397,8 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
                         priority=_coerce_int(row.get('priority')),
                         due_time=_coerce_float(row.get('due_time')),
                         wave=_coerce_int(row.get('wave')),
+                        # INIT-6 Opcion B: destino de negocio (opcional).
+                        destino=(destino or None),
                     )
                 
                 # Add item to order
@@ -534,8 +543,10 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
                 if qty_to_allocate <= 0:
                     continue
 
-                # Determine staging ID (once per item)
-                staging_id = order.staging_id or almacen._seleccionar_staging_id()
+                # Determine staging ID (once per item). INIT-6 Opcion B:
+                # staging_id explicito > destino resuelto via destino_staging_map
+                # > fallback aleatorio de siempre (ver _resolver_staging_id).
+                staging_id = almacen._resolver_staging_id(order)
 
                 # Create WorkOrders per allocated location (REAL coords / area /
                 # pick_sequence), each split further by operator capacity.

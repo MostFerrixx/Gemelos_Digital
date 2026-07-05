@@ -104,3 +104,26 @@ def test_cf06_total_ordenes_invalido(manager, canonical_config):
     ok, errors = manager.validate_config(cfg)
     assert not ok
     assert any("total_ordenes" in e for e in errors)
+
+
+def test_cf07_destino_staging_map_valido_ok(manager, canonical_config):
+    cfg = copy.deepcopy(canonical_config)
+    cfg["destino_staging_map"] = {"TIENDA_NORTE": 1, "TIENDA_SUR": 2}
+    ok, errors = manager.validate_config(cfg)
+    assert ok, "destino_staging_map valido no deberia rechazarse. Errores: %s" % errors
+
+
+def test_cf08_destino_staging_map_staging_id_fuera_de_rango(manager, canonical_config):
+    cfg = copy.deepcopy(canonical_config)
+    cfg["destino_staging_map"] = {"TIENDA_NORTE": 9}
+    ok, errors = manager.validate_config(cfg)
+    assert not ok
+    assert any("destino_staging_map" in e for e in errors)
+
+
+def test_cf09_destino_staging_map_no_es_dict(manager, canonical_config):
+    cfg = copy.deepcopy(canonical_config)
+    cfg["destino_staging_map"] = ["TIENDA_NORTE"]
+    ok, errors = manager.validate_config(cfg)
+    assert not ok
+    assert any("destino_staging_map" in e for e in errors)

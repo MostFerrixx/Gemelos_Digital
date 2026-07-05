@@ -198,6 +198,13 @@ class AlmacenMejorado:
             '1': 100, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0
         })
 
+        # INIT-6 Opcion B: mapa destino (tienda/zona de reparto) -> staging_id.
+        # Mismo patron que work_area_equipment (MEJ-3 QA-3): tabla explicita en
+        # config, no convencion implicita. Vacio por defecto -> sin efecto
+        # (los pedidos sin destino mapeado usan staging_id explicito o el
+        # fallback aleatorio de siempre, sin regresion).
+        self.destino_staging_map = configuracion.get('destino_staging_map', {})
+
         # ============================================================
         # INICIATIVA #2 - CONGESTION (Fase 0)
         # Se LEE el bloque de configuracion pero todavia NO se usa.
@@ -604,6 +611,37 @@ class AlmacenMejorado:
         
         # Fallback to first staging
         return staging_ids[0]
+
+    def _resolver_staging_id(self, order) -> int:
+        """
+        INIT-6 Opcion B: resuelve el staging_id de un pedido (modo Deterministic
+        / archivo). Orden de precedencia:
+          1. `order.staging_id` explicito (el pedido ya lo trae) -- sin cambios,
+             sigue siendo la maxima prioridad (compat con lo que ya existia).
+          2. `order.destino` (nombre de tienda/zona de reparto) resuelto via
+             `destino_staging_map` -- NUEVO: desacopla al pedido de tener que
+             conocer el numero de zona tecnico.
+          3. Fallback aleatorio de siempre (`_seleccionar_staging_id`), igual
+             que si no hubiera destino ni staging_id -- sin regresion.
+
+        Args:
+            order: ParsedOrder (tiene .staging_id y .destino, ambos opcionales)
+
+        Returns:
+            int: staging_id a usar para este pedido.
+        """
+        if order.staging_id is not None:
+            return order.staging_id
+
+        destino = getattr(order, 'destino', None)
+        if destino:
+            mapped = self.destino_staging_map.get(destino)
+            if mapped is not None:
+                return int(mapped)
+            print(f"[OUTBOUND][WARN] Pedido {order.order_id}: destino '{destino}' "
+                  f"no esta en destino_staging_map -- usando fallback aleatorio.")
+
+        return self._seleccionar_staging_id()
 
     def _generar_flujo_ordenes(self):
         """
