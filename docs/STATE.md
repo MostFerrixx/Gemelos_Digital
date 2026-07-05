@@ -8,16 +8,16 @@
 
 ## Git
 
-- `main` = `e7bc74a`. Working tree limpio. Sin ramas feature pendientes de
-  merge.
+- `main` = pendiente del commit de este cierre (INIT-3 v2 + fix warm-start).
+  Working tree limpio salvo eso. Sin ramas feature pendientes de merge.
 - Baseline byte-identico vigente: `sha256=5f1f4adcd2a288d2...`, 4.919.513 bytes,
-  seed 42, Python 3.13.6 (`tests/baseline.json`). Sin cambios desde INIT-1
-  (MEJ-2 v2 no toca el `.jsonl`, solo el archivo separado de metricas).
+  seed 42, Python 3.13.6 (`tests/baseline.json`). Sin cambios en esta sesion
+  (ningun item toco el motor de simulacion, solo optimizer/web/experiment runner).
 
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 90 passed, 1 deselected (~3.5s)
+python -m pytest -q                # 92 passed, 1 deselected (~6s)
 python scripts/regression_gate.py  # GATE PASS esperado
 ```
 
@@ -29,11 +29,15 @@ python scripts/regression_gate.py  # GATE PASS esperado
   `run`/`compare`, requiere `scipy` (ya en requirements.txt). KPIs incluyen
   `fill_rate_pct` (N/A en modo Stochastic, real en modo Deterministic/archivo
   -- MEJ-2 v2).
-- Optimizador Optuna: CLI (`entry_points/run_optimization.py`) Y web
-  (`POST/GET /api/optimization/start|status|stop`, fire-and-forget +
-  polling via BD SQLite de Optuna). Espacio de busqueda: `num_operarios_terrestres`,
-  `num_montacargas`, `dispatch_strategy`, `max_wos_por_tour`, `radio_cercania`
-  (solo si estrategia == Cercania).
+- Optimizador Optuna: CLI (`entry_points/run_optimization.py`) Y web con UI
+  visual (tab "Optimizacion" en el configurador web -- INIT-3 v2): inputs,
+  boton iniciar/detener, progreso en vivo por polling. Endpoints
+  `POST/GET /api/optimization/start|status|stop`. Espacio de busqueda:
+  `num_operarios_terrestres`, `num_montacargas`, `dispatch_strategy`,
+  `max_wos_por_tour`, `radio_cercania` (solo si estrategia == Cercania).
+  **OJO:** el warm-start (config actual como primer trial) se consume SIEMPRE
+  en serie antes de paralelizar -- si se refactoriza `optimize()`, no romper
+  este orden (bug real de perdida de trials si se paraleliza el warm-start).
 - INIT-1: `StochasticOrderStrategy` asigna cada WO a ubicacion REAL de su SKU
   (no round-robin ciego). `DeterministicOrderStrategy` (modo archivo) ya lo
   hacia asi desde antes (Allocation Layer V12.1).
@@ -54,10 +58,9 @@ python scripts/regression_gate.py  # GATE PASS esperado
 
 ## Siguiente prioridad sugerida (sin decidir aun)
 
-INIT-3 v2 (UI minima para el optimizador web, o capacidades por agente en el
-espacio de busqueda), INIT-4b (KPI de SLA vencido), o alguna de las 3
-decisiones de arriba. Ver `docs/BACKLOG.md` para el resto del inventario
-abierto.
+INIT-3 v3 (capacidades por agente en el espacio de busqueda del optimizador),
+INIT-4b (KPI de SLA vencido), o alguna de las 3 decisiones de arriba. Ver
+`docs/BACKLOG.md` para el resto del inventario abierto.
 
 ## Bugs conocidos (no criticos)
 

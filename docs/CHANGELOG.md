@@ -10,6 +10,32 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-05 (cont. 2)
+
+- **INIT-3 v2 — UI web del optimizador + fix de bug de concurrencia real
+  encontrado en el camino.** Nuevo tab "Optimizacion" en el configurador web
+  (`web_prototype/static/web_configurator/`): inputs (trials, jobs, costos),
+  boton Iniciar/Detener, panel de progreso con polling cada 3s
+  (`/api/optimization/status`), recupera un estudio en curso si la pagina se
+  recarga. **Bug real encontrado y corregido**: `study.enqueue_trial()`
+  (warm-start) + `study.optimize(n_jobs>1)` provoca una carrera de Optuna --
+  dos workers toman el mismo trial encolado y le asignan el mismo
+  `trial.number`, perdiendo un trial silenciosamente (reproducido de forma
+  aislada y confirmado: con n_trials=2/n_jobs=2 solo se completaba 1 trial).
+  Preexistente en `optimizer.py` desde su creacion, nunca antes expuesto
+  porque nadie habia corrido `n_jobs>1` -- el panel web lo dispara con su
+  default (`n_jobs=2`). Fix: `SimulationOptimizer.optimize()` consume el
+  warm-start en serie (n_jobs=1, n_trials=1) ANTES de arrancar el resto en
+  paralelo. Ademas: `OptimizationRunner.status()` capturaba solo `KeyError`
+  para "estudio no existe todavia"; una consulta de status justo despues de
+  `start()` puede chocar con la migracion Alembic del subprocess recien
+  lanzado (`IntegrityError` de sqlalchemy) -- ahora se captura como
+  transitorio. Validado: CLI (n_trials=2/4, n_jobs=2/3, sin perdida de
+  trials) + flujo real via navegador (3/3 trials completados, antes se
+  perdia 1). 2 tests nuevos de regresion (orquestacion Optuna con objective
+  mockeado, sin correr sim real). Suite: 92 passed. Gate PASS sin cambio de
+  baseline (no toca el motor).
+
 ## 2026-07-05 (cont.)
 
 - **MEJ-2 v2** — `export_optimization_metrics()` ahora incluye `fill_rate_pct`

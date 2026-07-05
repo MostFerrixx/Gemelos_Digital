@@ -10,7 +10,7 @@ Actualizado: 2026-07-05 · Responsable: Cerebellum
 | INIT-6 — Staging multi-destino por ruta | PENDIENTE | Alta | Alto | Necesita decisiones de alcance del Director (ver abajo) |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | `_legacy/web_dashboard/` — conservar/reparar/eliminar | PENDIENTE DECISION | Baja | Depende | Director quiere revisarla primero |
-| INIT-3 v2 — capacidades/zonas en el optimizador + UI web | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
+| INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-4b — KPI de SLA vencido en reporte/visor | PENDIENTE | Baja | Bajo | Ninguno, listo para tomar |
 
 ---
@@ -66,18 +66,15 @@ primero). El Director quiere revisarla antes de decidir.
 
 ---
 
-## INIT-3 v2 — capacidades por agente + prioridades de zona + UI web
+## INIT-3 v3 — capacidades por agente en el optimizador
 
-Dos piezas diferidas de INIT-3 (ver CHANGELOG 2026-07-05):
-1. **Capacidades por tipo de agente en el espacio de busqueda del optimizador**:
-   requiere que el optimizador arme un `agent_types` explicito por trial en
-   vez de usar el fallback legacy (`num_operarios_terrestres`/`num_montacargas`),
-   ya que la capacidad esta hardcodeada en el fallback de `operators.py` (150
-   ground / 1000 forklift, no leida de config). Cambio de representacion mas
-   grande, no un fix.
-2. **UI minima en el configurador** para lanzar/ver el estudio de optimizacion
-   desde el navegador. Los 3 endpoints (`/api/optimization/start|status|stop`)
-   ya funcionan via HTTP directo (curl/Postman); falta el panel visual.
+Unica pieza diferida que queda de INIT-3 (la UI web se completo en v2, ver
+CHANGELOG 2026-07-05): **capacidades por tipo de agente en el espacio de
+busqueda**. Requiere que el optimizador arme un `agent_types` explicito por
+trial en vez de usar el fallback legacy (`num_operarios_terrestres`/
+`num_montacargas`), ya que la capacidad esta hardcodeada en el fallback de
+`operators.py` (150 ground / 1000 forklift, no leida de config). Cambio de
+representacion mas grande, no un fix.
 
 ---
 

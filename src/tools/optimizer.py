@@ -300,18 +300,32 @@ class SimulationOptimizer:
             )
             
             # Warm-start: Sugerir config actual como primer trial
-            if len(study.trials) == 0:
+            warm_start_pending = len(study.trials) == 0
+            if warm_start_pending:
                 print("\n[OPTIMIZER] Warm-start: Enqueuing current config as baseline...")
                 study.enqueue_trial({
                     "num_operarios_terrestres": self.base_config.get("num_operarios_terrestres", 2),
                     "num_montacargas": self.base_config.get("num_montacargas", 1),
                     "dispatch_strategy": self.base_config.get("dispatch_strategy", "Ejecucion de Plan")
                 })
-            
+
+            # BUGFIX concurrencia: enqueue_trial() + n_jobs>1 provoca una carrera
+            # real de Optuna -- dos workers toman el MISMO trial encolado y le
+            # asignan el mismo trial.number, perdiendo un trial silenciosamente
+            # (confirmado con repro aislada, 2026-07-05). Fix: consumir el
+            # trial encolado en serie (n_jobs=1) ANTES de arrancar el resto en
+            # paralelo, para que no haya nada encolado cuando corren varios
+            # workers a la vez.
+            if warm_start_pending and self.n_jobs > 1 and n_trials > 1:
+                print("[OPTIMIZER] Consumiendo warm-start en serie antes de paralelizar "
+                      "(evita carrera enqueue_trial + n_jobs>1)...")
+                study.optimize(self.objective, n_trials=1, n_jobs=1, show_progress_bar=False)
+                n_trials -= 1
+
             # Ejecutar optimización
             print(f"\n[OPTIMIZER] Starting optimization with {self.n_jobs} parallel jobs...")
             print("[OPTIMIZER] Press Ctrl+C to stop gracefully (progress will be saved)\n")
-            
+
             study.optimize(
                 self.objective,
                 n_trials=n_trials,

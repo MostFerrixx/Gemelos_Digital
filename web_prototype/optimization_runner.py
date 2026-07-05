@@ -107,13 +107,20 @@ class OptimizationRunner:
 
         try:
             study = optuna.load_study(study_name=study_name, storage=storage)
-        except KeyError:
+        except Exception:
+            # BUGFIX concurrencia: justo despues de start(), el subprocess
+            # recien esta creando/migrando el esquema SQLite (Alembic). Una
+            # consulta de status que llega en ese instante puede chocar con
+            # esa migracion (visto en la practica: IntegrityError de
+            # sqlalchemy en alembic_version, no solo el KeyError esperado de
+            # "estudio no existe"). Cualquier excepcion aca es transitoria --
+            # se resuelve solo en el proximo poll.
             return {
                 "running": self.is_running(),
                 "study_name": study_name,
                 "storage": storage,
                 "n_trials_completed": 0,
-                "note": "Estudio aun no existe en la BD (puede estar inicializando).",
+                "note": "Estudio aun no existe o esta inicializando la BD (reintentar en unos segundos).",
             }
 
         trials = study.trials

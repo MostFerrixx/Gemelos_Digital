@@ -31,6 +31,7 @@ class WebConfigurator {
         this.setupTabNavigation();
         this.setupValidations();
         this.setupOrderGenerationMode(); // NEW: Setup order mode toggle
+        this.setupOptimizationPanel(); // INIT-3 v2: panel de optimizacion Optuna
 
         // Load initial configuration
         await this.loadConfiguration();
@@ -205,7 +206,8 @@ class WebConfigurator {
             'estrategias': { title: 'Estrategias', subtitle: 'Defina la lógica de despacho y tipos de tours' },
             'flota': { title: 'Flota de Agentes', subtitle: 'Gestione grupos de operarios y montacargas' },
             'layout-datos': { title: 'Layout y Datos', subtitle: 'Archivos de mapa, secuencia y escala' },
-            'staging': { title: 'Outbound Staging', subtitle: 'Distribución de salida por zonas' }
+            'staging': { title: 'Outbound Staging', subtitle: 'Distribución de salida por zonas' },
+            'optimizacion': { title: 'Optimización', subtitle: 'Estudio Optuna: ajuste automático de flota y estrategia' }
         };
 
         navItems.forEach(button => {
@@ -369,6 +371,144 @@ class WebConfigurator {
                 }
             });
         }
+    }
+
+    /**
+     * INIT-3 v2: panel de optimizacion Optuna (start/status/stop via
+     * /api/optimization/*). El estudio corre en background en el servidor;
+     * este panel solo lanza y consulta por polling, no bloquea la pestaña.
+     */
+    setupOptimizationPanel() {
+        const btnStart = document.getElementById('btn-optimization-start');
+        const btnStop = document.getElementById('btn-optimization-stop');
+        const badge = document.getElementById('optimization-status-badge');
+        const progressBox = document.getElementById('optimization-progress');
+        const studyNameEl = document.getElementById('opt-study-name');
+        const progressTextEl = document.getElementById('opt-progress-text');
+        const bestScoreEl = document.getElementById('opt-best-score');
+        const bestParamsEl = document.getElementById('opt-best-params');
+
+        if (!btnStart || !btnStop) return; // tab no presente (defensivo)
+
+        let pollHandle = null;
+        let activeStudyName = null;
+
+        const setBadge = (text, cls) => {
+            badge.textContent = text;
+            badge.className = `badge ${cls}`;
+        };
+
+        const renderStatus = (status) => {
+            progressBox.classList.remove('hidden');
+            studyNameEl.textContent = status.study_name || '-';
+            progressTextEl.textContent =
+                `${status.n_trials_completed || 0} / ${status.n_trials_total || 0} trials`;
+            if (status.best_score !== undefined && status.best_score !== null) {
+                bestScoreEl.textContent = Number(status.best_score).toFixed(4);
+                bestParamsEl.textContent = JSON.stringify(status.best_params, null, 2);
+            } else {
+                bestScoreEl.textContent = 'Aun sin trials completados...';
+                bestParamsEl.textContent = '';
+            }
+        };
+
+        const stopPolling = () => {
+            if (pollHandle) {
+                clearInterval(pollHandle);
+                pollHandle = null;
+            }
+        };
+
+        const pollStatus = async () => {
+            if (!activeStudyName) return;
+            try {
+                const resp = await fetch(`/api/optimization/status?study_name=${encodeURIComponent(activeStudyName)}`);
+                const status = await resp.json();
+                renderStatus(status);
+                if (status.running) {
+                    setBadge('Corriendo...', 'badge-warning');
+                    btnStart.disabled = true;
+                    btnStop.disabled = false;
+                } else {
+                    setBadge('Finalizado', 'badge-success');
+                    btnStart.disabled = false;
+                    btnStop.disabled = true;
+                    stopPolling();
+                }
+            } catch (err) {
+                console.error('[OPTIMIZATION] Error consultando estado:', err);
+            }
+        };
+
+        btnStart.addEventListener('click', async () => {
+            const body = {
+                n_trials: parseInt(document.getElementById('opt-n-trials').value, 10) || 20,
+                n_jobs: parseInt(document.getElementById('opt-n-jobs').value, 10) || 2,
+                cost_ground: parseFloat(document.getElementById('opt-cost-ground').value) || 15.0,
+                cost_forklift: parseFloat(document.getElementById('opt-cost-forklift').value) || 50.0,
+                penalty_failed: parseFloat(document.getElementById('opt-penalty-failed').value) || 100.0,
+            };
+            try {
+                const resp = await fetch('/api/optimization/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    this.showNotification(`Error: ${err.detail || 'no se pudo iniciar'}`, 'error');
+                    return;
+                }
+                const data = await resp.json();
+                activeStudyName = data.study_name;
+                this.showNotification(`Optimizacion iniciada: ${data.study_name}`, 'success');
+                setBadge('Corriendo...', 'badge-warning');
+                btnStart.disabled = true;
+                btnStop.disabled = false;
+                stopPolling();
+                pollHandle = setInterval(pollStatus, 3000);
+                pollStatus();
+            } catch (err) {
+                this.showNotification(`Error inesperado: ${err.message}`, 'error');
+            }
+        });
+
+        btnStop.addEventListener('click', async () => {
+            try {
+                const resp = await fetch('/api/optimization/stop', { method: 'POST' });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    this.showNotification(`Error: ${err.detail || 'no se pudo detener'}`, 'error');
+                    return;
+                }
+                this.showNotification('Optimizacion detenida', 'success');
+                setBadge('Detenido', 'badge-neutral');
+                btnStart.disabled = false;
+                btnStop.disabled = true;
+                stopPolling();
+            } catch (err) {
+                this.showNotification(`Error inesperado: ${err.message}`, 'error');
+            }
+        });
+
+        // Si ya habia un estudio corriendo (servidor no reiniciado desde que
+        // se lanzo), retomar el polling en vez de mostrar "Inactivo".
+        (async () => {
+            try {
+                const resp = await fetch('/api/optimization/status');
+                const status = await resp.json();
+                if (status.running && status.study_name) {
+                    activeStudyName = status.study_name;
+                    renderStatus(status);
+                    setBadge('Corriendo...', 'badge-warning');
+                    btnStart.disabled = true;
+                    btnStop.disabled = false;
+                    pollHandle = setInterval(pollStatus, 3000);
+                }
+            } catch (err) {
+                console.error('[OPTIMIZATION] Error consultando estado inicial:', err);
+            }
+        })();
     }
 
     /**

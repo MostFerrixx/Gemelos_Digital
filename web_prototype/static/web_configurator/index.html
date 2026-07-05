@@ -50,6 +50,11 @@
                     <span class="nav-icon">🚛</span>
                     <span class="nav-text">Outbound Staging</span>
                 </button>
+                <button class="nav-item" data-tab="optimizacion" data-section="advanced">
+                    <span class="nav-step">6</span>
+                    <span class="nav-icon">🧪</span>
+                    <span class="nav-text">Optimizacion</span>
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -497,6 +502,57 @@
                                     <label>Staging 7</label>
                                     <input type="number" id="staging-7" class="staging-input" value="0">
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 6: Optimizacion (INIT-3 v2) -->
+                <div id="tab-optimizacion" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Estudio de Optimizacion (Optuna)</h3>
+                            <span id="optimization-status-badge" class="badge badge-neutral">Inactivo</span>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">
+                                Corre N simulaciones ajustando flota, estrategia de despacho,
+                                <code>max_wos_por_tour</code> y <code>radio_cercania</code> (si aplica) para
+                                maximizar throughput/costo. Un estudio puede tardar varios minutos; corre en
+                                segundo plano, no hace falta dejar esta pestaña abierta.
+                            </p>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="opt-n-trials">Trials</label>
+                                    <input type="number" id="opt-n-trials" min="1" max="1000" value="20">
+                                </div>
+                                <div class="form-group">
+                                    <label for="opt-n-jobs">Jobs paralelos</label>
+                                    <input type="number" id="opt-n-jobs" min="1" max="8" value="2">
+                                </div>
+                                <div class="form-group">
+                                    <label for="opt-cost-ground">Costo Ground ($/h)</label>
+                                    <input type="number" id="opt-cost-ground" min="0" step="0.5" value="15">
+                                </div>
+                                <div class="form-group">
+                                    <label for="opt-cost-forklift">Costo Forklift ($/h)</label>
+                                    <input type="number" id="opt-cost-forklift" min="0" step="0.5" value="50">
+                                </div>
+                                <div class="form-group">
+                                    <label for="opt-penalty-failed">Penalizacion WO fallida ($)</label>
+                                    <input type="number" id="opt-penalty-failed" min="0" step="10" value="100">
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button id="btn-optimization-start" class="btn-primary">Iniciar Optimizacion</button>
+                                <button id="btn-optimization-stop" class="btn-secondary" disabled>Detener</button>
+                            </div>
+
+                            <div id="optimization-progress" class="optimization-progress hidden">
+                                <p><strong>Estudio:</strong> <span id="opt-study-name">-</span></p>
+                                <p><strong>Progreso:</strong> <span id="opt-progress-text">0 / 0 trials</span></p>
+                                <p><strong>Mejor score hasta ahora:</strong> <span id="opt-best-score">-</span></p>
+                                <pre id="opt-best-params" class="optimization-params"></pre>
                             </div>
                         </div>
                     </div>
