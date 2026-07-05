@@ -1,12 +1,15 @@
 # HANDOFF — Gemelo Digital de Almacen
 # Estado operativo para nueva sesion de Cerebellum
 
-**Generado:** 2026-06-18  ·  **Actualizado:** 2026-07-04
+**Generado:** 2026-06-18  ·  **Actualizado:** 2026-07-04 (fin de sesion MEJ-1/3/4)
 **Por:** Cerebellum (sesion de traspaso)
-**Rama activa:** `feature/mej-1-red-seguridad` (desde `0179539` = main)
-**Ultimo hito:** MEJ-1 COMPLETA (red de seguridad: pytest + gate byte-identico
-+ CI). Ver docs/PLAN_MEJORA_1_RED_SEGURIDAD.md y seccion 4. Proxima accion
-sugerida: merge de MEJ-1 y arrancar MEJ-3 (seccion 5).
+**Rama activa:** `feature/mej-4-anticolisiones` (HEAD `d1fec07`, CI verde)
+**Ultimo hito:** MEJ-1 (red de seguridad, YA en main), MEJ-3 (esquema de config)
+y MEJ-4 (anti-colisiones completo) EJECUTADAS con CI verde.
+**Proxima accion sugerida:** (1) merge fast-forward de
+`feature/mej-4-anticolisiones` a main (trae MEJ-3+MEJ-4, pendiente OK Director);
+(2) decision del Director sobre el HALLAZGO makespan +55% (PLAN_MEJORA_4 §4);
+(3) arrancar MEJ-2 (experiment runner con replicas). Ver seccion 5.
 
 ---
 
@@ -72,15 +75,28 @@ El arbol data/ es una migracion abandonada que solo lee codigo muerto.
 
 ## 3. GIT — ESTADO ACTUAL
 
-**Rama:** `feature/allocation-layer-v12.1`
-**HEAD:** `0179539` (local y remote identicos)
-**main:** `0179539` (sincronizado via fast-forward; divergencia 0/0, verificado 2026-07-04)
+**Estado 2026-07-04 (fin de sesion):**
+- `main` = `093b8c9` (contiene MEJ-1 completa; fast-forward hecho con OK del Director).
+- Cadena lineal POSTERIOR a main, toda pusheada y con CI verde, PENDIENTE DE
+  MERGE (requiere OK del Director; el clasificador de permisos bloquea pushes a
+  main sin autorizacion explicita):
+  `093b8c9 (main)` -> `f9c6000` (docs plan MEJ-4, rama mej-1) -> `e4db0ab`
+  (MEJ-3, rama `feature/mej-3-config-schema`) -> `d1fec07` (MEJ-4, rama
+  `feature/mej-4-anticolisiones`).
+  **Un solo `git push origin feature/mej-4-anticolisiones:main` (ff) lleva todo.**
+- Rama historica `feature/allocation-layer-v12.1` = `0179539` (ya en main).
 
-No hay commits pendientes de push ni merge.
-
-### Log completo de la rama (mas reciente primero)
+### Log de la sesion 2026-07-04 (mas reciente primero)
 
 ```
+d1fec07  feat(mej-4): anti-colisiones completo -- dwell en el plan + planner SIPP + fallback visible
+e4db0ab  feat(mej-3): esquema unico de config (pydantic) + purga de claves muertas
+f9c6000  docs(mej-4): analisis del sistema anti-colisiones + plan aprobado
+093b8c9  docs(mej-1): cierre -- CI en verde, gate multiplataforma documentado   <- main
+9f57bea  fix(gate): normalizar EOL (CRLF->LF) antes de hashear -- gate multiplataforma
+c369cb7  ci(debug): publicar sha esperado/obtenido como anotacion cuando el gate falla
+167def7  fix(ci): migrar Excel -> SQLite antes del gate (warehouse.db no se versiona)
+6b0b438  feat(mej-1): red de seguridad automatizada -- suite pytest + gate byte-identico + CI
 0179539  docs(backlog): inventario de iniciativas reconciliado + notas de arquitectura
 afe5602  docs(readme): al dia post-INIT-4 -- features opt-in y correcciones
 a70410e  docs: reconciliar arquitectura real + documentar flags opt-in (CLAUDE + HANDOFF)
@@ -359,7 +375,8 @@ Fix: forzar minimo 1 unidad por viaje; marcar WOs imposibles como 'failed' (no '
 | `AUDITORIA.md` | Vigente (mayo 2026) | Diagnostico estructural completo del repo |
 | `docs/HANDOFF.md` | ACTUALIZADO 2026-06-29 | Este archivo — estado operativo para nueva sesion |
 | `docs/PLAN_INIT4.md` | Vigente (2026-06-29) | Plan + pruebas + checklist de INIT-4 (C1/C2/C3) |
-| `docs/PLAN_MEJORA_1_RED_SEGURIDAD.md` | Vigente (2026-07-04) | Plan aprobado de MEJ-1: suite pytest + gate de regresion |
+| `docs/PLAN_MEJORA_1_RED_SEGURIDAD.md` | EJECUTADO (2026-07-04) | MEJ-1: suite pytest + gate + CI (con lecciones de la validacion) |
+| `docs/PLAN_MEJORA_4_ANTICOLISIONES.md` | EJECUTADO (2026-07-04) | MEJ-4: analisis anti-colisiones + 5 iteraciones + resultados + hallazgo makespan |
 | `docs/BACKLOG.md` | ACTUALIZADO 2026-06-29 | INIT-4 + INIT-5 + BK cerrados; INIT-1/3/KPI-SLA/WOs pendientes |
 | `docs/VALIDACION_UI_WEB.md` | ACTUALIZADO 2026-06-27 | 60 controles; E6/E7 eliminados, D1 resuelto |
 | `docs/PROPUESTA_MEJORA_DISENO_UI.md` | ACTUALIZADO 2026-06-27 | D-01..D-16 implementadas |
@@ -432,11 +449,18 @@ mantiene el `.jsonl` byte-identico al baseline. Se activan en configs de prueba/
 - Validacion de estos bloques en `web_prototype/config_manager.py` (release_times
   acotado a <= 1.000.000 para evitar hangs). Detalle en `docs/PLAN_INIT4.md`.
 
-### Bloque `congestion` (Iniciativa 2) — PRESENTE y ACTIVO en el canonico
+### Bloque `congestion` (Iniciativa 2 + MEJ-4) — PRESENTE y ACTIVO en el canonico
 A diferencia de los flags INIT-4 (ausentes/neutros), el bloque `congestion` SI
-esta en el config.json canonico y ACTIVO desde antes del baseline:
-`enabled: true`, `mode: "timewindow"`, `timewindow.shadow: false` => ruteo por
-reserva espacio-temporal EJECUTADO (Fase 2; fallback a ruta estatica si no hay
-plan). Modulos: congestion_manager.py, reservation_table.py, spacetime_planner.py.
-El gate byte-identico (`a4ae8d4e…`) incluye esta capa: NO desactivarla si se
-quiere reproducir el baseline. Historia: docs/antiguos/PLAN_INICIATIVA_2_OPCION_C.md.
+esta en el config.json canonico y ACTIVO: `enabled: true`, `mode: "timewindow"`,
+`timewindow.shadow: false`, `timewindow.clearance: 0.05` (MEJ-4) => ruteo por
+reserva espacio-temporal EJECUTADO con permanencias (dwell) reservadas al
+planificar, planner SIPP y fallback visible. Claves VIVAS ademas de las de
+timewindow: `staggered_start` + `spawn_offset` (spawn escalonado). Las 9 claves
+F3 del enfoque viejo (wait_timeout, backoff_*, etc.) fueron PURGADAS en MEJ-3
+(el motor conserva defaults por si un preset viejo activa mode:'cell').
+Modulos: congestion_manager.py (observador/validador I1), reservation_table.py
+(+ earliest_free), spacetime_planner.py (SIPP + reserve_dwell +
+reserve_path_best_effort). El baseline VIGENTE (`c6f129ef…`, 5.118.303 bytes
+normalizados) incluye TODO esto: NO desactivar la capa ni cambiar clearance si
+se quiere reproducirlo. Historia: docs/antiguos/PLAN_INICIATIVA_2_OPCION_C.md
+y docs/PLAN_MEJORA_4_ANTICOLISIONES.md.

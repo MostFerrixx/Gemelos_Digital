@@ -1,7 +1,8 @@
 # Gemelo Digital de Almacen
 
-**Version:** V12.1 (Allocation Layer + INIT-4)
-**Estado:** En desarrollo activo - rama `feature/allocation-layer-v12.1`
+**Version:** V12.1 (Allocation Layer + INIT-4 + MEJ-1/3/4)
+**Estado:** En desarrollo activo - ramas `feature/mej-3-config-schema` y
+`feature/mej-4-anticolisiones` con CI verde, pendientes de merge a `main`
 **Arquitectura:** Headless (SimPy) + Replay + GUI web
 **Actualizado:** 2026-07-04
 
@@ -71,6 +72,29 @@ byte-identica al baseline). Se activan desde `config.json`.
 
 Detalle e implementacion: `docs/PLAN_INIT4.md` y la seccion "Flags opt-in" de
 `CLAUDE.md` / `docs/HANDOFF.md`.
+
+---
+
+## 2.2 Calidad y realismo (MEJ-1 / MEJ-3 / MEJ-4, 2026-07-04)
+
+- **Red de seguridad automatizada (MEJ-1):** suite pytest (~73 tests, <10 s) +
+  gate de regresion byte-identico en un comando (~15 s) + CI en GitHub Actions.
+  Ver seccion "Tests y gate de regresion" abajo.
+- **Esquema unico de configuracion (MEJ-3):** `src/core/config_schema.py` es la
+  fuente de verdad de TODAS las claves de `config.json` (cada una anotada con su
+  lector real). Typos y claves legacy se detectan y avisan; tipos invalidos
+  bloquean el guardado desde la web. Se purgaron ~19 claves muertas y dos
+  controles de UI sin efecto.
+- **Anti-colisiones completado (MEJ-4):** la permanencia de los operarios
+  (picking, descarga, lifting) se reserva en la tabla espacio-temporal AL
+  PLANIFICAR (destino-con-permanencia); el planner usa busqueda estilo SIPP
+  (salto al primer hueco libre + dominancia por intervalo seguro); fallback
+  visible y margen `clearance`. Resultado: sin amontonamientos fisicos (max 2
+  agentes/celda en relevos instantaneos, antes 4 superpuestos descargando) y
+  **colas reales visibles en el staging**. NOTA: el makespan canonico subio
+  ~55% porque la cola del staging unico ahora se modela de verdad (antes el
+  throughput estaba inflado por descargas fisicamente imposibles). Detalle:
+  `docs/PLAN_MEJORA_4_ANTICOLISIONES.md`.
 
 ---
 
@@ -258,9 +282,11 @@ con defaults neutros): `tiempos.pick_time_model`, `priority_dispatch_enabled`,
 `waves` (ver seccion 2.1). La variable de entorno `WAREHOUSE_SEED` fija la semilla.
 
 A diferencia de esos flags, el bloque **`congestion`** (evasion de colisiones /
-ruteo por reserva espacio-temporal, Iniciativa 2) SI esta presente y **activo**
-en el config canonico (`enabled: true`, `mode: "timewindow"`, `shadow: false`).
-Es parte del comportamiento de referencia del motor.
+ruteo por reserva espacio-temporal, Iniciativa 2 + MEJ-4) SI esta presente y
+**activo** en el config canonico (`enabled: true`, `mode: "timewindow"`,
+`shadow: false`, `clearance: 0.05`). Es parte del comportamiento de referencia
+del motor. Toda clave nueva de config debe registrarse en
+`src/core/config_schema.py` (MEJ-3).
 
 Los **datos canonicos viven en la raiz**:
 
@@ -293,6 +319,9 @@ Cada simulacion crea una carpeta `output/simulation_YYYYMMDD_HHMMSS/` con:
 - `docs/HANDOFF.md` - estado operativo al dia (arquitectura, historial, flags, pendientes).
 - `docs/BACKLOG.md` - inventario de iniciativas (hechas y pendientes).
 - `docs/PLAN_INIT4.md` - plan + pruebas de INIT-4 (prioridad/SLA/olas + tiempos).
+- `docs/PLAN_MEJORA_1_RED_SEGURIDAD.md` - MEJ-1: suite pytest + gate + CI (ejecutado).
+- `docs/PLAN_MEJORA_4_ANTICOLISIONES.md` - MEJ-4: analisis del sistema
+  anti-colisiones, iteraciones y resultados, incl. el hallazgo del makespan (+55%).
 - `AUDITORIA.md` - diagnostico estructural completo (mayo 2026).
 - `_legacy/README.md` - que se archivo, por que y como revertirlo.
 - `docs/antiguos/` - planes/bitacoras de iniciativas ya cerradas (historico).

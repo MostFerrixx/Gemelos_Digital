@@ -34,7 +34,7 @@ Simulador de operaciones logísticas de almacén (Warehouse Digital Twin).
   (viewer Pygame, dashboard PyQt6, configurador Tkinter) fueron **archivadas** en
   `_legacy/gui_escritorio/` (commit `3cd37e6`); el frontend vigente es solo la web.
 
-## 3. ARQUITECTURA REAL (V12.1, verificada 2026-06-29)
+## 3. ARQUITECTURA REAL (V12.1, verificada 2026-07-04)
 La verdad es el código en `main` + el working dir. `README.md` (raíz) y
 `docs/HANDOFF.md` están **al día** y son referencia válida; los archivos históricos
 en `docs/antiguos/` NO (describen fases ya cerradas). Ante cualquier duda, rastrea
@@ -108,10 +108,14 @@ usa `find_excel_file()` (busca `layouts/Warehouse_Logic_v2.xlsx`, luego
 
 ## 5. ESTADO ACTUAL (actualizado 2026-07-04)
 
-### Rama activa y estado de git
-`feature/allocation-layer-v12.1` sincronizada con `main`. HEAD: `0179539`
-(= main = origin/main, divergencia 0/0). No hay commits pendientes de push
-ni merge. Lee `docs/HANDOFF.md` para el estado operativo detallado.
+### Rama activa y estado de git (2026-07-04, post MEJ-1/3/4)
+`main` = `093b8c9` (incluye MEJ-1). Cadena lineal pendiente de merge (CI verde
+en todas): `f9c6000` (docs MEJ-4 plan, en rama mej-1) -> `e4db0ab` (MEJ-3, rama
+`feature/mej-3-config-schema`) -> `d1fec07` (MEJ-4, rama
+`feature/mej-4-anticolisiones`). **Un solo fast-forward de
+`feature/mej-4-anticolisiones` lleva todo a main** — pendiente del OK del
+Director. La rama historica `feature/allocation-layer-v12.1` quedo en `0179539`
+(ya contenida en main). Lee `docs/HANDOFF.md` para el detalle operativo.
 
 ### Lo que ya esta commiteado (todo en main via fast-forward)
 - **Allocation Layer V12.1** (base): asignacion de stock real FCFS antes de
@@ -151,6 +155,18 @@ ni merge. Lee `docs/HANDOFF.md` para el estado operativo detallado.
   "limpia" (opt-in); C3 olas por release diferido. Todo opt-in con gate
   byte-identico. Ver docs/PLAN_INIT4.md.
 - **Limpieza** (`8fd8a3c`): 40+ archivos basura en basura/, .gitignore ampliado.
+- **MEJ-1** (`6b0b438`..`093b8c9`, en main): red de seguridad — suite pytest en
+  `tests/` (fixtures en conftest, ~73 tests), `scripts/regression_gate.py`
+  (byte-identico modulo EOL, `--update-baseline --yes` para cambios
+  intencionales), `tests/baseline.json`, CI `.github/workflows/tests.yml`
+  (pytest + run_migration + gate en ubuntu). `make test` / `make gate` /
+  `run test` / `run gate`. El viejo tests/ legacy esta en `_legacy/tests_gui/`.
+- **MEJ-3** (`e4db0ab`, rama mej-3): `src/core/config_schema.py` (esquema unico
+  pydantic, validacion-only), integrado en motor (warnings) y web (bloquea tipos
+  invalidos); purga de claves muertas en config.json/defaults/app.js/index.html.
+- **MEJ-4** (`d1fec07`, rama mej-4): anti-colisiones completo — dwell reservado
+  al planificar, planner SIPP, fallback visible, clearance 0.05, parking
+  disperso. Co-ocupaciones 28→9, makespan +55% (hallazgo abierto).
 
 ### Flags y features opt-in (todos leídos de `config.json`; defaults NEUTROS)
 Estos flags NO están en el `config.json` canónico: el motor los lee con `.get()` y
@@ -266,10 +282,15 @@ Para tareas de desarrollo, responde SIEMPRE en este orden:
 Sé directo y técnico; explica el "porqué" de las decisiones de arquitectura.
 
 ## 8. AL INICIAR CADA SESIÓN (sustituye a las reglas rotas de .cursorrules)
-1. `git status` y `git log --oneline -5`.
-2. Revisa si hay cambios sin commitear (¿sigue ahí la Allocation Layer V12.1?).
-3. Lee `AUDITORIA.md` si necesitas el mapa completo del proyecto.
-4. Resume al Director el estado real y la próxima acción sugerida, y pregunta la
+1. `git status` y `git log --oneline -5` (¿en qué rama estás? ¿qué falta mergear?).
+2. **Red de seguridad (MEJ-1):** `python -m pytest -q` debe dar verde en segundos.
+   Tras CUALQUIER cambio de motor: además `python scripts/regression_gate.py`
+   (PASS = comportamiento intacto; cambio intencional = `--update-baseline --yes`
+   y commitear el baseline JUNTO con la feature).
+3. Lee `docs/HANDOFF.md` (estado operativo) y `docs/BACKLOG.md` (pendientes).
+   `AUDITORIA.md` solo si necesitas el mapa estructural completo (mayo 2026).
+4. Clave nueva de config → regístrala en `src/core/config_schema.py` (MEJ-3).
+5. Resume al Director el estado real y la próxima acción sugerida, y pregunta la
    prioridad. No empieces a cambiar nada sin su luz verde.
 
 — Cerebellum sincronizado. ¿Cuál es la siguiente prioridad, Director?
