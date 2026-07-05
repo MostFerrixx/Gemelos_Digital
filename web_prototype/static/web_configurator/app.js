@@ -32,6 +32,7 @@ class WebConfigurator {
         this.setupValidations();
         this.setupOrderGenerationMode(); // NEW: Setup order mode toggle
         this.setupOptimizationPanel(); // INIT-3 v2: panel de optimizacion Optuna
+        this.setupExperimentPanel(); // MEJ-EXP-WEB: comparador A/B
 
         // Load initial configuration
         await this.loadConfiguration();
@@ -258,7 +259,8 @@ class WebConfigurator {
             'flota': { title: 'Flota de Agentes', subtitle: 'Gestione grupos de operarios y montacargas' },
             'layout-datos': { title: 'Layout y Datos', subtitle: 'Archivos de mapa, secuencia y escala' },
             'staging': { title: 'Outbound Staging', subtitle: 'Distribución de salida por zonas' },
-            'optimizacion': { title: 'Optimización', subtitle: 'Estudio Optuna: ajuste automático de flota y estrategia' }
+            'optimizacion': { title: 'Optimización', subtitle: 'Estudio Optuna: ajuste automático de flota y estrategia' },
+            'experimentos': { title: 'Experimentos A/B', subtitle: 'Compara dos configuraciones con rigor estadístico' }
         };
 
         navItems.forEach(button => {
@@ -558,6 +560,201 @@ class WebConfigurator {
                 }
             } catch (err) {
                 console.error('[OPTIMIZATION] Error consultando estado inicial:', err);
+            }
+        })();
+    }
+
+    /**
+     * MEJ-EXP-WEB: comparador A/B (start/status/stop via /api/experiment/*).
+     * Mismo patron que el panel de optimizacion: subprocess en el servidor,
+     * polling cada 3s, retoma un experimento en curso si se recarga la pagina.
+     */
+    setupExperimentPanel() {
+        const btnStart = document.getElementById('btn-experiment-start');
+        const btnStop = document.getElementById('btn-experiment-stop');
+        const badge = document.getElementById('experiment-status-badge');
+        const progressBox = document.getElementById('experiment-progress');
+        const labelsEl = document.getElementById('exp-labels');
+        const progressTextEl = document.getElementById('exp-progress-text');
+        const resultContainer = document.getElementById('exp-result-container');
+        const selectA = document.getElementById('exp-config-a');
+        const selectB = document.getElementById('exp-config-b');
+
+        if (!btnStart || !btnStop) return; // tab no presente (defensivo)
+
+        let pollHandle = null;
+
+        const KPI_LABELS = {
+            'total_workorders_completed': 'WOs completadas',
+            'total_workorders_failed': 'WOs fallidas',
+            'total_simulation_time_seconds': 'Tiempo de simulación (s)',
+            'avg_completion_time_seconds': 'Tiempo medio por WO (s)',
+            'throughput_wo_per_s': 'Throughput (WO/s)',
+            'fill_rate_pct': 'Fill-rate (%)',
+        };
+
+        const setBadge = (text, cls) => {
+            badge.textContent = text;
+            badge.className = `badge ${cls}`;
+        };
+
+        const stopPolling = () => {
+            if (pollHandle) {
+                clearInterval(pollHandle);
+                pollHandle = null;
+            }
+        };
+
+        const populateSelects = async () => {
+            try {
+                const resp = await fetch('/api/configurator/configurations');
+                const data = await resp.json();
+                const presets = data.configurations || data || [];
+                [selectA, selectB].forEach(sel => {
+                    if (!sel) return;
+                    sel.innerHTML = '<option value="current">Actual (config.json)</option>';
+                    presets.forEach(p => {
+                        const opt = document.createElement('option');
+                        opt.value = p.id;
+                        opt.textContent = p.name;
+                        sel.appendChild(opt);
+                    });
+                });
+            } catch (err) {
+                console.error('[EXPERIMENT] Error cargando presets:', err);
+            }
+        };
+
+        const renderResultTable = (rows, labels) => {
+            const available = (rows || []).filter(r => r.available);
+            if (available.length === 0) {
+                resultContainer.innerHTML = '<p class="help-text">Sin KPIs disponibles.</p>';
+                return;
+            }
+            const fmt = (v, dec = 2) => (v == null ? '-' : Number(v).toFixed(dec));
+            let html = '<table class="experiment-result-table"><thead><tr>' +
+                '<th>KPI</th><th>A</th><th>B</th><th>Δ%</th><th>p</th><th>Veredicto</th>' +
+                '</tr></thead><tbody>';
+            available.forEach(r => {
+                const significant = (r.verdict || '').indexOf('SIGNIFICATIVA') !== -1;
+                html += `<tr class="${significant ? 'exp-significant' : ''}">` +
+                    `<td>${KPI_LABELS[r.kpi] || r.kpi}</td>` +
+                    `<td>${fmt(r.mean_a)}</td><td>${fmt(r.mean_b)}</td>` +
+                    `<td>${r.delta_pct == null ? '-' : (r.delta_pct >= 0 ? '+' : '') + fmt(r.delta_pct, 1) + '%'}</td>` +
+                    `<td>${r.pvalue == null ? '-' : fmt(r.pvalue, 4)}</td>` +
+                    `<td>${r.verdict || '-'}</td></tr>`;
+            });
+            html += '</tbody></table>';
+            html += '<p class="help-text">Veredicto por t-test pareado (α=0.05). "RUIDO" = la ' +
+                'diferencia observada no es estadísticamente distinguible del azar con estas réplicas.</p>';
+            resultContainer.innerHTML = html;
+        };
+
+        const renderStatus = (status) => {
+            progressBox.classList.remove('hidden');
+            const labels = status.labels || {};
+            labelsEl.textContent = `A: ${labels.a || '-'}  vs  B: ${labels.b || '-'}`;
+            progressTextEl.textContent =
+                `${status.completed_replicas || 0} / ${status.total_replicas || 0} réplicas` +
+                (status.current_label ? ` (corriendo ${status.current_label})` : '');
+            if (status.status === 'done' && status.result) {
+                renderResultTable(status.result, labels);
+            } else if (status.status === 'error') {
+                resultContainer.innerHTML =
+                    `<p class="help-text" style="color:var(--color-danger);">Error: ${status.error || 'desconocido'}</p>`;
+            }
+        };
+
+        const pollStatus = async () => {
+            try {
+                const resp = await fetch('/api/experiment/status');
+                const status = await resp.json();
+                renderStatus(status);
+                if (status.running) {
+                    setBadge('Corriendo...', 'badge-warning');
+                    btnStart.disabled = true;
+                    btnStop.disabled = false;
+                } else {
+                    if (status.status === 'done') {
+                        setBadge('Finalizado', 'badge-success');
+                    } else if (status.status === 'error') {
+                        setBadge('Error', 'badge-error');
+                    }
+                    btnStart.disabled = false;
+                    btnStop.disabled = true;
+                    stopPolling();
+                }
+            } catch (err) {
+                console.error('[EXPERIMENT] Error consultando estado:', err);
+            }
+        };
+
+        btnStart.addEventListener('click', async () => {
+            const body = {
+                config_a: selectA?.value || 'current',
+                config_b: selectB?.value || 'current',
+                replicas: parseInt(document.getElementById('exp-replicas').value, 10) || 5,
+                base_seed: parseInt(document.getElementById('exp-base-seed').value, 10) || 1000,
+            };
+            try {
+                const resp = await fetch('/api/experiment/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    this.showNotification(`Error: ${err.detail || 'no se pudo iniciar'}`, 'error');
+                    return;
+                }
+                resultContainer.innerHTML = '';
+                this.showNotification('Comparación A/B iniciada', 'success');
+                setBadge('Corriendo...', 'badge-warning');
+                btnStart.disabled = true;
+                btnStop.disabled = false;
+                stopPolling();
+                pollHandle = setInterval(pollStatus, 3000);
+                pollStatus();
+            } catch (err) {
+                this.showNotification(`Error inesperado: ${err.message}`, 'error');
+            }
+        });
+
+        btnStop.addEventListener('click', async () => {
+            try {
+                const resp = await fetch('/api/experiment/stop', { method: 'POST' });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    this.showNotification(`Error: ${err.detail || 'no se pudo detener'}`, 'error');
+                    return;
+                }
+                this.showNotification('Comparación detenida', 'success');
+                setBadge('Detenido', 'badge-neutral');
+                btnStart.disabled = false;
+                btnStop.disabled = true;
+                stopPolling();
+            } catch (err) {
+                this.showNotification(`Error inesperado: ${err.message}`, 'error');
+            }
+        });
+
+        populateSelects();
+
+        // Si ya habia un experimento corriendo (servidor no reiniciado desde
+        // que se lanzo), retomar el polling en vez de mostrar "Inactivo".
+        (async () => {
+            try {
+                const resp = await fetch('/api/experiment/status');
+                const status = await resp.json();
+                if (status.running) {
+                    renderStatus(status);
+                    setBadge('Corriendo...', 'badge-warning');
+                    btnStart.disabled = true;
+                    btnStop.disabled = false;
+                    pollHandle = setInterval(pollStatus, 3000);
+                }
+            } catch (err) {
+                console.error('[EXPERIMENT] Error consultando estado inicial:', err);
             }
         })();
     }

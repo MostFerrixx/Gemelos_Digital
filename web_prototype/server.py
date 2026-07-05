@@ -21,6 +21,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from web_prototype.config_manager import WebConfigurationManager
 from web_prototype.simulation_runner import SimulationRunner
 from web_prototype.optimization_runner import OptimizationRunner
+from web_prototype.experiment_runner_web import ExperimentWebRunner
 
 # Initialize configuration manager
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -48,6 +49,14 @@ class StartOptimizationRequest(BaseModel):
     cost_ground: float = 15.0
     cost_forklift: float = 50.0
     penalty_failed: float = 100.0
+
+class StartExperimentRequest(BaseModel):
+    """MEJ-EXP-WEB: parametros para lanzar una comparacion A/B de configs.
+    config_a/config_b: "current" (config.json canonico) o el id de un preset."""
+    config_a: str = "current"
+    config_b: str = "current"
+    replicas: int = 5
+    base_seed: int = 1000
 
 
 app = FastAPI()
@@ -1190,6 +1199,78 @@ def stop_optimization():
     stopped = runner.stop()
     if not stopped:
         raise HTTPException(status_code=409, detail="No hay ninguna optimizacion en curso.")
+    return {"stopped": True}
+
+
+def _materialize_experiment_config(selector: str) -> tuple:
+    """MEJ-EXP-WEB: resuelve el selector de config ("current" o id de preset) a
+    un path de archivo legible por experiment_runner.py y una etiqueta humana.
+    Los presets se validan (misma barrera que el guardado) y se escriben a un
+    temp file; "current" usa el config.json canonico directamente."""
+    import tempfile as _tempfile
+    if selector == "current":
+        return os.path.join(PROJECT_ROOT, "config.json"), "Actual (config.json)"
+
+    config = config_manager.load_configuration(selector)
+    if config is None:
+        raise HTTPException(status_code=404, detail=f"Preset '{selector}' no encontrado.")
+    is_valid, errors = config_manager.validate_config(config)
+    if not is_valid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El preset '{selector}' no pasa la validacion del motor: {errors}")
+
+    name = selector
+    for meta in config_manager.list_configurations():
+        if meta.get("id") == selector:
+            name = meta.get("name", selector)
+            break
+
+    fd, path = _tempfile.mkstemp(prefix="experiment_config_", suffix=".json")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+    return path, name
+
+
+@app.post("/api/experiment/start")
+def start_experiment(request: StartExperimentRequest):
+    """
+    MEJ-EXP-WEB: lanza una comparacion A/B (scripts/experiment_runner.py compare)
+    en background. 2xN replicas con semillas pareadas y veredicto estadistico
+    por KPI. Progreso via GET /api/experiment/status (polling).
+    """
+    if request.config_a == request.config_b:
+        raise HTTPException(status_code=400,
+                            detail="Config A y Config B son la misma: no hay nada que comparar.")
+    if not (1 <= request.replicas <= 50):
+        raise HTTPException(status_code=400, detail="replicas debe estar entre 1 y 50.")
+
+    path_a, label_a = _materialize_experiment_config(request.config_a)
+    path_b, label_b = _materialize_experiment_config(request.config_b)
+
+    runner = ExperimentWebRunner()
+    try:
+        result = runner.start(path_a, path_b, label_a, label_b,
+                              replicas=request.replicas, base_seed=request.base_seed)
+        return {"started": True, **result}
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.get("/api/experiment/status")
+def get_experiment_status():
+    """Progreso del experimento A/B (replicas completadas, resultado al final)."""
+    runner = ExperimentWebRunner()
+    return runner.status()
+
+
+@app.post("/api/experiment/stop")
+def stop_experiment():
+    """Cancela el experimento A/B en curso (si lo hay)."""
+    runner = ExperimentWebRunner()
+    stopped = runner.stop()
+    if not stopped:
+        raise HTTPException(status_code=409, detail="No hay ningun experimento en curso.")
     return {"stopped": True}
 
 

@@ -118,7 +118,7 @@ def run_one_replica(config_path, seed, keep_output=False):
     return metrics
 
 
-def run_replicas(config_path, n, base_seed, keep_output=False, label=""):
+def run_replicas(config_path, n, base_seed, keep_output=False, label="", progress_cb=None):
     results = []
     for i in range(n):
         seed = base_seed + i
@@ -131,7 +131,85 @@ def run_replicas(config_path, n, base_seed, keep_output=False, label=""):
             metrics.get("_elapsed_wallclock_s", 0.0),
         ))
         results.append(metrics)
+        if progress_cb is not None:
+            progress_cb(label.strip("[] "), i + 1, n)
     return results
+
+
+class ProgressWriter:
+    """MEJ-EXP-WEB: escribe el progreso del experimento a un JSON (escritura
+    atomica: tmp + os.replace) para que la web pueda hacer polling sin leer
+    archivos a medio escribir. Sin --progress-json no se instancia -- el CLI
+    puro queda identico."""
+
+    def __init__(self, path, mode, total_replicas):
+        self.path = path
+        self.state = {
+            "mode": mode,
+            "status": "running",
+            "total_replicas": total_replicas,
+            "completed_replicas": 0,
+            "current_label": "",
+            "error": None,
+            "result": None,
+        }
+        self._flush()
+
+    def _flush(self):
+        tmp = self.path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(self.state, f, ensure_ascii=True, indent=2)
+        os.replace(tmp, self.path)
+
+    def on_replica(self, label, done_in_label, n_label):
+        # En compare, B corre despues de A: el acumulado global avanza de a 1.
+        self.state["completed_replicas"] += 1
+        self.state["current_label"] = label
+        self._flush()
+
+    def finish(self, result_rows):
+        self.state["status"] = "done"
+        self.state["result"] = result_rows
+        self._flush()
+
+    def fail(self, error_msg):
+        self.state["status"] = "error"
+        self.state["error"] = str(error_msg)
+        self._flush()
+
+
+def build_run_result(results):
+    """Filas serializables del resumen de un run (para --progress-json y Excel)."""
+    rows = []
+    for key in ALL_KPI_KEYS + OPTIONAL_KPI_KEYS:
+        values = _collect_values(key, results)
+        if not values:
+            rows.append({"kpi": key, "available": False})
+            continue
+        s = summarize(values)
+        rows.append({"kpi": key, "available": True, **s})
+    return rows
+
+
+def build_compare_result(results_a, results_b):
+    """Filas serializables de la comparacion A/B (para --progress-json y Excel)."""
+    rows = []
+    for key in ALL_KPI_KEYS + OPTIONAL_KPI_KEYS:
+        values_a = _collect_values(key, results_a)
+        values_b = _collect_values(key, results_b)
+        if not values_a or not values_b:
+            rows.append({"kpi": key, "available": False})
+            continue
+        sa, sb = summarize(values_a), summarize(values_b)
+        v = paired_verdict(values_a, values_b)
+        delta_pct = ((sb["mean"] - sa["mean"]) / sa["mean"] * 100.0) if sa["mean"] else None
+        rows.append({
+            "kpi": key, "available": True,
+            "mean_a": sa["mean"], "mean_b": sb["mean"],
+            "delta_pct": delta_pct,
+            "pvalue": v["pvalue"], "verdict": v["verdict"],
+        })
+    return rows
 
 
 def summarize(values):
@@ -255,8 +333,18 @@ def cmd_run(args):
     if not os.path.isfile(args.config):
         print("[FAIL] No existe el config: %s" % args.config)
         return 1
-    results = run_replicas(args.config, args.replicas, args.base_seed, keep_output=args.keep_output)
+    pw = ProgressWriter(args.progress_json, "run", args.replicas) if args.progress_json else None
+    try:
+        results = run_replicas(args.config, args.replicas, args.base_seed,
+                                keep_output=args.keep_output,
+                                progress_cb=pw.on_replica if pw else None)
+    except Exception as e:
+        if pw:
+            pw.fail(e)
+        raise
     _print_run_summary(results)
+    if pw:
+        pw.finish(build_run_result(results))
     if args.output:
         _export_excel(args.output, results)
     return 0
@@ -267,9 +355,21 @@ def cmd_compare(args):
         if not os.path.isfile(path):
             print("[FAIL] No existe el config: %s" % path)
             return 1
-    results_a = run_replicas(args.config_a, args.replicas, args.base_seed, keep_output=args.keep_output, label="[A] ")
-    results_b = run_replicas(args.config_b, args.replicas, args.base_seed, keep_output=args.keep_output, label="[B] ")
+    pw = ProgressWriter(args.progress_json, "compare", args.replicas * 2) if args.progress_json else None
+    try:
+        results_a = run_replicas(args.config_a, args.replicas, args.base_seed,
+                                  keep_output=args.keep_output, label="[A] ",
+                                  progress_cb=pw.on_replica if pw else None)
+        results_b = run_replicas(args.config_b, args.replicas, args.base_seed,
+                                  keep_output=args.keep_output, label="[B] ",
+                                  progress_cb=pw.on_replica if pw else None)
+    except Exception as e:
+        if pw:
+            pw.fail(e)
+        raise
     _print_compare_summary(results_a, results_b)
+    if pw:
+        pw.finish(build_compare_result(results_a, results_b))
     if args.output:
         _export_excel(args.output, results_a, results_b=results_b)
     return 0
@@ -288,6 +388,8 @@ def main():
     p_run.add_argument("--base-seed", type=int, default=1000, help="Primera semilla (default 1000)")
     p_run.add_argument("--output", type=str, default=None, help="Path .xlsx para exportar resultados")
     p_run.add_argument("--keep-output", action="store_true", help="No borrar output/simulation_* de cada replica")
+    p_run.add_argument("--progress-json", type=str, default=None,
+                       help="Path a un JSON de progreso/resultado (para polling desde la web)")
     p_run.set_defaults(func=cmd_run)
 
     p_cmp = sub.add_parser("compare", help="Compara dos configs con semillas pareadas + veredicto estadistico")
@@ -297,6 +399,8 @@ def main():
     p_cmp.add_argument("--base-seed", type=int, default=1000, help="Primera semilla (default 1000)")
     p_cmp.add_argument("--output", type=str, default=None, help="Path .xlsx para exportar resultados")
     p_cmp.add_argument("--keep-output", action="store_true", help="No borrar output/simulation_* de cada replica")
+    p_cmp.add_argument("--progress-json", type=str, default=None,
+                       help="Path a un JSON de progreso/resultado (para polling desde la web)")
     p_cmp.set_defaults(func=cmd_compare)
 
     args = parser.parse_args()

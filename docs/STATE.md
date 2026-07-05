@@ -8,9 +8,9 @@
 
 ## Git
 
-- `main` = `5840a06`. Working tree limpio. Sin ramas feature pendientes de
-  merge. Push directo a main autorizado por el Director para esta sesion
-  (confirmado 2026-07-05 tras un bloqueo del clasificador de permisos).
+- `main` = pendiente del commit de este cierre (MEJ-EXP-WEB). Working tree
+  limpio salvo eso. Sin ramas feature pendientes de merge. Push directo a
+  main autorizado por el Director para esta sesion.
 - Baseline byte-identico vigente: `sha256=38419bb375cd3dcb...`, 4.919.657 bytes,
   seed 42, Python 3.13.6 (`tests/baseline.json`). Actualizado en INIT-4b:
   SOLO metadata nueva (`sla_summary` en `SIMULATION_START`) -- verificado que
@@ -19,7 +19,7 @@
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 112 passed, 1 deselected (~7s)
+python -m pytest -q                # 115 passed, 1 deselected (~7s)
 python scripts/regression_gate.py  # GATE PASS esperado
 ```
 
@@ -60,6 +60,20 @@ python scripts/regression_gate.py  # GATE PASS esperado
   N/A si ninguna WO completada trae `due_time` (INIT-4 C2 apagado o modo
   Stochastic). Un pedido cuenta "a tiempo" si TODAS sus WOs terminan antes de
   su `due_time` (se usa el MAX `tiempo_fin` del pedido).
+- **MEJ-EXP-WEB**: comparador A/B en el configurador (tab "Experimentos A/B",
+  paso 7): Config A/B ("Actual" o preset guardado, validado antes de lanzar),
+  replicas pareadas, progreso en vivo, tabla de veredictos por KPI.
+  Endpoints `/api/experiment/start|status|stop`; el runner CLI reporta
+  progreso via `--progress-json` (escritura atomica). Queda un preset
+  "PRUEBA B - 3 ground" en `data/config_presets/` (gitignoreado) para probar.
+
+## Plan acordado con el Director (terna de mejoras, 2026-07-05)
+
+Orden: **(3) comparador A/B web -- HECHO** -> **(1) MEJ-BOTTLENECK** (panel
+de cuellos de botella; ANTES de construir, revisar reportes existentes por
+corrida y decidir mejorar vs rehacer+eliminar, pedido explicito del Director)
+-> **(2) MEJ-SLA-OPT** (optimizador penaliza SLA vencido; replanteada -- el
+fill-rate NO depende de la config, el SLA si). Detalle en `docs/BACKLOG.md`.
 
 ## Decisiones del Director pendientes
 
@@ -72,11 +86,9 @@ python scripts/regression_gate.py  # GATE PASS esperado
    canonico: ¿repartir el trafico entre las 7 zonas ahora que el mecanismo
    funciona, o mantener 100% en zona 1? Es tuning de negocio, no un bug.
 
-## Siguiente prioridad sugerida (sin decidir aun)
+## Siguiente prioridad (acordada)
 
-INIT-3 v3 (capacidades por agente en el optimizador), o alguna de las
-decisiones de arriba. Ver `docs/BACKLOG.md` para el resto del inventario
-abierto.
+MEJ-BOTTLENECK (ver plan de la terna arriba).
 
 ## Bugs conocidos (no criticos)
 

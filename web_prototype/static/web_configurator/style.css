@@ -1677,3 +1677,31 @@ select:disabled {
     color: #fff;
     border-color: var(--color-primary, #2563eb);
 }
+
+/* MEJ-EXP-WEB: tabla de resultados de la comparacion A/B */
+.experiment-result-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+    margin-top: 0.75rem;
+}
+
+.experiment-result-table th,
+.experiment-result-table td {
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.experiment-result-table th {
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+}
+
+.experiment-result-table tr.exp-significant td {
+    font-weight: 600;
+    color: var(--color-success);
+}

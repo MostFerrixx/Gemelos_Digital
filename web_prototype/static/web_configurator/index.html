@@ -55,6 +55,11 @@
                     <span class="nav-icon">🧪</span>
                     <span class="nav-text">Optimizacion</span>
                 </button>
+                <button class="nav-item" data-tab="experimentos" data-section="advanced">
+                    <span class="nav-step">7</span>
+                    <span class="nav-icon">⚖️</span>
+                    <span class="nav-text">Experimentos A/B</span>
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -590,6 +595,62 @@
                                 <p><strong>Progreso:</strong> <span id="opt-progress-text">0 / 0 trials</span></p>
                                 <p><strong>Mejor score hasta ahora:</strong> <span id="opt-best-score">-</span></p>
                                 <pre id="opt-best-params" class="optimization-params"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 7: Experimentos A/B (MEJ-EXP-WEB) -->
+                <div id="tab-experimentos" class="tab-content">
+                    <p class="tab-intro">
+                        Compara dos configuraciones corriendo N réplicas de cada una con las
+                        <strong>mismas semillas</strong> y da un veredicto estadístico por KPI:
+                        <strong>diferencia real</strong> o <strong>ruido aleatorio</strong>. Una sola
+                        corrida no alcanza para decidir — la simulación es estocástica y dos corridas
+                        de la misma config dan números distintos.
+                    </p>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Comparación A/B</h3>
+                            <span id="experiment-status-badge" class="badge badge-neutral">Inactivo</span>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Elegí las dos configuraciones a comparar.
+                                "Actual" es el <code>config.json</code> vigente; el resto son los presets
+                                guardados desde esta pantalla (botón Guardar).
+                            </p>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="exp-config-a">Config A (referencia)</label>
+                                    <select id="exp-config-a"></select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="exp-config-b">Config B (variante)</label>
+                                    <select id="exp-config-b"></select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="exp-replicas">Réplicas por config</label>
+                                    <input type="number" id="exp-replicas" min="2" max="50" value="5">
+                                    <span class="help-text">Más réplicas = veredicto más confiable pero
+                                        más lento (~10-15 s por réplica). Mínimo útil: 5.</span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="exp-base-seed">Semilla base</label>
+                                    <input type="number" id="exp-base-seed" min="0" value="1000">
+                                    <span class="help-text">Ambas configs usan las mismas semillas
+                                        (pareadas) — así la diferencia observada es de la config, no del azar.</span>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button id="btn-experiment-start" class="btn-primary">Iniciar Comparación</button>
+                                <button id="btn-experiment-stop" class="btn-secondary" disabled>Detener</button>
+                            </div>
+
+                            <div id="experiment-progress" class="optimization-progress hidden">
+                                <p><strong>Comparando:</strong> <span id="exp-labels">-</span></p>
+                                <p><strong>Progreso:</strong> <span id="exp-progress-text">0 / 0 réplicas</span></p>
+                                <div id="exp-result-container"></div>
                             </div>
                         </div>
                     </div>

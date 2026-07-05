@@ -83,3 +83,63 @@ def test_collect_values_disponible_en_modo_deterministico():
         {"fill_rate_pct": 92.0},
     ]
     assert experiment_runner._collect_values("fill_rate_pct", results) == [87.5, 92.0]
+
+
+def _fake_results(n, completed=30, sim_time=250.0):
+    return [{
+        "total_workorders_completed": completed + i,
+        "total_workorders_failed": 0,
+        "total_simulation_time_seconds": sim_time + i,
+        "avg_completion_time_seconds": 8.0,
+        "throughput_wo_per_s": 0.12,
+        "fill_rate_pct": None,  # modo estocastico
+    } for i in range(n)]
+
+
+def test_build_compare_result_filas_serializables(tmp_path):
+    """MEJ-EXP-WEB: el resultado de compare debe ser JSON-serializable y marcar
+    los KPIs no disponibles (fill_rate_pct None en estocastico) como available=False."""
+    import json as _json
+    rows = experiment_runner.build_compare_result(_fake_results(3), _fake_results(3, completed=40))
+    _json.dumps(rows)  # no debe explotar
+    by_kpi = {r["kpi"]: r for r in rows}
+    assert by_kpi["total_workorders_completed"]["available"] is True
+    assert by_kpi["total_workorders_completed"]["mean_b"] > by_kpi["total_workorders_completed"]["mean_a"]
+    assert by_kpi["fill_rate_pct"]["available"] is False
+
+
+def test_progress_writer_ciclo_completo(tmp_path):
+    """MEJ-EXP-WEB: running -> replicas acumuladas -> done con resultado."""
+    import json as _json
+    path = str(tmp_path / "progress.json")
+    pw = experiment_runner.ProgressWriter(path, "compare", 6)
+
+    with open(path, encoding="utf-8") as f:
+        state = _json.load(f)
+    assert state["status"] == "running"
+    assert state["total_replicas"] == 6
+    assert state["completed_replicas"] == 0
+
+    pw.on_replica("A", 1, 3)
+    pw.on_replica("A", 2, 3)
+    with open(path, encoding="utf-8") as f:
+        state = _json.load(f)
+    assert state["completed_replicas"] == 2
+    assert state["current_label"] == "A"
+
+    pw.finish([{"kpi": "x", "available": True}])
+    with open(path, encoding="utf-8") as f:
+        state = _json.load(f)
+    assert state["status"] == "done"
+    assert state["result"][0]["kpi"] == "x"
+
+
+def test_progress_writer_fail(tmp_path):
+    import json as _json
+    path = str(tmp_path / "progress.json")
+    pw = experiment_runner.ProgressWriter(path, "run", 5)
+    pw.fail(RuntimeError("replica exploto"))
+    with open(path, encoding="utf-8") as f:
+        state = _json.load(f)
+    assert state["status"] == "error"
+    assert "replica exploto" in state["error"]

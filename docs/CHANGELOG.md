@@ -10,6 +10,34 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-05 (cont. 7)
+
+- **MEJ-EXP-WEB — comparador A/B en el navegador** (propuesta 3 de la terna
+  aprobada por el Director; orden acordado: 3 -> 1 -> 2 replanteada). Nuevo
+  tab "Experimentos A/B" (paso 7) en el configurador: selects de Config A/B
+  ("Actual" = config.json canonico, o cualquier preset guardado, validado
+  con la misma barrera del guardado antes de lanzar), replicas y semilla
+  base, progreso en vivo y tabla de resultados por KPI (media A/B, delta %,
+  p-valor, veredicto; filas significativas resaltadas). Plomeria:
+  `--progress-json` en `scripts/experiment_runner.py` (ProgressWriter con
+  escritura atomica tmp+os.replace, para polling sin lecturas a medio
+  escribir) + `web_prototype/experiment_runner_web.py` (singleton, mismo
+  patron fire-and-forget de OptimizationRunner) + 3 endpoints
+  (`/api/experiment/start|status|stop`). Guardas: A==B -> 400, replicas
+  fuera de 1..50 -> 400, preset invalido -> 400, doble start -> 409.
+  Validado end-to-end en navegador real: comparacion "Actual (2 ground)" vs
+  preset "3 ground" con 2 replicas pareadas -> makespan -3.2% y throughput
+  +3.3%, ambos DIFERENCIA SIGNIFICATIVA (p<0.05) -- resultado con sentido
+  fisico. 4 tests nuevos (ProgressWriter ciclo completo/fail,
+  build_compare_result serializable). Suite: 115 passed. Gate PASS sin
+  cambio de baseline (no toca el motor).
+- **Correccion de alcance a la propuesta 2 (senalada por el Director):** el
+  fill-rate NO depende de la configuracion -- la asignacion de stock ocurre
+  ANTES de simular (allocation layer: pedido vs stock, invariante a flota/
+  estrategia). Lo que SI depende de la config es el SLA (due_time vs tiempo
+  de completado). La propuesta 2 queda replanteada como "el optimizador
+  debe penalizar SLA vencido", no fill-rate.
+
 ## 2026-07-05 (cont. 6)
 
 - **INIT-4b — KPI de SLA vencido en reporte/visor.** Ultimo punto diferido de

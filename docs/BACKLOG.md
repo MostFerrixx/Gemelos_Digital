@@ -7,10 +7,48 @@ Actualizado: 2026-07-05 · Responsable: Cerebellum
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
+| MEJ-BOTTLENECK — panel de cuellos de botella (SIGUIENTE, aprobada) | APROBADA | Alta | Medio | Ninguno -- revisar primero reportes CSV/JSON existentes (pedido del Director) |
+| MEJ-SLA-OPT — optimizador penaliza SLA vencido (replanteada) | APROBADA | Media | Bajo-Medio | Despues de MEJ-BOTTLENECK (orden acordado 3->1->2) |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
 | Distribucion real de `outbound_staging_distribution` en config canonico | PENDIENTE DECISION | -- | Trivial (config) | Decision de negocio del Director, no un bug |
+
+---
+
+## MEJ-BOTTLENECK — Panel de cuellos de botella (aprobada, SIGUIENTE)
+
+**Origen:** terna de mejoras propuesta por Cerebellum y aprobada por el
+Director (2026-07-05), orden acordado: comparador A/B web (HECHO) -> esta ->
+MEJ-SLA-OPT.
+
+El motor YA calcula por corrida los datos de cuellos de botella (hotspots de
+congestion con celda y max concurrentes en `congestion_report_*.json`,
+metricas del planner en `timewindow_shadow_report_*.json`, esperas de
+slot/carril y ocupacion pico por zona en `outbound_metrics`) pero quedan
+enterrados en JSONs sueltos por corrida que nadie consolida. Consolidarlos en
+un lugar visible: hoja Excel y/o panel del visor web.
+
+**Pedido explicito del Director:** ANTES de construir, revisar los
+reportes/archivos que ya se generan por corrida (CSV/JSON/Excel existentes) y
+decidir si se mejoran los existentes o se rehace y se eliminan los viejos.
+No duplicar.
+
+---
+
+## MEJ-SLA-OPT — El optimizador penaliza SLA vencido (replanteada)
+
+**Origen:** propuesta 2 de la terna, REPLANTEADA tras la observacion correcta
+del Director: el fill-rate NO depende de la config (la asignacion de stock
+ocurre antes de simular, invariante a flota/estrategia). Lo que SI depende es
+el **SLA**: con `due_time` en los pedidos (INIT-4 C2), una config mas lenta
+completa igual pero VENCIDA. Hoy `SimulationOptimizer.calculate_score` solo
+mira throughput/costo/WOs fallidas -- podria recomendar una config "optima"
+que hace vencer pedidos sin que nadie lo note. Fix: incorporar
+`sla_summary.orders_late` (ya exportado por INIT-4b via
+`export_optimization_metrics`... verificar si esta; si no, agregarlo como se
+hizo con `fill_rate_pct`) como penalizacion en el score. Solo aplica cuando
+los pedidos traen due_time; sin SLA el score queda identico (no-regresion).
 
 ---
 
