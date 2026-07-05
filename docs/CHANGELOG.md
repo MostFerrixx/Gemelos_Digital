@@ -10,6 +10,18 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-05 (cont.)
+
+- **MEJ-2 v2** — `export_optimization_metrics()` ahora incluye `fill_rate_pct`
+  y `service_level` (mismo patron/fuente que INIT-5:
+  `build_service_level_summary()`). En modo Stochastic (default de
+  `config.json`) es `None`/N/A -- consistente con como ya se comporta en
+  visor/API/Excel, no es un caso especial nuevo. `experiment_runner.py`
+  filtra los `None` (`_collect_values`) en vez de tratarlos como 0.0. No toca
+  el `.jsonl` (metrica en archivo separado) -- gate PASS sin cambio de
+  baseline. Probado en ambos modos (Stochastic -> N/A; Deterministic con
+  `layouts/Orders Test.json` -> 100.0%). 2 tests nuevos, suite 90 passed.
+
 ## 2026-07-05
 
 - **INIT-3** (`3cf359e`) — RCA revelo que el desalineamiento motor-optimizador

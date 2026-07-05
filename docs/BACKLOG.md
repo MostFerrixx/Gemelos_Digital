@@ -10,7 +10,6 @@ Actualizado: 2026-07-05 · Responsable: Cerebellum
 | INIT-6 — Staging multi-destino por ruta | PENDIENTE | Alta | Alto | Necesita decisiones de alcance del Director (ver abajo) |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | `_legacy/web_dashboard/` — conservar/reparar/eliminar | PENDIENTE DECISION | Baja | Depende | Director quiere revisarla primero |
-| MEJ-2 v2 — KPI de nivel de servicio en experiment runner | DIFERIDO | Media | Bajo | Ninguno, listo para tomar |
 | INIT-3 v2 — capacidades/zonas en el optimizador + UI web | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-4b — KPI de SLA vencido en reporte/visor | PENDIENTE | Baja | Bajo | Ninguno, listo para tomar |
 
@@ -64,18 +63,6 @@ rota (apunta a un `.jsonl` de prueba que ya no existe). Su funcion ya la cubre
 el panel de WorkOrders del viewer web vigente. Recomendacion de Cerebellum:
 eliminar (revisar 2 min por si hay alguna idea de presentacion que rescatar
 primero). El Director quiere revisarla antes de decidir.
-
----
-
-## MEJ-2 v2 — KPI de nivel de servicio en el experiment runner
-
-Extender `export_optimization_metrics()` (`event_generator.py`) con
-`service_level` (fill-rate/backorders, mismo patron que INIT-5:
-`core/replay_utils.build_service_level_summary()`), y agregar la clave a
-`ALL_KPI_KEYS` en `scripts/experiment_runner.py`. Diferido en MEJ-2 v1 porque
-toca el motor (nuevo campo en metadata del `.jsonl`) y dispara el gate/baseline;
-v1 se mantuvo deliberadamente sin riesgo. Cuando se retome: actualizar baseline
-con `--update-baseline --yes`.
 
 ---
 

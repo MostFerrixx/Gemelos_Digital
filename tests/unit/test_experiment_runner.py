@@ -64,3 +64,22 @@ def test_paired_verdict_requiere_misma_longitud():
     v = experiment_runner.paired_verdict([1.0, 2.0], [1.0])
     assert v["pvalue"] is None
     assert "N/A" in v["verdict"]
+
+
+def test_collect_values_filtra_none_de_kpi_opcional():
+    """MEJ-2 v2: fill_rate_pct es None en modo estocastico (INIT-5) -- debe
+    filtrarse, no tratarse como 0.0 (ensuciaria media/std con datos falsos)."""
+    results = [
+        {"fill_rate_pct": None, "total_workorders_completed": 10},
+        {"fill_rate_pct": None, "total_workorders_completed": 12},
+    ]
+    assert experiment_runner._collect_values("fill_rate_pct", results) == []
+    assert experiment_runner._collect_values("total_workorders_completed", results) == [10, 12]
+
+
+def test_collect_values_disponible_en_modo_deterministico():
+    results = [
+        {"fill_rate_pct": 87.5},
+        {"fill_rate_pct": 92.0},
+    ]
+    assert experiment_runner._collect_values("fill_rate_pct", results) == [87.5, 92.0]

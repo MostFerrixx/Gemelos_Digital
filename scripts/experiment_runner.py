@@ -49,6 +49,12 @@ RAW_KPI_KEYS = [
 ]
 ALL_KPI_KEYS = RAW_KPI_KEYS + ["throughput_wo_per_s"]
 
+# MEJ-2 v2: nivel de servicio (fill_rate_pct). Puede ser None en modo
+# estocastico (sin validacion de stock, mismo comportamiento que INIT-5 en el
+# visor/API/Excel) -- se agrega y agrega por separado porque summarize()/
+# paired_verdict() necesitan filtrar los None antes de operar.
+OPTIONAL_KPI_KEYS = ["fill_rate_pct"]
+
 
 def _find_new_output_dir(before):
     if not os.path.isdir(OUTPUT_DIR):
@@ -166,12 +172,22 @@ def paired_verdict(values_a, values_b, alpha=0.05):
     return {"statistic": statistic, "pvalue": pvalue, "verdict": verdict}
 
 
+def _collect_values(key, results):
+    """Valores no-None de un KPI. Los KPIs opcionales (ej. fill_rate_pct) son
+    None en modo estocastico (INIT-5); se filtran en vez de tratarlos como 0.0
+    para no ensuciar media/std con un cero que no paso en la realidad."""
+    return [r[key] for r in results if r.get(key) is not None]
+
+
 def _print_run_summary(results):
     print("\n" + "=" * 70)
     print("RESUMEN -- %d replicas" % len(results))
     print("=" * 70)
-    for key in ALL_KPI_KEYS:
-        values = [r.get(key, 0.0) for r in results]
+    for key in ALL_KPI_KEYS + OPTIONAL_KPI_KEYS:
+        values = _collect_values(key, results)
+        if not values:
+            print("%-32s N/A (no disponible en este modo)" % key)
+            continue
         s = summarize(values)
         print("%-32s media=%.2f  std=%.2f  IC95=[%.2f, %.2f]" % (
             key, s["mean"], s["std"], s["ci95_low"], s["ci95_high"]))
@@ -182,9 +198,12 @@ def _print_compare_summary(results_a, results_b):
     print("\n" + "=" * 90)
     print("COMPARACION A/B -- %d replicas pareadas por semilla" % len(results_a))
     print("=" * 90)
-    for key in ALL_KPI_KEYS:
-        values_a = [r.get(key, 0.0) for r in results_a]
-        values_b = [r.get(key, 0.0) for r in results_b]
+    for key in ALL_KPI_KEYS + OPTIONAL_KPI_KEYS:
+        values_a = _collect_values(key, results_a)
+        values_b = _collect_values(key, results_b)
+        if not values_a or not values_b:
+            print("%-32s N/A (no disponible en este modo)" % key)
+            continue
         sa, sb = summarize(values_a), summarize(values_b)
         v = paired_verdict(values_a, values_b)
         delta_pct = ((sb["mean"] - sa["mean"]) / sa["mean"] * 100.0) if sa["mean"] else float("nan")
@@ -200,16 +219,26 @@ def _export_excel(path, results, results_b=None):
     df_a = pd.DataFrame(results)
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
         df_a.to_excel(writer, sheet_name="Replicas_A", index=False)
-        summary_rows = [{"kpi": k, **summarize([r.get(k, 0.0) for r in results])} for k in ALL_KPI_KEYS]
+        summary_rows = []
+        for k in ALL_KPI_KEYS + OPTIONAL_KPI_KEYS:
+            values = _collect_values(k, results)
+            row = {"kpi": k}
+            row.update(summarize(values) if values else {"n": 0, "mean": None, "std": None,
+                                                           "ci95_low": None, "ci95_high": None})
+            summary_rows.append(row)
         pd.DataFrame(summary_rows).to_excel(writer, sheet_name="Resumen_A", index=False)
 
         if results_b is not None:
             df_b = pd.DataFrame(results_b)
             df_b.to_excel(writer, sheet_name="Replicas_B", index=False)
             compare_rows = []
-            for k in ALL_KPI_KEYS:
-                values_a = [r.get(k, 0.0) for r in results]
-                values_b = [r.get(k, 0.0) for r in results_b]
+            for k in ALL_KPI_KEYS + OPTIONAL_KPI_KEYS:
+                values_a = _collect_values(k, results)
+                values_b = _collect_values(k, results_b)
+                if not values_a or not values_b:
+                    compare_rows.append({"kpi": k, "mean_a": None, "mean_b": None,
+                                          "pvalue": None, "verdict": "N/A (no disponible en este modo)"})
+                    continue
                 v = paired_verdict(values_a, values_b)
                 compare_rows.append({
                     "kpi": k,

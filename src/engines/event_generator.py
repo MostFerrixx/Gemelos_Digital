@@ -422,24 +422,31 @@ class EventGenerator:
             output_path: Path completo donde guardar el archivo JSON de métricas
         """
         import json
-        
+        from core.replay_utils import build_service_level_summary
+
         # Obtener estadísticas del dispatcher
         stats = self.almacen.dispatcher.obtener_estadisticas()
-        
+
         # Calcular métricas derivadas
         total_completed = stats['completados']
         total_wo = stats['total']
         total_failed = total_wo - total_completed
         simulation_time = self.env.now
-        
+
         # Calcular tiempo promedio de completación (si hay WOs completadas)
         avg_completion_time = simulation_time / max(total_completed, 1)
-        
+
         # Extraer configuración de recursos
         ground_operators = self.configuracion.get('num_operarios_terrestres', 0)
         forklifts = self.configuracion.get('num_montacargas', 0)
         dispatch_strategy = self.configuracion.get('dispatch_strategy', 'unknown')
-        
+
+        # MEJ-2 v2: nivel de servicio (mismo patron/fuente que INIT-5). En modo
+        # estocastico (sin validacion de stock) available=False y
+        # fill_rate_pct=None -- consistente con como ya se muestra "N/A" en el
+        # visor/API/Excel, no es un caso especial nuevo.
+        service_level = build_service_level_summary(self.almacen)
+
         # Construir objeto de métricas
         metrics = {
             "total_workorders_completed": total_completed,
@@ -452,6 +459,8 @@ class EventGenerator:
                 "forklifts": forklifts
             },
             "dispatch_strategy": dispatch_strategy,
+            "fill_rate_pct": service_level.get("fill_rate_pct"),
+            "service_level": service_level,
             "timestamp": self.session_timestamp,
             "session_output_dir": self.session_output_dir
         }
