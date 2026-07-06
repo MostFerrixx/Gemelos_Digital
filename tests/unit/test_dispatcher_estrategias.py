@@ -20,8 +20,9 @@ def test_es01a_constructor_passthrough_del_config(make_dispatcher):
 
 
 def test_es01b_defaults_con_config_vacio(fake_env):
-    """Los DEFAULTS del motor son contrato (HANDOFF seccion 8): config vacio
-    debe reproducir el comportamiento historico documentado."""
+    """Los DEFAULTS del motor son contrato (pinneado por esta suite; esquema
+    en src/core/config_schema.py): config vacio debe reproducir el
+    comportamiento historico documentado."""
     from subsystems.simulation.dispatcher import DispatcherV11
     disp = DispatcherV11(env=fake_env, almacen=None, assignment_calculator=None,
                          route_calculator=None, data_manager=None, configuracion={})

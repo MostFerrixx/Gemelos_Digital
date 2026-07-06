@@ -77,7 +77,8 @@ def fake_env():
 
 @pytest.fixture
 def base_config():
-    """Config minima con los defaults documentados (HANDOFF seccion 8)."""
+    """Config minima con los defaults del motor (contrato pinneado por la
+    suite; esquema completo en src/core/config_schema.py)."""
     return {
         "dispatch_strategy": "Optimizacion Global",
         "max_wos_por_tour": 20,

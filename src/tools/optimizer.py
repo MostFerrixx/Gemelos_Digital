@@ -74,6 +74,14 @@ class SimulationOptimizer:
         # Directorios temporales
         self.temp_configs_dir = "temp_configs"
         self.temp_metrics_dir = "temp_metrics"
+
+        # AUDIT 2026-07-06: limpiar la carpeta output/simulation_* de cada
+        # trial tras leer sus metricas (antes cada trial dejaba ~5MB de
+        # replay+Excel+PNG que nadie miraba; un estudio de 50 trials dejaba
+        # 50 carpetas). Se resuelve por trial via metrics['session_output_dir']
+        # (race-free con n_jobs>1, a diferencia de un diff antes/despues del
+        # directorio). optimize(cleanup=False) / --no-cleanup lo desactiva.
+        self.cleanup_trial_outputs = True
         
         # Directorio para configs optimizados
         self.optimized_configs_dir = "optimized_configs"
@@ -214,7 +222,14 @@ class SimulationOptimizer:
         print(f"[OPTIMIZER] Trial {trial.number} SCORE: {score:.4f}")
         print(f"  Completed: {metrics['total_workorders_completed']}/{metrics['total_workorders']}")
         print(f"  Sim time: {metrics['total_simulation_time_seconds']:.1f}s")
-        
+
+        # AUDIT 2026-07-06: borrar la carpeta output/ de ESTE trial (el path
+        # viene en sus propias metricas -> sin carrera aunque n_jobs>1).
+        if self.cleanup_trial_outputs:
+            trial_dir = metrics.get("session_output_dir")
+            if trial_dir and os.path.basename(os.path.normpath(trial_dir)).startswith("simulation_"):
+                shutil.rmtree(trial_dir, ignore_errors=True)
+
         return score
     
     def calculate_score(self, metrics: Dict[str, Any]) -> float:
@@ -288,7 +303,10 @@ class SimulationOptimizer:
         print(f"Parallel jobs: {self.n_jobs}")
         print(f"Storage: {storage}")
         print("="*60)
-        
+
+        # AUDIT 2026-07-06: --no-cleanup tambien conserva el output/ por trial.
+        self.cleanup_trial_outputs = cleanup
+
         try:
             # Crear/cargar estudio
             study = optuna.create_study(

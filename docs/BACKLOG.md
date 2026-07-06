@@ -85,7 +85,11 @@ Detectado durante MEJ-BOTTLENECK (2026-07-06): `src/analytics/exporter.py`
 (0 callers; ademas quedo desactualizado: todavia escribe los 3 archivos
 purgados del pipeline vivo). Tambien `_exportar_eventos_crudos_organizado` y
 el import de `exportar_metricas` solo los referencia ese metodo muerto.
-Eliminarlos requiere fase de limpieza explicita con OK del Director (Ley #6).
+Sumado en la auditoria (2026-07-06): duplicacion historica del bloque
+badges + modals en `web_configurator/style.css` (~lineas 578 y 771; la copia
+del panel de optimizacion que cayo ahi ya fue deduplicada, pero la
+duplicacion de base sigue). Eliminarlos requiere fase de limpieza explicita
+con OK del Director (Ley #6).
 
 ---
 

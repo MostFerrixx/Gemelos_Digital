@@ -10,6 +10,32 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-06 (cont.)
+
+- **AUDIT — auditoria integral del trabajo de la sesion** (pedida por el
+  Director tras MEJ-BOTTLENECK). Verificado OK sin reparar: suite local
+  121 passed; gate PASS byte-identico (x2 consecutivas, determinismo);
+  **CI de GitHub en verde para todos los commits recientes de main**
+  (validacion independiente en Linux); `config.json` canonico intacto desde
+  MEJ-4 (coherente con el baseline); CI instala `requirements.txt` (la
+  dependencia nueva scipy queda cubierta); sin residuos de archivos
+  temporales ni presets no deseados. **Reparado**: (1) el optimizador Optuna
+  dejaba la carpeta `output/simulation_*` completa (~5MB) de CADA trial sin
+  limpiar -- un estudio de 50 trials dejaba 50 carpetas; ahora cada trial
+  borra su propio output tras leer las metricas (race-free con n_jobs>1
+  porque el path viene en `metrics['session_output_dir']`, no de un diff del
+  directorio; `--no-cleanup` lo conserva); validado con smoke real de 2
+  trials (0 carpetas nuevas). (2) Referencias rotas a `docs/HANDOFF.md`
+  (renombrado a STATE.md en la reestructuracion) en el comentario del
+  workflow de CI y en 2 docstrings de tests. (3) Bloque CSS del panel de
+  optimizacion duplicado en el configurador (mi replace_all habia insertado
+  en una region ya duplicada historicamente); deduplicado y verificado en
+  navegador que los estilos siguen aplicando. **Anotado para poda futura**
+  (BACKLOG): exporter.py V1 muerto, variante `_with_buffer` muerta y
+  desactualizada, duplicacion historica badges/modals en el CSS del
+  configurador. Smokes funcionales post-audit: optimizador CLI (2 trials,
+  n_jobs=2) y experiment runner CLI (`run` + `--progress-json`) sanos.
+
 ## 2026-07-06
 
 - **MEJ-BOTTLENECK — panel de cuellos de botella + purga de reportes muertos**

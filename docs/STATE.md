@@ -8,8 +8,9 @@
 
 ## Git
 
-- `main` = pendiente del commit de este cierre (MEJ-BOTTLENECK). Working
-  tree limpio salvo eso. Push directo a main autorizado por el Director.
+- `main` = pendiente del commit del cierre de la auditoria (el de
+  MEJ-BOTTLENECK ya esta pusheado: `539de20`). Push directo a main
+  autorizado por el Director.
 - Baseline byte-identico vigente: `sha256=71fc9904141ddc73...`, 4.920.352 bytes,
   seed 42, Python 3.13.6 (`tests/baseline.json`). Actualizado en
   MEJ-BOTTLENECK: SOLO metadata nueva (`bottleneck_summary`) -- eventos
@@ -95,8 +96,10 @@ si). Detalle en `docs/BACKLOG.md`.
 
 ## Siguiente prioridad (acordada)
 
-MEJ-SLA-OPT (ultima de la terna). Pendiente ademas: auditoria integral del
-trabajo de la sesion (pedida por el Director junto con MEJ-BOTTLENECK).
+MEJ-SLA-OPT (ultima de la terna 3->1->2). La auditoria integral pedida por
+el Director ya se ejecuto (ver CHANGELOG 2026-07-06 cont.): CI verde,
+config canonico intacto, 3 reparaciones aplicadas (limpieza de outputs por
+trial del optimizador, referencias rotas a HANDOFF, CSS duplicado).
 
 ## Bugs conocidos (no criticos)
 

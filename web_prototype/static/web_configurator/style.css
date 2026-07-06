@@ -864,51 +864,9 @@ body {
     color: var(--color-danger);
 }
 
-.badge-neutral {
-    background-color: rgba(107, 114, 128, 0.1);
-    color: var(--color-text-secondary);
-}
-
-.badge-warning {
-    background-color: rgba(245, 158, 11, 0.15);
-    color: var(--color-warning);
-}
-
-/* INIT-3 v2: panel de optimizacion */
-.form-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-}
-
-.form-row .form-group {
-    flex: 1 1 160px;
-}
-
-.form-actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 1rem;
-}
-
-.optimization-progress {
-    margin-top: 1.5rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--color-border);
-}
-
-.optimization-progress p {
-    margin: 0.35rem 0;
-}
-
-.optimization-params {
-    background-color: rgba(107, 114, 128, 0.08);
-    border-radius: 6px;
-    padding: 0.75rem;
-    font-size: 0.85rem;
-    white-space: pre-wrap;
-    word-break: break-word;
-}
+/* (AUDIT 2026-07-06: aqui habia una copia del bloque badge-neutral/warning +
+   panel de optimizacion, insertada por error en una region ya duplicada
+   historicamente; las reglas canonicas viven ~linea 630.) */
 
 /* Modals */
 .modal {

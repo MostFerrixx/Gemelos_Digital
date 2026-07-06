@@ -1,7 +1,8 @@
 # MEJ-1 (F5): CI de red de seguridad.
 # Corre la suite pytest y el gate de regresion byte-identico en cada push/PR.
 # El baseline (tests/baseline.json) fue generado con Python 3.13 y es el mismo
-# SHA en Windows y Linux (verificado, ver docs/HANDOFF.md seccion 7).
+# SHA en Windows y Linux (el gate normaliza EOL; detalle en la descripcion de
+# tests/baseline.json y en docs/CHANGELOG.md, entrada MEJ-1 2026-07-04).
 name: tests
 
 on:
