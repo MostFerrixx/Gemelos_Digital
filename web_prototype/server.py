@@ -98,6 +98,7 @@ class ReplayData:
         self.snapshot_interval = 60.0  # Create a snapshot every 60 seconds
         self.service_level = None  # INIT-5: resumen de nivel de servicio (backorders)
         self.sla_summary = None  # INIT-4b: resumen de cumplimiento de SLA (due_time)
+        self.bottleneck_summary = None  # MEJ-BOTTLENECK: cuellos de botella de la corrida
         self.load_data()
         self.precompute_snapshots()
 
@@ -221,6 +222,7 @@ class ReplayData:
             self.events = []
             self.service_level = None
             self.sla_summary = None
+            self.bottleneck_summary = None
             with open(REPLAY_FILE, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
@@ -235,6 +237,8 @@ class ReplayData:
                             self.service_level = event.get('service_level')
                             # INIT-4b: resumen de cumplimiento de SLA desde la metadata.
                             self.sla_summary = event.get('sla_summary')
+                            # MEJ-BOTTLENECK: cuellos de botella desde la metadata.
+                            self.bottleneck_summary = event.get('bottleneck_summary')
                             # Extract initial WOs directly from event
                             initial_wos = event.get('initial_work_orders', [])
                             print(f"Found {len(initial_wos)} initial WOs in SIMULATION_START")
@@ -835,6 +839,7 @@ def get_snapshot(t: float):
         "max_time": replay_data.max_time,
         "service_level": replay_data.service_level,  # INIT-5: nivel de servicio (backorders)
         "sla_summary": replay_data.sla_summary,  # INIT-4b: cumplimiento de SLA (due_time)
+        "bottleneck_summary": replay_data.bottleneck_summary,  # MEJ-BOTTLENECK: cuellos de botella
         "state": {
             "agents": agents,  # Now includes cargo_volume and capacidad
             "work_orders": current_state['work_orders']
@@ -883,7 +888,8 @@ def get_snapshot(t: float):
                 "backlog": current_state.get('outbound', {}).get('backlog', 0),
             },
             "service_level": replay_data.service_level,  # INIT-5: nivel de servicio (backorders)
-            "sla_summary": replay_data.sla_summary  # INIT-4b: cumplimiento de SLA (due_time)
+            "sla_summary": replay_data.sla_summary,  # INIT-4b: cumplimiento de SLA (due_time)
+            "bottleneck_summary": replay_data.bottleneck_summary  # MEJ-BOTTLENECK: cuellos de botella
         }
     }
 
@@ -954,6 +960,7 @@ def get_state(t: float):
         "max_time": replay_data.max_time,
         "service_level": replay_data.service_level,  # INIT-5: nivel de servicio (backorders)
         "sla_summary": replay_data.sla_summary,  # INIT-4b: cumplimiento de SLA (due_time)
+        "bottleneck_summary": replay_data.bottleneck_summary,  # MEJ-BOTTLENECK: cuellos de botella
         "agents": current_state['agents'],
         "work_orders": current_state['work_orders']
     }
@@ -1005,6 +1012,7 @@ def get_metrics(t: float):
         "simulation_time": t,
         "service_level": replay_data.service_level,  # INIT-5: nivel de servicio (backorders)
         "sla_summary": replay_data.sla_summary,  # INIT-4b: cumplimiento de SLA (due_time)
+        "bottleneck_summary": replay_data.bottleneck_summary,  # MEJ-BOTTLENECK: cuellos de botella
         "work_orders": {
             "total": wo_total,
             "staged": wo_completed,

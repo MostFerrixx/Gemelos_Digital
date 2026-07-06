@@ -411,3 +411,50 @@
     color: var(--dashboard-accent-teal);
     font-size: 12px;
 }
+
+/* MEJ-BOTTLENECK: panel de cuellos de botella (resumen de la corrida completa) */
+.right-dashboard .bottleneck-section {
+    padding: 10px 15px;
+    border-top: 1px solid var(--dashboard-border, rgba(110, 118, 129, 0.3));
+    max-height: 220px;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.right-dashboard .bottleneck-hint {
+    font-size: 0.75rem;
+    color: var(--dashboard-text-secondary);
+    cursor: help;
+    margin-left: 4px;
+}
+
+.right-dashboard .bottleneck-group {
+    margin-bottom: 8px;
+}
+
+.right-dashboard .bottleneck-group-title {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--dashboard-text-secondary);
+    margin-bottom: 3px;
+}
+
+.right-dashboard .bottleneck-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.72rem;
+    color: var(--dashboard-text-primary);
+    padding: 1px 0;
+}
+
+.right-dashboard .bottleneck-row span:last-child {
+    color: var(--dashboard-text-secondary);
+    text-align: right;
+}
+
+.right-dashboard .bottleneck-hotspot span:first-child {
+    color: #d29922;
+}

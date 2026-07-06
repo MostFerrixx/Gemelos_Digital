@@ -114,28 +114,15 @@ class AnalyticsExporter:
                 output_dir = "."
                 result.rollback_info['output_dir'] = output_dir
 
-            # 1. Exportar metricas JSON basicas
-            try:
-                archivo_json = os.path.join(output_dir, f"simulacion_completada_{timestamp}.json")
-                exportar_metricas(self.context.almacen, archivo_json)
-                result.add_file(archivo_json)
-                print(f"[1/4] Metricas JSON guardadas: {archivo_json}")
-            except Exception as e:
-                result.add_error(f"Error exportando metricas JSON: {e}")
+            # MEJ-BOTTLENECK: purgados los 3 archivos que nadie leia
+            # (simulacion_completada_*.json placeholder "SKELETON",
+            # raw_events_*.json ~4.5MB duplicado del .jsonl con esquema viejo,
+            # simulation_report_*.json version JSON del Excel sin consumidores).
+            # El PNG del heatmap ahora cuelga de archivo_excel (antes colgaba
+            # del JSON eliminado, un acople accidental).
 
-            # 2. Exportar eventos crudos
-            try:
-                archivo_eventos = self._exportar_eventos_crudos_organizado(output_dir, timestamp)
-                if archivo_eventos:
-                    result.add_file(archivo_eventos)
-                    print(f"[2/4] Eventos detallados guardados: {archivo_eventos}")
-                else:
-                    result.add_warning("No se pudieron exportar eventos crudos")
-            except Exception as e:
-                result.add_error(f"Error exportando eventos crudos: {e}")
-
-            # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine -> Excel
-            print("[3/4] Simulacion completada. Generando reporte de Excel...")
+            # 1. PIPELINE AUTOMATIZADO: AnalyticsEngine -> Excel
+            print("[1/2] Simulacion completada. Generando reporte de Excel...")
             try:
                 # Usar el metodo __init__ original con eventos y configuracion en memoria
                 analytics_engine = AnalyticsEngine(self.context.event_log, self.context.configuracion)
@@ -145,24 +132,18 @@ class AnalyticsExporter:
                 excel_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.xlsx")
                 archivo_excel = analytics_engine.export_to_excel(excel_filename)
 
-                # Generar archivo JSON con la misma información
-                json_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.json")
-                archivo_json = analytics_engine.export_to_json(json_filename)
-
                 if archivo_excel:
                     result.add_file(archivo_excel)
-                    print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
+                    print(f"[1/2] Reporte de Excel generado: {archivo_excel}")
                     # INIT-5: anexar hoja 'Nivel de servicio' (backorders) al reporte.
                     self._append_service_level_sheet(archivo_excel)
                     # INIT-4b: anexar hoja 'Cumplimiento SLA' (due_time) al reporte.
                     self._append_sla_summary_sheet(archivo_excel)
+                    # MEJ-BOTTLENECK: anexar hoja 'Cuellos de Botella' al reporte.
+                    self._append_bottleneck_sheet(archivo_excel)
 
-                if archivo_json:
-                    result.add_file(archivo_json)
-                    print(f"[3/4] Reporte de JSON generado: {archivo_json}")
-
-                    # 4. PIPELINE AUTOMATIZADO: Visualizer -> PNG
-                    print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
+                    # 2. PIPELINE AUTOMATIZADO: Visualizer -> PNG
+                    print("[2/2] Reporte de Excel generado. Creando imagen de heatmap...")
                     try:
                         png_file = self._ejecutar_visualizador(archivo_excel, timestamp, output_dir)
                         if png_file:
@@ -239,9 +220,9 @@ class AnalyticsExporter:
             ws.append(['TOTAL', '', svc['total_requested'], svc['total_served'],
                        svc['total_unfilled'], svc['fill_rate_pct']])
             wb.save(excel_path)
-            print("[3/4] Hoja 'Nivel de servicio' anexada al Excel")
+            print("[1/2] Hoja 'Nivel de servicio' anexada al Excel")
         except Exception as e:
-            print(f"[3/4] WARNING: no se pudo anexar hoja de nivel de servicio: {e}")
+            print(f"[1/2] WARNING: no se pudo anexar hoja de nivel de servicio: {e}")
 
     def _append_sla_summary_sheet(self, excel_path):
         """INIT-4b: anexa una hoja 'Cumplimiento SLA' (due_time) al reporte Excel
@@ -273,9 +254,80 @@ class AnalyticsExporter:
                 ws.append([o.get('order_id'), o.get('due_time'), o.get('completion_time'),
                            o.get('delay_seconds')])
             wb.save(excel_path)
-            print("[3/4] Hoja 'Cumplimiento SLA' anexada al Excel")
+            print("[1/2] Hoja 'Cumplimiento SLA' anexada al Excel")
         except Exception as e:
-            print(f"[3/4] WARNING: no se pudo anexar hoja de cumplimiento SLA: {e}")
+            print(f"[1/2] WARNING: no se pudo anexar hoja de cumplimiento SLA: {e}")
+
+    def _append_bottleneck_sheet(self, excel_path):
+        """MEJ-BOTTLENECK: anexa una hoja 'Cuellos de Botella' al reporte Excel
+        ya generado (mismo patron que las hojas de INIT-5/INIT-4b). Consolida
+        los hotspots de congestion, las metricas del planner espacio-temporal
+        y las esperas del muelle (outbound) que antes quedaban repartidos en
+        JSONs sueltos por corrida. Con los subsistemas apagados anota N/A."""
+        try:
+            import openpyxl
+            from core.replay_utils import build_bottleneck_summary
+            bn = build_bottleneck_summary(self.context.almacen)
+            wb = openpyxl.load_workbook(excel_path)
+            if 'Cuellos de Botella' in wb.sheetnames:
+                del wb['Cuellos de Botella']
+            ws = wb.create_sheet('Cuellos de Botella')
+            ws.append(['Cuellos de Botella (donde se pierde tiempo)'])
+            ws.append([])
+            if not bn.get('available'):
+                ws.append(['Congestion y outbound desactivados en esta corrida -> N/A'])
+                wb.save(excel_path)
+                return
+
+            cong = bn.get('congestion')
+            ws.append(['CONGESTION DE PASILLOS (agentes que coinciden en la misma celda)'])
+            if cong:
+                ws.append(['Co-ocupaciones totales', cong['cooccupation_events_total']])
+                ws.append(['Celdas distintas con co-ocupacion', cong['distinct_cells_with_cooccupation']])
+                ws.append(['Max agentes simultaneos en una celda', cong['max_concurrent_any_cell']])
+                ws.append([])
+                ws.append(['Celda (x,y)', 'Co-ocupaciones', 'Max simultaneos'])
+                for h in cong.get('top_hotspots', []):
+                    cell = h.get('cell', ['?', '?'])
+                    ws.append(['(%s, %s)' % (cell[0], cell[1]),
+                               h.get('cooccupations', 0), h.get('max_concurrent', 0)])
+            else:
+                ws.append(['Capa de congestion desactivada -> N/A'])
+            ws.append([])
+
+            pl = bn.get('planner')
+            ws.append(['PLANNER ANTI-COLISION (ruteo espacio-temporal)'])
+            if pl:
+                ws.append(['Tramos planificados', pl['segments_planned']])
+                ws.append(['Planes encontrados / fallidos', '%s / %s' % (pl['plans_found'], pl['plans_failed'])])
+                ws.append(['Esperas insertadas por plan (promedio)', pl['avg_waits_per_plan']])
+                ws.append(['Solapes en reservas (debe ser 0)', pl['table_overlap_violations']])
+            else:
+                ws.append(['Planner desactivado -> N/A'])
+            ws.append([])
+
+            ob = bn.get('outbound')
+            ws.append(['MUELLE / STAGING (esperas de descarga y despacho)'])
+            if ob:
+                ws.append(['Pallets depositados / despachados',
+                           '%s / %s' % (ob['pallets_staged'], ob['pallets_shipped'])])
+                ws.append(['Esperas por slot lleno (eventos)', ob['slot_wait_events']])
+                ws.append(['Tiempo total esperando slot (s)', round(ob['slot_wait_time'], 1)])
+                ws.append(['Espera maxima por slot (s)', round(ob['max_slot_wait'], 1)])
+                ws.append(['Esperas por carril lleno (eventos)', ob['lane_full_wait_events']])
+                ws.append(['Tiempo total esperando carril (s)', round(ob['lane_full_wait_time'], 1)])
+                peak = ob.get('peak_occupancy') or {}
+                if peak:
+                    ws.append([])
+                    ws.append(['Zona de staging', 'Ocupacion pico (pallets)'])
+                    for sid in sorted(peak, key=lambda x: int(x)):
+                        ws.append(['Staging %s' % sid, peak[sid]])
+            else:
+                ws.append(['Outbound desactivado -> N/A'])
+            wb.save(excel_path)
+            print("[1/2] Hoja 'Cuellos de Botella' anexada al Excel")
+        except Exception as e:
+            print(f"[1/2] WARNING: no se pudo anexar hoja de cuellos de botella: {e}")
 
     def export_complete_analytics_with_buffer(self, buffer_eventos=None) -> ExportResult:
         """

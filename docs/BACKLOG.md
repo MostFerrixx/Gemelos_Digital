@@ -1,42 +1,22 @@
 # BACKLOG — Gemelo Digital de Almacen
 # Solo lo PENDIENTE. Lo cerrado vive en docs/CHANGELOG.md (no se repite aca).
 
-Actualizado: 2026-07-05 · Responsable: Cerebellum
+Actualizado: 2026-07-06 · Responsable: Cerebellum
 
 ## Indice (de un vistazo)
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
-| MEJ-BOTTLENECK — panel de cuellos de botella (SIGUIENTE, aprobada) | APROBADA | Alta | Medio | Ninguno -- revisar primero reportes CSV/JSON existentes (pedido del Director) |
-| MEJ-SLA-OPT — optimizador penaliza SLA vencido (replanteada) | APROBADA | Media | Bajo-Medio | Despues de MEJ-BOTTLENECK (orden acordado 3->1->2) |
+| MEJ-SLA-OPT — optimizador penaliza SLA vencido (SIGUIENTE, replanteada) | APROBADA | Media | Bajo-Medio | Ninguno (ultima de la terna 3->1->2) |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
 | Distribucion real de `outbound_staging_distribution` en config canonico | PENDIENTE DECISION | -- | Trivial (config) | Decision de negocio del Director, no un bug |
+| Poda de codigo muerto en analytics (exporter.py V1, _with_buffer) | CANDIDATO | Baja | Bajo | Fase de limpieza explicita + OK del Director (Ley #6) |
 
 ---
 
-## MEJ-BOTTLENECK — Panel de cuellos de botella (aprobada, SIGUIENTE)
-
-**Origen:** terna de mejoras propuesta por Cerebellum y aprobada por el
-Director (2026-07-05), orden acordado: comparador A/B web (HECHO) -> esta ->
-MEJ-SLA-OPT.
-
-El motor YA calcula por corrida los datos de cuellos de botella (hotspots de
-congestion con celda y max concurrentes en `congestion_report_*.json`,
-metricas del planner en `timewindow_shadow_report_*.json`, esperas de
-slot/carril y ocupacion pico por zona en `outbound_metrics`) pero quedan
-enterrados en JSONs sueltos por corrida que nadie consolida. Consolidarlos en
-un lugar visible: hoja Excel y/o panel del visor web.
-
-**Pedido explicito del Director:** ANTES de construir, revisar los
-reportes/archivos que ya se generan por corrida (CSV/JSON/Excel existentes) y
-decidir si se mejoran los existentes o se rehace y se eliminan los viejos.
-No duplicar.
-
----
-
-## MEJ-SLA-OPT — El optimizador penaliza SLA vencido (replanteada)
+## MEJ-SLA-OPT — El optimizador penaliza SLA vencido (SIGUIENTE, replanteada)
 
 **Origen:** propuesta 2 de la terna, REPLANTEADA tras la observacion correcta
 del Director: el fill-rate NO depende de la config (la asignacion de stock
@@ -95,6 +75,17 @@ trial en vez de usar el fallback legacy (`num_operarios_terrestres`/
 `num_montacargas`), ya que la capacidad esta hardcodeada en el fallback de
 `operators.py` (150 ground / 1000 forklift, no leida de config). Cambio de
 representacion mas grande, no un fix.
+
+---
+
+## Poda de codigo muerto en analytics (candidato, fase de limpieza)
+
+Detectado durante MEJ-BOTTLENECK (2026-07-06): `src/analytics/exporter.py`
+(V1 completo, 0 imports) y `exporter_v2.export_complete_analytics_with_buffer`
+(0 callers; ademas quedo desactualizado: todavia escribe los 3 archivos
+purgados del pipeline vivo). Tambien `_exportar_eventos_crudos_organizado` y
+el import de `exportar_metricas` solo los referencia ese metodo muerto.
+Eliminarlos requiere fase de limpieza explicita con OK del Director (Ley #6).
 
 ---
 

@@ -105,6 +105,72 @@ def build_sla_summary(almacen):
     }
 
 
+def build_bottleneck_summary(almacen):
+    """MEJ-BOTTLENECK: consolida en UN dict serializable los indicadores de
+    cuellos de botella que el motor YA calcula pero quedaban enterrados en
+    JSONs sueltos por corrida (congestion_report, timewindow_shadow_report)
+    o solo en memoria (outbound_metrics). Misma plomeria que INIT-5/INIT-4b:
+    NO calcula nada nuevo, solo transporta. Fuente unica para la metadata del
+    .jsonl, la API del visor y la hoja Excel 'Cuellos de Botella'.
+
+    Cada bloque es None si su subsistema no esta activo en la corrida
+    (congestion off / outbound off) -- available=False solo si NINGUNO lo esta."""
+    congestion = None
+    cm = getattr(almacen, 'congestion_manager', None)
+    if cm is not None and getattr(cm, 'active', False):
+        try:
+            s = cm.resumen()
+            congestion = {
+                'cooccupation_events_total': s.get('cooccupation_events_total', 0),
+                'distinct_cells_with_cooccupation': s.get('distinct_cells_with_cooccupation', 0),
+                'max_concurrent_any_cell': s.get('max_concurrent_any_cell', 0),
+                'top_hotspots': (s.get('top_hotspots') or [])[:8],
+            }
+        except Exception:
+            congestion = None
+
+    planner = None
+    sp = getattr(almacen, 'spacetime_planner', None)
+    if sp is not None and hasattr(sp, 'shadow_report'):
+        try:
+            rep = sp.shadow_report()
+            # OJO: NO incluir avg_plan_ms/max_plan_ms aca -- son WALL-CLOCK
+            # (time.perf_counter), varian entre corridas identicas y romperian
+            # el gate byte-identico del .jsonl. El coste de CPU del planner
+            # sigue disponible en timewindow_shadow_report_*.json (no hasheado).
+            planner = {
+                'segments_planned': rep.get('segments_planned', 0),
+                'plans_found': rep.get('plans_found', 0),
+                'plans_failed': rep.get('plans_failed', 0),
+                'avg_waits_per_plan': rep.get('avg_waits_per_plan'),
+                'table_overlap_violations': rep.get('table_overlap_violations', 0),
+            }
+        except Exception:
+            planner = None
+
+    outbound = None
+    om = getattr(almacen, 'outbound_metrics', None)
+    if om:
+        outbound = {
+            'pallets_staged': om.get('pallets_staged', 0),
+            'pallets_shipped': om.get('pallets_shipped', 0),
+            'slot_wait_events': om.get('slot_wait_events', 0),
+            'slot_wait_time': om.get('slot_wait_time', 0.0),
+            'max_slot_wait': om.get('max_slot_wait', 0.0),
+            'lane_full_wait_events': om.get('lane_full_wait_events', 0),
+            'lane_full_wait_time': om.get('lane_full_wait_time', 0.0),
+            # {staging_id: ocupacion pico} -- claves a str para JSON estable
+            'peak_occupancy': {str(k): v for k, v in (om.get('peak_occupancy') or {}).items()},
+        }
+
+    return {
+        'available': any(b is not None for b in (congestion, planner, outbound)),
+        'congestion': congestion,
+        'planner': planner,
+        'outbound': outbound,
+    }
+
+
 def agregar_evento_replay(buffer, evento):
     """Agrega un evento al bufer de replay"""
     buffer.add_event(evento)
@@ -163,6 +229,14 @@ def volcar_replay_a_archivo(buffer, archivo_salida, configuracion, almacen=None,
             if sla.get('available'):
                 print(f"[REPLAY-METADATA] SLA: {sla['on_time_pct']}% a tiempo "
                       f"({sla['orders_late']} de {sla['total_orders_with_sla']} pedidos vencidos)")
+
+            # MEJ-BOTTLENECK: resumen de cuellos de botella en la metadata del replay.
+            bottleneck = build_bottleneck_summary(almacen)
+            metadata['bottleneck_summary'] = bottleneck
+            if bottleneck.get('available') and bottleneck.get('congestion'):
+                c = bottleneck['congestion']
+                print(f"[REPLAY-METADATA] Cuellos de botella: {c['cooccupation_events_total']} "
+                      f"co-ocupaciones en {c['distinct_cells_with_cooccupation']} celdas")
 
             f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
 

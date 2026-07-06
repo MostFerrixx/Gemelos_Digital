@@ -4,21 +4,23 @@
 > presente, nada mas. Historial -> `docs/CHANGELOG.md`. Pendientes ->
 > `docs/BACKLOG.md`. Identidad/reglas/arquitectura -> `CLAUDE.md`.
 
-**Ultima actualizacion:** 2026-07-05
+**Ultima actualizacion:** 2026-07-06
 
 ## Git
 
-- `main` = `4dceb85`. Working tree limpio. Sin ramas feature pendientes de
-  merge. Push directo a main autorizado por el Director para esta sesion.
-- Baseline byte-identico vigente: `sha256=38419bb375cd3dcb...`, 4.919.657 bytes,
-  seed 42, Python 3.13.6 (`tests/baseline.json`). Actualizado en INIT-4b:
-  SOLO metadata nueva (`sla_summary` en `SIMULATION_START`) -- verificado que
-  los eventos (linea 2+) son byte-identicos al baseline anterior de INIT-1.
+- `main` = pendiente del commit de este cierre (MEJ-BOTTLENECK). Working
+  tree limpio salvo eso. Push directo a main autorizado por el Director.
+- Baseline byte-identico vigente: `sha256=71fc9904141ddc73...`, 4.920.352 bytes,
+  seed 42, Python 3.13.6 (`tests/baseline.json`). Actualizado en
+  MEJ-BOTTLENECK: SOLO metadata nueva (`bottleneck_summary`) -- eventos
+  byte-identicos desde INIT-1 (sha sin linea 1 = `67749aa4...`). REGLA nueva
+  pinneada por test BN-05: la metadata del .jsonl NO puede contener valores
+  wall-clock (avg_plan_ms rompio el determinismo y se corrigio).
 
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 115 passed, 1 deselected (~7s)
+python -m pytest -q                # 121 passed, 1 deselected (~8s)
 python scripts/regression_gate.py  # GATE PASS esperado
 ```
 
@@ -65,14 +67,20 @@ python scripts/regression_gate.py  # GATE PASS esperado
   Endpoints `/api/experiment/start|status|stop`; el runner CLI reporta
   progreso via `--progress-json` (escritura atomica). Queda un preset
   "PRUEBA B - 3 ground" en `data/config_presets/` (gitignoreado) para probar.
+- **MEJ-BOTTLENECK**: `build_bottleneck_summary()` (replay_utils) consolida
+  congestion + planner + muelle en metadata del .jsonl, API, hoja Excel
+  "Cuellos de Botella" y panel del dashboard derecho del visor. Cada corrida
+  genera ahora 5 archivos (antes 8): purgados raw_events / simulation_report
+  .json / simulacion_completada. PROHIBIDO meter valores wall-clock en la
+  metadata del .jsonl (test BN-05 lo pina; rompe el gate byte-identico).
 
 ## Plan acordado con el Director (terna de mejoras, 2026-07-05)
 
-Orden: **(3) comparador A/B web -- HECHO** -> **(1) MEJ-BOTTLENECK** (panel
-de cuellos de botella; ANTES de construir, revisar reportes existentes por
-corrida y decidir mejorar vs rehacer+eliminar, pedido explicito del Director)
--> **(2) MEJ-SLA-OPT** (optimizador penaliza SLA vencido; replanteada -- el
-fill-rate NO depende de la config, el SLA si). Detalle en `docs/BACKLOG.md`.
+Orden: **(3) comparador A/B web -- HECHO** -> **(1) MEJ-BOTTLENECK -- HECHO**
+(hoja Excel "Cuellos de Botella" + panel en el visor + purga de los 3
+reportes muertos por corrida) -> **(2) MEJ-SLA-OPT** (optimizador penaliza
+SLA vencido; replanteada -- el fill-rate NO depende de la config, el SLA
+si). Detalle en `docs/BACKLOG.md`.
 
 ## Decisiones del Director pendientes
 
@@ -87,7 +95,8 @@ fill-rate NO depende de la config, el SLA si). Detalle en `docs/BACKLOG.md`.
 
 ## Siguiente prioridad (acordada)
 
-MEJ-BOTTLENECK (ver plan de la terna arriba).
+MEJ-SLA-OPT (ultima de la terna). Pendiente ademas: auditoria integral del
+trabajo de la sesion (pedida por el Director junto con MEJ-BOTTLENECK).
 
 ## Bugs conocidos (no criticos)
 

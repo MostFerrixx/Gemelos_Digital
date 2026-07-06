@@ -1,8 +1,8 @@
 {
-    "description": "Baseline byte-identico (modulo EOL) de la simulacion canonica (config.json de la raiz, congestion timewindow ACTIVO), WAREHOUSE_SEED=42, hash con CRLF normalizado a LF (mismo SHA en Windows y Linux). Actualizado en INIT-4b (2026-07-05): metadata SIMULATION_START del .jsonl ahora incluye 'sla_summary' (cumplimiento de SLA/due_time, mismo patron que INIT-5 service_level). CAMBIO SOLO DE METADATA: verificado que los eventos (linea 2 en adelante) son byte-identicos (sha256 sin la linea 1 identico antes/despues); solo crece el tama\u00f1o (4.919.513 -> 4.919.657 bytes, +144 bytes exactos del nuevo campo JSON). Cambio intencional: python scripts/regression_gate.py --update-baseline --yes",
+    "description": "Baseline byte-identico (modulo EOL) de la simulacion canonica (config.json de la raiz, congestion timewindow ACTIVO), WAREHOUSE_SEED=42, hash con CRLF normalizado a LF (mismo SHA en Windows y Linux). Actualizado en MEJ-BOTTLENECK (2026-07-06): metadata SIMULATION_START del .jsonl ahora incluye 'bottleneck_summary' (hotspots de congestion + planner + esperas de muelle; mismo patron que service_level/sla_summary). CAMBIO SOLO DE METADATA: verificado que los eventos (linea 2 en adelante) son byte-identicos (sha256 sin linea 1 = 67749aa4..., identico desde INIT-1). OJO: el summary excluye avg_plan_ms (wall-clock, no determinista) -- incluirlo rompio el gate y se corrigio antes de fijar este baseline; determinismo verificado con dos corridas consecutivas PASS. Cambio intencional: python scripts/regression_gate.py --update-baseline --yes",
     "seed": 42,
-    "sha256": "38419bb375cd3dcb1349551946f83847cd2937baedc019403573009cf7f50121",
-    "size_bytes": 4919657,
+    "sha256": "71fc9904141ddc73cb2070e42385ad0c9c41c5c66f2a3b71b9960374a2ef3867",
+    "size_bytes": 4920352,
     "python_version": "3.13.6",
-    "updated": "2026-07-05"
+    "updated": "2026-07-06"
 }

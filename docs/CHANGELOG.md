@@ -10,6 +10,35 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-06
+
+- **MEJ-BOTTLENECK — panel de cuellos de botella + purga de reportes muertos**
+  (propuesta 1 de la terna; auditoria previa de reportes pedida por el
+  Director). **Purga**: dejaron de generarse los 3 archivos por corrida que
+  nadie leia -- `simulacion_completada_*.json` (placeholder "SKELETON"),
+  `raw_events_*.json` (~4.5MB, duplicado del .jsonl con esquema viejo) y
+  `simulation_report_*.json` (version JSON del Excel sin consumidores); el
+  PNG del heatmap colgaba del JSON eliminado (acople accidental) y ahora
+  cuelga del Excel. Carpeta de salida: 8 -> 5 archivos, ~4.9MB menos por
+  corrida. **Consolidacion**: nuevo `build_bottleneck_summary()` en
+  `core/replay_utils.py` (mismo patron que INIT-5/INIT-4b) reune hotspots de
+  congestion (top 8, con celda y max concurrentes), metricas del planner
+  (planes ok/fallidos, esperas por plan, solapes) y esperas del muelle
+  (slot/carril, ocupacion pico por zona). Cableado en: metadata del .jsonl,
+  4 respuestas de la API, hoja Excel "Cuellos de Botella" y panel nuevo en
+  el dashboard derecho del visor (hotspots en ambar; hint de que es resumen
+  de corrida completa, no varia con el scrubber). **Bug real detectado y
+  corregido durante la validacion**: la primera version incluia
+  `avg_plan_ms` (wall-clock del planner) en la metadata -> dos corridas
+  identicas daban SHA distinto y el gate byte-identico quedaba roto. Se
+  excluyo todo valor wall-clock del summary (queda en
+  timewindow_shadow_report_*.json, no hasheado) y el test BN-05 pina la
+  regla ("_ms" prohibido en el summary). Determinismo verificado con dos
+  corridas consecutivas PASS. Baseline actualizado (`71fc9904...`,
+  4.920.352 bytes; eventos byte-identicos desde INIT-1: sha sin linea 1 =
+  `67749aa4...`). 6 tests nuevos. Suite: 121 passed. Validado end-to-end en
+  navegador real (corrida con outbound + 3 zonas activas).
+
 ## 2026-07-05 (cont. 7)
 
 - **MEJ-EXP-WEB — comparador A/B en el navegador** (propuesta 3 de la terna

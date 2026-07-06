@@ -923,6 +923,64 @@ const ControlsModule = {
         } else {
             this.setMetricValue('metric-sla', 'N/A');
         }
+
+        // MEJ-BOTTLENECK: panel de cuellos de botella (resumen estatico de la
+        // corrida completa -- se renderiza una sola vez por replay cargado).
+        this.renderBottleneckPanel(metrics.bottleneck_summary);
+    },
+
+    renderBottleneckPanel(bn) {
+        const section = document.getElementById('bottleneck-section');
+        const content = document.getElementById('bottleneck-content');
+        if (!section || !content) return;
+
+        // Guard: es un resumen de fin de corrida, no cambia con el scrubber.
+        const key = bn ? JSON.stringify(bn).length : 0;
+        if (this._bottleneckKey === key) return;
+        this._bottleneckKey = key;
+
+        if (!bn || !bn.available) {
+            section.style.display = 'none';
+            return;
+        }
+        section.style.display = 'block';
+
+        let html = '';
+        const cong = bn.congestion;
+        if (cong && cong.cooccupation_events_total > 0) {
+            html += `<div class="bottleneck-group">
+                <div class="bottleneck-group-title">Congestión de pasillos</div>
+                <div class="bottleneck-row"><span>Co-ocupaciones</span><span>${cong.cooccupation_events_total} en ${cong.distinct_cells_with_cooccupation} celdas</span></div>`;
+            (cong.top_hotspots || []).slice(0, 5).forEach(h => {
+                const c = h.cell || ['?', '?'];
+                html += `<div class="bottleneck-row bottleneck-hotspot"><span>Celda (${c[0]}, ${c[1]})</span><span>${h.cooccupations}× · máx ${h.max_concurrent} agentes</span></div>`;
+            });
+            html += '</div>';
+        } else if (cong) {
+            html += `<div class="bottleneck-group">
+                <div class="bottleneck-group-title">Congestión de pasillos</div>
+                <div class="bottleneck-row"><span>Sin co-ocupaciones</span><span>✓</span></div></div>`;
+        }
+
+        const pl = bn.planner;
+        if (pl) {
+            html += `<div class="bottleneck-group">
+                <div class="bottleneck-group-title">Planner anti-colisión</div>
+                <div class="bottleneck-row"><span>Planes (ok / fallidos)</span><span>${pl.plans_found} / ${pl.plans_failed}</span></div>
+                <div class="bottleneck-row"><span>Esperas por plan</span><span>${pl.avg_waits_per_plan != null ? pl.avg_waits_per_plan : '-'}</span></div>
+            </div>`;
+        }
+
+        const ob = bn.outbound;
+        if (ob) {
+            html += `<div class="bottleneck-group">
+                <div class="bottleneck-group-title">Muelle / staging</div>
+                <div class="bottleneck-row"><span>Esperas por slot</span><span>${ob.slot_wait_events} (${(ob.slot_wait_time || 0).toFixed(0)}s, máx ${(ob.max_slot_wait || 0).toFixed(0)}s)</span></div>
+                <div class="bottleneck-row"><span>Esperas por carril</span><span>${ob.lane_full_wait_events} (${(ob.lane_full_wait_time || 0).toFixed(0)}s)</span></div>
+            </div>`;
+        }
+
+        content.innerHTML = html || '<div class="bottleneck-row"><span>Sin datos</span></div>';
     },
 
     async renderEventMarkers(maxTime) {
