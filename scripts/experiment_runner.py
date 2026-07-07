@@ -35,7 +35,6 @@ import time
 from scipy import stats as _stats
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 ENTRY_POINT = os.path.join(PROJECT_ROOT, "entry_points", "run_generate_replay.py")
 TIMEOUT_SECONDS = 600
 
@@ -56,22 +55,8 @@ ALL_KPI_KEYS = RAW_KPI_KEYS + ["throughput_wo_per_s"]
 OPTIONAL_KPI_KEYS = ["fill_rate_pct"]
 
 
-def _find_new_output_dir(before):
-    if not os.path.isdir(OUTPUT_DIR):
-        return None
-    after = {d for d in os.listdir(OUTPUT_DIR) if d.startswith("simulation_")}
-    new_dirs = sorted(after - before)
-    if not new_dirs:
-        return None
-    return os.path.join(OUTPUT_DIR, new_dirs[-1])
-
-
 def run_one_replica(config_path, seed, keep_output=False):
     """Corre una replica aislada; devuelve (metrics_dict, elapsed_seconds)."""
-    before = set()
-    if os.path.isdir(OUTPUT_DIR):
-        before = {d for d in os.listdir(OUTPUT_DIR) if d.startswith("simulation_")}
-
     env = os.environ.copy()
     env["WAREHOUSE_SEED"] = str(seed)
     env["PYTHONUNBUFFERED"] = "1"
@@ -104,11 +89,20 @@ def run_one_replica(config_path, seed, keep_output=False):
         metrics = json.load(f)
     os.remove(metrics_path)
 
-    sim_dir = _find_new_output_dir(before)
-    if sim_dir and not keep_output:
-        shutil.rmtree(sim_dir, ignore_errors=True)
-    elif sim_dir:
-        metrics["_output_dir"] = sim_dir
+    # REVIEW 2026-07-06: la carpeta a limpiar sale de las metricas de ESTA
+    # replica (el motor reporta su propio session_output_dir), no de un diff
+    # antes/despues del directorio output/ -- el diff tenia una carrera real
+    # si un estudio del optimizador corria a la vez (podia borrar la carpeta
+    # de OTRO proceso y dejar la propia). Mismo patron que el fix de auditoria
+    # en optimizer.py.
+    sim_dir = metrics.get("session_output_dir")
+    if sim_dir and not os.path.isabs(sim_dir):
+        sim_dir = os.path.join(PROJECT_ROOT, sim_dir)
+    if sim_dir and os.path.basename(os.path.normpath(sim_dir)).startswith("simulation_"):
+        if not keep_output:
+            shutil.rmtree(sim_dir, ignore_errors=True)
+        else:
+            metrics["_output_dir"] = sim_dir
 
     completed = metrics.get("total_workorders_completed", 0)
     sim_time = metrics.get("total_simulation_time_seconds", 0)

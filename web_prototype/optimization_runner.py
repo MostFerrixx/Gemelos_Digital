@@ -86,7 +86,16 @@ class OptimizationRunner:
     def stop(self) -> bool:
         if not self.is_running():
             return False
-        self._process.terminate()
+        # REVIEW 2026-07-06: matar el ARBOL de procesos, no solo el padre.
+        # terminate() en Windows mata run_optimization.py pero deja huerfano
+        # al motor de simulacion del trial en curso (proceso nieto), que sigue
+        # corriendo y deja su carpeta output/ sin limpiar (el padre muerto ya
+        # no ejecuta el cleanup post-trial).
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(self._process.pid), "/T", "/F"],
+                           capture_output=True)
+        else:
+            self._process.terminate()
         try:
             self._process.wait(timeout=5)
         except subprocess.TimeoutExpired:

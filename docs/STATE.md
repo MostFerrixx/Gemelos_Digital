@@ -4,11 +4,12 @@
 > presente, nada mas. Historial -> `docs/CHANGELOG.md`. Pendientes ->
 > `docs/BACKLOG.md`. Identidad/reglas/arquitectura -> `CLAUDE.md`.
 
-**Ultima actualizacion:** 2026-07-06
+**Ultima actualizacion:** 2026-07-07
 
 ## Git
 
-- `main` = `8e4d9aa`. Working tree limpio. Sin ramas feature pendientes de
+- `main` = pendiente del commit del cierre de la review. Working tree limpio
+  salvo eso. Sin ramas feature pendientes de
   merge. Push directo a main autorizado por el Director.
 - Baseline byte-identico vigente: `sha256=71fc9904141ddc73...`, 4.920.352 bytes,
   seed 42, Python 3.13.6 (`tests/baseline.json`). Actualizado en
@@ -20,7 +21,7 @@
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 124 passed, 1 deselected (~8s)
+python -m pytest -q                # 125 passed, 1 deselected (~8s)
 python scripts/regression_gate.py  # GATE PASS esperado
 ```
 

@@ -637,9 +637,19 @@ class AlmacenMejorado:
         if destino:
             mapped = self.destino_staging_map.get(destino)
             if mapped is not None:
-                return int(mapped)
-            print(f"[OUTBOUND][WARN] Pedido {order.order_id}: destino '{destino}' "
-                  f"no esta en destino_staging_map -- usando fallback aleatorio.")
+                # REVIEW 2026-07-06: coercion defensiva -- un config editado a
+                # mano con un valor no numerico ("tres") crasheaba la
+                # generacion de pedidos. La web valida 1-7, pero el motor
+                # tambien puede recibir configs por --config sin pasar por ahi.
+                try:
+                    return int(mapped)
+                except (TypeError, ValueError):
+                    print(f"[OUTBOUND][WARN] destino_staging_map['{destino}'] = "
+                          f"'{mapped}' no es un staging_id valido -- usando "
+                          f"fallback aleatorio.")
+            else:
+                print(f"[OUTBOUND][WARN] Pedido {order.order_id}: destino '{destino}' "
+                      f"no esta en destino_staging_map -- usando fallback aleatorio.")
 
         return self._seleccionar_staging_id()
 

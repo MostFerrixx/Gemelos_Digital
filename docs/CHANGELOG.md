@@ -10,6 +10,33 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-07
+
+- **REVIEW — revision de codigo de las funcionalidades recientes** (pedida
+  por el Director). 4 hallazgos, todos reparados y validados:
+  (1) **Procesos huerfanos al detener desde la web** (moderado):
+  `stop()` de OptimizationRunner y ExperimentWebRunner usaba `terminate()`,
+  que en Windows mata solo al proceso padre -- el motor de simulacion en
+  curso (nieto) quedaba huerfano, seguia corriendo hasta terminar y dejaba
+  su carpeta output/ sin limpiar. Fix: matar el arbol completo con
+  `taskkill /T /F` (fallback a terminate en no-Windows). Validado en vivo:
+  stop a mitad de replica -> 24s despues, cero carpetas huerfanas.
+  (2) **Carrera en la limpieza del experiment runner** (menor):
+  `run_one_replica` identificaba su carpeta con un diff antes/despues de
+  output/ -- con un estudio del optimizador corriendo a la vez podia borrar
+  la carpeta de OTRO proceso. Fix: usar `metrics['session_output_dir']`
+  (el motor reporta su propia carpeta; mismo patron que el fix de auditoria
+  del optimizador). `_find_new_output_dir` quedo muerta y se elimino.
+  (3) **Guard debil del panel de cuellos de botella** (menor): comparaba la
+  LONGITUD del JSON del summary -- dos replays con summaries del mismo largo
+  no re-renderizaban. Fix: comparar el string completo.
+  (4) **`_resolver_staging_id` sin coercion defensiva** (robustez): un
+  `destino_staging_map` editado a mano con valor no numerico ("tres")
+  crasheaba la generacion de pedidos. Fix: try/except con WARN + fallback
+  aleatorio; "5" como string se acepta. Test nuevo lo pina.
+  Tambien: mensaje del status del experimento tras un stop manual ya no
+  sugiere crasheo. Suite: 125 passed. Gate PASS sin cambio de baseline.
+
 ## 2026-07-06 (cont. 2)
 
 - **MEJ-SLA-OPT — el optimizador penaliza SLA vencido** (propuesta 2 de la

@@ -79,7 +79,15 @@ class ExperimentWebRunner:
     def stop(self) -> bool:
         if not self.is_running():
             return False
-        self._process.terminate()
+        # REVIEW 2026-07-06: matar el ARBOL de procesos, no solo el padre
+        # (mismo bug que OptimizationRunner: terminate() dejaba huerfano al
+        # motor de la replica en curso, que seguia corriendo y dejaba su
+        # carpeta output/ sin limpiar).
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(self._process.pid), "/T", "/F"],
+                           capture_output=True)
+        else:
+            self._process.terminate()
         try:
             self._process.wait(timeout=5)
         except subprocess.TimeoutExpired:
@@ -102,9 +110,11 @@ class ExperimentWebRunner:
             base.update({"status": "initializing", "completed_replicas": 0, "total_replicas": 0})
             return base
         base.update(progress)
-        # Proceso muerto sin status final en el JSON = crasheo antes de escribir.
+        # Proceso muerto sin status final en el JSON = detenido manualmente
+        # (stop) o crasheo antes de escribir el resultado.
         if not base["running"] and progress.get("status") == "running":
             base["status"] = "error"
-            base["error"] = ("El proceso del experimento termino inesperadamente "
-                             "sin reportar resultado (revisar logs del servidor).")
+            base["error"] = ("El experimento termino sin reportar resultado "
+                             "(detenido manualmente o crasheo -- revisar logs "
+                             "del servidor si no fue un stop).")
         return base

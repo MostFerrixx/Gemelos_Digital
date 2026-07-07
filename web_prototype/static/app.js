@@ -935,7 +935,9 @@ const ControlsModule = {
         if (!section || !content) return;
 
         // Guard: es un resumen de fin de corrida, no cambia con el scrubber.
-        const key = bn ? JSON.stringify(bn).length : 0;
+        // REVIEW 2026-07-06: comparar el string COMPLETO, no su longitud --
+        // dos replays distintos con summaries del mismo largo no re-renderizaban.
+        const key = bn ? JSON.stringify(bn) : '';
         if (this._bottleneckKey === key) return;
         this._bottleneckKey = key;
 

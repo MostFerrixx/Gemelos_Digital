@@ -52,6 +52,21 @@ def test_sin_destino_ni_staging_id_cae_al_fallback_aleatorio_sin_regresion():
     assert alm._resolver_staging_id(order) == 3
 
 
+def test_valor_no_numerico_en_el_mapa_no_crashea_cae_al_fallback():
+    """REVIEW 2026-07-06: config editado a mano con staging_id no numerico
+    ("tres") no debe crashear la generacion de pedidos -- WARN + fallback."""
+    alm = _almacen(destino_staging_map={"TIENDA_NORTE": "tres"},
+                    outbound_staging_distribution={"1": 0, "2": 100, "3": 0,
+                                                    "4": 0, "5": 0, "6": 0, "7": 0})
+    order = ParsedOrder(order_id="ORD-1", destino="TIENDA_NORTE")
+    assert alm._resolver_staging_id(order) == 2  # fallback determinista
+
+    # Un valor numerico como string SI debe aceptarse (JSON a mano con "5").
+    alm2 = _almacen(destino_staging_map={"TIENDA_NORTE": "5"})
+    order2 = ParsedOrder(order_id="ORD-2", destino="TIENDA_NORTE")
+    assert alm2._resolver_staging_id(order2) == 5
+
+
 def test_parseo_json_lee_campo_destino(tmp_path):
     orders_file = tmp_path / "orders.json"
     orders_file.write_text(json.dumps({
