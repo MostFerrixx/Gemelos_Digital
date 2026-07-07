@@ -584,6 +584,12 @@
                                     <label for="opt-penalty-failed">Penalizacion WO fallida ($)</label>
                                     <input type="number" id="opt-penalty-failed" min="0" step="10" value="100">
                                 </div>
+                                <div class="form-group">
+                                    <label for="opt-penalty-late">Penalizacion SLA vencido ($)</label>
+                                    <input type="number" id="opt-penalty-late" min="0" step="10" value="50">
+                                    <span class="help-text">Resta puntos por cada pedido completado después
+                                        de su plazo (due_time). Sin plazos en los pedidos, no tiene efecto.</span>
+                                </div>
                             </div>
                             <div class="form-actions">
                                 <button id="btn-optimization-start" class="btn-primary">Iniciar Optimizacion</button>

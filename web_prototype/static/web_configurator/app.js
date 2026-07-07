@@ -500,6 +500,12 @@ class WebConfigurator {
                 cost_ground: parseFloat(document.getElementById('opt-cost-ground').value) || 15.0,
                 cost_forklift: parseFloat(document.getElementById('opt-cost-forklift').value) || 50.0,
                 penalty_failed: parseFloat(document.getElementById('opt-penalty-failed').value) || 100.0,
+                // MEJ-SLA-OPT: $ por pedido con SLA vencido. NO usar || como los
+                // demas: 0 es un valor valido (desactiva la penalizacion a proposito).
+                penalty_late: (() => {
+                    const v = parseFloat(document.getElementById('opt-penalty-late')?.value);
+                    return Number.isNaN(v) ? 50.0 : v;
+                })(),
             };
             try {
                 const resp = await fetch('/api/optimization/start', {

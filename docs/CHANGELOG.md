@@ -10,6 +10,28 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-06 (cont. 2)
+
+- **MEJ-SLA-OPT — el optimizador penaliza SLA vencido** (propuesta 2 de la
+  terna, replanteada tras la observacion correcta del Director: el fill-rate
+  NO depende de la config -- se decide en la asignacion de stock antes de
+  simular -- pero el SLA si, porque una config mas lenta completa los mismos
+  pedidos DESPUES de su due_time). `export_optimization_metrics()` ahora
+  incluye `orders_late`/`sla_summary` (INIT-4b, archivo de metricas separado
+  del .jsonl -> sin cambio de baseline). `SimulationOptimizer.calculate_score`
+  suma `orders_late * PENALTY_LATE_ORDER` (default $50/pedido) al denominador
+  del score, junto a las penalizaciones existentes. Cadena completa: CLI
+  `--penalty-late`, request/runner web, campo "Penalizacion SLA vencido" en
+  el tab Optimizacion (con help-text; acepta 0 para desactivar -- guard
+  Number.isNaN en vez de || para no pisar el 0). NO-REGRESION: sin due_time
+  en los pedidos, orders_late=0 y el score es IDENTICO al historico (tambien
+  con metricas de versiones previas sin la clave, via .get). Validado
+  end-to-end: corrida real con 2 de 3 pedidos vencidos -> orders_late=2 en
+  las metricas y score 1.30 vs 2.31 si no hubieran vencido. 3 tests nuevos
+  (no-regresion con clave ausente y orders_late=0, penalizacion proporcional,
+  penalty=0 desactiva). Suite: 124 passed. Gate PASS sin cambio de baseline.
+  **Con esto la terna acordada (3 -> 1 -> 2) queda COMPLETA.**
+
 ## 2026-07-06 (cont.)
 
 - **AUDIT — auditoria integral del trabajo de la sesion** (pedida por el

@@ -112,3 +112,44 @@ def test_radio_cercania_ausente_en_otras_estrategias(optimizer, monkeypatch):
     written = _written_trial_config(optimizer, trial.number)
     assert written["dispatch_strategy"] == "FIFO Estricto"
     assert "radio_cercania" not in written
+
+
+# --- MEJ-SLA-OPT: penalizacion por SLA vencido en calculate_score ---
+
+def _metrics_base(orders_late=None):
+    m = {
+        "total_workorders_completed": 100,
+        "total_workorders_failed": 0,
+        "total_simulation_time_seconds": 3600.0,  # throughput = 100 WO/h
+        "resource_costs": {"ground_operators": 2, "forklifts": 0},  # $30/h
+    }
+    if orders_late is not None:
+        m["orders_late"] = orders_late
+    return m
+
+
+def test_sla_opt_sin_pedidos_vencidos_score_identico(optimizer):
+    """orders_late=0 y metrics sin la clave (version previa) dan el MISMO
+    score que la formula historica -- no-regresion."""
+    historico = 100.0 / 30.0  # throughput / costo, sin penalizaciones
+    assert optimizer.calculate_score(_metrics_base(orders_late=0)) == historico
+    assert optimizer.calculate_score(_metrics_base()) == historico  # clave ausente
+
+
+def test_sla_opt_pedidos_vencidos_bajan_el_score(optimizer):
+    score_ok = optimizer.calculate_score(_metrics_base(orders_late=0))
+    score_late = optimizer.calculate_score(_metrics_base(orders_late=4))
+    # denominador: 30 + 4*50 = 230 -> score cae de 3.33 a ~0.43
+    assert score_late < score_ok
+    assert score_late == 100.0 / (30.0 + 4 * optimizer.PENALTY_LATE_ORDER)
+
+
+def test_sla_opt_penalizacion_configurable_en_cero_desactiva(tmp_path):
+    from tools.optimizer import SimulationOptimizer
+    config_path = tmp_path / "cfg.json"
+    config_path.write_text(json.dumps({"dispatch_strategy": "Ejecucion de Plan"}),
+                           encoding="utf-8")
+    opt = SimulationOptimizer(base_config_path=str(config_path),
+                              n_parallel_jobs=1, penalty_late_order=0.0)
+    assert (opt.calculate_score(_metrics_base(orders_late=10))
+            == opt.calculate_score(_metrics_base(orders_late=0)))

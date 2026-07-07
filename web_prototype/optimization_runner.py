@@ -47,7 +47,8 @@ class OptimizationRunner:
     def start(self, config_path: str = "config.json", n_trials: int = 50,
               n_jobs: int = 2, study_name: Optional[str] = None,
               cost_ground: float = 15.0, cost_forklift: float = 50.0,
-              penalty_failed: float = 100.0) -> Dict[str, Any]:
+              penalty_failed: float = 100.0,
+              penalty_late: float = 50.0) -> Dict[str, Any]:
         if self.is_running():
             raise RuntimeError(
                 "Ya hay una optimizacion en curso ('%s'). Espera a que "
@@ -68,6 +69,7 @@ class OptimizationRunner:
             "--cost-ground", str(cost_ground),
             "--cost-forklift", str(cost_forklift),
             "--penalty-failed", str(penalty_failed),
+            "--penalty-late", str(penalty_late),
         ]
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"

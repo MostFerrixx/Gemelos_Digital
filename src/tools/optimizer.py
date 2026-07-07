@@ -44,25 +44,30 @@ class SimulationOptimizer:
         n_parallel_jobs: int = 4,
         cost_ground_operator: float = 15.0,
         cost_forklift: float = 50.0,
-        penalty_failed_wo: float = 100.0
+        penalty_failed_wo: float = 100.0,
+        penalty_late_order: float = 50.0
     ):
         """
         Inicializa el optimizador de simulación.
-        
+
         Args:
             base_config_path: Path al config.json base que se usará como template
             n_parallel_jobs: Número de simulaciones en paralelo (recomendado: 2-4)
             cost_ground_operator: Costo operativo por operario terrestre ($/hora)
             cost_forklift: Costo operativo por montacargas ($/hora, incluye operador + equipo)
             penalty_failed_wo: Penalización por cada WorkOrder fallida ($)
+            penalty_late_order: MEJ-SLA-OPT: penalización por cada pedido con SLA
+                vencido (completado después de su due_time). Solo actúa si los
+                pedidos traen due_time (INIT-4 C2); sin SLA, score idéntico.
         """
         self.base_config_path = base_config_path
         self.n_jobs = n_parallel_jobs
-        
+
         # Parámetros de la función de costo
         self.COST_GROUND_OP = cost_ground_operator
         self.COST_FORKLIFT = cost_forklift
         self.PENALTY_FAILED_WO = penalty_failed_wo
+        self.PENALTY_LATE_ORDER = penalty_late_order
         
         # Cargar configuración base
         if not os.path.exists(base_config_path):
@@ -95,6 +100,7 @@ class SimulationOptimizer:
         print(f"  Jobs paralelos: {n_parallel_jobs}")
         print(f"  Costos: Ground=${self.COST_GROUND_OP}/h, Forklift=${self.COST_FORKLIFT}/h")
         print(f"  Penalizacion fallos: ${self.PENALTY_FAILED_WO}/WO")
+        print(f"  Penalizacion SLA vencido: ${self.PENALTY_LATE_ORDER}/pedido")
     
     def objective(self, trial: optuna.Trial) -> float:
         """
@@ -218,6 +224,8 @@ class SimulationOptimizer:
         trial.set_user_attr("failed_wo", metrics["total_workorders_failed"])
         trial.set_user_attr("simulation_time", metrics["total_simulation_time_seconds"])
         trial.set_user_attr("total_cost_per_hour", n_ground * self.COST_GROUND_OP + n_forklifts * self.COST_FORKLIFT)
+        # MEJ-SLA-OPT: pedidos vencidos del trial (0 si los pedidos no traen due_time)
+        trial.set_user_attr("orders_late", metrics.get("orders_late", 0))
         
         print(f"[OPTIMIZER] Trial {trial.number} SCORE: {score:.4f}")
         print(f"  Completed: {metrics['total_workorders_completed']}/{metrics['total_workorders']}")
@@ -264,14 +272,20 @@ class SimulationOptimizer:
         
         # Penalización por órdenes fallidas
         failure_penalty = metrics["total_workorders_failed"] * self.PENALTY_FAILED_WO
-        
+
+        # MEJ-SLA-OPT: penalización por pedidos con SLA vencido (completados
+        # después de su due_time). orders_late=0 cuando ningún pedido trae
+        # due_time (o el metrics viene de una versión previa sin la clave)
+        # -> score idéntico al histórico, no-regresión.
+        late_penalty = metrics.get("orders_late", 0) * self.PENALTY_LATE_ORDER
+
         # Score final
-        denominator = total_cost_per_hour + failure_penalty
+        denominator = total_cost_per_hour + failure_penalty + late_penalty
         if denominator <= 0:
             return 0.0
-        
+
         score = throughput / denominator
-        
+
         return score
     
     def optimize(

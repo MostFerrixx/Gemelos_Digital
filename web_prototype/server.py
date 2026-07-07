@@ -49,6 +49,7 @@ class StartOptimizationRequest(BaseModel):
     cost_ground: float = 15.0
     cost_forklift: float = 50.0
     penalty_failed: float = 100.0
+    penalty_late: float = 50.0  # MEJ-SLA-OPT: $ por pedido con SLA vencido
 
 class StartExperimentRequest(BaseModel):
     """MEJ-EXP-WEB: parametros para lanzar una comparacion A/B de configs.
@@ -1183,6 +1184,7 @@ def start_optimization(request: StartOptimizationRequest):
             cost_ground=request.cost_ground,
             cost_forklift=request.cost_forklift,
             penalty_failed=request.penalty_failed,
+            penalty_late=request.penalty_late,
         )
         return {"started": True, **result}
     except RuntimeError as e:

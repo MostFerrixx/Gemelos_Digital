@@ -114,6 +114,14 @@ Examples:
         default=100.0,
         help='Penalización por WorkOrder fallida ($, default: 100.0)'
     )
+
+    parser.add_argument(
+        '--penalty-late',
+        type=float,
+        default=50.0,
+        help='MEJ-SLA-OPT: penalizacion por pedido con SLA vencido ($, default: 50.0). '
+             'Solo actua si los pedidos traen due_time (INIT-4 C2).'
+    )
     
     args = parser.parse_args()
     
@@ -129,6 +137,7 @@ Examples:
     print(f"  Cleanup:          {not args.no_cleanup}")
     print(f"  Cost config:      Ground=${args.cost_ground}/h, Forklift=${args.cost_forklift}/h")
     print(f"  Penalty failed:   ${args.penalty_failed}/WO")
+    print(f"  Penalty SLA late: ${args.penalty_late}/pedido")
     print("="*70)
     
     # Validar que config existe
@@ -144,7 +153,8 @@ Examples:
             n_parallel_jobs=args.n_jobs,
             cost_ground_operator=args.cost_ground,
             cost_forklift=args.cost_forklift,
-            penalty_failed_wo=args.penalty_failed
+            penalty_failed_wo=args.penalty_failed,
+            penalty_late_order=args.penalty_late
         )
         
         # Ejecutar optimización

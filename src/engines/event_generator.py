@@ -422,7 +422,7 @@ class EventGenerator:
             output_path: Path completo donde guardar el archivo JSON de métricas
         """
         import json
-        from core.replay_utils import build_service_level_summary
+        from core.replay_utils import build_service_level_summary, build_sla_summary
 
         # Obtener estadísticas del dispatcher
         stats = self.almacen.dispatcher.obtener_estadisticas()
@@ -447,6 +447,11 @@ class EventGenerator:
         # visor/API/Excel, no es un caso especial nuevo.
         service_level = build_service_level_summary(self.almacen)
 
+        # MEJ-SLA-OPT: cumplimiento de SLA (INIT-4b) para que el optimizador
+        # pueda penalizar configs que hacen vencer pedidos. Sin due_time en
+        # ningun pedido -> available=False y orders_late=0 (score identico).
+        sla_summary = build_sla_summary(self.almacen)
+
         # Construir objeto de métricas
         metrics = {
             "total_workorders_completed": total_completed,
@@ -461,6 +466,8 @@ class EventGenerator:
             "dispatch_strategy": dispatch_strategy,
             "fill_rate_pct": service_level.get("fill_rate_pct"),
             "service_level": service_level,
+            "orders_late": sla_summary.get("orders_late", 0),
+            "sla_summary": sla_summary,
             "timestamp": self.session_timestamp,
             "session_output_dir": self.session_output_dir
         }

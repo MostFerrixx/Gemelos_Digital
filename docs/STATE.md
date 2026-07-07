@@ -20,7 +20,7 @@
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 121 passed, 1 deselected (~8s)
+python -m pytest -q                # 124 passed, 1 deselected (~8s)
 python scripts/regression_gate.py  # GATE PASS esperado
 ```
 
@@ -37,7 +37,9 @@ python scripts/regression_gate.py  # GATE PASS esperado
   (solo si estrategia == Cercania). El warm-start se consume SIEMPRE en serie
   antes de paralelizar (bug real de perdida de trials si no).
 - INIT-1: `StochasticOrderStrategy` asigna cada WO a ubicacion REAL de su SKU.
-- `export_optimization_metrics()` expone `fill_rate_pct`/`service_level`.
+- `export_optimization_metrics()` expone `fill_rate_pct`/`service_level` y
+  `orders_late`/`sla_summary` (MEJ-SLA-OPT); el score del optimizador penaliza
+  `orders_late * PENALTY_LATE_ORDER` ($50 default, `--penalty-late` / campo web).
 - **INIT-6**: `OutboundProcess` (outbound.py) sirve UNA zona de staging por
   camion (la del pallet mas antiguo), no mezcla zonas/rutas. Pedidos en modo
   archivo (Deterministic) pueden traer `destino` (string) que se resuelve a
@@ -76,11 +78,11 @@ python scripts/regression_gate.py  # GATE PASS esperado
 
 ## Plan acordado con el Director (terna de mejoras, 2026-07-05)
 
-Orden: **(3) comparador A/B web -- HECHO** -> **(1) MEJ-BOTTLENECK -- HECHO**
-(hoja Excel "Cuellos de Botella" + panel en el visor + purga de los 3
-reportes muertos por corrida) -> **(2) MEJ-SLA-OPT** (optimizador penaliza
-SLA vencido; replanteada -- el fill-rate NO depende de la config, el SLA
-si). Detalle en `docs/BACKLOG.md`.
+**TERNA COMPLETA (2026-07-06):** (3) comparador A/B web -- HECHO -> (1)
+MEJ-BOTTLENECK -- HECHO -> (2) MEJ-SLA-OPT -- HECHO (el optimizador penaliza
+pedidos con SLA vencido via orders_late en las metricas; $50/pedido default,
+configurable en CLI y web, 0 la desactiva; sin due_time el score es identico
+al historico). Detalle en `docs/CHANGELOG.md` 2026-07-06.
 
 ## Decisiones del Director pendientes
 
@@ -93,12 +95,13 @@ si). Detalle en `docs/BACKLOG.md`.
    canonico: ¿repartir el trafico entre las 7 zonas ahora que el mecanismo
    funciona, o mantener 100% en zona 1? Es tuning de negocio, no un bug.
 
-## Siguiente prioridad (acordada)
+## Siguiente prioridad (sin decidir aun)
 
-MEJ-SLA-OPT (ultima de la terna 3->1->2). La auditoria integral pedida por
-el Director ya se ejecuto (ver CHANGELOG 2026-07-06 cont.): CI verde,
-config canonico intacto, 3 reparaciones aplicadas (limpieza de outputs por
-trial del optimizador, referencias rotas a HANDOFF, CSS duplicado).
+La terna acordada quedo completa y la auditoria integral tambien (CHANGELOG
+2026-07-06). Candidatos: INIT-3 v3 (capacidades por agente en el
+optimizador), fase de limpieza/poda (exporter V1, _with_buffer, CSS
+duplicado historico -- requiere OK del Director), o alguna de las decisiones
+pendientes de arriba.
 
 ## Bugs conocidos (no criticos)
 
