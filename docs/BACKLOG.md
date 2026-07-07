@@ -11,7 +11,6 @@ Actualizado: 2026-07-06 · Responsable: Cerebellum
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
 | Distribucion real de `outbound_staging_distribution` en config canonico | PENDIENTE DECISION | -- | Trivial (config) | Decision de negocio del Director, no un bug |
-| Poda de codigo muerto en analytics (exporter.py V1, _with_buffer) | CANDIDATO | Baja | Bajo | Fase de limpieza explicita + OK del Director (Ley #6) |
 
 ---
 
@@ -58,21 +57,6 @@ trial en vez de usar el fallback legacy (`num_operarios_terrestres`/
 `num_montacargas`), ya que la capacidad esta hardcodeada en el fallback de
 `operators.py` (150 ground / 1000 forklift, no leida de config). Cambio de
 representacion mas grande, no un fix.
-
----
-
-## Poda de codigo muerto en analytics (candidato, fase de limpieza)
-
-Detectado durante MEJ-BOTTLENECK (2026-07-06): `src/analytics/exporter.py`
-(V1 completo, 0 imports) y `exporter_v2.export_complete_analytics_with_buffer`
-(0 callers; ademas quedo desactualizado: todavia escribe los 3 archivos
-purgados del pipeline vivo). Tambien `_exportar_eventos_crudos_organizado` y
-el import de `exportar_metricas` solo los referencia ese metodo muerto.
-Sumado en la auditoria (2026-07-06): duplicacion historica del bloque
-badges + modals en `web_configurator/style.css` (~lineas 578 y 771; la copia
-del panel de optimizacion que cayo ahi ya fue deduplicada, pero la
-duplicacion de base sigue). Eliminarlos requiere fase de limpieza explicita
-con OK del Director (Ley #6).
 
 ---
 

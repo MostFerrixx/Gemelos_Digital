@@ -22,6 +22,12 @@ from datetime import datetime
 import optuna
 from optuna.samplers import TPESampler
 
+# REVIEW 2026-07-07: anclar TODO a la raiz del proyecto (antes los paths
+# relativos -- entry_points/..., temp_configs, output del trial -- solo
+# funcionaban si el CLI se lanzaba parado en la raiz; fragil). Mismo patron
+# que scripts/experiment_runner.py.
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 
 class SimulationOptimizer:
     """
@@ -76,9 +82,9 @@ class SimulationOptimizer:
         with open(base_config_path, 'r', encoding='utf-8') as f:
             self.base_config = json.load(f)
         
-        # Directorios temporales
-        self.temp_configs_dir = "temp_configs"
-        self.temp_metrics_dir = "temp_metrics"
+        # Directorios temporales (anclados a la raiz del proyecto)
+        self.temp_configs_dir = os.path.join(PROJECT_ROOT, "temp_configs")
+        self.temp_metrics_dir = os.path.join(PROJECT_ROOT, "temp_metrics")
 
         # AUDIT 2026-07-06: limpiar la carpeta output/simulation_* de cada
         # trial tras leer sus metricas (antes cada trial dejaba ~5MB de
@@ -89,7 +95,7 @@ class SimulationOptimizer:
         self.cleanup_trial_outputs = True
         
         # Directorio para configs optimizados
-        self.optimized_configs_dir = "optimized_configs"
+        self.optimized_configs_dir = os.path.join(PROJECT_ROOT, "optimized_configs")
         os.makedirs(self.optimized_configs_dir, exist_ok=True)
         
         # Timestamp para esta sesión de optimización
@@ -178,7 +184,7 @@ class SimulationOptimizer:
         
         cmd = [
             sys.executable,  # Usar el mismo intérprete Python
-            "entry_points/run_generate_replay.py",
+            os.path.join(PROJECT_ROOT, "entry_points", "run_generate_replay.py"),
             "--config", config_path,
             "--output-metrics", metrics_path
         ]
@@ -186,6 +192,7 @@ class SimulationOptimizer:
         try:
             result = subprocess.run(
                 cmd,
+                cwd=PROJECT_ROOT,  # REVIEW 2026-07-07: el motor escribe output/ relativo
                 capture_output=True,
                 text=True,
                 timeout=600  # Timeout de 10 minutos por simulación
@@ -235,6 +242,8 @@ class SimulationOptimizer:
         # viene en sus propias metricas -> sin carrera aunque n_jobs>1).
         if self.cleanup_trial_outputs:
             trial_dir = metrics.get("session_output_dir")
+            if trial_dir and not os.path.isabs(trial_dir):
+                trial_dir = os.path.join(PROJECT_ROOT, trial_dir)
             if trial_dir and os.path.basename(os.path.normpath(trial_dir)).startswith("simulation_"):
                 shutil.rmtree(trial_dir, ignore_errors=True)
 

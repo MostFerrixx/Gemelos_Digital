@@ -97,10 +97,10 @@ al historico). Detalle en `docs/CHANGELOG.md` 2026-07-06.
 
 ## Siguiente prioridad (sin decidir aun)
 
-La terna acordada quedo completa y la auditoria integral tambien (CHANGELOG
-2026-07-06). Candidatos: INIT-3 v3 (capacidades por agente en el
-optimizador), fase de limpieza/poda (exporter V1, _with_buffer, CSS
-duplicado historico -- requiere OK del Director), o alguna de las decisiones
+Terna completa + auditoria + review de codigo + 4 mejoras estructurales
+(split de server.py en routers, poda, optimizador cwd-independiente,
+arranque limpio) TODAS hechas (CHANGELOG 2026-07-07). Queda: INIT-3 v3
+(capacidades por agente en el optimizador) o alguna de las decisiones
 pendientes de arriba.
 
 ## Bugs conocidos (no criticos)

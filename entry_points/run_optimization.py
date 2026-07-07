@@ -173,9 +173,11 @@ Examples:
             return 0
         
         # Guardar mejor configuración
-        os.makedirs("optimized_configs", exist_ok=True)
+        # REVIEW 2026-07-07: usar el dir anclado a la raiz del proyecto que ya
+        # resuelve el optimizador (antes era relativo al cwd -> fragil).
+        os.makedirs(optimizer.optimized_configs_dir, exist_ok=True)
         timestamp = result.get('timestamp', datetime.now().strftime('%Y%m%d_%H%M%S'))
-        best_config_filename = os.path.join("optimized_configs", f"config_optimized_{timestamp}.json")
+        best_config_filename = os.path.join(optimizer.optimized_configs_dir, f"config_optimized_{timestamp}.json")
         
         # Cargar config base y aplicar best params
         with open(args.config, 'r', encoding='utf-8') as f:

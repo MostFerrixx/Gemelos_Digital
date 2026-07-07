@@ -10,6 +10,36 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-07 (cont. 2)
+
+- **MEJORAS ESTRUCTURALES 1-4** (las 4 oportunidades de la review,
+  aprobadas en bloque por el Director; orden de relevancia):
+  **(1) server.py partido en modulos** (`21eeb70`): el monolito de 1410
+  lineas con 6 responsabilidades quedo en `server.py` (89 lineas, solo arma
+  la app) + `app_state.py` (estado compartido) + `routers/` (configurator,
+  replay, runners, system). Cuerpos extraidos VERBATIM; verificado route set
+  identico (33 rutas, diff antes/despues) + smoke completo en servidor real.
+  Incluyo de paso: **(4) arranque limpio** (replay_data ya no apunta a un
+  replay hardcodeado inexistente de nov-2025; arranca vacio a proposito),
+  el mismo `pass` muerto de traversal en validate-replay (tercera instancia
+  de esa clase), y basename() en upload-orders.
+  **(2) Poda de codigo muerto** (`7559403`): eliminados
+  `src/analytics/exporter.py` (V1) -- el gate ATRAPO un import relativo en
+  `analytics/__init__.py` que el grep inicial no vio, corregido --,
+  `export_complete_analytics_with_buffer` + `_exportar_eventos_crudos_organizado`
+  (0 callers), 22 selectores CSS con cuerpo identico duplicado en el
+  configurador (los 4 con cuerpos DIFERENTES se dejaron: la cascada hace
+  efectivo al ultimo), y los backups `style_original.css` (trackeado) /
+  `style.css.backup`. Neto: ~-1200 lineas. Estilos verificados en navegador
+  (badge/modal/toast).
+  **(3) Optimizador independiente del cwd**: `optimizer.py` y
+  `run_optimization.py` anclados a PROJECT_ROOT (entry point, temp dirs,
+  optimized_configs, cwd del subprocess, cleanup del trial). Validado
+  corriendo el CLI desde C:/Users/ferri: config optimizado aterrizo en el
+  proyecto, cero basura en el cwd ajeno, limpieza de trials intacta.
+  Suite: 125 passed. Gate PASS byte-identico tras cada fase.
+
+
 ## 2026-07-07 (cont.)
 
 - **REVIEW 2 — segunda pasada de revision + prueba de integracion total**
