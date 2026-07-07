@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Optional
 
 from engines.analytics_engine import AnalyticsEngine
-from subsystems.utils.helpers import exportar_metricas, mostrar_metricas_consola
+from subsystems.utils.helpers import mostrar_metricas_consola
 from .context import SimulationContext, ExportResult
 
 
@@ -329,159 +329,9 @@ class AnalyticsExporter:
         except Exception as e:
             print(f"[1/2] WARNING: no se pudo anexar hoja de cuellos de botella: {e}")
 
-    def export_complete_analytics_with_buffer(self, buffer_eventos=None) -> ExportResult:
-        """
-        Pipeline completo con buffer especifico - Version mejorada con ExportResult.
-
-        Args:
-            buffer_eventos: Buffer de eventos especifico (heredado de V1, no usado)
-
-        Returns:
-            ExportResult: Resultado detallado de la exportacion
-        """
-        start_time = time.time()
-        result = ExportResult()
-
-        # Configurar metadatos
-        result.export_metadata = self.context.get_export_metadata()
-        result.export_metadata['buffer_mode'] = True
-        result.rollback_info['output_dir'] = self.context.session_output_dir
-
-        print("\n" + "="*70)
-        print("SIMULACION COMPLETADA - INICIANDO PIPELINE DE ANALITICAS V2 (WITH BUFFER)")
-        print("="*70)
-
-        if not self.context.almacen:
-            result.add_error("No hay datos del almacen para procesar")
-            return result
-
-        try:
-            # Mostrar metricas basicas
-            mostrar_metricas_consola(self.context.almacen)
-
-            # UNIFIED: Use session timestamp and output dir from context
-            timestamp = self.context.session_timestamp
-            output_dir = self.context.session_output_dir
-
-            try:
-                os.makedirs(output_dir, exist_ok=True)
-                print(f"[SETUP] Directorio de salida creado: {output_dir}")
-            except Exception as e:
-                result.add_warning(f"No se pudo crear directorio de salida: {e}")
-                output_dir = "."
-                result.rollback_info['output_dir'] = output_dir
-
-            # Mismo pipeline que export_complete_analytics
-            # 1. Exportar metricas JSON basicas
-            try:
-                archivo_json = os.path.join(output_dir, f"simulacion_completada_{timestamp}.json")
-                exportar_metricas(self.context.almacen, archivo_json)
-                result.add_file(archivo_json)
-                print(f"[1/4] Metricas JSON guardadas: {archivo_json}")
-            except Exception as e:
-                result.add_error(f"Error exportando metricas JSON: {e}")
-
-            # 2. Exportar eventos crudos
-            try:
-                archivo_eventos = self._exportar_eventos_crudos_organizado(output_dir, timestamp)
-                if archivo_eventos:
-                    result.add_file(archivo_eventos)
-                    print(f"[2/4] Eventos detallados guardados: {archivo_eventos}")
-            except Exception as e:
-                result.add_error(f"Error exportando eventos crudos: {e}")
-
-            # 3. PIPELINE AUTOMATIZADO: AnalyticsEngine -> Excel
-            print("[3/4] Simulacion completada. Generando reporte de Excel...")
-            try:
-                analytics_engine = AnalyticsEngine(self.context.event_log, self.context.configuracion)
-                analytics_engine.process_events()
-
-                excel_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.xlsx")
-                archivo_excel = analytics_engine.export_to_excel(excel_filename)
-
-                # Generar archivo JSON con la misma información
-                json_filename = os.path.join(output_dir, f"simulation_report_{timestamp}.json")
-                archivo_json = analytics_engine.export_to_json(json_filename)
-
-                if archivo_excel:
-                    result.add_file(archivo_excel)
-                    print(f"[3/4] Reporte de Excel generado: {archivo_excel}")
-                    # INIT-5: anexar hoja 'Nivel de servicio' (backorders) al reporte.
-                    self._append_service_level_sheet(archivo_excel)
-                    # INIT-4b: anexar hoja 'Cumplimiento SLA' (due_time) al reporte.
-                    self._append_sla_summary_sheet(archivo_excel)
-
-                if archivo_json:
-                    result.add_file(archivo_json)
-                    print(f"[3/4] Reporte de JSON generado: {archivo_json}")
-
-                    # 4. PIPELINE AUTOMATIZADO: Visualizer -> PNG
-                    print("[4/4] Reporte de Excel generado. Creando imagen de heatmap...")
-                    try:
-                        png_file = self._ejecutar_visualizador(archivo_excel, timestamp, output_dir)
-                        if png_file:
-                            result.add_file(png_file)
-                    except Exception as e:
-                        result.add_warning(f"Error generando heatmap PNG: {e}")
-                else:
-                    result.add_error("No se pudo generar el reporte de Excel")
-
-            except Exception as e:
-                result.add_error(f"Error en pipeline de analiticas: {e}")
-
-            # Timing final
-            end_time = time.time()
-            result.set_execution_time(start_time, end_time)
-
-            # Resumen final
-            print("\n" + "="*70)
-            print("PROCESO COMPLETADO V2 (WITH BUFFER)")
-            print("="*70)
-            print(result.get_summary())
-            print("="*70)
-
-            return result
-
-        except Exception as e:
-            # Error critico - rollback automatico
-            result.add_error(f"Error critico en exportacion with buffer: {e}")
-            result.set_execution_time(start_time, time.time())
-
-            print(f"[ROLLBACK] Error critico detectado: {e}")
-            if result.rollback_on_failure():
-                print("[ROLLBACK] Rollback completado exitosamente")
-            else:
-                print("[ROLLBACK] Rollback tuvo problemas - verificar manualmente")
-
-            return result
-
-    def _exportar_eventos_crudos_organizado(self, output_dir: str, timestamp: str) -> Optional[str]:
-        """
-        Exporta eventos crudos a directorio organizado.
-
-        Version mejorada con mejor error handling.
-
-        Args:
-            output_dir: Directorio de salida
-            timestamp: Timestamp para nombre de archivo
-
-        Returns:
-            Optional[str]: Path del archivo generado o None si falla
-        """
-        filename = os.path.join(output_dir, f"raw_events_{timestamp}.json")
-
-        try:
-            if not self.context.event_log:
-                print("[ANALYTICS V2] Warning: No hay eventos para exportar")
-                return None
-
-            with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(self.context.event_log, f, indent=2, ensure_ascii=False)
-            print(f"[ANALYTICS V2] Eventos exportados a: {filename} ({len(self.context.event_log)} eventos)")
-            return filename
-        except Exception as e:
-            print(f"[ANALYTICS V2] Error exportando eventos: {e}")
-            return None
+    # (PODA 2026-07-07: aqui vivian export_complete_analytics_with_buffer y
+    #  _exportar_eventos_crudos_organizado -- 0 callers, y ademas escribian los
+    #  3 archivos ya purgados del pipeline vivo. Ver docs/CHANGELOG.md.)
 
     def _ejecutar_visualizador(self, excel_path: str, timestamp: str, output_dir: str) -> Optional[str]:
         """
