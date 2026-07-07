@@ -8,9 +8,8 @@
 
 ## Git
 
-- `main` = pendiente del commit del cierre de la auditoria (el de
-  MEJ-BOTTLENECK ya esta pusheado: `539de20`). Push directo a main
-  autorizado por el Director.
+- `main` = `6f7ce86`. Working tree limpio. Sin ramas feature pendientes de
+  merge. Push directo a main autorizado por el Director.
 - Baseline byte-identico vigente: `sha256=71fc9904141ddc73...`, 4.920.352 bytes,
   seed 42, Python 3.13.6 (`tests/baseline.json`). Actualizado en
   MEJ-BOTTLENECK: SOLO metadata nueva (`bottleneck_summary`) -- eventos
