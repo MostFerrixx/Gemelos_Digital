@@ -8,8 +8,7 @@
 
 ## Git
 
-- `main` = pendiente del commit del cierre de la review. Working tree limpio
-  salvo eso. Sin ramas feature pendientes de
+- `main` = `b197f87`. Working tree limpio. Sin ramas feature pendientes de
   merge. Push directo a main autorizado por el Director.
 - Baseline byte-identico vigente: `sha256=71fc9904141ddc73...`, 4.920.352 bytes,
   seed 42, Python 3.13.6 (`tests/baseline.json`). Actualizado en
