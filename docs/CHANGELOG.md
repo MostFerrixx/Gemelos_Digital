@@ -10,6 +10,27 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-07 (cont.)
+
+- **REVIEW 2 — segunda pasada de revision + prueba de integracion total**
+  (pedida por el Director). **Prueba de integracion**: una sola corrida
+  combinando TODO lo de la sesion (24 pedidos con destino + due_time, 4 con
+  SLA imposible, destino_staging_map a zonas 1/4/6, outbound activo) --
+  camiones respetaron exactamente las 3 zonas mapeadas, sla_summary reporto
+  exactamente los 4 vencidos, fill 100%, bottleneck con ocupacion pico solo
+  en 1/4/6, las 3 hojas nuevas en el Excel, orders_late=4 en las metricas
+  del optimizador. Recarga de replay viejo (sin metadata nueva) resetea los
+  3 summaries a None (sin datos pegados). **2 hallazgos reparados**:
+  (1) el chequeo de path traversal de `/api/load_replay` era un `pass`
+  (codigo muerto que aparentaba validar) -- ahora valida el path RESUELTO
+  contra PROJECT_ROOT; verificado en vivo (`../evil.jsonl` -> 400, path
+  legitimo pasa). (2) `/api/upload_replay` usaba `file.filename` crudo en el
+  path -- un nombre con separadores (`a/../../x.jsonl`) escapaba de
+  `uploads/`; fix con `os.path.basename`. **Verificado sin reparar**:
+  `reload_data` resetea correctamente los summaries; `TMX_PATH` (arbol
+  `data/` muerto) es solo un candidato de compatibilidad en una cadena de
+  fallbacks sana. Suite: 125 passed. Gate PASS.
+
 ## 2026-07-07
 
 - **REVIEW — revision de codigo de las funcionalidades recientes** (pedida

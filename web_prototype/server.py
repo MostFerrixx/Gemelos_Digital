@@ -1079,7 +1079,9 @@ async def upload_replay_file(file: UploadFile = File(...)):
         os.makedirs(uploads_dir, exist_ok=True)
         
         # Save file to uploads directory
-        file_path = os.path.join(uploads_dir, f"uploaded_{file.filename}")
+        # REVIEW 2026-07-07: basename() -- un filename artesanal con
+        # separadores (a/../../x.jsonl) escapaba de uploads/.
+        file_path = os.path.join(uploads_dir, f"uploaded_{os.path.basename(file.filename)}")
         
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -1306,16 +1308,18 @@ def validate_replay_file(file: str):
 @app.post("/api/load_replay")
 def load_replay_file(file: str):
     """Load an existing replay file from the server"""
-    # Security check: prevent path traversal
-    if ".." in file or file.startswith("/") or file.startswith("\\"):
-         # Allow relative paths but ensure they are within project root
-         pass
-         
-    file_path = os.path.join(PROJECT_ROOT, file)
-    
+    # REVIEW 2026-07-07: el chequeo de path traversal anterior era un `pass`
+    # (codigo muerto que aparentaba validar). Validacion real: el path
+    # RESUELTO debe quedar dentro de PROJECT_ROOT.
+    file_path = os.path.realpath(os.path.join(PROJECT_ROOT, file))
+    root = os.path.realpath(PROJECT_ROOT)
+    if not file_path.startswith(root + os.sep):
+        raise HTTPException(status_code=400,
+                            detail="Path fuera del proyecto (path traversal bloqueado)")
+
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Replay file not found")
-    
+
     if not file.endswith('.jsonl'):
         raise HTTPException(status_code=400, detail="Invalid file format")
         
