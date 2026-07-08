@@ -1,0 +1,53 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "description": "ASN de prueba INIT-7: 5 camiones de recepcion sobre SKUs reales del Excel canonico",
+    "created_at": "2026-07-08"
+  },
+  "trucks": [
+    {
+      "truck_id": "IN-001",
+      "arrival_time": 300,
+      "dock_id": 1,
+      "lines": [
+        { "sku_id": "SKU029", "quantity": 24 },
+        { "sku_id": "SKU046", "quantity": 12 }
+      ]
+    },
+    {
+      "truck_id": "IN-002",
+      "arrival_time": 900,
+      "dock_id": 2,
+      "lines": [
+        { "sku_id": "SKU015", "quantity": 30 },
+        { "sku_id": "SKU039", "quantity": 18 },
+        { "sku_id": "SKU012", "quantity": 6 }
+      ]
+    },
+    {
+      "truck_id": "IN-003",
+      "arrival_time": 1800,
+      "dock_id": 3,
+      "lines": [
+        { "sku_id": "SKU023", "quantity": 40 }
+      ]
+    },
+    {
+      "truck_id": "IN-004",
+      "arrival_time": 2700,
+      "lines": [
+        { "sku_id": "SKU009", "quantity": 15 },
+        { "sku_id": "SKU024", "quantity": 15 }
+      ]
+    },
+    {
+      "truck_id": "IN-005",
+      "arrival_time": 3600,
+      "dock_id": 1,
+      "lines": [
+        { "sku_id": "SKU016", "quantity": 20 },
+        { "sku_id": "SKU050", "quantity": 10 }
+      ]
+    }
+  ]
+}

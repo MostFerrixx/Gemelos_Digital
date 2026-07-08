@@ -10,6 +10,26 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-08
+
+- **INIT-7 F0 — INBOUND, dominio y datos.** Arranca la iniciativa de
+  recepcion/putaway (plan completo y 4 decisiones del Director en
+  `docs/PLAN_INIT7_INBOUND.md`). Entregado: hoja `InboundDocks` en el Excel
+  canonico (3 muelles fila superior: (3,1),(15,1),(27,1)); tabla
+  `inbound_docks` propia (NO `staging_areas`: su PK simple haria que un dock
+  INBOUND id=1 pisara la zona OUTBOUND id=1) con create-if-missing para DBs
+  viejas; importer + loaders en data_manager (DB y fallback Excel, sin
+  defaults: inbound es opt-in) + validacion de bounds; bloque `inbound` en
+  `config_schema` (enabled/arrival_mode/asn_file_path/truck_interval/
+  pallets_per_truck/unload_time_per_pallet/slotting_strategy); ASN de
+  ejemplo `layouts/Inbound Test.json` (5 camiones, SKUs reales, dock_id
+  opcional). 9 tests nuevos (IN-01..09). Motor NO lee nada de esto todavia:
+  GATE PASS byte-identico sin update. Hallazgo clave de la investigacion:
+  las olas de INIT-4 permiten pre-generar WOs de putaway con release=arrival
+  (sin inyeccion dinamica); el tileset ya tenia tipo `inbound` (gid 6).
+
+---
+
 ## 2026-07-07 (cont. 2)
 
 - **MEJORAS ESTRUCTURALES 1-4** (las 4 oportunidades de la review,

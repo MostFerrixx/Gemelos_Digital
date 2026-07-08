@@ -98,6 +98,24 @@ class OutboundConfig(BaseModel):
     dwell_scaffold: Optional[float] = None
 
 
+class InboundConfig(BaseModel):
+    """
+    Bloque 'inbound' (INIT-7: recepcion y putaway). Opt-in: NO esta en el
+    canonico; bloque ausente o enabled=false => comportamiento historico
+    byte-identico. Lectores: F1 InboundProcess (llegadas), F2 putaway,
+    F3 slotting. En F0 solo existe el contrato.
+    """
+    model_config = ConfigDict(extra="allow")
+    enabled: Optional[bool] = None
+    arrival_mode: Optional[str] = None       # deterministic | stochastic
+    asn_file_path: Optional[str] = None      # modo deterministic
+    truck_interval: Optional[float] = None   # modo stochastic (segundos)
+    pallets_per_truck: Optional[int] = None  # modo stochastic
+    unload_time_per_pallet: Optional[float] = None
+    # fija_por_sku | cercana_al_muelle | abc_rotacion (F3)
+    slotting_strategy: Optional[str] = None
+
+
 class WavesConfig(BaseModel):
     """INIT-4 C3: olas por release diferido (opt-in)."""
     model_config = ConfigDict(extra="allow")
@@ -166,6 +184,9 @@ class WarehouseConfig(BaseModel):
     # INIT-6 Opcion B: destino de negocio -> staging_id (warehouse._resolver_staging_id)
     destino_staging_map: Optional[Dict[str, int]] = None
 
+    # --- Inbound (INIT-7, opt-in; lectores en F1/F2/F3) ---
+    inbound: Optional[InboundConfig] = None
+
     # --- Congestion (Iniciativa 2, ACTIVA) ---
     congestion: Optional[CongestionConfig] = None
 
@@ -221,7 +242,7 @@ def validate_config_schema(config: Dict[str, Any]) -> Tuple[List[str], List[str]
         if model.congestion.timewindow is not None:
             for key in _extras_of(model.congestion.timewindow):
                 warnings.append("clave DESCONOCIDA: 'congestion.timewindow.%s'" % key)
-    for block_name in ("outbound", "tiempos", "waves"):
+    for block_name in ("outbound", "tiempos", "waves", "inbound"):
         block = getattr(model, block_name)
         if block is not None:
             for key in _extras_of(block):

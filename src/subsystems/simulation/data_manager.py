@@ -79,6 +79,9 @@ class DataManager:
         self.outbound_staging_locations: Dict[int, Tuple[int, int]] = {}
         # INICIATIVA #3: celdas COMPLETAS de cada zona de staging (varias por id).
         self.outbound_staging_zone_cells: Dict[int, List[Tuple[int, int]]] = {}
+        # INIT-7 F0: muelles de recepcion (dock_id -> ancla). Vacio si el
+        # Excel/DB no los define; el motor no los usa hasta F1 (inbound off).
+        self.inbound_dock_locations: Dict[int, Tuple[int, int]] = {}
         self.sku_catalog: Dict[str, Dict[str, Any]] = {}  # NEW: SKU catalog cache
 
         # Load data from SQLite (preferred) or Excel (fallback)
@@ -150,6 +153,14 @@ class DataManager:
         if getattr(self, 'outbound_staging_zone_cells', None):
             return self.outbound_staging_zone_cells
         return {sid: [cell] for sid, cell in self.outbound_staging_locations.items()}
+
+    def get_inbound_dock_locations(self) -> Dict[int, Tuple[int, int]]:
+        """
+        INIT-7 F0: dict {dock_id: (x, y)} de muelles de recepcion.
+        Vacio si la hoja 'InboundDocks' / tabla inbound_docks no existe
+        (inbound deshabilitado): NO se generan defaults.
+        """
+        return self.inbound_dock_locations
 
     def get_layout_manager(self) -> LayoutManager:
         """
@@ -238,13 +249,17 @@ class DataManager:
             
             # Load staging areas
             self._load_staging_areas_from_db(conn)
-            
+
+            # INIT-7 F0: inbound docks (opcional)
+            self._load_inbound_docks_from_db(conn)
+
             conn.close()
-            
+
             print(f"[DATA-MANAGER] SQLite loading complete:")
             print(f"  - SKUs loaded: {len(self.sku_catalog)}")
             print(f"  - Picking locations: {len(self.puntos_de_picking_ordenados)}")
             print(f"  - Staging areas: {len(self.outbound_staging_locations)}")
+            print(f"  - Inbound docks: {len(self.inbound_dock_locations)}")
             
         except sqlite3.Error as e:
             conn.close() if 'conn' in locals() else None
@@ -349,6 +364,24 @@ class DataManager:
             print("[DATA-MANAGER] No staging areas in DB, generating defaults")
             self._generate_default_staging_locations()
 
+    def _load_inbound_docks_from_db(self, conn: sqlite3.Connection):
+        """
+        INIT-7 F0: load inbound docks from database (OPTIONAL).
+        DBs creadas antes del cambio de schema no tienen la tabla: se deja
+        vacio SIN error (inbound es opt-in, no hay defaults).
+        """
+        try:
+            cursor = conn.execute("SELECT dock_id, x, y FROM inbound_docks")
+        except sqlite3.OperationalError:
+            print("[DATA-MANAGER] Tabla inbound_docks no existe (DB anterior "
+                  "a INIT-7) - sin muelles de recepcion")
+            return
+
+        for row in cursor:
+            dock_id = row['dock_id']
+            if dock_id and dock_id > 0:
+                self.inbound_dock_locations[dock_id] = (row['x'] or 0, row['y'] or 0)
+
     # ========================================================================
     # PRIVATE METHODS - Excel Data Loading (Legacy Fallback)
     # ========================================================================
@@ -396,6 +429,11 @@ class DataManager:
             print("[DATA-MANAGER WARNING] Sheet 'OutboundStaging' not found - "
                   "generating default staging locations")
             self._generate_default_staging_locations()
+
+        # Process InboundDocks sheet (OPTIONAL, INIT-7 F0: sin defaults)
+        if 'InboundDocks' in workbook.sheetnames:
+            sheet = workbook['InboundDocks']
+            self._process_inbound_docks(sheet)
 
         workbook.close()
         
@@ -565,6 +603,57 @@ class DataManager:
               f"{len(staging_dict)} registros")
         print(f"[DATA-MANAGER] OutboundStaging procesado: {staging_dict}")
 
+    def _process_inbound_docks(self, sheet):
+        """
+        INIT-7 F0: Process InboundDocks sheet from Excel (fallback sin DB).
+
+        Expected columns:
+        - dock_id: Unique identifier (integer)
+        - x: Grid X coordinate
+        - y: Grid Y coordinate
+
+        Args:
+            sheet: openpyxl worksheet object
+        """
+        # Find header row
+        header_row = None
+        for idx, row in enumerate(sheet.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
+            if row and any('dock' in str(cell).lower() for cell in row if cell):
+                header_row = idx
+                break
+
+        if not header_row:
+            header_row = 1
+
+        headers = [cell.value for cell in sheet[header_row]]
+
+        dock_dict = {}
+        for row in sheet.iter_rows(min_row=header_row + 1, values_only=True):
+            if not row or not row[0]:
+                continue
+
+            row_dict = {}
+            for idx, header in enumerate(headers):
+                if header and idx < len(row):
+                    row_dict[header] = row[idx]
+
+            try:
+                dock_id = int(row_dict.get('dock_id', 0))
+                x = int(row_dict.get('x', 0))
+                y = int(row_dict.get('y', 0))
+
+                if dock_id > 0:
+                    dock_dict[dock_id] = (x, y)
+
+            except (ValueError, TypeError, KeyError) as e:
+                print(f"[DATA-MANAGER WARNING] Skipping invalid dock row: {row_dict} - {e}")
+                continue
+
+        self.inbound_dock_locations = dock_dict
+
+        print(f"[DATA-MANAGER] Hoja 'InboundDocks' cargada con "
+              f"{len(dock_dict)} muelles: {dock_dict}")
+
     def _generate_default_staging_locations(self):
         """
         Generate default staging locations if OutboundStaging sheet is missing
@@ -631,9 +720,23 @@ class DataManager:
                 f"Valid grid range: 0-{grid_w-1} x 0-{grid_h-1}"
             )
 
+        # INIT-7 F0: validate inbound docks (CRITICAL if present)
+        invalid_docks = []
+        for dock_id, (x, y) in self.inbound_dock_locations.items():
+            if not (0 <= x < grid_w and 0 <= y < grid_h):
+                invalid_docks.append((dock_id, x, y))
+
+        if invalid_docks:
+            raise DataManagerError(
+                f"Inbound docks out of bounds: {invalid_docks}. "
+                f"Valid grid range: 0-{grid_w-1} x 0-{grid_h-1}"
+            )
+
         print(f"[DATA-MANAGER] Validacion completada:")
         print(f"  - {len(self.puntos_de_picking_ordenados)} picking points validados")
         print(f"  - {len(self.outbound_staging_locations)} staging areas validadas")
+        if self.inbound_dock_locations:
+            print(f"  - {len(self.inbound_dock_locations)} inbound docks validados")
         print(f"  - {len(self.sku_catalog)} SKUs en catalogo")
         print(f"  - Grid bounds: {grid_w}x{grid_h}")
 
