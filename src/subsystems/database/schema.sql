@@ -97,6 +97,17 @@ CREATE TABLE IF NOT EXISTS staging_areas (
 );
 
 -- ================================================================
+-- INBOUND DOCKS (INIT-7 F0: muelles de recepcion)
+-- Tabla propia (no staging_areas): staging_areas tiene PK simple staging_id
+-- y una fila INBOUND id=1 pisaria la zona OUTBOUND id=1.
+-- ================================================================
+CREATE TABLE IF NOT EXISTS inbound_docks (
+    dock_id INTEGER PRIMARY KEY,                  -- e.g., 1, 2, 3...
+    x INTEGER NOT NULL,
+    y INTEGER NOT NULL
+);
+
+-- ================================================================
 -- PERFORMANCE INDICES
 -- ================================================================
 CREATE INDEX IF NOT EXISTS idx_locations_type ON locations(location_type);

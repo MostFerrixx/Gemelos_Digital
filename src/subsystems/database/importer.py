@@ -33,6 +33,7 @@ class ImportResult:
     locations_imported: int = 0
     inventory_imported: int = 0
     staging_imported: int = 0
+    inbound_docks_imported: int = 0
     warnings: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
     
@@ -53,7 +54,8 @@ class ExcelImporter:
     - Sheet 'PickingLocations': x, y, pick_sequence, equipment_required, 
                                  sku_initial, qty_initial, WorkGroup, WorkArea
     - Sheet 'OutboundStaging' (optional): staging_id, x, y
-    
+    - Sheet 'InboundDocks' (optional, INIT-7 F0): dock_id, x, y
+
     The importer generates location_ids based on pick_sequence if not provided.
     """
     
@@ -117,7 +119,15 @@ class ExcelImporter:
                     self._import_staging_areas(sheet, conn, result)
                 else:
                     result.add_warning("Sheet 'OutboundStaging' not found - skipping")
-                
+
+                # Process InboundDocks sheet (optional, INIT-7 F0)
+                if 'InboundDocks' in workbook.sheetnames:
+                    sheet = workbook['InboundDocks']
+                    self._import_inbound_docks(sheet, conn, result)
+                else:
+                    result.add_warning("Sheet 'InboundDocks' not found - skipping "
+                                       "(sin muelles de recepcion)")
+
                 result.success = len(result.errors) == 0
                 
         except Exception as e:
@@ -140,6 +150,21 @@ class ExcelImporter:
         conn.execute("DELETE FROM locations")
         conn.execute("DELETE FROM sku_catalog")
         conn.execute("DELETE FROM staging_areas")
+        # INIT-7 F0: tabla nueva -- crearla si la DB es anterior al schema
+        self._ensure_inbound_docks_table(conn)
+        conn.execute("DELETE FROM inbound_docks")
+
+    @staticmethod
+    def _ensure_inbound_docks_table(conn: sqlite3.Connection):
+        """INIT-7 F0: la tabla puede no existir en DBs creadas antes del cambio
+        de schema (initialize_schema solo corre si schema_version == 0)."""
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS inbound_docks (
+                dock_id INTEGER PRIMARY KEY,
+                x INTEGER NOT NULL,
+                y INTEGER NOT NULL
+            )
+        """)
     
     def _find_header_row(self, sheet, marker_column: str, 
                          max_rows: int = 10) -> Optional[int]:
@@ -344,7 +369,49 @@ class ExcelImporter:
         
         result.staging_imported = count
         print(f"[IMPORTER] Imported {count} staging areas")
-    
+
+    def _import_inbound_docks(self, sheet, conn: sqlite3.Connection,
+                              result: ImportResult):
+        """
+        INIT-7 F0: Import InboundDocks sheet (muelles de recepcion).
+
+        Expected columns: dock_id, x, y
+        """
+        print("[IMPORTER] Processing 'InboundDocks' sheet...")
+
+        self._ensure_inbound_docks_table(conn)
+
+        header_row = self._find_header_row(sheet, 'dock_id')
+        if not header_row:
+            header_row = 1  # Assume first row is header
+
+        headers = self._get_headers(sheet, header_row)
+        count = 0
+
+        for row in sheet.iter_rows(min_row=header_row + 1, values_only=True):
+            if not row or not row[0]:
+                continue
+
+            data = self._row_to_dict(row, headers)
+
+            try:
+                dock_id = self._safe_int(data.get('dock_id'), 0)
+                x = self._safe_int(data.get('x'), 0)
+                y = self._safe_int(data.get('y'), 0)
+
+                if dock_id > 0:
+                    conn.execute("""
+                        INSERT OR REPLACE INTO inbound_docks (dock_id, x, y)
+                        VALUES (?, ?, ?)
+                    """, (dock_id, x, y))
+                    count += 1
+
+            except Exception as e:
+                result.add_warning(f"Skipping inbound dock row: {data} - {e}")
+
+        result.inbound_docks_imported = count
+        print(f"[IMPORTER] Imported {count} inbound docks")
+
     @staticmethod
     def _safe_int(value, default: int = 0) -> int:
         """Safely convert value to int."""
@@ -365,6 +432,7 @@ class ExcelImporter:
         print(f"  Locations imported: {result.locations_imported}")
         print(f"  Inventory records: {result.inventory_imported}")
         print(f"  Staging areas: {result.staging_imported}")
+        print(f"  Inbound docks: {result.inbound_docks_imported}")
         print(f"  Warnings: {len(result.warnings)}")
         print(f"  Errors: {len(result.errors)}")
         print("=" * 50 + "\n")
