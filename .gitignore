@@ -633,3 +633,4 @@ LIMPIAR_TEMPORALES.bat
 # de debug sueltos en la raiz, no para la suite oficial de tests/.
 !tests/test_*.py
 !tests/unit/test_*.py
+temp_web/

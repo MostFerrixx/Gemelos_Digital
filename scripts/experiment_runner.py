@@ -38,6 +38,30 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 ENTRY_POINT = os.path.join(PROJECT_ROOT, "entry_points", "run_generate_replay.py")
 TIMEOUT_SECONDS = 600
 
+# DISK 2026-07-07: los temporales van a una carpeta del PROYECTO (disco D,
+# gitignoreada), NO a %TEMP% (disco C) -- el Director reporto saturacion de C
+# y estos archivos quedaban huerfanos ante crash/stop (taskkill). purge_stale
+# borra los que tengan mas de 1 dia al arrancar cualquier corrida.
+TEMP_WEB_DIR = os.path.join(PROJECT_ROOT, "temp_web")
+
+
+def purge_stale_temp(max_age_hours=24):
+    """Borra archivos de temp_web/ con mas de max_age_hours (huerfanos de
+    corridas crasheadas/detenidas). Silencioso e inofensivo si no existe."""
+    try:
+        if not os.path.isdir(TEMP_WEB_DIR):
+            return
+        cutoff = time.time() - max_age_hours * 3600
+        for name in os.listdir(TEMP_WEB_DIR):
+            p = os.path.join(TEMP_WEB_DIR, name)
+            try:
+                if os.path.isfile(p) and os.path.getmtime(p) < cutoff:
+                    os.remove(p)
+            except OSError:
+                pass
+    except OSError:
+        pass
+
 # KPIs leidos directamente de export_optimization_metrics() (event_generator.py).
 # "throughput_wo_per_s" es derivado (completadas / tiempo de sim).
 RAW_KPI_KEYS = [
@@ -61,7 +85,10 @@ def run_one_replica(config_path, seed, keep_output=False):
     env["WAREHOUSE_SEED"] = str(seed)
     env["PYTHONUNBUFFERED"] = "1"
 
-    fd, metrics_path = tempfile.mkstemp(prefix="experiment_metrics_", suffix=".json")
+    os.makedirs(TEMP_WEB_DIR, exist_ok=True)
+    purge_stale_temp()
+    fd, metrics_path = tempfile.mkstemp(prefix="experiment_metrics_", suffix=".json",
+                                        dir=TEMP_WEB_DIR)
     os.close(fd)
     os.remove(metrics_path)  # el motor lo crea; solo reservamos el nombre
 

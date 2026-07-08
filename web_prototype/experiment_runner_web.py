@@ -50,7 +50,17 @@ class ExperimentWebRunner:
             raise RuntimeError(
                 "Ya hay un experimento en curso. Espera a que termine o cancelalo primero.")
 
-        fd, progress_path = tempfile.mkstemp(prefix="experiment_web_", suffix=".json")
+        # DISK 2026-07-07: temp del PROYECTO (D), no %TEMP% (C); y borrar el
+        # progress del experimento anterior (antes se acumulaban para siempre).
+        temp_dir = os.path.join(self.PROJECT_ROOT, "temp_web")
+        os.makedirs(temp_dir, exist_ok=True)
+        if self._progress_path and os.path.exists(self._progress_path):
+            try:
+                os.remove(self._progress_path)
+            except OSError:
+                pass
+        fd, progress_path = tempfile.mkstemp(prefix="experiment_web_", suffix=".json",
+                                             dir=temp_dir)
         os.close(fd)
 
         cmd = [

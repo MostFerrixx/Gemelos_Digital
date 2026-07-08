@@ -163,7 +163,11 @@ def _materialize_experiment_config(selector: str) -> tuple:
             name = meta.get("name", selector)
             break
 
-    fd, path = _tempfile.mkstemp(prefix="experiment_config_", suffix=".json")
+    # DISK 2026-07-07: temp del PROYECTO (D), no %TEMP% (C). La purga de
+    # viejos la hace experiment_runner.purge_stale_temp en cada corrida.
+    temp_dir = os.path.join(PROJECT_ROOT, "temp_web")
+    os.makedirs(temp_dir, exist_ok=True)
+    fd, path = _tempfile.mkstemp(prefix="experiment_config_", suffix=".json", dir=temp_dir)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
     return path, name
