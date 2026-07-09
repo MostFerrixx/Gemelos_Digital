@@ -8,20 +8,19 @@
 
 ## Git
 
-- `main` = `72360b2` (merge F1) + INIT-7 F2 (rama `feature/init7-inbound-f0`,
+- `main` = `b495c24` (merge F2) + INIT-7 F3 (rama `feature/init7-inbound-f0`,
   a mergear y pushear al cierre). Push directo a main autorizado.
 - Baseline byte-identico vigente: `sha256=71fc9904141ddc73...`, 4.920.352
-  bytes, seed 42, Python 3.13.6 (`tests/baseline.json`). INIT-7 F0/F1/F2 NO
+  bytes, seed 42, Python 3.13.6 (`tests/baseline.json`). INIT-7 F0-F3 NO
   lo tocaron (GATE PASS sin update: inbound off/ausente en el canonico).
-  Determinismo con inbound ON tambien verificado (2 corridas seed 42 ->
-  sha256 identico).
+  Determinismo con inbound ON tambien verificado.
 - REGLA pinneada por test BN-05: la metadata del .jsonl NO puede contener
   valores wall-clock (rompe el determinismo del gate).
 
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 147 passed, 1 deselected (~10s)
+python -m pytest -q                # 153 passed, 1 deselected (~8s)
 python scripts/regression_gate.py  # GATE PASS esperado
 ```
 
@@ -40,19 +39,24 @@ Plan completo + 4 decisiones del Director (2026-07-08):
   (`InboundProcess`, `InboundDock`=simpy.Resource, `InboundPallet`,
   `load_asn_trucks`); integracion en warehouse.py + event_generator.py;
   eventos inbound_* al .jsonl + marcador verde en el visor; tests IN-10..16.
-- **F2 HECHO (2026-07-09):** putaway completo — WOs pre-generadas en t=0
-  (agenda ASN o stochastic pre-muestreado), elegibles al aterrizar su pallet
-  (`marcar_pallet_listo`), cola propia en dispatcher (picks primero, putaway
-  de relleno), `_execute_putaway_tour` en operators (muelle -> destino,
-  1 pallet/viaje, filtro de equipamiento por work_area del destino),
-  slotting `fija_por_sku`, stock real via `data_manager.add_stock`, eventos
-  con `dock_to_stock`. Tests IN-20..25. Smoke: 10/10 pallets guardados.
-  Decisiones tecnicas completas en `docs/PLAN_INIT7_INBOUND.md`.
-- **Proxima fase: F3 (slotting conmutable)** — `cercana_al_muelle` (resolver
-  destino AL ATERRIZAR, no en t=0) y `abc_rotacion` + leer
-  `inbound.slotting_strategy` + selector en la UI web. Luego F4 (KPIs:
-  `build_inbound_summary`, el dock_to_stock ya viaja en cada evento
-  `inbound_pallet_stored`).
+- **F2 HECHO (2026-07-09):** putaway completo — WOs pre-generadas en t=0,
+  elegibles al aterrizar su pallet, cola propia en dispatcher (picks
+  primero), `_execute_putaway_tour` en operators, stock real via
+  `data_manager.add_stock`, eventos con `dock_to_stock`. Tests IN-20..25.
+- **F3 HECHO (2026-07-09):** slotting conmutable — `resolve_slotting` en
+  `inbound.py` con `fija_por_sku` / `cercana_al_muelle` / `abc_rotacion`
+  (leidas de `config.inbound.slotting_strategy`), resueltas al aterrizar el
+  pallet; UI tab "Inbound" (paso 6) con toggle + modo + selector de
+  slotting; opt-in real (config canonico sin bloque). Tests IN-30..35.
+  Las 3 estrategias dan destinos distintos en smoke. Decisiones tecnicas
+  por fase en `docs/PLAN_INIT7_INBOUND.md`.
+- **Proxima fase: F4 (KPIs)** — `build_inbound_summary()` en
+  `core/replay_utils.py` (dock-to-stock ya viaja en cada evento
+  `inbound_pallet_stored`; agregar distancia de putaway, utilizacion de
+  muelles, desglose por estrategia) -> metadata/API/visor/Excel. Cierra la
+  comparabilidad de estrategias en el A/B. PROHIBIDO wall-clock (regla
+  BN-05). Es la ultima fase del alcance v1 (F0-F4); F5 (mixto) requiere la
+  decision 4 del Director.
 
 ## Que esta VIVO y ACTIVO ahora mismo (ademas de CLAUDE.md §3/§5)
 

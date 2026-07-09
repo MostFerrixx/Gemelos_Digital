@@ -10,6 +10,28 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-09 (cont.)
+
+- **INIT-7 F3 — INBOUND, estrategias de slotting conmutables.** El valor de
+  producto de la iniciativa: donde guardar cada pallet que llega, comparable
+  con el A/B. En `inbound.py`: `resolve_slotting` con 3 estrategias leidas de
+  `config.inbound.slotting_strategy` — `fija_por_sku` (menor pick_sequence),
+  `cercana_al_muelle` (menor Manhattan al muelle REAL), `abc_rotacion`
+  (`compute_abc_classes` sobre la demanda de picking de la corrida: 'A' cerca
+  del staging de salida, 'C' lejos, 'B' fija). `sku_candidate_locations`
+  garantiza coherencia del inventario (solo slots donde el SKU ya vive, PK
+  `location_id`). Resolucion AL ATERRIZAR en `warehouse.marcar_pallet_listo`
+  (cercana depende del muelle real, imposible en t=0); fallback determinista
+  a fija. UI: tab "Inbound" nuevo (paso 6, renumera Optimizacion->7,
+  A/B->8) con toggle + modo ASN/estocastico (campos condicionales) +
+  selector de slotting, guia de 3 niveles; opt-in real (config canonico se
+  conserva sin bloque inbound => gate intacto). 6 tests (IN-30..35).
+  Validado: 153 passed, GATE PASS sin update, las 3 estrategias dan
+  destinos DISTINTOS en smoke real, bloque UI valida limpio en el schema,
+  config.json canonico sin inbound.
+
+---
+
 ## 2026-07-09
 
 - **INIT-7 F2 — INBOUND, putaway completo.** El corazon del motor inbound:

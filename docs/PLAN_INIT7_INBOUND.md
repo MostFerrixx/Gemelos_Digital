@@ -52,7 +52,7 @@ igual que hoy se comparan estrategias de despacho.
 | F0 | Dominio y datos: hoja `InboundDocks` en el Excel canonico, tabla `inbound_docks` (schema+importer), loaders en data_manager, bloque `inbound` en config_schema, archivo ASN de ejemplo (`layouts/Inbound Test.json`), tests | **HECHO 2026-07-08** |
 | F1 | Llegadas: `InboundProcess` (espejo de OutboundProcess), camiones segun ASN o intervalo estocastico, descarga a buffer de muelle, eventos al .jsonl + marcadores en visor | **HECHO 2026-07-08** |
 | F2 | Putaway: WO tipo `putaway` (muelle -> ubicacion) pre-generadas en t=0, tour de deposito en operators, stock dinamico | **HECHO 2026-07-09** |
-| F3 | Estrategias de slotting conmutables: `fija_por_sku` / `cercana_al_muelle` / `abc_rotacion` + selector en UI web | pendiente |
+| F3 | Estrategias de slotting conmutables: `fija_por_sku` / `cercana_al_muelle` / `abc_rotacion` + selector en UI web | **HECHO 2026-07-09** |
 | F4 | KPIs: `inbound_summary` (dock-to-stock time, distancia putaway, utilizacion de muelles) con el patron build_X_summary -> metadata/API/visor/Excel | pendiente |
 | F5 | Flujo mixto inbound+outbound: flota compartida, prioridades pick vs putaway, stock entrante alimenta pedidos (requiere decision 4) | pendiente |
 
@@ -158,8 +158,40 @@ igual que hoy se comparan estrategias de despacho.
 - Edge documentado: pallet cuyo SKU no esta en el plan maestro => WARN, se
   descarga pero queda en buffer sin WO (no bloquea la terminacion).
 
+### Decisiones tecnicas de F3 (2026-07-09)
+
+- **3 estrategias en `inbound.py`** (`resolve_slotting`, conmutadas por
+  `config.inbound.slotting_strategy`; validas en `SLOTTING_STRATEGIES`):
+  - `fija_por_sku` (default): menor `pick_sequence` -> siempre el mismo slot.
+  - `cercana_al_muelle`: candidata con menor Manhattan al muelle REAL ->
+    minimiza el viaje de guardado de hoy.
+  - `abc_rotacion`: demanda de picking de ESTA corrida -> terciles A/B/C
+    (`compute_abc_classes`); 'A' cerca del staging de salida (pickear rapido
+    manana), 'C' lejos (liberar slots premium), 'B' fija.
+- **Coherencia del inventario:** un SKU solo se guarda en ubicaciones donde
+  ese SKU YA vive (`sku_candidate_locations`). La tabla `inventory` tiene PK
+  `location_id` (1 SKU por ubicacion): guardar un SKU en una ubicacion ajena
+  romperia el modelo. Por eso el slotting elige ENTRE los ~7 slots propios
+  del SKU, no cualquier ubicacion libre.
+- **Resolucion AL ATERRIZAR** (no en t=0): `cercana_al_muelle` depende del
+  muelle real (contencion de colas), imposible de precomputar. `fija_por_sku`
+  se fija en t=0 como destino PROVISORIO (valida SKU + da work_area para el
+  snapshot); las otras dos re-resuelven en `marcar_pallet_listo`.
+- **Fallback determinista:** sin datos para la estrategia pedida (p.ej. sin
+  dock_cell) degrada a `fija_por_sku`; estrategia desconocida en config ->
+  WARN + `fija_por_sku`.
+- **UI:** tab "Inbound" nuevo (paso 6, renumera Optimizacion->7,
+  Experimentos->8). Toggle + modo (ASN/estocastico con campos condicionales)
+  + selector de slotting, patron de guia de 3 niveles (.tab-intro/
+  .description-text/.help-text). Opt-in real: si el toggle esta off y no
+  habia inbound, el config canonico se conserva SIN el bloque (el merge del
+  backend no lo agrega) => gate byte-identico intacto.
+- Verificado: las 3 estrategias producen destinos DISTINTOS para los mismos
+  pallets (smoke con ASN canonico); bloque inbound de la UI valida limpio en
+  el schema (sin claves desconocidas); config.json canonico sigue sin inbound.
+
 `enabled=false` (o bloque ausente) => comportamiento identico al historico;
-el gate byte-identico DEBE pasar sin actualizar baseline en F0 y F1.
+el gate byte-identico DEBE pasar sin actualizar baseline (F0-F3).
 
 ## Regla de validacion por fase
 

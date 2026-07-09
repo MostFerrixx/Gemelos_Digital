@@ -7,7 +7,7 @@ Actualizado: 2026-07-08 · Responsable: Cerebellum
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
-| INIT-7 — Inbound F3-F5 (F0-F2 HECHOS) | EN CURSO | **Alta (iniciativa activa)** | F3+F4 ~1 sesion, F5 +1-2 | Ninguno; F5 requiere decision 4 del plan |
+| INIT-7 — Inbound F4-F5 (F0-F3 HECHOS) | EN CURSO | **Alta (iniciativa activa)** | F4 ~medio dia, F5 +1-2 | Ninguno; F5 requiere decision 4 del plan |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
@@ -18,22 +18,16 @@ Actualizado: 2026-07-08 · Responsable: Cerebellum
 ## INIT-7 — INBOUND: recepcion y almacenamiento (INICIATIVA ACTIVA)
 
 **Plan completo y decisiones del Director (2026-07-08):
-`docs/PLAN_INIT7_INBOUND.md`.** F0 (dominio y datos), F1 (llegadas) y F2
-(putaway completo: WOs pre-generadas + tour de deposito + stock dinamico +
-dock-to-stock en eventos) HECHOS — ver CHANGELOG 2026-07-08/09 y las
-decisiones tecnicas de F2 en el plan. Fases pendientes:
-- **F3 — Slotting (el valor de producto):** estrategias conmutables
-  `fija_por_sku` (HECHA en F2, hoy default hardcodeado en
-  `warehouse._generar_putaway_work_orders`) / `cercana_al_muelle` /
-  `abc_rotacion`, leyendo `inbound.slotting_strategy` + selector en UI web
-  (patron de guia de 3 niveles). Comparables con el experiment runner A/B.
-  Nota tecnica: `cercana_al_muelle` necesita resolver destino AL ATERRIZAR
-  (depende del muelle real) => mover la resolucion de destino de la
-  generacion t=0 a `marcar_pallet_listo`.
+`docs/PLAN_INIT7_INBOUND.md`.** F0 (dominio y datos), F1 (llegadas), F2
+(putaway completo) y F3 (slotting conmutable + UI) HECHOS — ver CHANGELOG
+2026-07-08/09 y las decisiones tecnicas por fase en el plan. Fases
+pendientes:
 - **F4 — KPIs:** `build_inbound_summary()` en `core/replay_utils.py`
   (dock-to-stock ya viene en cada evento `inbound_pallet_stored`, distancia
-  putaway, utilizacion de muelles) -> metadata/API/visor/Excel + hoja Excel.
-  PROHIBIDO wall-clock en metadata (regla BN-05).
+  de putaway, utilizacion de muelles, desglose por estrategia de slotting)
+  -> metadata/API/visor/Excel + hoja Excel. Es el cierre que hace
+  COMPARABLES las 3 estrategias en el experiment runner A/B. PROHIBIDO
+  wall-clock en metadata (regla BN-05).
 - **F5 — Flujo mixto** (segunda etapa): flota compartida pick+putaway,
   requiere la decision 4 del plan (stock del dia disponible para picking del
   mismo dia vs turnos separados).

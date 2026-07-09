@@ -110,6 +110,16 @@ class WebConfigurator {
         if (outboundToggle) {
             outboundToggle.addEventListener('change', () => this._updateOutboundVisibility());
         }
+
+        // INIT-7 F3: listeners del tab Inbound (toggle + modo de llegadas)
+        const inboundToggle = document.getElementById('toggle-inbound');
+        if (inboundToggle) {
+            inboundToggle.addEventListener('change', () => this._updateInboundVisibility());
+        }
+        const inboundMode = document.getElementById('inbound-arrival-mode');
+        if (inboundMode) {
+            inboundMode.addEventListener('change', () => this._updateInboundVisibility());
+        }
     }
 
     // BK-01: muestra/oculta el campo radio_cercania segun estrategia seleccionada
@@ -128,6 +138,21 @@ class WebConfigurator {
         if (!tog || !group) return;
         group.style.display = tog.checked ? 'block' : 'none';
         if (capGroup) capGroup.style.display = tog.checked ? 'block' : 'none';
+    }
+
+    // INIT-7 F3: muestra/oculta las opciones inbound segun toggle y modo.
+    _updateInboundVisibility() {
+        const tog = document.getElementById('toggle-inbound');
+        const opts = document.getElementById('inbound-options');
+        const slotCard = document.getElementById('inbound-slotting-card');
+        if (!tog || !opts) return;
+        opts.style.display = tog.checked ? 'block' : 'none';
+        if (slotCard) slotCard.style.display = tog.checked ? 'block' : 'none';
+        const mode = document.getElementById('inbound-arrival-mode')?.value || 'deterministic';
+        const asnGroup = document.getElementById('inbound-asn-group');
+        const stochGroup = document.getElementById('inbound-stochastic-group');
+        if (asnGroup) asnGroup.style.display = mode === 'deterministic' ? 'block' : 'none';
+        if (stochGroup) stochGroup.style.display = mode === 'stochastic' ? 'block' : 'none';
     }
 
     // INIT-6 Opcion B: editor de destino_staging_map (destino -> staging_id).
@@ -973,6 +998,25 @@ class WebConfigurator {
         }
         this._updateOutboundVisibility();
 
+        // INIT-7 F3: tab Inbound (bloque ausente = apagado, opt-in)
+        const inb = config.inbound || {};
+        const inbToggle = document.getElementById('toggle-inbound');
+        if (inbToggle) inbToggle.checked = inb.enabled === true;
+        const _setVal = (id, val, fallback) => {
+            const el = document.getElementById(id);
+            if (el) el.value = (val != null) ? val : fallback;
+        };
+        _setVal('inbound-arrival-mode', inb.arrival_mode, 'deterministic');
+        _setVal('inbound-asn-file', inb.asn_file_path, 'layouts/Inbound Test.json');
+        _setVal('inbound-truck-interval', inb.truck_interval, 600);
+        _setVal('inbound-num-trucks', inb.num_trucks, 5);
+        _setVal('inbound-pallets-per-truck', inb.pallets_per_truck, 10);
+        _setVal('inbound-units-per-pallet', inb.units_per_pallet, 20);
+        _setVal('inbound-unload-time', inb.unload_time_per_pallet, 15);
+        _setVal('inbound-putaway-load-time', inb.putaway_load_time, 10);
+        _setVal('inbound-slotting', inb.slotting_strategy, 'fija_por_sku');
+        this._updateInboundVisibility();
+
         // INIT-6 Opcion B: destino -> staging_id
         this._renderDestinoStagingRows(config.destino_staging_map || {});
 
@@ -1016,6 +1060,14 @@ class WebConfigurator {
                 enabled: true, dispatch_policy: 'interval', truck_interval: 90.0,
                 truck_capacity: 8, loading_time: 2.0, zone_capacity_default: 8,
                 slot_wait_alert: 60.0, slot_poll_dt: 0.1, dwell_scaffold: 10.0
+            },
+            // INIT-7: inbound opt-in (default APAGADO = comportamiento historico)
+            inbound: {
+                enabled: false, arrival_mode: 'deterministic',
+                asn_file_path: 'layouts/Inbound Test.json',
+                truck_interval: 600.0, num_trucks: 5, pallets_per_truck: 10,
+                units_per_pallet: 20, unload_time_per_pallet: 15.0,
+                putaway_load_time: 10.0, slotting_strategy: 'fija_por_sku'
             },
             // C5: defaults del bloque tiempos (perfil DEMO = valores actuales del motor)
             tiempos: {
@@ -1142,6 +1194,37 @@ class WebConfigurator {
         config.outbound = baseOb;
         // INIT-6 Opcion B: destino -> staging_id
         config.destino_staging_map = this._serializeDestinoStagingRows();
+
+        // INIT-7 F3: bloque inbound completo (mismo patron base+overrides).
+        // Solo se emite si el usuario lo activo alguna vez o ya existia en el
+        // config: un config canonico SIN bloque inbound se conserva limpio
+        // (opt-in real, el gate byte-identico depende de la ausencia).
+        const inbToggleEl = document.getElementById('toggle-inbound');
+        const inbOn = inbToggleEl?.checked ?? false;
+        if (inbOn || (this.currentConfig && this.currentConfig.inbound)) {
+            const baseInb = JSON.parse(JSON.stringify(
+                (this.currentConfig && this.currentConfig.inbound) || defaults.inbound));
+            baseInb.enabled = inbOn;
+            const mode = document.getElementById('inbound-arrival-mode')?.value;
+            if (mode) baseInb.arrival_mode = mode;
+            const asn = document.getElementById('inbound-asn-file')?.value;
+            if (asn && asn.trim() !== '') baseInb.asn_file_path = asn.trim();
+            const _numField = (id, key, min, isFloat) => {
+                const el = document.getElementById(id);
+                if (!el || el.value === '') return;
+                const v = isFloat ? parseFloat(el.value) : parseInt(el.value);
+                if (!isNaN(v) && v >= min) baseInb[key] = v;
+            };
+            _numField('inbound-truck-interval', 'truck_interval', 1, true);
+            _numField('inbound-num-trucks', 'num_trucks', 1, false);
+            _numField('inbound-pallets-per-truck', 'pallets_per_truck', 1, false);
+            _numField('inbound-units-per-pallet', 'units_per_pallet', 1, false);
+            _numField('inbound-unload-time', 'unload_time_per_pallet', 0, true);
+            _numField('inbound-putaway-load-time', 'putaway_load_time', 0, true);
+            const slot = document.getElementById('inbound-slotting')?.value;
+            if (slot) baseInb.slotting_strategy = slot;
+            config.inbound = baseInb;
+        }
 
         // C5: bloque tiempos completo. Mismo patron que congestion/outbound:
         // base = bloque en memoria (para preservar cell_size_m y speed_factor_ground
