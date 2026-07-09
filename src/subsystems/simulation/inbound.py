@@ -175,30 +175,121 @@ def build_stochastic_schedule(config: Dict[str, Any],
     return schedule
 
 
+# F3: estrategias de slotting disponibles (config inbound.slotting_strategy).
+SLOTTING_STRATEGIES = ('fija_por_sku', 'cercana_al_muelle', 'abc_rotacion')
+
+
+def sku_candidate_locations(sku_id: str,
+                            picking_points: List[Dict[str, Any]]
+                            ) -> List[Dict[str, Any]]:
+    """
+    F3: ubicaciones candidatas para guardar un SKU = las ubicaciones donde ese
+    SKU ya vive en el plan maestro (~7 por SKU en el layout canonico). Guardar
+    SOLO en ubicaciones propias mantiene coherente el modelo de inventario
+    (1 SKU por ubicacion, PK de la tabla inventory).
+
+    Returns:
+        Lista de {'cell', 'location_id', 'work_area', 'pick_sequence'}
+        ordenada por pick_sequence (determinista).
+    """
+    out = []
+    for punto in picking_points or []:
+        if punto.get('sku_initial') != sku_id:
+            continue
+        out.append({
+            'cell': (punto['x'], punto['y']),
+            'location_id': punto.get('location_id'),
+            'work_area': punto.get('WorkArea', 'Area_Ground'),
+            'pick_sequence': punto.get('pick_sequence', 0),
+        })
+    out.sort(key=lambda c: c['pick_sequence'])
+    return out
+
+
 def resolve_target_fija_por_sku(sku_id: str,
                                 picking_points: List[Dict[str, Any]]
                                 ) -> Optional[Dict[str, Any]]:
     """
-    F2: slotting 'fija_por_sku' (default): el pallet se guarda donde ese SKU
+    Slotting 'fija_por_sku' (default F2): el pallet se guarda donde ese SKU
     ya vive (su ubicacion de picking con menor pick_sequence: determinista).
 
     Returns:
-        {'cell': (x, y), 'location_id': str, 'work_area': str} o None si el
-        SKU no tiene ubicacion en el plan maestro.
+        {'cell': (x, y), 'location_id': str, 'work_area': str, ...} o None
+        si el SKU no tiene ubicacion en el plan maestro.
     """
-    best = None
-    for punto in picking_points or []:
-        if punto.get('sku_initial') != sku_id:
-            continue
-        if best is None or punto.get('pick_sequence', 0) < best.get('pick_sequence', 0):
-            best = punto
-    if best is None:
+    candidates = sku_candidate_locations(sku_id, picking_points)
+    return candidates[0] if candidates else None
+
+
+def _manhattan(a: Tuple[int, int], b: Tuple[int, int]) -> int:
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+
+def compute_abc_classes(demand_by_sku: Dict[str, float]) -> Dict[str, str]:
+    """
+    F3: clasificacion ABC por rotacion. Ranking por demanda DESC (empate:
+    sku_id ASC, determinista); tercio superior = 'A', medio = 'B', bajo = 'C'.
+    La demanda viene de las WOs de picking de ESTA corrida (lo que realmente
+    rota hoy), no de un historico externo.
+    """
+    if not demand_by_sku:
+        return {}
+    ranked = sorted(demand_by_sku, key=lambda s: (-demand_by_sku[s], s))
+    n = len(ranked)
+    tercio = max(1, n // 3)
+    classes = {}
+    for i, sku in enumerate(ranked):
+        if i < tercio:
+            classes[sku] = 'A'
+        elif i < n - tercio:
+            classes[sku] = 'B'
+        else:
+            classes[sku] = 'C'
+    return classes
+
+
+def resolve_slotting(strategy: str, sku_id: str,
+                     picking_points: List[Dict[str, Any]],
+                     dock_cell: Optional[Tuple[int, int]] = None,
+                     staging_cell: Optional[Tuple[int, int]] = None,
+                     abc_class: Optional[str] = None
+                     ) -> Optional[Dict[str, Any]]:
+    """
+    F3: resuelve la ubicacion destino de un pallet segun la estrategia.
+    Se llama AL ATERRIZAR el pallet (cercana_al_muelle depende del muelle
+    real, que depende de la contencion de colas y no se conoce en t=0).
+
+    - 'fija_por_sku': menor pick_sequence (siempre el mismo slot).
+    - 'cercana_al_muelle': candidata mas cercana (Manhattan) al muelle real
+      -> minimiza el viaje de guardado. Empate: menor pick_sequence.
+    - 'abc_rotacion': SKUs clase 'A' (alta rotacion) -> candidata mas cercana
+      al staging de salida (pickear rapido manana); clase 'C' -> la mas
+      lejana (liberar slots premium); clase 'B' -> fija_por_sku.
+
+    Fallback determinista: sin datos para la estrategia pedida (p.ej. sin
+    dock_cell), degrada a fija_por_sku.
+    """
+    candidates = sku_candidate_locations(sku_id, picking_points)
+    if not candidates:
         return None
-    return {
-        'cell': (best['x'], best['y']),
-        'location_id': best.get('location_id'),
-        'work_area': best.get('WorkArea', 'Area_Ground'),
-    }
+
+    if strategy == 'cercana_al_muelle' and dock_cell is not None:
+        return min(candidates,
+                   key=lambda c: (_manhattan(c['cell'], dock_cell),
+                                  c['pick_sequence']))
+
+    if strategy == 'abc_rotacion' and staging_cell is not None:
+        if abc_class == 'A':
+            return min(candidates,
+                       key=lambda c: (_manhattan(c['cell'], staging_cell),
+                                      c['pick_sequence']))
+        if abc_class == 'C':
+            return min(candidates,
+                       key=lambda c: (-_manhattan(c['cell'], staging_cell),
+                                      c['pick_sequence']))
+        # clase 'B' (o sin clase): comportamiento fijo.
+
+    return candidates[0]  # fija_por_sku y fallbacks
 
 
 class InboundProcess:

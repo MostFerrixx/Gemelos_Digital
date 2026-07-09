@@ -152,7 +152,10 @@ defaults que reproducen el comportamiento histórico. Por eso una corrida sin el
   `inbound_docks`) segun ASN determinista (`asn_file_path`) o intervalo
   estocastico pre-muestreado; putaway completo (WOs pre-generadas en t=0,
   elegibles al aterrizar su pallet, cola propia en dispatcher con picks
-  primero, 1 pallet/viaje, stock via `data_manager.add_stock`). Lectores:
+  primero, 1 pallet/viaje, stock via `data_manager.add_stock`); slotting
+  conmutable `slotting_strategy` (`fija_por_sku` / `cercana_al_muelle` /
+  `abc_rotacion`, resuelto en `inbound.resolve_slotting` al aterrizar el
+  pallet) con UI en el tab "Inbound" del configurador. Lectores:
   `warehouse.py` + `inbound.py` + `dispatcher._asignar_putaway` +
   `operators._execute_putaway_tour`. Contrato y decisiones en
   `docs/PLAN_INIT7_INBOUND.md`.

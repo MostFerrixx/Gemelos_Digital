@@ -107,8 +107,9 @@ def test_in21_slotting_fija_por_sku():
          "location_id": "LOC-C", "WorkArea": "Area_Ground"},
     ]
     t = resolve_target_fija_por_sku("SKU001", puntos)
-    assert t == {"cell": (4, 3), "location_id": "LOC-A",
-                 "work_area": "Area_Ground"}  # menor pick_sequence gana
+    # menor pick_sequence gana
+    assert (t["cell"], t["location_id"], t["work_area"]) == (
+        (4, 3), "LOC-A", "Area_Ground")
     assert resolve_target_fija_por_sku("SKU999", puntos) is None
 
 

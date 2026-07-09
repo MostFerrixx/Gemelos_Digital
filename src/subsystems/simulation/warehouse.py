@@ -768,14 +768,46 @@ class AlmacenMejorado:
         ASN = 1 pallet = 1 WO; 1 pallet por viaje, realismo de paleta).
 
         La WO nace INELEGIBLE (pallet_ready=False, ubicacion=None: el muelle
-        real se conoce al descargar). El destino se resuelve YA con el slotting
-        'fija_por_sku' (F2 default; F3 hace la estrategia conmutable): el
-        pallet va donde su SKU vive en el plan maestro, y hereda el work_area
-        de esa ubicacion (mismo filtro de equipamiento que un pick).
+        real se conoce al descargar). El destino PROVISORIO se fija con
+        'fija_por_sku' (valida que el SKU exista y da un work_area para el
+        snapshot); el destino FINAL lo resuelve la estrategia de slotting
+        configurada AL ATERRIZAR el pallet (marcar_pallet_listo, F3).
         """
-        from .inbound import resolve_target_fija_por_sku
+        from .inbound import (SLOTTING_STRATEGIES, compute_abc_classes,
+                              resolve_target_fija_por_sku)
         picking_points = (self.data_manager.get_picking_points()
                           if self.data_manager is not None else [])
+
+        # F3: estrategia de slotting (valida con fallback determinista).
+        self.inbound_slotting = str(self.inbound_config.get(
+            'slotting_strategy', 'fija_por_sku'))
+        if self.inbound_slotting not in SLOTTING_STRATEGIES:
+            print(f"[INBOUND][WARN] slotting_strategy desconocida "
+                  f"'{self.inbound_slotting}' - se usa fija_por_sku "
+                  f"(validas: {', '.join(SLOTTING_STRATEGIES)})")
+            self.inbound_slotting = 'fija_por_sku'
+        print(f"[INBOUND] F3: estrategia de slotting = {self.inbound_slotting}")
+
+        # F3 abc_rotacion: demanda por SKU de las WOs de picking de ESTA
+        # corrida (ya estan en la lista maestra) -> clases A/B/C.
+        self.inbound_abc_classes = {}
+        if self.inbound_slotting == 'abc_rotacion':
+            demand = {}
+            for wo in self.dispatcher.lista_maestra_work_orders:
+                if getattr(wo, 'task_type', 'pick') == 'putaway':
+                    continue
+                demand[wo.sku_id] = demand.get(wo.sku_id, 0) + wo.cantidad_inicial
+            self.inbound_abc_classes = compute_abc_classes(demand)
+            _n = {c: sum(1 for v in self.inbound_abc_classes.values() if v == c)
+                  for c in ('A', 'B', 'C')}
+            print(f"[INBOUND] F3: rotacion ABC calculada de {len(demand)} SKUs "
+                  f"con demanda: {_n}")
+
+        # F3 abc_rotacion: referencia de "cerca del picking de salida" =
+        # ancla del staging 1 (el depot historico de los agentes).
+        _stg = (self.data_manager.get_outbound_staging_locations()
+                if self.data_manager is not None else {})
+        self._inbound_staging_ref = _stg.get(1, (3, 29))
         wos: List[WorkOrder] = []
         sin_destino = 0
         for truck in self.inbound_schedule:
@@ -819,12 +851,33 @@ class AlmacenMejorado:
         """
         F2: callback del InboundProcess al descargar un pallet. Completa la
         WO de putaway (muelle real) y la vuelve ELEGIBLE para el dispatcher.
+
+        F3: aca se resuelve el destino FINAL con la estrategia configurada
+        (cercana_al_muelle necesita el muelle real, que recien ahora se
+        conoce). Si la resolucion falla se conserva el destino provisorio
+        (fija_por_sku, fijado al generar la WO).
         """
         wo = self.putaway_wos_por_pallet.get(pallet.id)
         if wo is None:
             return  # pallet sin WO (SKU fuera del plan maestro): queda en buffer
         wo.ubicacion = dock.cell
         wo.dock_id = dock.dock_id
+
+        if getattr(self, 'inbound_slotting', 'fija_por_sku') != 'fija_por_sku':
+            from .inbound import resolve_slotting
+            picking_points = (self.data_manager.get_picking_points()
+                              if self.data_manager is not None else [])
+            target = resolve_slotting(
+                self.inbound_slotting, wo.sku_id, picking_points,
+                dock_cell=dock.cell,
+                staging_cell=getattr(self, '_inbound_staging_ref', None),
+                abc_class=getattr(self, 'inbound_abc_classes', {}).get(wo.sku_id),
+            )
+            if target is not None:
+                wo.target_location = target['cell']
+                wo.location_id = target['location_id']
+                wo.work_area = target['work_area']
+
         wo.pallet_ready = True
         wo.tiempo_pallet_listo = float(self.env.now)
 

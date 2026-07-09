@@ -50,13 +50,18 @@
                     <span class="nav-icon">🚛</span>
                     <span class="nav-text">Outbound Staging</span>
                 </button>
-                <button class="nav-item" data-tab="optimizacion" data-section="advanced">
+                <button class="nav-item" data-tab="inbound" data-section="advanced">
                     <span class="nav-step">6</span>
+                    <span class="nav-icon">📦</span>
+                    <span class="nav-text">Inbound</span>
+                </button>
+                <button class="nav-item" data-tab="optimizacion" data-section="advanced">
+                    <span class="nav-step">7</span>
                     <span class="nav-icon">🧪</span>
                     <span class="nav-text">Optimizacion</span>
                 </button>
                 <button class="nav-item" data-tab="experimentos" data-section="advanced">
-                    <span class="nav-step">7</span>
+                    <span class="nav-step">8</span>
                     <span class="nav-icon">⚖️</span>
                     <span class="nav-text">Experimentos A/B</span>
                 </button>
@@ -549,7 +554,114 @@
                     </div>
                 </div>
 
-                <!-- Tab 6: Optimizacion (INIT-3 v2) -->
+                <!-- Tab 6: Inbound (INIT-7) -->
+                <div id="tab-inbound" class="tab-content">
+                    <p class="tab-intro">
+                        Recepción de mercadería: camiones llegan a los muelles de la fila
+                        superior del mapa, descargan pallets y los operarios los guardan en
+                        ubicaciones del almacén (putaway). El picking siempre tiene prioridad;
+                        el putaway se hace con capacidad ociosa. La <strong>estrategia de
+                        slotting</strong> decide dónde guardar cada pallet — compará
+                        estrategias con la pestaña Experimentos A/B.
+                    </p>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Recepción de Camiones</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Con el inbound apagado la simulación es
+                                idéntica a la histórica (solo picking). Al activarlo, los camiones
+                                llegan según una agenda determinista (archivo ASN) o un intervalo
+                                estocástico.
+                            </p>
+                            <div class="form-group">
+                                <label class="toggle-label">
+                                    <input type="checkbox" id="toggle-inbound">
+                                    <span>Activar inbound (recepción + putaway)</span>
+                                </label>
+                            </div>
+                            <div id="inbound-options" style="display: none;">
+                                <div class="form-group">
+                                    <label for="inbound-arrival-mode">Modo de llegadas</label>
+                                    <select id="inbound-arrival-mode">
+                                        <option value="deterministic">Determinista (archivo ASN)</option>
+                                        <option value="stochastic">Estocástico (intervalo fijo)</option>
+                                    </select>
+                                    <p class="help-text">Determinista: cada camión, su hora y su contenido
+                                        vienen de un archivo (escenario real reproducible). Estocástico:
+                                        camiones sintéticos con SKUs muestreados del catálogo (stress test).</p>
+                                </div>
+                                <div class="form-group" id="inbound-asn-group">
+                                    <label for="inbound-asn-file">Archivo ASN</label>
+                                    <input type="text" id="inbound-asn-file" value="layouts/Inbound Test.json">
+                                    <p class="help-text">JSON con la agenda de camiones (truck_id, arrival_time
+                                        en segundos, líneas de SKU + cantidad, dock_id opcional). Ejemplo de
+                                        referencia: <code>layouts/Inbound Test.json</code>.</p>
+                                </div>
+                                <div id="inbound-stochastic-group" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="inbound-truck-interval">Intervalo entre camiones (s)</label>
+                                        <input type="number" id="inbound-truck-interval" value="600" min="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="inbound-num-trucks">Cantidad de camiones</label>
+                                        <input type="number" id="inbound-num-trucks" value="5" min="1">
+                                        <p class="help-text">La agenda es finita: la simulación termina cuando
+                                            todo lo recibido quedó guardado.</p>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="inbound-pallets-per-truck">Pallets por camión</label>
+                                        <input type="number" id="inbound-pallets-per-truck" value="10" min="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="inbound-units-per-pallet">Unidades por pallet</label>
+                                        <input type="number" id="inbound-units-per-pallet" value="20" min="1">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="inbound-unload-time">Descarga por pallet (s)</label>
+                                    <input type="number" id="inbound-unload-time" value="15" min="0" step="0.5">
+                                    <p class="help-text">Tiempo que tarda el camión en bajar cada pallet al
+                                        buffer del muelle.</p>
+                                </div>
+                                <div class="form-group">
+                                    <label for="inbound-putaway-load-time">Carga del pallet por el operario (s)</label>
+                                    <input type="number" id="inbound-putaway-load-time" value="10" min="0" step="0.5">
+                                    <p class="help-text">Tiempo que tarda el operario en tomar el pallet del
+                                        muelle antes de llevarlo a su ubicación.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card" id="inbound-slotting-card" style="display: none;">
+                        <div class="card-header">
+                            <h3>Estrategia de Slotting</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Dónde se guarda cada pallet que llega. Cada SKU
+                                vive en varias ubicaciones del plan maestro; la estrategia elige entre
+                                ellas. Es la palanca principal a comparar en Experimentos A/B.
+                            </p>
+                            <div class="form-group">
+                                <label for="inbound-slotting">Estrategia</label>
+                                <select id="inbound-slotting">
+                                    <option value="fija_por_sku">Fija por SKU (reposición clásica)</option>
+                                    <option value="cercana_al_muelle">Más cercana al muelle</option>
+                                    <option value="abc_rotacion">ABC por rotación</option>
+                                </select>
+                                <p class="help-text">
+                                    <strong>Fija:</strong> siempre el mismo slot (predecible, viajes largos).
+                                    <strong>Cercana al muelle:</strong> minimiza el viaje de guardado de hoy.
+                                    <strong>ABC:</strong> lo que rota mucho queda cerca del despacho — guarda
+                                    más lento hoy, pickea más rápido mañana.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 7: Optimizacion (INIT-3 v2) -->
                 <div id="tab-optimizacion" class="tab-content">
                     <div class="card">
                         <div class="card-header">
