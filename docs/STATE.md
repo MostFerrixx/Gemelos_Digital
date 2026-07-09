@@ -8,18 +8,18 @@
 
 ## Git
 
-- `main` = `713a9b6` + INIT-7 F0 (rama `feature/init7-inbound-f0`, a mergear
-  y pushear al cierre). Push directo a main autorizado por el Director.
+- `main` = `92426a6` (merge F0) + INIT-7 F1 (rama `feature/init7-inbound-f0`,
+  a mergear y pushear al cierre). Push directo a main autorizado.
 - Baseline byte-identico vigente: `sha256=71fc9904141ddc73...`, 4.920.352
-  bytes, seed 42, Python 3.13.6 (`tests/baseline.json`). INIT-7 F0 NO lo
-  toco (GATE PASS sin update: el motor todavia no lee nada del inbound).
+  bytes, seed 42, Python 3.13.6 (`tests/baseline.json`). INIT-7 F0/F1 NO lo
+  tocaron (GATE PASS sin update: inbound off/ausente en el canonico).
 - REGLA pinneada por test BN-05: la metadata del .jsonl NO puede contener
   valores wall-clock (rompe el determinismo del gate).
 
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 134 passed, 1 deselected (~14s)
+python -m pytest -q                # 141 passed, 1 deselected (~14s)
 python scripts/regression_gate.py  # GATE PASS esperado
 ```
 
@@ -34,13 +34,16 @@ Plan completo + 4 decisiones del Director (2026-07-08):
   loaders DB+Excel en data_manager (`get_inbound_dock_locations()`, sin
   defaults), bloque `inbound` en config_schema (opt-in, NO esta en el
   canonico), ASN ejemplo `layouts/Inbound Test.json`, tests IN-01..09.
-- **Proxima fase: F1 (llegadas)** — `InboundProcess` espejo de
-  `OutboundProcess`, ASN deterministico + modo estocastico, eventos al
-  .jsonl. Gate debe seguir PASS sin update.
-- Palancas confirmadas por investigacion: olas INIT-4 para release=arrival
-  (sin inyeccion dinamica de WOs); `warehouse.db` ya migrada con los 3
-  muelles; tileset TMX ya traia tipo `inbound` (gid 6, walkable);
-  filas y=0..2 del WH1 caminables.
+- **F1 HECHO (2026-07-08):** `src/subsystems/simulation/inbound.py`
+  (`InboundProcess`, `InboundDock`=simpy.Resource, `InboundPallet`,
+  `load_asn_trucks`); integracion en warehouse.py + event_generator.py;
+  eventos inbound_* al .jsonl + marcador verde en el visor; tests IN-10..16.
+  Smoke real validado: 4 camiones / 8 pallets a tiempos exactos del ASN,
+  conviviendo con el picking. Los pallets quedan en `almacen.inbound_buffer`.
+- **Proxima fase: F2 (putaway)** — WO tipo putaway pre-generadas con
+  release=arrival (mecanismo de olas), tour de deposito en operators.py,
+  stock dinamico en memoria. NOTA: las WOs de putaway deben entrar a la
+  lista maestra para que la corrida no termine con pallets sin guardar.
 
 ## Que esta VIVO y ACTIVO ahora mismo (ademas de CLAUDE.md §3/§5)
 

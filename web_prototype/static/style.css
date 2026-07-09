@@ -1098,3 +1098,7 @@ select:focus {
 .time-marker--truck {
     background: var(--color-accent-orange, #f0883e);
 }
+/* INIT-7 F1: descargas de camion inbound (verde, distinguible del outbound) */
+.time-marker--truck_in {
+    background: var(--color-accent-green, #3fb950);
+}

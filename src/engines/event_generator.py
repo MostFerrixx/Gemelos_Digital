@@ -190,6 +190,13 @@ class EventGenerator:
            getattr(self.almacen, 'outbound_process', None) is not None:
             self.env.process(self.almacen.outbound_process.run())
 
+        # 7d. INIT-7 / F1: arranque del proceso inbound (llegadas de camiones).
+        # Con inbound off (default, bloque ausente en el canonico) la condicion
+        # es falsa => no-op => .jsonl byte-identico al baseline.
+        if getattr(self.almacen, 'inbound_enabled', False) and \
+           getattr(self.almacen, 'inbound_process', None) is not None:
+            self.env.process(self.almacen.inbound_process.run())
+
         # 8. Inicializar almacen y crear ordenes
         self.almacen._crear_catalogo_y_stock()
         self.almacen._generar_flujo_ordenes()
@@ -387,6 +394,15 @@ class EventGenerator:
                         f"{k}={v}" for k, v in sorted(_om.items())))
             except Exception as _e:
                 logger.info(f"[OUTBOUND][WARN] no se pudieron imprimir metricas: {_e}")
+
+            # INIT-7 F1: telemetria del subsistema inbound (si esta activo).
+            try:
+                _im = getattr(self.almacen, 'inbound_metrics', None)
+                if _im:
+                    logger.info("[INBOUND] METRICAS: " + ", ".join(
+                        f"{k}={v}" for k, v in sorted(_im.items())))
+            except Exception as _e:
+                logger.info(f"[INBOUND][WARN] no se pudieron imprimir metricas: {_e}")
 
             # Exportar métricas de optimización si se solicitó
             if self.output_metrics_path:

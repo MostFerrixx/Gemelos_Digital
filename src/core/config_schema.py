@@ -111,6 +111,7 @@ class InboundConfig(BaseModel):
     asn_file_path: Optional[str] = None      # modo deterministic
     truck_interval: Optional[float] = None   # modo stochastic (segundos)
     pallets_per_truck: Optional[int] = None  # modo stochastic
+    units_per_pallet: Optional[int] = None   # modo stochastic (qty por pallet)
     unload_time_per_pallet: Optional[float] = None
     # fija_por_sku | cercana_al_muelle | abc_rotacion (F3)
     slotting_strategy: Optional[str] = None
