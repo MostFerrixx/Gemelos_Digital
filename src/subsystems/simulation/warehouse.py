@@ -4,6 +4,7 @@ Warehouse Management Module - AlmacenMejorado Class
 Digital Twin Warehouse Simulator
 """
 
+import os
 import simpy
 import random
 from typing import Optional, List, Dict, Any
@@ -358,8 +359,11 @@ class AlmacenMejorado:
         self.inbound_docks = {}       # {dock_id: InboundDock}
         self.inbound_buffer = []      # pallets descargados esperando putaway (F2)
         self.inbound_process = None
+        self.inbound_schedule = []        # F2: agenda de camiones conocida en t=0
+        self.putaway_wos_por_pallet = {}  # F2: pallet_id -> WorkOrder de putaway
         if self.inbound_enabled:
-            from .inbound import InboundDock, InboundProcess
+            from .inbound import (AsnError, InboundDock, InboundProcess,
+                                  build_stochastic_schedule, load_asn_trucks)
             docks_raw = (self.data_manager.get_inbound_dock_locations()
                          if self.data_manager is not None else {})
             if not docks_raw:
@@ -367,6 +371,27 @@ class AlmacenMejorado:
                       "InboundDocks vacia/ausente) - inbound se DESACTIVA.")
                 self.inbound_enabled = False
             else:
+                # F2: la agenda se construye EN t=0 (ASN o pre-muestreo del
+                # stochastic) para poder pre-generar las WOs de putaway.
+                _mode = str(self.inbound_config.get('arrival_mode', 'deterministic'))
+                if _mode == 'stochastic':
+                    _catalog = (self.data_manager.sku_catalog
+                                if self.data_manager is not None else {})
+                    self.inbound_schedule = build_stochastic_schedule(
+                        self.inbound_config, _catalog)
+                else:
+                    _asn_path = self.inbound_config.get('asn_file_path') or ''
+                    if _asn_path and not os.path.isabs(_asn_path):
+                        _root = os.path.abspath(os.path.join(
+                            os.path.dirname(__file__), '..', '..', '..'))
+                        _asn_path = os.path.join(_root, _asn_path)
+                    try:
+                        self.inbound_schedule = load_asn_trucks(_asn_path)
+                    except AsnError as e:
+                        print(f"[INBOUND][ERROR] {e} - inbound se DESACTIVA.")
+                        self.inbound_enabled = False
+
+            if self.inbound_enabled:
                 self.inbound_docks = {
                     did: InboundDock(did, cell, self.env)
                     for did, cell in sorted(docks_raw.items())
@@ -379,12 +404,18 @@ class AlmacenMejorado:
                     'dock_wait_time': 0.0,
                     'max_dock_wait': 0.0,
                     'buffer_peak': 0,
+                    # F2: putaway
+                    'pallets_stored': 0,
+                    'dock_to_stock_total': 0.0,
+                    'max_dock_to_stock': 0.0,
                 }
                 self.inbound_process = InboundProcess(
-                    self.env, self, self.inbound_config)
+                    self.env, self, self.inbound_config,
+                    trucks=self.inbound_schedule)
                 print(f"[INBOUND] F1 activo: {len(self.inbound_docks)} muelles "
                       f"{ {d: k.cell for d, k in self.inbound_docks.items()} }, "
-                      f"modo={self.inbound_process.arrival_mode}")
+                      f"modo={_mode}, {len(self.inbound_schedule)} camiones "
+                      f"en agenda")
         else:
             print("[INBOUND] desactivado (enabled:false) - comportamiento actual.")
 
@@ -702,11 +733,22 @@ class AlmacenMejorado:
         """
         # Delegate to strategy pattern
         all_work_orders = self.order_strategy.generate_work_orders(self)
-        
+
         # Add work orders to dispatcher
         if all_work_orders:
             self.dispatcher.agregar_work_orders(all_work_orders)
-        
+
+        # INIT-7 F2: pre-generar las WOs de putaway desde la agenda inbound
+        # (misma palanca que las olas: existen en t=0 pero son inelegibles
+        # hasta que su pallet aterrice). Entran a la lista maestra => la
+        # simulacion NO termina hasta guardar todos los pallets.
+        if self.inbound_enabled and self.inbound_schedule:
+            putaway_wos = self._generar_putaway_work_orders()
+            if putaway_wos:
+                self.dispatcher.agregar_work_orders(putaway_wos)
+                print(f"[INBOUND] F2: {len(putaway_wos)} WOs de putaway "
+                      f"pre-generadas (inelegibles hasta que llegue su camion)")
+
         print(f"[ALMACEN] Distribucion por tipo: {self.distribucion_tipos}")
         
         # Store validation result for API access (deterministic mode only)
@@ -715,6 +757,127 @@ class AlmacenMejorado:
     def get_order_validation_result(self):
         """Get validation result from last order generation (deterministic mode only)"""
         return getattr(self, '_last_validation_result', None)
+
+    # ========================================================================
+    # INIT-7 F2 - PUTAWAY (recepcion -> almacenamiento)
+    # ========================================================================
+
+    def _generar_putaway_work_orders(self) -> List[WorkOrder]:
+        """
+        F2: una WO de putaway por pallet de la agenda inbound (1 linea del
+        ASN = 1 pallet = 1 WO; 1 pallet por viaje, realismo de paleta).
+
+        La WO nace INELEGIBLE (pallet_ready=False, ubicacion=None: el muelle
+        real se conoce al descargar). El destino se resuelve YA con el slotting
+        'fija_por_sku' (F2 default; F3 hace la estrategia conmutable): el
+        pallet va donde su SKU vive en el plan maestro, y hereda el work_area
+        de esa ubicacion (mismo filtro de equipamiento que un pick).
+        """
+        from .inbound import resolve_target_fija_por_sku
+        picking_points = (self.data_manager.get_picking_points()
+                          if self.data_manager is not None else [])
+        wos: List[WorkOrder] = []
+        sin_destino = 0
+        for truck in self.inbound_schedule:
+            truck_id = str(truck['truck_id'])
+            for i, line in enumerate(truck['lines'], start=1):
+                sku_id = str(line['sku_id'])
+                sku = self.catalogo_skus.get(sku_id)
+                target = resolve_target_fija_por_sku(sku_id, picking_points)
+                if sku is None or target is None:
+                    sin_destino += 1
+                    print(f"[INBOUND][WARN] pallet {sku_id} de {truck_id} sin "
+                          f"SKU/ubicacion en plan maestro - queda en buffer "
+                          f"sin putaway")
+                    continue
+                pallet_id = f"INP-{truck_id}-{i}"
+                wo = WorkOrder(
+                    work_order_id=f"WO-PUT-{truck_id}-{i}",
+                    order_id=truck_id,
+                    tour_id="PUTAWAY",
+                    sku=sku,
+                    cantidad=int(line['quantity']),
+                    ubicacion=None,                # muelle real: al descargar
+                    work_area=target['work_area'],
+                    pick_sequence=0,
+                    location_id=target['location_id'],
+                )
+                wo.task_type = 'putaway'
+                wo.pallet_id = pallet_id
+                wo.dock_id = None
+                wo.pallet_ready = False
+                wo.tiempo_pallet_listo = None
+                wo.target_location = target['cell']
+                self.putaway_wos_por_pallet[pallet_id] = wo
+                wos.append(wo)
+        if sin_destino:
+            print(f"[INBOUND][WARN] {sin_destino} pallets sin destino de "
+                  f"putaway (SKU fuera del plan maestro)")
+        return wos
+
+    def marcar_pallet_listo(self, pallet, dock) -> None:
+        """
+        F2: callback del InboundProcess al descargar un pallet. Completa la
+        WO de putaway (muelle real) y la vuelve ELEGIBLE para el dispatcher.
+        """
+        wo = self.putaway_wos_por_pallet.get(pallet.id)
+        if wo is None:
+            return  # pallet sin WO (SKU fuera del plan maestro): queda en buffer
+        wo.ubicacion = dock.cell
+        wo.dock_id = dock.dock_id
+        wo.pallet_ready = True
+        wo.tiempo_pallet_listo = float(self.env.now)
+
+    def tomar_pallet_inbound(self, pallet_id: str):
+        """F2: saca el pallet del buffer del muelle (el operario lo cargo)."""
+        for i, p in enumerate(self.inbound_buffer):
+            if p.id == pallet_id:
+                return self.inbound_buffer.pop(i)
+        return None
+
+    def registrar_stock_putaway(self, wo, pallet=None) -> None:
+        """
+        F2: deposito completado. Suma el stock a la ubicacion real (simetrico
+        de consumir_stock_picking, que ya escribe inventory en caliente),
+        cierra el dock-to-stock del pallet y emite el evento de analitica.
+        """
+        qty = int(getattr(wo, 'cantidad_inicial', 0) or 0)
+        location_id = getattr(wo, 'location_id', None)
+        if (qty > 0 and location_id and self.data_manager is not None
+                and hasattr(self.data_manager, 'add_stock')):
+            result = self.data_manager.add_stock(location_id, qty,
+                                                 sim_now=self.env.now)
+            if result is not None:
+                print(f"[STOCK] Putaway {wo.id}: +{qty}u en {location_id} "
+                      f"({wo.sku_id}) -> avail={result[0]}")
+
+        t_stored = float(self.env.now)
+        dock_to_stock = None
+        if pallet is not None:
+            pallet.status = 'stored'
+            pallet.t_stored = t_stored
+            pallet.target_location = location_id
+            dock_to_stock = round(t_stored - pallet.t_unloaded, 2)
+
+        m = getattr(self, 'inbound_metrics', None)
+        if m is not None:
+            m['pallets_stored'] = m.get('pallets_stored', 0) + 1
+            if dock_to_stock is not None:
+                m['dock_to_stock_total'] = (m.get('dock_to_stock_total', 0.0)
+                                            + dock_to_stock)
+                m['max_dock_to_stock'] = max(m.get('max_dock_to_stock', 0.0),
+                                             dock_to_stock)
+
+        self.registrar_evento('inbound_pallet_stored', {
+            'pallet_id': getattr(wo, 'pallet_id', None),
+            'work_order_id': wo.id,
+            'sku_id': wo.sku_id,
+            'quantity': qty,
+            'location_id': location_id,
+            'dock_id': getattr(wo, 'dock_id', None),
+            'agent_id': wo.assigned_agent_id,
+            'dock_to_stock': dock_to_stock,
+        })
 
     def consumir_stock_picking(self, wo, sim_now=None):
         """

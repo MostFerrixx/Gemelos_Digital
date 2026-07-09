@@ -924,6 +924,11 @@ class BaseOperator:
                 yield self.env.timeout(0.5)  # V12: Reduced for fast termination detection
                 continue
 
+            # INIT-7 F2: tour de putaway (muelle -> ubicacion), flujo propio.
+            if tour.get('tour_type') == 'putaway':
+                yield from self._execute_putaway_tour(tour)
+                continue
+
             tour_start_time = self.env.now
 
             # PASO 2: Procesar tour asignado
@@ -1198,6 +1203,119 @@ class BaseOperator:
 
             logger.info(f"[{self.id}] t={self.env.now:.1f} Tour completado, "
                   f"total completadas: {self.tasks_completed}")
+
+    # ------------------------------------------------------------------
+    # INIT-7 F2: tour de putaway (inverso del pick)
+    # ------------------------------------------------------------------
+
+    def _putaway_nav(self, destino, wo, goal_dwell: float = 0.0):
+        """Navega al destino con el mismo primitivo del pick (_recorrer_tramo:
+        congestion timewindow incluida). Fallback _jump_to si no hay path."""
+        destino = tuple(destino)
+        if tuple(self.current_position) == destino:
+            return
+        path = None
+        if hasattr(self.almacen, 'route_calculator') and self.almacen.route_calculator:
+            try:
+                path = self.almacen.route_calculator.pathfinder.find_path(
+                    self.current_position, destino)
+            except Exception as e:
+                logger.error(f"[{self.id}] ERROR pathfinding putaway a {destino}: {e}")
+        if path and len(path) > 1:
+            self.status = "moving"
+
+            def _on_before(step_idx, step_position):
+                self.almacen.registrar_evento('estado_agente', {
+                    'agent_id': self.id,
+                    'agent_type': self.type,
+                    'position': self.current_position,
+                    'status': self.status,
+                    'current_task': wo.id,
+                    'current_work_area': wo.work_area,
+                    'cargo_volume': self.cargo_volume
+                })
+
+            yield from self._recorrer_tramo(
+                path, self.default_speed, on_before=_on_before,
+                time_per_cell=self.time_per_cell, goal_dwell=goal_dwell)
+            self.total_distance_traveled += len(path) - 1
+        else:
+            self._jump_to(destino)
+
+    def _execute_putaway_tour(self, tour):
+        """
+        INIT-7 F2: ciclo de UN putaway (1 pallet por viaje):
+        ir al muelle -> cargar el pallet -> ir a la ubicacion destino ->
+        depositar -> stock += (registrar_stock_putaway) -> WO completada.
+        """
+        wo = tour['work_orders'][0]
+        tour_start_time = self.env.now
+        load_time = float(getattr(self.almacen, 'inbound_config', {})
+                          .get('putaway_load_time', 10.0))
+
+        self.status = "working"
+        self.almacen.dispatcher.notificar_inicio_trabajo(self, wo)
+        logger.info(f"[{self.id}] t={self.env.now:.1f} Putaway asignado: {wo.id} "
+              f"muelle {getattr(wo, 'dock_id', '?')} -> {wo.target_location}")
+
+        # 1. Ir al muelle y cargar el pallet.
+        yield from self._putaway_nav(wo.ubicacion, wo, goal_dwell=load_time)
+        self.status = "picking"
+        self.almacen.registrar_evento('estado_agente', {
+            'agent_id': self.id, 'agent_type': self.type,
+            'position': self.current_position, 'status': self.status,
+            'current_task': wo.id, 'current_work_area': wo.work_area,
+            'cargo_volume': self.cargo_volume
+        })
+        self._tw_reserve_dwell(load_time)
+        yield self.env.timeout(load_time)
+
+        pallet = None
+        if hasattr(self.almacen, 'tomar_pallet_inbound'):
+            pallet = self.almacen.tomar_pallet_inbound(
+                getattr(wo, 'pallet_id', None))
+        self.cargo_volume += wo.cantidad_inicial * wo.sku.volumen
+        self.almacen.registrar_evento('inbound_putaway_started', {
+            'pallet_id': getattr(wo, 'pallet_id', None),
+            'work_order_id': wo.id,
+            'agent_id': self.id,
+            'dock_id': getattr(wo, 'dock_id', None),
+            'sku_id': wo.sku_id,
+            'quantity': wo.cantidad_inicial,
+        })
+
+        # 2. Ir a la ubicacion destino y depositar.
+        yield from self._putaway_nav(wo.target_location, wo,
+                                     goal_dwell=float(self.discharge_time))
+        self.status = "unloading"
+        self.almacen.registrar_evento('estado_agente', {
+            'agent_id': self.id, 'agent_type': self.type,
+            'position': self.current_position, 'status': self.status,
+            'current_task': wo.id, 'current_work_area': wo.work_area,
+            'cargo_volume': self.cargo_volume
+        })
+        self._tw_reserve_dwell(float(self.discharge_time))
+        yield self.env.timeout(float(self.discharge_time))
+
+        self.cargo_volume = max(0, self.cargo_volume
+                                - wo.cantidad_inicial * wo.sku.volumen)
+        wo.cantidad_restante = 0
+        # Stock += en la ubicacion real + dock-to-stock + evento de analitica.
+        self.almacen.registrar_stock_putaway(wo, pallet)
+        # Contabilidad estandar (misma que un pick: contadores + terminacion).
+        self.almacen.dispatcher.notificar_completado_individual(self, wo)
+
+        self.almacen.registrar_evento('trip_completed', {
+            'agent_id': self.id,
+            'data': {
+                'duration': self.env.now - tour_start_time,
+                'num_work_orders': 1
+            }
+        })
+        self.almacen.dispatcher.finalizar_tour(self)
+        self.tasks_completed += 1
+        logger.info(f"[{self.id}] t={self.env.now:.1f} Putaway completado: {wo.id} "
+              f"({wo.cantidad_inicial}u {wo.sku_id} en {wo.location_id})")
 
 
 class GroundOperator(BaseOperator):

@@ -1006,6 +1006,52 @@ class DataManager:
             print(f"[STOCK][ERROR] consume_stock failed for {location_id}: {e}")
             return None
 
+    def add_stock(self, location_id: str, qty: int,
+                  sim_now: Optional[float] = None) -> Optional[Tuple[int, int]]:
+        """
+        INIT-7 F2: simetrico de consume_stock. Suma stock a una ubicacion
+        cuando un pallet inbound se deposita (putaway completado).
+
+        La corrida sigue siendo reproducible: restore_inventory_baseline
+        restaura qty_available al inicio de cada corrida, asi que el stock
+        agregado por el putaway NO se acumula entre corridas.
+
+        Returns:
+            (new_qty_available, qty_reserved) on success, None on error/no-op.
+        """
+        if not location_id or qty is None or qty <= 0:
+            return None
+        if not os.path.exists(self.db_path):
+            return None
+
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT qty_available, qty_reserved FROM inventory WHERE location_id = ?",
+                (location_id,)
+            ).fetchone()
+            if row is None:
+                conn.close()
+                print(f"[STOCK][WARN] location '{location_id}' not in inventory - skip add")
+                return None
+
+            new_avail = (row['qty_available'] or 0) + qty
+            reserved = row['qty_reserved'] or 0
+
+            conn.execute(
+                "UPDATE inventory SET qty_available = ?, last_updated = ? "
+                "WHERE location_id = ?",
+                (new_avail, sim_now, location_id)
+            )
+            conn.commit()
+            conn.close()
+            return (new_avail, reserved)
+        except sqlite3.Error as e:
+            conn.close() if 'conn' in locals() else None
+            print(f"[STOCK][ERROR] add_stock failed for {location_id}: {e}")
+            return None
+
     def restore_inventory_baseline(self) -> bool:
         """
         Restore qty_available from a baseline snapshot and reset reservations (Fase 2).

@@ -4,22 +4,24 @@
 > presente, nada mas. Historial -> `docs/CHANGELOG.md`. Pendientes ->
 > `docs/BACKLOG.md`. Identidad/reglas/arquitectura -> `CLAUDE.md`.
 
-**Ultima actualizacion:** 2026-07-08
+**Ultima actualizacion:** 2026-07-09
 
 ## Git
 
-- `main` = `92426a6` (merge F0) + INIT-7 F1 (rama `feature/init7-inbound-f0`,
+- `main` = `72360b2` (merge F1) + INIT-7 F2 (rama `feature/init7-inbound-f0`,
   a mergear y pushear al cierre). Push directo a main autorizado.
 - Baseline byte-identico vigente: `sha256=71fc9904141ddc73...`, 4.920.352
-  bytes, seed 42, Python 3.13.6 (`tests/baseline.json`). INIT-7 F0/F1 NO lo
-  tocaron (GATE PASS sin update: inbound off/ausente en el canonico).
+  bytes, seed 42, Python 3.13.6 (`tests/baseline.json`). INIT-7 F0/F1/F2 NO
+  lo tocaron (GATE PASS sin update: inbound off/ausente en el canonico).
+  Determinismo con inbound ON tambien verificado (2 corridas seed 42 ->
+  sha256 identico).
 - REGLA pinneada por test BN-05: la metadata del .jsonl NO puede contener
   valores wall-clock (rompe el determinismo del gate).
 
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 141 passed, 1 deselected (~14s)
+python -m pytest -q                # 147 passed, 1 deselected (~10s)
 python scripts/regression_gate.py  # GATE PASS esperado
 ```
 
@@ -38,12 +40,19 @@ Plan completo + 4 decisiones del Director (2026-07-08):
   (`InboundProcess`, `InboundDock`=simpy.Resource, `InboundPallet`,
   `load_asn_trucks`); integracion en warehouse.py + event_generator.py;
   eventos inbound_* al .jsonl + marcador verde en el visor; tests IN-10..16.
-  Smoke real validado: 4 camiones / 8 pallets a tiempos exactos del ASN,
-  conviviendo con el picking. Los pallets quedan en `almacen.inbound_buffer`.
-- **Proxima fase: F2 (putaway)** — WO tipo putaway pre-generadas con
-  release=arrival (mecanismo de olas), tour de deposito en operators.py,
-  stock dinamico en memoria. NOTA: las WOs de putaway deben entrar a la
-  lista maestra para que la corrida no termine con pallets sin guardar.
+- **F2 HECHO (2026-07-09):** putaway completo — WOs pre-generadas en t=0
+  (agenda ASN o stochastic pre-muestreado), elegibles al aterrizar su pallet
+  (`marcar_pallet_listo`), cola propia en dispatcher (picks primero, putaway
+  de relleno), `_execute_putaway_tour` en operators (muelle -> destino,
+  1 pallet/viaje, filtro de equipamiento por work_area del destino),
+  slotting `fija_por_sku`, stock real via `data_manager.add_stock`, eventos
+  con `dock_to_stock`. Tests IN-20..25. Smoke: 10/10 pallets guardados.
+  Decisiones tecnicas completas en `docs/PLAN_INIT7_INBOUND.md`.
+- **Proxima fase: F3 (slotting conmutable)** — `cercana_al_muelle` (resolver
+  destino AL ATERRIZAR, no en t=0) y `abc_rotacion` + leer
+  `inbound.slotting_strategy` + selector en la UI web. Luego F4 (KPIs:
+  `build_inbound_summary`, el dock_to_stock ya viaja en cada evento
+  `inbound_pallet_stored`).
 
 ## Que esta VIVO y ACTIVO ahora mismo (ademas de CLAUDE.md §3/§5)
 

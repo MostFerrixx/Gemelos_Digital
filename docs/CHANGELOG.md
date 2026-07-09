@@ -10,6 +10,31 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-09
+
+- **INIT-7 F2 — INBOUND, putaway completo.** El corazon del motor inbound:
+  WOs `task_type='putaway'` pre-generadas en t=0 desde la agenda (ASN o
+  stochastic PRE-MUESTREADO via `build_stochastic_schedule`, finito por
+  `num_trucks`), elegibles POR EVENTO cuando su pallet aterriza
+  (`marcar_pallet_listo` fija el muelle real, imposible de precomputar por
+  contencion). Cola propia `putaway_pendientes` en el dispatcher (los pools
+  de pick no la ven; SI cuenta en lista_maestra => la corrida no termina
+  hasta guardar todo — el 5o camion del smoke F1 ahora llega). Prioridad:
+  picks primero, putaway de relleno (F5 lo revisa). 1 pallet por viaje;
+  work_area del destino => mismo filtro de equipamiento que un pick. Tour
+  de deposito en operators (`_execute_putaway_tour`: muelle -> cargar ->
+  ubicacion -> depositar, con `_recorrer_tramo` = congestion timewindow
+  incluida). Slotting F2 = `fija_por_sku` (F3 lo conmuta). Stock real via
+  `data_manager.add_stock` (simetrico del consume_stock que los picks ya
+  usan; baseline de inventario lo resetea entre corridas). Eventos
+  `inbound_putaway_started` / `inbound_pallet_stored` (con `dock_to_stock`
+  en tiempo de sim -> insumo de F4). 6 tests (IN-20..25). Validado: 147
+  passed, GATE PASS sin update, smoke real: 5 camiones / 10 pallets, 10/10
+  guardados en sus ubicaciones reales con stock +=, y DETERMINISMO con
+  inbound ON verificado (2 corridas seed 42 -> sha256 identico 63f8da4e).
+
+---
+
 ## 2026-07-08 (cont.)
 
 - **INIT-7 F1 — INBOUND, llegadas de camiones.** Nuevo
