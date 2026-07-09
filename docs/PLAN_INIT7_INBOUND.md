@@ -50,7 +50,7 @@ igual que hoy se comparan estrategias de despacho.
 | Fase | Entrega | Estado |
 |---|---|---|
 | F0 | Dominio y datos: hoja `InboundDocks` en el Excel canonico, tabla `inbound_docks` (schema+importer), loaders en data_manager, bloque `inbound` en config_schema, archivo ASN de ejemplo (`layouts/Inbound Test.json`), tests | **HECHO 2026-07-08** |
-| F1 | Llegadas: `InboundProcess` (espejo de OutboundProcess), camiones segun ASN o intervalo estocastico, descarga a buffer de muelle, eventos al .jsonl + marcadores en visor | pendiente |
+| F1 | Llegadas: `InboundProcess` (espejo de OutboundProcess), camiones segun ASN o intervalo estocastico, descarga a buffer de muelle, eventos al .jsonl + marcadores en visor | **HECHO 2026-07-08** |
 | F2 | Putaway: WO tipo `putaway` (muelle -> ubicacion) pre-generadas con release=arrival (mecanismo de olas), tour de deposito en operators, stock dinamico en memoria | pendiente |
 | F3 | Estrategias de slotting conmutables: `fija_por_sku` / `cercana_al_muelle` / `abc_rotacion` + selector en UI web | pendiente |
 | F4 | KPIs: `inbound_summary` (dock-to-stock time, distancia putaway, utilizacion de muelles) con el patron build_X_summary -> metadata/API/visor/Excel | pendiente |
@@ -96,10 +96,29 @@ igual que hoy se comparan estrategias de despacho.
   "asn_file_path": "layouts/Inbound Test.json",
   "truck_interval": 600.0,               // modo stochastic
   "pallets_per_truck": 10,               // modo stochastic
+  "units_per_pallet": 20,                // modo stochastic (qty por pallet, F1)
   "unload_time_per_pallet": 15.0,
   "slotting_strategy": "cercana_al_muelle"  // fija_por_sku | cercana_al_muelle | abc_rotacion
 }
 ```
+
+### Decisiones tecnicas de F1 (2026-07-08)
+
+- Muelles = `simpy.Resource(capacity=1)`: cola de camiones FIFO determinista,
+  sin polling. Cada camion es su PROPIO proceso SimPy (descargas simultaneas
+  en muelles distintos).
+- 1 linea del ASN = 1 pallet (espejo de 1 WO = 1 pallet en outbound).
+- Asignacion de muelle: `dock_id` explicito del ASN si existe; ausente o
+  invalido -> muelle con cola mas corta (empate: id menor, determinista).
+- Eventos al .jsonl: `inbound_truck_arrived` / `_docked` / 
+  `inbound_pallet_unloaded` / `inbound_truck_departed`. Marcador verde
+  (`truck_in`) en la barra de tiempo del visor por cada descarga.
+- Buffer sin tope en F1; los pallets quedan en `almacen.inbound_buffer`
+  (estado `in_dock_buffer`) hasta que F2 los consuma.
+- La TERMINACION de la simulacion sigue gobernada por las WOs de picking:
+  camiones con arrival_time posterior al fin del picking NO llegan (visto en
+  el smoke: el 5o camion del ASN, t=3600, quedo fuera). En F2 las WOs de
+  putaway entran a la lista maestra y extienden la corrida naturalmente.
 
 `enabled=false` (o bloque ausente) => comportamiento identico al historico;
 el gate byte-identico DEBE pasar sin actualizar baseline en F0 y F1.

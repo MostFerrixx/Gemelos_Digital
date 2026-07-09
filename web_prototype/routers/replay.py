@@ -499,8 +499,9 @@ def load_replay_file(file: str):
 @router.get("/api/event-markers")
 def get_event_markers():
     """D-15: tiempos de eventos notables del replay para marcar en la barra de tiempo.
-    Hoy: salidas de camion (truck_departed) como hitos del outbound. Devuelve [] si no hay
-    (p.ej. outbound apagado)."""
+    Hitos: salidas de camion outbound (truck_departed) y, desde INIT-7 F1,
+    descargas de camion inbound (inbound_truck_departed). Devuelve [] si no hay
+    (p.ej. ambos subsistemas apagados)."""
     markers = []
     try:
         for e in replay_data.events:
@@ -512,6 +513,15 @@ def get_event_markers():
                     "t": t,
                     "type": "truck",
                     "label": f"Camion {e.get('truck_id', '')} ({loaded} pallets)".strip()
+                })
+            elif etype == 'inbound_truck_departed':
+                t = e.get('timestamp', 0)
+                unloaded = e.get('pallets_unloaded', 0)
+                markers.append({
+                    "t": t,
+                    "type": "truck_in",
+                    "label": (f"Recepcion {e.get('truck_id', '')} "
+                              f"({unloaded} pallets, muelle {e.get('dock_id', '?')})").strip()
                 })
     except Exception as ex:
         print(f"[EVENT-MARKERS] WARN: {ex}")

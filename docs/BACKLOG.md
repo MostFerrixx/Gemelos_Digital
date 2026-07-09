@@ -7,7 +7,7 @@ Actualizado: 2026-07-08 · Responsable: Cerebellum
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
-| INIT-7 — Inbound F1-F5 (F0 HECHO) | EN CURSO | **Alta (iniciativa activa)** | F1-F4 ~2-3 sesiones, F5 +1-2 | Ninguno; F5 requiere decision 4 del plan |
+| INIT-7 — Inbound F2-F5 (F0+F1 HECHOS) | EN CURSO | **Alta (iniciativa activa)** | F2-F4 ~2 sesiones, F5 +1-2 | Ninguno; F5 requiere decision 4 del plan |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
@@ -18,19 +18,18 @@ Actualizado: 2026-07-08 · Responsable: Cerebellum
 ## INIT-7 — INBOUND: recepcion y almacenamiento (INICIATIVA ACTIVA)
 
 **Plan completo y decisiones del Director (2026-07-08):
-`docs/PLAN_INIT7_INBOUND.md`.** F0 (dominio y datos) HECHO — ver CHANGELOG
-2026-07-08. Fases pendientes:
+`docs/PLAN_INIT7_INBOUND.md`.** F0 (dominio y datos) y F1 (llegadas) HECHOS —
+ver CHANGELOG 2026-07-08. Fases pendientes:
 
-- **F1 — Llegadas:** `InboundProcess` espejo de `OutboundProcess` (outbound.py):
-  camiones segun ASN (`layouts/Inbound Test.json` de ejemplo) o intervalo
-  estocastico, descarga a buffer de muelle (anclas ya cargadas:
-  `data_manager.get_inbound_dock_locations()`), eventos al .jsonl +
-  marcadores en el visor. Gate DEBE pasar sin update (inbound off en canonico).
 - **F2 — Putaway:** WO tipo `putaway` (muelle -> ubicacion) pre-generadas en
   t=0 con release=arrival reusando el mecanismo de olas
   (`dispatcher._wo_elegible_por_ola`); tour de deposito en `operators.py`
   (inverso del pick: cargar en muelle, depositar en racks); stock dinamico EN
-  MEMORIA (la BD no se escribe en caliente).
+  MEMORIA (la BD no se escribe en caliente). Los pallets ya esperan en
+  `almacen.inbound_buffer` (estado `in_dock_buffer`, F1). NOTA de F1: las WOs
+  de putaway deben entrar a la lista maestra para que la corrida no termine
+  con pallets sin guardar (hoy el fin del picking corta las llegadas
+  posteriores).
 - **F3 — Slotting (el valor de producto):** estrategias conmutables
   `fija_por_sku` / `cercana_al_muelle` / `abc_rotacion` + selector en UI web
   (patron de guia de 3 niveles). Comparables con el experiment runner A/B.

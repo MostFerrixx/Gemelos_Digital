@@ -348,6 +348,46 @@ class AlmacenMejorado:
         else:
             print("[OUTBOUND] desactivado (enabled:false) - comportamiento actual.")
 
+        # ============================================================
+        # INIT-7 - INBOUND (recepcion) - F1: llegadas de camiones.
+        # Con enabled:false (default, bloque AUSENTE en el canonico) nada de
+        # esto se ejecuta => .jsonl byte-identico al baseline.
+        # ============================================================
+        self.inbound_config = configuracion.get('inbound', {'enabled': False})
+        self.inbound_enabled = bool(self.inbound_config.get('enabled', False))
+        self.inbound_docks = {}       # {dock_id: InboundDock}
+        self.inbound_buffer = []      # pallets descargados esperando putaway (F2)
+        self.inbound_process = None
+        if self.inbound_enabled:
+            from .inbound import InboundDock, InboundProcess
+            docks_raw = (self.data_manager.get_inbound_dock_locations()
+                         if self.data_manager is not None else {})
+            if not docks_raw:
+                print("[INBOUND][WARN] enabled=true pero sin muelles (hoja "
+                      "InboundDocks vacia/ausente) - inbound se DESACTIVA.")
+                self.inbound_enabled = False
+            else:
+                self.inbound_docks = {
+                    did: InboundDock(did, cell, self.env)
+                    for did, cell in sorted(docks_raw.items())
+                }
+                self.inbound_metrics = {
+                    'trucks_received': 0,
+                    'pallets_unloaded': 0,
+                    'units_received': 0,
+                    'dock_wait_events': 0,
+                    'dock_wait_time': 0.0,
+                    'max_dock_wait': 0.0,
+                    'buffer_peak': 0,
+                }
+                self.inbound_process = InboundProcess(
+                    self.env, self, self.inbound_config)
+                print(f"[INBOUND] F1 activo: {len(self.inbound_docks)} muelles "
+                      f"{ {d: k.cell for d, k in self.inbound_docks.items()} }, "
+                      f"modo={self.inbound_process.arrival_mode}")
+        else:
+            print("[INBOUND] desactivado (enabled:false) - comportamiento actual.")
+
         # Counters (dual system: WorkOrders and PickingTasks)
         self.workorders_completadas_count = 0  # Main KPI counter
         self.tareas_completadas_count = 0      # Legacy picking tasks counter

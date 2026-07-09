@@ -10,6 +10,25 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-08 (cont.)
+
+- **INIT-7 F1 — INBOUND, llegadas de camiones.** Nuevo
+  `src/subsystems/simulation/inbound.py`: `InboundProcess` (espejo de
+  OutboundProcess) con modos deterministic (ASN via `load_asn_trucks`, valida
+  y reordena) y stochastic (intervalo + SKUs muestreados del catalogo
+  ordenado, reproducible bajo seed); muelles como `simpy.Resource(cap=1)`
+  (cola FIFO determinista, cada camion es su propio proceso); pallets al
+  `inbound_buffer` (estado `in_dock_buffer`, F2 los consume). Integracion:
+  bloque inbound en `warehouse.py` (docks+metrics+process, se autodesactiva
+  sin muelles), arranque 7d + telemetria en `event_generator.py`, eventos
+  `inbound_truck_arrived/_docked/_pallet_unloaded/_departed` al .jsonl,
+  marcador verde `truck_in` en la barra de tiempo del visor, clave
+  `units_per_pallet` al schema. 7 tests (IN-10..16). Validado: 141 passed,
+  GATE PASS sin update (inbound off en canonico), smoke real con ASN: 4
+  camiones/8 pallets a tiempos exactos conviviendo con el picking.
+
+---
+
 ## 2026-07-08
 
 - **INIT-7 F0 — INBOUND, dominio y datos.** Arranca la iniciativa de
