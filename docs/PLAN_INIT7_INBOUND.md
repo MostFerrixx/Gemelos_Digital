@@ -51,7 +51,7 @@ igual que hoy se comparan estrategias de despacho.
 |---|---|---|
 | F0 | Dominio y datos: hoja `InboundDocks` en el Excel canonico, tabla `inbound_docks` (schema+importer), loaders en data_manager, bloque `inbound` en config_schema, archivo ASN de ejemplo (`layouts/Inbound Test.json`), tests | **HECHO 2026-07-08** |
 | F1 | Llegadas: `InboundProcess` (espejo de OutboundProcess), camiones segun ASN o intervalo estocastico, descarga a buffer de muelle, eventos al .jsonl + marcadores en visor | **HECHO 2026-07-08** |
-| F2 | Putaway: WO tipo `putaway` (muelle -> ubicacion) pre-generadas con release=arrival (mecanismo de olas), tour de deposito en operators, stock dinamico en memoria | pendiente |
+| F2 | Putaway: WO tipo `putaway` (muelle -> ubicacion) pre-generadas en t=0, tour de deposito en operators, stock dinamico | **HECHO 2026-07-09** |
 | F3 | Estrategias de slotting conmutables: `fija_por_sku` / `cercana_al_muelle` / `abc_rotacion` + selector en UI web | pendiente |
 | F4 | KPIs: `inbound_summary` (dock-to-stock time, distancia putaway, utilizacion de muelles) con el patron build_X_summary -> metadata/API/visor/Excel | pendiente |
 | F5 | Flujo mixto inbound+outbound: flota compartida, prioridades pick vs putaway, stock entrante alimenta pedidos (requiere decision 4) | pendiente |
@@ -119,6 +119,44 @@ igual que hoy se comparan estrategias de despacho.
   camiones con arrival_time posterior al fin del picking NO llegan (visto en
   el smoke: el 5o camion del ASN, t=3600, quedo fuera). En F2 las WOs de
   putaway entran a la lista maestra y extienden la corrida naturalmente.
+  **[RESUELTO en F2: verificado en smoke, el 5o camion ahora llega y sus
+  pallets se guardan.]**
+
+### Decisiones tecnicas de F2 (2026-07-09)
+
+- **WOs de putaway pre-generadas en t=0** desde la agenda inbound (1 linea
+  ASN = 1 pallet = 1 WO, ids `WO-PUT-{truck}-{i}` alineados con
+  `INP-{truck}-{i}`). Para el modo stochastic la agenda se PRE-MUESTREA en
+  t=0 (`build_stochastic_schedule`, FINITA via `num_trucks` default 5) y el
+  InboundProcess la reproduce: equivalente bajo seed y necesario para
+  conocer las WOs de antemano.
+- **Elegibilidad por evento, no por reloj:** la WO nace `pallet_ready=False`
+  y el InboundProcess la libera al descargar (`marcar_pallet_listo`, que
+  ademas fija el muelle REAL: no se puede precomputar porque depende de la
+  contencion de muelles). Mas preciso que las olas por release_time.
+- **Cola propia en el dispatcher** (`putaway_pendientes`): las estrategias
+  de pick no la ven; SI entra a `lista_maestra` => la terminacion espera a
+  que todo se guarde. Prioridad: PICKS PRIMERO (despacho a cliente manda);
+  putaway solo cuando el flujo de picks no encontro tour. F5 revisa esto.
+- **1 pallet por viaje** (realismo de paleta: un montacargas lleva UNA).
+  El work_area de la WO = el del DESTINO => mismo filtro de equipamiento
+  que un pick (Forklift guarda en Area_High, Ground en Area_Ground).
+- **Slotting F2 = `fija_por_sku`** (el pallet va donde su SKU vive, menor
+  pick_sequence). F3 lo hace conmutable con las otras dos estrategias.
+- **Stock dinamico via `data_manager.add_stock`** (simetrico del
+  `consume_stock` que los picks YA usan escribiendo inventory en caliente;
+  el plan original decia "en memoria" pero la simetria con el mecanismo
+  existente gana). `restore_inventory_baseline` al inicio de cada corrida
+  garantiza que el stock agregado no se acumula entre corridas.
+- **Determinismo verificado con inbound ON:** dos corridas seguidas con
+  seed 42 dan .jsonl con sha256 identico (63f8da4e...).
+- Eventos nuevos: `inbound_putaway_started` (pallet cargado en muelle) e
+  `inbound_pallet_stored` (deposito, con `dock_to_stock` en segundos de sim
+  = t_stored - t_unloaded; insumo directo de F4).
+- Claves nuevas de config (registradas en schema): `num_trucks`,
+  `putaway_load_time` (default 10 s).
+- Edge documentado: pallet cuyo SKU no esta en el plan maestro => WARN, se
+  descarga pero queda en buffer sin WO (no bloquea la terminacion).
 
 `enabled=false` (o bloque ausente) => comportamiento identico al historico;
 el gate byte-identico DEBE pasar sin actualizar baseline en F0 y F1.

@@ -72,6 +72,9 @@ class DispatcherV11:
         self.work_orders_asignados: Dict[str, List[Any]] = {}    # {operator_id: [WO1, WO2...]}
         self.work_orders_en_progreso: Dict[str, Any] = {}        # {operator_id: current_WO}
         self.work_orders_completados: List[Any] = []             # COMPLETED state
+        # INIT-7 F2: cola SEPARADA de putaway (no contamina los pools de pick;
+        # SI entran a lista_maestra => la terminacion las espera).
+        self.putaway_pendientes: List[Any] = []
 
         # Operator Tracking
         self.operadores_disponibles: List[Any] = []              # Idle operators
@@ -146,7 +149,13 @@ class DispatcherV11:
 
         for wo in work_orders:
             self.lista_maestra_work_orders.append(wo)
-            self.work_orders_pendientes.append(wo)
+            # INIT-7 F2: las WOs de putaway van a su propia cola (las
+            # estrategias de pick iteran work_orders_pendientes y no deben
+            # verlas); igual cuentan en lista_maestra para la terminacion.
+            if getattr(wo, 'task_type', 'pick') == 'putaway':
+                self.putaway_pendientes.append(wo)
+            else:
+                self.work_orders_pendientes.append(wo)
             wo.status = "released"
 
         # FASE 2: Configurar contador inicial de WorkOrders para metadata
@@ -207,8 +216,9 @@ class DispatcherV11:
                 logger.debug(f"[DISPATCHER] {self.env.now:.2f} - No hay WorkOrders pendientes para "
                       f"{operator.type}_{operator.id}")
                 self._last_no_work_log[operator_key] = self.env.now
-            
-            return None
+
+            # INIT-7 F2: sin picks pendientes, intentar putaway (None si no hay).
+            return self._asignar_putaway(operator)
 
         # BUGFIX: Evitar spam de logs - solo log cada 5 segundos
         if not hasattr(self, '_last_request_log'):
@@ -236,8 +246,9 @@ class DispatcherV11:
             if self.env.now - last_log_time >= 60.0:
                 logger.debug(f"[DISPATCHER] No hay candidatos viables para {operator.type}_{operator.id}")
                 self._last_no_candidates_log[operator_key] = self.env.now
-            
-            return None
+
+            # INIT-7 F2: sin candidatos de pick, intentar putaway.
+            return self._asignar_putaway(operator)
 
         logger.debug(f"[DISPATCHER] Estrategia '{self.estrategia}' selecciono {len(candidatos)} candidatos")
 
@@ -258,7 +269,8 @@ class DispatcherV11:
 
         if not selected_work_orders:
             logger.debug(f"[DISPATCHER] No se pudo seleccionar batch para {operator.type}_{operator.id}")
-            return None
+            # INIT-7 F2: sin batch de pick viable, intentar putaway.
+            return self._asignar_putaway(operator)
 
         # Step 4: Build optimal tour
         tour = self._construir_tour(operator, selected_work_orders)
@@ -287,6 +299,52 @@ class DispatcherV11:
               f"distancia: {tour_result['total_distance']:.1f}, "
               f"volumen: {tour_result['total_volume']}")
 
+        return tour_result
+
+    def _asignar_putaway(self, operator: Any) -> Optional[Dict[str, Any]]:
+        """
+        INIT-7 F2: asigna UNA WO de putaway (1 pallet por viaje, realismo de
+        paleta). Solo se llama cuando el flujo de picks no encontro tour =>
+        el picking (despacho a cliente) tiene prioridad sobre el guardado.
+
+        Elegibilidad: pallet aterrizado (pallet_ready) + work_area del DESTINO
+        servible por el operario (mismo filtro de equipamiento que un pick).
+        Orden: pallet listo hace mas tiempo primero (FIFO por
+        tiempo_pallet_listo, empate por id: determinista).
+        """
+        if not self.putaway_pendientes:
+            return None
+
+        elegibles = [
+            wo for wo in self.putaway_pendientes
+            if getattr(wo, 'pallet_ready', False)
+            and operator.get_priority_for_work_area(wo.work_area) < 999
+        ]
+        if not elegibles:
+            return None
+
+        wo = min(elegibles, key=lambda w: (w.tiempo_pallet_listo, w.id))
+
+        self.putaway_pendientes.remove(wo)
+        self._marcar_asignados(operator, [wo])
+
+        tour_result = {
+            'tour_type': 'putaway',
+            'work_orders': [wo],
+            # El operario resuelve los paths en ejecucion (pos actual ->
+            # muelle -> destino); la estructura minima mantiene el contrato.
+            'route': {'visit_sequence': [wo], 'segment_paths': [],
+                      'segment_distances': []},
+            'total_distance': 0.0,
+            'total_volume': wo.calcular_volumen_restante(),
+            'num_stops': 1,
+        }
+        self.total_asignaciones += 1
+        self.total_tours_creados += 1
+
+        logger.info(f"[DISPATCHER] Putaway asignado a {operator.type}_{operator.id}: "
+              f"{wo.id} (pallet {getattr(wo, 'pallet_id', '?')}, muelle "
+              f"{getattr(wo, 'dock_id', '?')} -> {wo.target_location})")
         return tour_result
 
     def _seleccionar_work_orders_candidatos(self, operator: Any) -> List[Any]:

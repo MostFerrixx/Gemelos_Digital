@@ -7,7 +7,7 @@ Actualizado: 2026-07-08 · Responsable: Cerebellum
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
-| INIT-7 — Inbound F2-F5 (F0+F1 HECHOS) | EN CURSO | **Alta (iniciativa activa)** | F2-F4 ~2 sesiones, F5 +1-2 | Ninguno; F5 requiere decision 4 del plan |
+| INIT-7 — Inbound F3-F5 (F0-F2 HECHOS) | EN CURSO | **Alta (iniciativa activa)** | F3+F4 ~1 sesion, F5 +1-2 | Ninguno; F5 requiere decision 4 del plan |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
@@ -18,24 +18,22 @@ Actualizado: 2026-07-08 · Responsable: Cerebellum
 ## INIT-7 — INBOUND: recepcion y almacenamiento (INICIATIVA ACTIVA)
 
 **Plan completo y decisiones del Director (2026-07-08):
-`docs/PLAN_INIT7_INBOUND.md`.** F0 (dominio y datos) y F1 (llegadas) HECHOS —
-ver CHANGELOG 2026-07-08. Fases pendientes:
-
-- **F2 — Putaway:** WO tipo `putaway` (muelle -> ubicacion) pre-generadas en
-  t=0 con release=arrival reusando el mecanismo de olas
-  (`dispatcher._wo_elegible_por_ola`); tour de deposito en `operators.py`
-  (inverso del pick: cargar en muelle, depositar en racks); stock dinamico EN
-  MEMORIA (la BD no se escribe en caliente). Los pallets ya esperan en
-  `almacen.inbound_buffer` (estado `in_dock_buffer`, F1). NOTA de F1: las WOs
-  de putaway deben entrar a la lista maestra para que la corrida no termine
-  con pallets sin guardar (hoy el fin del picking corta las llegadas
-  posteriores).
+`docs/PLAN_INIT7_INBOUND.md`.** F0 (dominio y datos), F1 (llegadas) y F2
+(putaway completo: WOs pre-generadas + tour de deposito + stock dinamico +
+dock-to-stock en eventos) HECHOS — ver CHANGELOG 2026-07-08/09 y las
+decisiones tecnicas de F2 en el plan. Fases pendientes:
 - **F3 — Slotting (el valor de producto):** estrategias conmutables
-  `fija_por_sku` / `cercana_al_muelle` / `abc_rotacion` + selector en UI web
+  `fija_por_sku` (HECHA en F2, hoy default hardcodeado en
+  `warehouse._generar_putaway_work_orders`) / `cercana_al_muelle` /
+  `abc_rotacion`, leyendo `inbound.slotting_strategy` + selector en UI web
   (patron de guia de 3 niveles). Comparables con el experiment runner A/B.
+  Nota tecnica: `cercana_al_muelle` necesita resolver destino AL ATERRIZAR
+  (depende del muelle real) => mover la resolucion de destino de la
+  generacion t=0 a `marcar_pallet_listo`.
 - **F4 — KPIs:** `build_inbound_summary()` en `core/replay_utils.py`
-  (dock-to-stock time, distancia putaway, utilizacion de muelles) ->
-  metadata/API/visor/Excel. PROHIBIDO wall-clock en metadata (regla BN-05).
+  (dock-to-stock ya viene en cada evento `inbound_pallet_stored`, distancia
+  putaway, utilizacion de muelles) -> metadata/API/visor/Excel + hoja Excel.
+  PROHIBIDO wall-clock en metadata (regla BN-05).
 - **F5 — Flujo mixto** (segunda etapa): flota compartida pick+putaway,
   requiere la decision 4 del plan (stock del dia disponible para picking del
   mismo dia vs turnos separados).

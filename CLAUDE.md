@@ -150,9 +150,12 @@ defaults que reproducen el comportamiento histórico. Por eso una corrida sin el
 - **`inbound`** (INIT-7, bloque opt-in, default ausente/`enabled:false`):
   recepcion de camiones en muelles (hoja Excel `InboundDocks`, tabla
   `inbound_docks`) segun ASN determinista (`asn_file_path`) o intervalo
-  estocastico; pallets a `almacen.inbound_buffer` esperando putaway (F2).
-  Lectores: `warehouse.py` + `src/subsystems/simulation/inbound.py`.
-  Contrato y fases en `docs/PLAN_INIT7_INBOUND.md`.
+  estocastico pre-muestreado; putaway completo (WOs pre-generadas en t=0,
+  elegibles al aterrizar su pallet, cola propia en dispatcher con picks
+  primero, 1 pallet/viaje, stock via `data_manager.add_stock`). Lectores:
+  `warehouse.py` + `inbound.py` + `dispatcher._asignar_putaway` +
+  `operators._execute_putaway_tour`. Contrato y decisiones en
+  `docs/PLAN_INIT7_INBOUND.md`.
 - **`cercania_tour_mode`** ("cost" default / "greedy_nn"): BK-03; greedy descartado.
 - Refactor **Template Method** en `operators.py`: `BaseOperator.agent_process()` +
   hook `_do_picking_at()` por subclase (Ground/Forklift). Logging por nivel en todo

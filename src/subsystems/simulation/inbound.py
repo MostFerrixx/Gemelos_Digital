@@ -146,6 +146,61 @@ def load_asn_trucks(asn_path: str) -> List[Dict[str, Any]]:
     return sorted(trucks, key=lambda t: (t["arrival_time"], t["truck_id"]))
 
 
+def build_stochastic_schedule(config: Dict[str, Any],
+                              sku_catalog: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    F2: pre-muestrea la agenda de camiones del modo stochastic EN t=0.
+
+    Antes (F1) el loop estocastico muestreaba durante la corrida; F2 necesita
+    la agenda completa de antemano para pre-generar las WOs de putaway (misma
+    palanca que las olas de INIT-4). Muestrear en t=0 es equivalente y
+    reproducible bajo WAREHOUSE_SEED. La agenda es FINITA (`num_trucks`):
+    la simulacion debe poder terminar cuando todo el putaway este hecho.
+    """
+    catalog = sorted(sku_catalog or {})
+    if not catalog:
+        return []
+    interval = float(config.get("truck_interval", 600.0))
+    pallets = int(config.get("pallets_per_truck", 10))
+    units = int(config.get("units_per_pallet", 20))
+    num_trucks = int(config.get("num_trucks", 5))
+    schedule = []
+    for n in range(1, num_trucks + 1):
+        schedule.append({
+            "truck_id": f"IN-S{n}",
+            "arrival_time": interval * n,
+            "lines": [{"sku_id": random.choice(catalog), "quantity": units}
+                      for _ in range(pallets)],
+        })
+    return schedule
+
+
+def resolve_target_fija_por_sku(sku_id: str,
+                                picking_points: List[Dict[str, Any]]
+                                ) -> Optional[Dict[str, Any]]:
+    """
+    F2: slotting 'fija_por_sku' (default): el pallet se guarda donde ese SKU
+    ya vive (su ubicacion de picking con menor pick_sequence: determinista).
+
+    Returns:
+        {'cell': (x, y), 'location_id': str, 'work_area': str} o None si el
+        SKU no tiene ubicacion en el plan maestro.
+    """
+    best = None
+    for punto in picking_points or []:
+        if punto.get('sku_initial') != sku_id:
+            continue
+        if best is None or punto.get('pick_sequence', 0) < best.get('pick_sequence', 0):
+            best = punto
+    if best is None:
+        return None
+    return {
+        'cell': (best['x'], best['y']),
+        'location_id': best.get('location_id'),
+        'work_area': best.get('WorkArea', 'Area_Ground'),
+    }
+
+
 class InboundProcess:
     """
     Proceso de llegadas de camiones inbound (F1).
@@ -190,8 +245,15 @@ class InboundProcess:
     # ------------------------------------------------------------------
 
     def run(self):
-        """Proceso raiz: agenda las llegadas segun el modo configurado."""
-        if self.arrival_mode == "stochastic":
+        """Proceso raiz: agenda las llegadas segun el modo configurado.
+
+        F2: si hay agenda pre-construida (trucks), se REPRODUCE tal cual sin
+        importar el modo (el warehouse pre-muestrea tambien el stochastic para
+        poder generar las WOs de putaway en t=0). El loop estocastico en vivo
+        queda como fallback para uso standalone (tests F1)."""
+        if self._trucks is not None:
+            yield from self._run_deterministic()
+        elif self.arrival_mode == "stochastic":
             yield from self._run_stochastic()
         else:
             yield from self._run_deterministic()
@@ -292,6 +354,11 @@ class InboundProcess:
                 )
                 if buffer is not None:
                     buffer.append(pallet)
+                # F2: liberar la WO de putaway de este pallet (si el almacen
+                # las pre-genero; los stubs de test F1 no tienen el metodo).
+                marcar = getattr(self.almacen, 'marcar_pallet_listo', None)
+                if callable(marcar):
+                    marcar(pallet, dock)
                 self.pallets_unloaded += 1
                 if m is not None:
                     m['pallets_unloaded'] = m.get('pallets_unloaded', 0) + 1
