@@ -10,10 +10,43 @@ decisiones tecnicas en `docs/PLAN_INIT7_INBOUND.md`.)*
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
+| MEJ-ROBUSTEZ-AGENTES — tour sin try/except => cuelgue infinito | ABIERTO (auditoria 2026-07-10) | **Media-alta** | ~1 sesion corta | Requiere OK del Director al mini-plan |
+| Menores de auditoria (UX cross-dock, throughput picks-only, LOCATION) | ABIERTO | Baja | ~1-2 h el paquete | Ninguno |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
 | Distribucion real de `outbound_staging_distribution` en config canonico | PENDIENTE DECISION | -- | Trivial (config) | Decision de negocio del Director, no un bug |
+
+---
+
+## MEJ-ROBUSTEZ-AGENTES — excepcion a mitad de tour = cuelgue infinito
+
+**Origen: auditoria 2026-07-10. PRE-EXISTENTE (no es regresion de INIT-7).**
+Ni el tour de picks ni el de putaway estan envueltos en try/except dentro de
+`agent_process` (operators.py): si algo revienta a mitad de tour (pathfinding,
+dato corrupto), el generador SimPy muere EN SILENCIO, su WO asignada nunca
+completa y `simulacion_ha_terminado()` nunca da True => el headless queda
+colgado para siempre (al optimizador lo salva el timeout de 600s; al server
+web y al CLI, nadie). Fix propuesto: try/except alrededor de la ejecucion del
+tour que (a) loguee el stack ASCII, (b) libere la contabilidad de la WO
+(devolverla a pendientes o marcarla fallida y completada-con-error para que
+la terminacion cierre), (c) deje al agente volver al ciclo idle. El diseno
+fino de (b) es la decision central: re-encolar puede re-crashear en loop;
+marcar fallida requiere un estado nuevo visible en el visor. Traer mini-plan
+al Director antes de tocar.
+
+---
+
+## Menores de la auditoria 2026-07-10 (paquete ~1-2 h)
+
+1. **UX cross-dock:** si el toggle esta activo con pedidos en modo
+   Estocastico, el motor avisa por consola y se desactiva, pero la UI no
+   dice nada. Agregar aviso visual en el tab Inbound.
+2. **`throughput_wo_per_s` mezcla picks+putaway+XD** con el tiempo extendido
+   de la recepcion: comparar configs con/sin inbound por throughput es
+   enganoso. Opcion: KPI `throughput_picks_per_s` limpio o nota en la UI.
+3. **LOCATION vacia** en la tabla del visor para WOs de putaway antes de
+   aterrizar (podria decir "en camion"). Cosmetico puro.
 
 ---
 

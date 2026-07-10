@@ -1,0 +1,304 @@
+{
+ "metadata": {
+  "version": "1.0",
+  "description": "Demo cross-dock INIT-7 F5b: pedidos canonicos + pedido insaciable de SKU029 (excede el stock -> backorder que el ASN rescata)",
+  "created_at": "2025-12-08"
+ },
+ "orders": [
+  {
+   "order_id": "ORD-001",
+   "items": [
+    {
+     "sku_id": "SKU029",
+     "quantity": 3
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-002",
+   "items": [
+    {
+     "sku_id": "SKU046",
+     "quantity": 5
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-003",
+   "items": [
+    {
+     "sku_id": "SKU015",
+     "quantity": 2
+    },
+    {
+     "sku_id": "SKU039",
+     "quantity": 4
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-004",
+   "items": [
+    {
+     "sku_id": "SKU012",
+     "quantity": 1
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-005",
+   "items": [
+    {
+     "sku_id": "SKU023",
+     "quantity": 10
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-006",
+   "items": [
+    {
+     "sku_id": "SKU050",
+     "quantity": 2
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-007",
+   "items": [
+    {
+     "sku_id": "SKU011",
+     "quantity": 5
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-008",
+   "items": [
+    {
+     "sku_id": "SKU019",
+     "quantity": 3
+    },
+    {
+     "sku_id": "SKU024",
+     "quantity": 3
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-009",
+   "items": [
+    {
+     "sku_id": "SKU049",
+     "quantity": 1
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-010",
+   "items": [
+    {
+     "sku_id": "SKU009",
+     "quantity": 6
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-011",
+   "items": [
+    {
+     "sku_id": "SKU004",
+     "quantity": 2
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-012",
+   "items": [
+    {
+     "sku_id": "SKU042",
+     "quantity": 4
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-013",
+   "items": [
+    {
+     "sku_id": "SKU008",
+     "quantity": 5
+    },
+    {
+     "sku_id": "SKU032",
+     "quantity": 5
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-014",
+   "items": [
+    {
+     "sku_id": "SKU006",
+     "quantity": 1
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-015",
+   "items": [
+    {
+     "sku_id": "SKU030",
+     "quantity": 2
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-016",
+   "items": [
+    {
+     "sku_id": "SKU017",
+     "quantity": 3
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-017",
+   "items": [
+    {
+     "sku_id": "SKU044",
+     "quantity": 2
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-018",
+   "items": [
+    {
+     "sku_id": "SKU020",
+     "quantity": 4
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-019",
+   "items": [
+    {
+     "sku_id": "SKU037",
+     "quantity": 1
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-020",
+   "items": [
+    {
+     "sku_id": "SKU041",
+     "quantity": 3
+    },
+    {
+     "sku_id": "SKU021",
+     "quantity": 2
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-021",
+   "items": [
+    {
+     "sku_id": "SKU031",
+     "quantity": 5
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-022",
+   "items": [
+    {
+     "sku_id": "SKU026",
+     "quantity": 2
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-023",
+   "items": [
+    {
+     "sku_id": "SKU042",
+     "quantity": 3
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-024",
+   "items": [
+    {
+     "sku_id": "SKU035",
+     "quantity": 1
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-025",
+   "items": [
+    {
+     "sku_id": "SKU040",
+     "quantity": 4
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-026",
+   "items": [
+    {
+     "sku_id": "SKU003",
+     "quantity": 2
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-027",
+   "items": [
+    {
+     "sku_id": "SKU030",
+     "quantity": 3
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-028",
+   "items": [
+    {
+     "sku_id": "SKU034",
+     "quantity": 2
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-029",
+   "items": [
+    {
+     "sku_id": "SKU027",
+     "quantity": 5
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-030",
+   "items": [
+    {
+     "sku_id": "SKU038",
+     "quantity": 1
+    }
+   ]
+  },
+  {
+   "order_id": "ORD-XDEMO",
+   "items": [
+    {
+     "sku_id": "SKU029",
+     "quantity": 5000
+    }
+   ]
+  }
+ ]
+}

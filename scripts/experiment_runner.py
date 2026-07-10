@@ -217,12 +217,30 @@ def build_run_result(results):
     return rows
 
 
+def _collect_paired_values(key, results_a, results_b):
+    """AUDIT 2026-07-10: pares (a, b) de la MISMA replica (mismo indice =
+    misma semilla), descartando el par completo si CUALQUIER lado es None.
+
+    Antes se filtraban los None por lado ANTES de parear (_collect_values
+    independiente): si los None caian en semillas distintas entre A y B, el
+    t-test pareado comparaba replicas desalineadas como si fueran pares.
+    Con los KPIs opcionales (fill_rate_pct, avg_dock_to_stock,
+    fill_rate_effective_pct...) el riesgo es real. Media y veredicto se
+    calculan sobre los MISMOS pares (consistencia estadistica)."""
+    pares_a, pares_b = [], []
+    for ra, rb in zip(results_a, results_b):
+        va, vb = ra.get(key), rb.get(key)
+        if va is not None and vb is not None:
+            pares_a.append(va)
+            pares_b.append(vb)
+    return pares_a, pares_b
+
+
 def build_compare_result(results_a, results_b):
     """Filas serializables de la comparacion A/B (para --progress-json y Excel)."""
     rows = []
     for key in ALL_KPI_KEYS + OPTIONAL_KPI_KEYS:
-        values_a = _collect_values(key, results_a)
-        values_b = _collect_values(key, results_b)
+        values_a, values_b = _collect_paired_values(key, results_a, results_b)
         if not values_a or not values_b:
             rows.append({"kpi": key, "available": False})
             continue
@@ -303,8 +321,8 @@ def _print_compare_summary(results_a, results_b):
     print("COMPARACION A/B -- %d replicas pareadas por semilla" % len(results_a))
     print("=" * 90)
     for key in ALL_KPI_KEYS + OPTIONAL_KPI_KEYS:
-        values_a = _collect_values(key, results_a)
-        values_b = _collect_values(key, results_b)
+        # AUDIT 2026-07-10: parear por semilla ANTES de filtrar None.
+        values_a, values_b = _collect_paired_values(key, results_a, results_b)
         if not values_a or not values_b:
             print("%-32s N/A (no disponible en este modo)" % key)
             continue
@@ -337,8 +355,8 @@ def _export_excel(path, results, results_b=None):
             df_b.to_excel(writer, sheet_name="Replicas_B", index=False)
             compare_rows = []
             for k in ALL_KPI_KEYS + OPTIONAL_KPI_KEYS:
-                values_a = _collect_values(k, results)
-                values_b = _collect_values(k, results_b)
+                # AUDIT 2026-07-10: parear por semilla ANTES de filtrar None.
+                values_a, values_b = _collect_paired_values(k, results, results_b)
                 if not values_a or not values_b:
                     compare_rows.append({"kpi": k, "mean_a": None, "mean_b": None,
                                           "pvalue": None, "verdict": "N/A (no disponible en este modo)"})
