@@ -32,6 +32,7 @@ class ReplayData:
         self.service_level = None  # INIT-5: resumen de nivel de servicio (backorders)
         self.sla_summary = None  # INIT-4b: resumen de cumplimiento de SLA (due_time)
         self.bottleneck_summary = None  # MEJ-BOTTLENECK: cuellos de botella de la corrida
+        self.inbound_summary = None  # INIT-7 F4: KPIs de recepcion/putaway
         self.load_data()
         self.precompute_snapshots()
 
@@ -160,6 +161,7 @@ class ReplayData:
             self.service_level = None
             self.sla_summary = None
             self.bottleneck_summary = None
+            self.inbound_summary = None
             with open(REPLAY_FILE, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
@@ -176,6 +178,8 @@ class ReplayData:
                             self.sla_summary = event.get('sla_summary')
                             # MEJ-BOTTLENECK: cuellos de botella desde la metadata.
                             self.bottleneck_summary = event.get('bottleneck_summary')
+                            # INIT-7 F4: KPIs de recepcion/putaway desde la metadata.
+                            self.inbound_summary = event.get('inbound_summary')
                             # Extract initial WOs directly from event
                             initial_wos = event.get('initial_work_orders', [])
                             print(f"Found {len(initial_wos)} initial WOs in SIMULATION_START")

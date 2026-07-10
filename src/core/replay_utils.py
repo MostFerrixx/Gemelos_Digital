@@ -171,6 +171,53 @@ def build_bottleneck_summary(almacen):
     }
 
 
+def build_inbound_summary(almacen):
+    """INIT-7 F4: consolida en UN dict serializable los KPIs de recepcion /
+    putaway que el motor YA acumula en almacen.inbound_metrics durante la
+    corrida. Misma plomeria que build_bottleneck_summary: NO calcula nada
+    nuevo, solo transporta y deriva promedios. Fuente unica para la metadata
+    del .jsonl, la API del visor y la hoja Excel 'Inbound'.
+
+    available=False si inbound no corrio en esta simulacion.
+
+    REGLA BN-05: todo lo que entra aca es tiempo de SIMULACION (dock_to_stock
+    = env.now - t_unloaded) o distancia de grilla -- ambos DETERMINISTAS. NADA
+    wall-clock (rompe el gate byte-identico del .jsonl)."""
+    im = getattr(almacen, 'inbound_metrics', None)
+    if not im:
+        return {'available': False}
+
+    stored = im.get('pallets_stored', 0)
+    d2s_total = im.get('dock_to_stock_total', 0.0)
+    dist_total = im.get('putaway_distance_total', 0.0)
+    avg_d2s = round(d2s_total / stored, 2) if stored else None
+    avg_dist = round(dist_total / stored, 2) if stored else None
+
+    return {
+        'available': True,
+        # estrategia de esta corrida: la clave que el A/B compara entre A y B.
+        'slotting_strategy': getattr(almacen, 'inbound_slotting', 'fija_por_sku'),
+        'docks_count': len(getattr(almacen, 'inbound_docks', {}) or {}),
+        'trucks_received': im.get('trucks_received', 0),
+        'pallets_unloaded': im.get('pallets_unloaded', 0),
+        'pallets_stored': stored,
+        'units_received': im.get('units_received', 0),
+        # dock-to-stock: cuanto tarda un pallet de bajar del camion a quedar
+        # guardado (segundos de simulacion).
+        'avg_dock_to_stock': avg_d2s,
+        'max_dock_to_stock': round(im.get('max_dock_to_stock', 0.0), 2),
+        # distancia de guardado (celdas): la palanca directa del slotting.
+        'avg_putaway_distance': avg_dist,
+        'max_putaway_distance': round(im.get('max_putaway_distance', 0.0), 2),
+        'putaway_distance_total': round(dist_total, 2),
+        # contencion de muelles.
+        'dock_wait_events': im.get('dock_wait_events', 0),
+        'dock_wait_time': round(im.get('dock_wait_time', 0.0), 2),
+        'max_dock_wait': round(im.get('max_dock_wait', 0.0), 2),
+        'buffer_peak': im.get('buffer_peak', 0),
+    }
+
+
 def agregar_evento_replay(buffer, evento):
     """Agrega un evento al bufer de replay"""
     buffer.add_event(evento)
@@ -237,6 +284,15 @@ def volcar_replay_a_archivo(buffer, archivo_salida, configuracion, almacen=None,
                 c = bottleneck['congestion']
                 print(f"[REPLAY-METADATA] Cuellos de botella: {c['cooccupation_events_total']} "
                       f"co-ocupaciones en {c['distinct_cells_with_cooccupation']} celdas")
+
+            # INIT-7 F4: resumen de recepcion/putaway (inbound) en la metadata.
+            inbound = build_inbound_summary(almacen)
+            metadata['inbound_summary'] = inbound
+            if inbound.get('available'):
+                print(f"[REPLAY-METADATA] Inbound ({inbound['slotting_strategy']}): "
+                      f"{inbound['pallets_stored']} pallets guardados, "
+                      f"dock-to-stock avg {inbound['avg_dock_to_stock']}s, "
+                      f"distancia putaway avg {inbound['avg_putaway_distance']} celdas")
 
             f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
 

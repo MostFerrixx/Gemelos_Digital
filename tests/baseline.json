@@ -1,8 +1,8 @@
 {
     "description": "Baseline byte-identico (modulo EOL) de la simulacion canonica (config.json de la raiz, congestion timewindow ACTIVO), WAREHOUSE_SEED=42, hash con CRLF normalizado a LF (mismo SHA en Windows y Linux). Actualizado en MEJ-BOTTLENECK (2026-07-06): metadata SIMULATION_START del .jsonl ahora incluye 'bottleneck_summary' (hotspots de congestion + planner + esperas de muelle; mismo patron que service_level/sla_summary). CAMBIO SOLO DE METADATA: verificado que los eventos (linea 2 en adelante) son byte-identicos (sha256 sin linea 1 = 67749aa4..., identico desde INIT-1). OJO: el summary excluye avg_plan_ms (wall-clock, no determinista) -- incluirlo rompio el gate y se corrigio antes de fijar este baseline; determinismo verificado con dos corridas consecutivas PASS. Cambio intencional: python scripts/regression_gate.py --update-baseline --yes",
     "seed": 42,
-    "sha256": "71fc9904141ddc73cb2070e42385ad0c9c41c5c66f2a3b71b9960374a2ef3867",
-    "size_bytes": 4920352,
+    "sha256": "930a1e6f879420a8e0e01c070bd6715598afe24a889821122e8bc89c6d53918c",
+    "size_bytes": 4920393,
     "python_version": "3.13.6",
-    "updated": "2026-07-06"
+    "updated": "2026-07-09"
 }

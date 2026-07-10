@@ -408,6 +408,9 @@ class AlmacenMejorado:
                     'pallets_stored': 0,
                     'dock_to_stock_total': 0.0,
                     'max_dock_to_stock': 0.0,
+                    # F4: distancia de guardado (KPI por estrategia de slotting)
+                    'putaway_distance_total': 0.0,
+                    'max_putaway_distance': 0.0,
                 }
                 self.inbound_process = InboundProcess(
                     self.env, self, self.inbound_config,
@@ -888,11 +891,14 @@ class AlmacenMejorado:
                 return self.inbound_buffer.pop(i)
         return None
 
-    def registrar_stock_putaway(self, wo, pallet=None) -> None:
+    def registrar_stock_putaway(self, wo, pallet=None, distance=0.0) -> None:
         """
         F2: deposito completado. Suma el stock a la ubicacion real (simetrico
         de consumir_stock_picking, que ya escribe inventory en caliente),
         cierra el dock-to-stock del pallet y emite el evento de analitica.
+
+        F4: acumula la distancia de guardado (celdas recorridas en este
+        putaway) para el KPI de distancia por estrategia de slotting.
         """
         qty = int(getattr(wo, 'cantidad_inicial', 0) or 0)
         location_id = getattr(wo, 'location_id', None)
@@ -912,9 +918,14 @@ class AlmacenMejorado:
             pallet.target_location = location_id
             dock_to_stock = round(t_stored - pallet.t_unloaded, 2)
 
+        dist = round(float(distance or 0.0), 2)
         m = getattr(self, 'inbound_metrics', None)
         if m is not None:
             m['pallets_stored'] = m.get('pallets_stored', 0) + 1
+            m['putaway_distance_total'] = (m.get('putaway_distance_total', 0.0)
+                                           + dist)
+            m['max_putaway_distance'] = max(m.get('max_putaway_distance', 0.0),
+                                            dist)
             if dock_to_stock is not None:
                 m['dock_to_stock_total'] = (m.get('dock_to_stock_total', 0.0)
                                             + dock_to_stock)
@@ -930,6 +941,7 @@ class AlmacenMejorado:
             'dock_id': getattr(wo, 'dock_id', None),
             'agent_id': wo.assigned_agent_id,
             'dock_to_stock': dock_to_stock,
+            'putaway_distance': dist,
         })
 
     def consumir_stock_picking(self, wo, sim_now=None):

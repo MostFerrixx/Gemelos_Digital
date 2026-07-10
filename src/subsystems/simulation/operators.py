@@ -1250,6 +1250,9 @@ class BaseOperator:
         """
         wo = tour['work_orders'][0]
         tour_start_time = self.env.now
+        # F4: distancia recorrida SOLO en este putaway (muelle + destino),
+        # para el KPI de distancia de guardado por estrategia de slotting.
+        dist_before = self.total_distance_traveled
         load_time = float(getattr(self.almacen, 'inbound_config', {})
                           .get('putaway_load_time', 10.0))
 
@@ -1300,8 +1303,10 @@ class BaseOperator:
         self.cargo_volume = max(0, self.cargo_volume
                                 - wo.cantidad_inicial * wo.sku.volumen)
         wo.cantidad_restante = 0
-        # Stock += en la ubicacion real + dock-to-stock + evento de analitica.
-        self.almacen.registrar_stock_putaway(wo, pallet)
+        # Stock += en la ubicacion real + dock-to-stock + distancia + evento.
+        putaway_distance = self.total_distance_traveled - dist_before
+        self.almacen.registrar_stock_putaway(wo, pallet,
+                                             distance=putaway_distance)
         # Contabilidad estandar (misma que un pick: contadores + terminacion).
         self.almacen.dispatcher.notificar_completado_individual(self, wo)
 

@@ -155,10 +155,13 @@ defaults que reproducen el comportamiento histórico. Por eso una corrida sin el
   primero, 1 pallet/viaje, stock via `data_manager.add_stock`); slotting
   conmutable `slotting_strategy` (`fija_por_sku` / `cercana_al_muelle` /
   `abc_rotacion`, resuelto en `inbound.resolve_slotting` al aterrizar el
-  pallet) con UI en el tab "Inbound" del configurador. Lectores:
-  `warehouse.py` + `inbound.py` + `dispatcher._asignar_putaway` +
-  `operators._execute_putaway_tour`. Contrato y decisiones en
-  `docs/PLAN_INIT7_INBOUND.md`.
+  pallet) con UI en el tab "Inbound" del configurador; KPIs
+  `build_inbound_summary` (dock-to-stock, distancia de putaway, muelles) en
+  metadata/API/panel del visor/hoja Excel + `avg_dock_to_stock`/
+  `avg_putaway_distance` comparables en el A/B. Lectores: `warehouse.py` +
+  `inbound.py` + `dispatcher._asignar_putaway` +
+  `operators._execute_putaway_tour` + `replay_utils.build_inbound_summary`.
+  Contrato y decisiones en `docs/PLAN_INIT7_INBOUND.md`.
 - **`cercania_tour_mode`** ("cost" default / "greedy_nn"): BK-03; greedy descartado.
 - Refactor **Template Method** en `operators.py`: `BaseOperator.agent_process()` +
   hook `_do_picking_at()` por subclase (Ground/Forklift). Logging por nivel en todo

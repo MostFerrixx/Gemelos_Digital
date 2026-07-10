@@ -191,6 +191,7 @@ def get_snapshot(t: float):
         "service_level": replay_data.service_level,  # INIT-5: nivel de servicio (backorders)
         "sla_summary": replay_data.sla_summary,  # INIT-4b: cumplimiento de SLA (due_time)
         "bottleneck_summary": replay_data.bottleneck_summary,  # MEJ-BOTTLENECK: cuellos de botella
+        "inbound_summary": replay_data.inbound_summary,  # INIT-7 F4: KPIs de recepcion/putaway
         "state": {
             "agents": agents,  # Now includes cargo_volume and capacidad
             "work_orders": current_state['work_orders']

@@ -927,6 +927,62 @@ const ControlsModule = {
         // MEJ-BOTTLENECK: panel de cuellos de botella (resumen estatico de la
         // corrida completa -- se renderiza una sola vez por replay cargado).
         this.renderBottleneckPanel(metrics.bottleneck_summary);
+
+        // INIT-7 F4: panel de recepcion/putaway (mismo patron, estatico).
+        this.renderInboundPanel(metrics.inbound_summary);
+    },
+
+    renderInboundPanel(ib) {
+        const section = document.getElementById('inbound-section');
+        const content = document.getElementById('inbound-content');
+        if (!section || !content) return;
+
+        // Estatico como el de bottleneck: solo re-render si cambia el replay.
+        const key = ib ? JSON.stringify(ib) : '';
+        if (this._inboundKey === key) return;
+        this._inboundKey = key;
+
+        if (!ib || !ib.available) {
+            section.style.display = 'none';
+            return;
+        }
+        section.style.display = 'block';
+
+        const fmt = (v) => (v == null ? '-' : v);
+        const stratLabels = {
+            fija_por_sku: 'Fija por SKU',
+            cercana_al_muelle: 'Cercana al muelle',
+            abc_rotacion: 'ABC por rotación',
+        };
+        const strat = stratLabels[ib.slotting_strategy] || ib.slotting_strategy;
+
+        let html = `<div class="bottleneck-group">
+            <div class="bottleneck-group-title">Slotting: ${strat}</div>
+            <div class="bottleneck-row"><span>Pallets guardados</span><span>${ib.pallets_stored} / ${ib.pallets_unloaded}</span></div>
+            <div class="bottleneck-row"><span>Camiones recibidos</span><span>${ib.trucks_received} (${ib.units_received} u)</span></div>
+        </div>`;
+
+        html += `<div class="bottleneck-group">
+            <div class="bottleneck-group-title">Dock-to-stock</div>
+            <div class="bottleneck-row"><span>Promedio</span><span>${fmt(ib.avg_dock_to_stock)}s</span></div>
+            <div class="bottleneck-row"><span>Máximo</span><span>${fmt(ib.max_dock_to_stock)}s</span></div>
+        </div>`;
+
+        html += `<div class="bottleneck-group">
+            <div class="bottleneck-group-title">Distancia de guardado</div>
+            <div class="bottleneck-row"><span>Promedio</span><span>${fmt(ib.avg_putaway_distance)} celdas</span></div>
+            <div class="bottleneck-row"><span>Máxima</span><span>${fmt(ib.max_putaway_distance)} celdas</span></div>
+        </div>`;
+
+        if (ib.dock_wait_events > 0) {
+            html += `<div class="bottleneck-group">
+                <div class="bottleneck-group-title">Muelles</div>
+                <div class="bottleneck-row"><span>Esperas de camión</span><span>${ib.dock_wait_events} (${(ib.dock_wait_time || 0).toFixed(0)}s, máx ${(ib.max_dock_wait || 0).toFixed(0)}s)</span></div>
+                <div class="bottleneck-row"><span>Buffer pico</span><span>${ib.buffer_peak} pallets</span></div>
+            </div>`;
+        }
+
+        content.innerHTML = html;
     },
 
     renderBottleneckPanel(bn) {

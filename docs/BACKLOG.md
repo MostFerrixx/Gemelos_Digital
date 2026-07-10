@@ -7,7 +7,7 @@ Actualizado: 2026-07-08 · Responsable: Cerebellum
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
-| INIT-7 — Inbound F4-F5 (F0-F3 HECHOS) | EN CURSO | **Alta (iniciativa activa)** | F4 ~medio dia, F5 +1-2 | Ninguno; F5 requiere decision 4 del plan |
+| INIT-7 — Inbound F5 flujo mixto (F0-F4 = v1 HECHO) | PAUSA (v1 completo) | Media | F5 +1-2 sesiones | Requiere decision 4 del Director |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
@@ -17,20 +17,17 @@ Actualizado: 2026-07-08 · Responsable: Cerebellum
 
 ## INIT-7 — INBOUND: recepcion y almacenamiento (INICIATIVA ACTIVA)
 
-**Plan completo y decisiones del Director (2026-07-08):
-`docs/PLAN_INIT7_INBOUND.md`.** F0 (dominio y datos), F1 (llegadas), F2
-(putaway completo) y F3 (slotting conmutable + UI) HECHOS — ver CHANGELOG
-2026-07-08/09 y las decisiones tecnicas por fase en el plan. Fases
-pendientes:
-- **F4 — KPIs:** `build_inbound_summary()` en `core/replay_utils.py`
-  (dock-to-stock ya viene en cada evento `inbound_pallet_stored`, distancia
-  de putaway, utilizacion de muelles, desglose por estrategia de slotting)
-  -> metadata/API/visor/Excel + hoja Excel. Es el cierre que hace
-  COMPARABLES las 3 estrategias en el experiment runner A/B. PROHIBIDO
-  wall-clock en metadata (regla BN-05).
-- **F5 — Flujo mixto** (segunda etapa): flota compartida pick+putaway,
-  requiere la decision 4 del plan (stock del dia disponible para picking del
-  mismo dia vs turnos separados).
+**ALCANCE v1 (F0-F4) COMPLETO.** Plan y decisiones del Director (2026-07-08):
+`docs/PLAN_INIT7_INBOUND.md`. F0 (dominio/datos), F1 (llegadas), F2 (putaway),
+F3 (slotting conmutable + UI) y F4 (KPIs + A/B comparable) HECHOS — ver
+CHANGELOG 2026-07-08/09 y decisiones tecnicas por fase en el plan. Queda solo
+la segunda etapa:
+- **F5 — Flujo mixto** (segunda etapa, requiere decision 4 del Director):
+  flota compartida pick+putaway con el stock entrante alimentando pedidos del
+  mismo dia (cross-docking implicito) vs turnos separados. Hoy inbound corre
+  junto al picking pero el stock recien guardado NO se pickea en la misma
+  corrida (las WOs de pick se fijan en t=0). F5 es abrir esa puerta. No
+  bloqueante: v1 ya entrega el valor (comparar estrategias de slotting).
 
 ---
 
