@@ -158,8 +158,12 @@ defaults que reproducen el comportamiento histórico. Por eso una corrida sin el
   pallet) con UI en el tab "Inbound" del configurador; KPIs
   `build_inbound_summary` (dock-to-stock, distancia de putaway, muelles) en
   metadata/API/panel del visor/hoja Excel + `avg_dock_to_stock`/
-  `avg_putaway_distance` comparables en el A/B. Lectores: `warehouse.py` +
-  `inbound.py` + `dispatcher._asignar_putaway` +
+  `avg_putaway_distance` comparables en el A/B; flujo mixto F5:
+  `putaway_priority` (`picks_first` default / `putaway_first`, quien manda
+  en la flota compartida; KPI `avg_putaway_wait`) y `cross_dock_enabled`
+  (solo modo deterministic: el stock del dia rescata backorders con picks
+  dinamicos WO-XD; KPI `fill_rate_effective_pct`). Lectores: `warehouse.py`
+  + `inbound.py` + `dispatcher._asignar_putaway` +
   `operators._execute_putaway_tour` + `replay_utils.build_inbound_summary`.
   Contrato y decisiones en `docs/PLAN_INIT7_INBOUND.md`.
 - **`cercania_tour_mode`** ("cost" default / "greedy_nn"): BK-03; greedy descartado.

@@ -54,7 +54,7 @@ igual que hoy se comparan estrategias de despacho.
 | F2 | Putaway: WO tipo `putaway` (muelle -> ubicacion) pre-generadas en t=0, tour de deposito en operators, stock dinamico | **HECHO 2026-07-09** |
 | F3 | Estrategias de slotting conmutables: `fija_por_sku` / `cercana_al_muelle` / `abc_rotacion` + selector en UI web | **HECHO 2026-07-09** |
 | F4 | KPIs: `inbound_summary` (dock-to-stock time, distancia putaway, utilizacion de muelles) con el patron build_X_summary -> metadata/API/visor/Excel | **HECHO 2026-07-09** |
-| F5 | Flujo mixto inbound+outbound: flota compartida, prioridades pick vs putaway, stock entrante alimenta pedidos (requiere decision 4) | pendiente |
+| F5 | Flujo mixto inbound+outbound: flota compartida, prioridades pick vs putaway, stock entrante alimenta pedidos (requiere decision 4) | **HECHO 2026-07-10** |
 
 ## Contratos de datos (F0)
 
@@ -236,6 +236,54 @@ real de comportamiento.)
 
 Con F4 cerrado, el alcance v1 aprobado por el Director esta HECHO: recepcion
 -> putaway -> stock, con 3 estrategias de slotting comparables por KPIs en el
-A/B. Falta solo **F5 (flujo mixto)**, segunda etapa que requiere la decision 4
-del Director (stock del dia disponible para picking del mismo dia vs turnos
-separados).
+A/B.
+
+### Decisiones tecnicas de F5 (2026-07-10) — INICIATIVA COMPLETA
+
+**Decision 4 del Director (2026-07-10): AMBAS opciones, conmutables por
+config antes de correr.** Dos flags nuevos en el bloque `inbound`:
+
+- **F5a `putaway_priority`** (`picks_first` default / `putaway_first`):
+  quien manda en la flota compartida. `picks_first` = comportamiento
+  historico (putaway solo con flota ociosa); `putaway_first` = un agente
+  libre toma ANTES el putaway pendiente mas viejo. NOTA de diseno: el plan
+  hablaba de "balanced", pero un 50/50 real es indefinible con todos los
+  picks creados en t=0 (el pick "mas viejo" siempre ganaria); los dos polos
+  honestos son picks_first/putaway_first. KPI nuevo de contencion cruzada:
+  `avg_putaway_wait` / `max_putaway_wait` (pallet LISTO esperando agente),
+  medido en `dispatcher._asignar_putaway`. Verificado en smoke (seed 42,
+  ASN canonico): espera avg 1305s (picks_first) vs 88s (putaway_first);
+  dock-to-stock 1323s vs 108s.
+- **F5b `cross_dock_enabled`** (bool, default false; requiere modo
+  deterministic, en estocastico avisa y se desactiva): el stock del dia
+  rescata backorders de la MISMA corrida. Mecanica: tras la allocation t=0,
+  `warehouse._preparar_cross_dock()` captura `unfilled_demand` del
+  validation result (LEIDO DIRECTO de la estrategia -- bug real del smoke:
+  `_last_validation_result` se asigna despues); al depositarse cada pallet,
+  `_rescatar_backorders_cross_dock()` crea picks dinamicos `WO-XD-####`
+  (FIFO por orden del archivo, tope = cantidad del pallet) desde la
+  ubicacion donde el putaway ACABA de guardar, heredando prioridad/
+  due_time/destino->staging del pedido original. Entran a la lista maestra
+  (extienden la corrida) y consumen el stock recien agregado.
+- **KPI estrella de F5b:** `fill_rate_effective_pct` en el service_level
+  (= (asignado t=0 + rescatado) / pedido). `fill_rate_pct` sigue siendo la
+  foto t=0 (contrato historico intacto); las claves nuevas SOLO aparecen si
+  hubo rescates => con cross-dock off la metadata es identica (gate PASS
+  sin update, verificado). Ambos KPIs + `avg_putaway_wait` agregados a
+  `OPTIONAL_KPI_KEYS` del A/B.
+- **UI:** selector de prioridad + toggle cross-dock en el tab Inbound
+  (guia de 3 niveles); visor: grupos "Flota compartida" y "Cross-docking"
+  en el panel Recepcion; hoja Excel "Inbound" con las secciones F5.
+- **Smoke F5b** (pedido insaciable de SKU029 = stock total + 100, ASN trae
+  24u): backorder 367u detectado, rescate de 24u a t=349s (al aterrizar el
+  pallet), pick WO-XD-0001 asignado a los 0.4s y despachado a t=361s;
+  fill-rate 66.5% -> 68.7% efectivo. Demo conservada:
+  `temp_web/cfg_f5b_crossdock.json` + `temp_web/orders_xd.json`.
+- Limitacion cosmetica documentada: `total_work_orders` de la metadata se
+  fija en t=0; los picks XD creados a mitad de corrida no lo incrementan
+  (el visor puede mostrar 45/44). La TERMINACION es correcta (cuenta contra
+  lista_maestra viva). Se acepta hasta que moleste de verdad.
+
+**Con F5 cerrado, INIT-7 esta COMPLETA (F0-F5): recepcion + putaway +
+slotting conmutable + KPIs + flujo mixto con prioridad configurable y
+cross-docking opcional.**

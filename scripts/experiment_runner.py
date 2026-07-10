@@ -76,9 +76,12 @@ ALL_KPI_KEYS = RAW_KPI_KEYS + ["throughput_wo_per_s"]
 # estocastico (sin validacion de stock, mismo comportamiento que INIT-5 en el
 # visor/API/Excel) -- se agrega y agrega por separado porque summarize()/
 # paired_verdict() necesitan filtrar los None antes de operar.
-# INIT-7 F4: KPIs de inbound (None cuando inbound off, mismo trato que
-# fill_rate_pct) -> el A/B compara estrategias de slotting con numeros reales.
-OPTIONAL_KPI_KEYS = ["fill_rate_pct", "avg_dock_to_stock", "avg_putaway_distance"]
+# INIT-7 F4/F5: KPIs de inbound (None cuando inbound off, mismo trato que
+# fill_rate_pct) -> el A/B compara estrategias de slotting, prioridad de
+# flota (avg_putaway_wait) y el efecto del cross-dock (fill_rate_effective).
+OPTIONAL_KPI_KEYS = ["fill_rate_pct", "avg_dock_to_stock",
+                     "avg_putaway_distance", "avg_putaway_wait",
+                     "fill_rate_effective_pct"]
 
 
 def run_one_replica(config_path, seed, keep_output=False):

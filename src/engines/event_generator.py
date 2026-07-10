@@ -494,6 +494,10 @@ class EventGenerator:
             # INIT-7 F4: comparables del slotting (None si inbound off).
             "avg_dock_to_stock": inbound_summary.get("avg_dock_to_stock"),
             "avg_putaway_distance": inbound_summary.get("avg_putaway_distance"),
+            # INIT-7 F5: contencion cruzada + fill-rate con rescates cross-dock
+            # (None si inbound off / sin rescates -- el A/B filtra los None).
+            "avg_putaway_wait": inbound_summary.get("avg_putaway_wait"),
+            "fill_rate_effective_pct": service_level.get("fill_rate_effective_pct"),
             "inbound_summary": inbound_summary,
             "timestamp": self.session_timestamp,
             "session_output_dir": self.session_output_dir

@@ -34,7 +34,7 @@ def build_service_level_summary(almacen):
     summ = getattr(vr, 'allocation_summary', {}) or {}
     unfilled = list(getattr(vr, 'unfilled_demand', []) or [])
     orders_short = len({u.get('order_id') for u in unfilled if u.get('order_id') is not None})
-    return {
+    out = {
         'available': True,
         'mode': 'deterministic',
         'fill_rate_pct': summ.get('allocation_rate', 100.0),
@@ -45,6 +45,20 @@ def build_service_level_summary(almacen):
         'backorder_items': summ.get('backorder_items_count', 0),
         'unfilled': unfilled,
     }
+    # INIT-7 F5b: el cross-dock rescata backorders DURANTE la corrida con el
+    # stock que llego ese dia. fill_rate_pct sigue siendo la foto de la
+    # allocation t=0 (contrato historico intacto); fill_rate_effective_pct
+    # suma lo rescatado. Las claves solo aparecen si hubo rescates: con
+    # cross-dock off la metadata es identica a la historica (gate intacto).
+    im = getattr(almacen, 'inbound_metrics', None) or {}
+    rescued = im.get('cross_dock_units_rescued', 0)
+    if rescued:
+        total_req = out['total_requested']
+        served_eff = out['total_served'] + rescued
+        out['units_rescued_cross_dock'] = rescued
+        out['fill_rate_effective_pct'] = (
+            round(served_eff / total_req * 100, 1) if total_req else 100.0)
+    return out
 
 
 def build_sla_summary(almacen):
@@ -192,9 +206,24 @@ def build_inbound_summary(almacen):
     dist_total = im.get('putaway_distance_total', 0.0)
     avg_d2s = round(d2s_total / stored, 2) if stored else None
     avg_dist = round(dist_total / stored, 2) if stored else None
+    # F5a: contencion cruzada (pallet listo esperando que un agente lo tome).
+    waits = im.get('putaway_wait_events', 0)
+    avg_wait = (round(im.get('putaway_wait_total', 0.0) / waits, 2)
+                if waits else None)
 
     return {
         'available': True,
+        # F5a: quien manda en la flota compartida (picks_first | putaway_first)
+        'putaway_priority': getattr(
+            getattr(almacen, 'dispatcher', None), 'putaway_priority',
+            'picks_first'),
+        # F5a: espera del pallet listo -> asignacion (la contencion cruzada).
+        'avg_putaway_wait': avg_wait,
+        'max_putaway_wait': round(im.get('max_putaway_wait', 0.0), 2),
+        # F5b: cross-docking (0/False si apagado).
+        'cross_dock_enabled': bool(getattr(almacen, 'cross_dock_enabled', False)),
+        'cross_dock_picks_created': im.get('cross_dock_picks_created', 0),
+        'cross_dock_units_rescued': im.get('cross_dock_units_rescued', 0),
         # estrategia de esta corrida: la clave que el A/B compara entre A y B.
         'slotting_strategy': getattr(almacen, 'inbound_slotting', 'fija_por_sku'),
         'docks_count': len(getattr(almacen, 'inbound_docks', {}) or {}),

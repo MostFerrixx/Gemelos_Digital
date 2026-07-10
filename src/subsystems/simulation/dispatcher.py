@@ -103,6 +103,18 @@ class DispatcherV11:
         # H-6 fix: radio blando -- parametros de expansion gradual
         self.radio_expansion_paso = configuracion.get('radio_expansion_paso', 50)   # celdas/paso
         self.radio_max_expansiones = configuracion.get('radio_max_expansiones', 5)  # tope maximo
+        # INIT-7 F5a: prioridad de la flota compartida pick vs putaway.
+        # picks_first (default historico): putaway solo si no hay tour de picks.
+        # putaway_first: un agente libre toma ANTES el putaway pendiente mas
+        # viejo (la recepcion manda; el picking usa la capacidad restante).
+        self.putaway_priority = str(
+            (configuracion.get('inbound') or {}).get('putaway_priority',
+                                                     'picks_first'))
+        if self.putaway_priority not in ('picks_first', 'putaway_first'):
+            logger.warning(f"[DISPATCHER WARN] putaway_priority desconocida "
+                           f"'{self.putaway_priority}', usando picks_first")
+            self.putaway_priority = 'picks_first'
+
         # BK-03 experiment: modo de construccion del tour para Cercania
         # "cost" = orden por AssignmentCostCalculator (actual, default)
         # "greedy_nn" = orden por vecino mas cercano desde posicion actual
@@ -203,6 +215,14 @@ class DispatcherV11:
                 }
                 or None if no work available
         """
+        # INIT-7 F5a: con putaway_first, el putaway pendiente mas viejo se
+        # asigna ANTES de evaluar picks (con picks_first este bloque es no-op:
+        # el putaway queda como fallback de los 3 puntos de salida sin tour).
+        if self.putaway_priority == 'putaway_first':
+            tour = self._asignar_putaway(operator)
+            if tour is not None:
+                return tour
+
         # Step 1: Check if work is available
         if not self.work_orders_pendientes:
             # BUGFIX: Solo log cada 10 segundos para evitar spam
@@ -324,6 +344,16 @@ class DispatcherV11:
             return None
 
         wo = min(elegibles, key=lambda w: (w.tiempo_pallet_listo, w.id))
+
+        # F5a: contencion cruzada -- cuanto espero el pallet LISTO en el muelle
+        # hasta que un agente lo tomo (picks_first la infla; putaway_first la
+        # baja a costa del picking). Va a inbound_metrics -> summary -> A/B.
+        m = getattr(self.almacen, 'inbound_metrics', None) if self.almacen else None
+        if m is not None and wo.tiempo_pallet_listo is not None:
+            wait = max(0.0, float(self.env.now) - float(wo.tiempo_pallet_listo))
+            m['putaway_wait_events'] = m.get('putaway_wait_events', 0) + 1
+            m['putaway_wait_total'] = m.get('putaway_wait_total', 0.0) + wait
+            m['max_putaway_wait'] = max(m.get('max_putaway_wait', 0.0), wait)
 
         self.putaway_pendientes.remove(wo)
         self._marcar_asignados(operator, [wo])
