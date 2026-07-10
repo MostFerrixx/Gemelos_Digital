@@ -1015,6 +1015,9 @@ class WebConfigurator {
         _setVal('inbound-unload-time', inb.unload_time_per_pallet, 15);
         _setVal('inbound-putaway-load-time', inb.putaway_load_time, 10);
         _setVal('inbound-slotting', inb.slotting_strategy, 'fija_por_sku');
+        _setVal('inbound-putaway-priority', inb.putaway_priority, 'picks_first');
+        const xdToggle = document.getElementById('inbound-cross-dock');
+        if (xdToggle) xdToggle.checked = inb.cross_dock_enabled === true;
         this._updateInboundVisibility();
 
         // INIT-6 Opcion B: destino -> staging_id
@@ -1067,7 +1070,8 @@ class WebConfigurator {
                 asn_file_path: 'layouts/Inbound Test.json',
                 truck_interval: 600.0, num_trucks: 5, pallets_per_truck: 10,
                 units_per_pallet: 20, unload_time_per_pallet: 15.0,
-                putaway_load_time: 10.0, slotting_strategy: 'fija_por_sku'
+                putaway_load_time: 10.0, slotting_strategy: 'fija_por_sku',
+                putaway_priority: 'picks_first', cross_dock_enabled: false
             },
             // C5: defaults del bloque tiempos (perfil DEMO = valores actuales del motor)
             tiempos: {
@@ -1223,6 +1227,11 @@ class WebConfigurator {
             _numField('inbound-putaway-load-time', 'putaway_load_time', 0, true);
             const slot = document.getElementById('inbound-slotting')?.value;
             if (slot) baseInb.slotting_strategy = slot;
+            // INIT-7 F5: prioridad de flota + cross-docking
+            const prio = document.getElementById('inbound-putaway-priority')?.value;
+            if (prio) baseInb.putaway_priority = prio;
+            const xd = document.getElementById('inbound-cross-dock');
+            if (xd) baseInb.cross_dock_enabled = xd.checked;
             config.inbound = baseInb;
         }
 

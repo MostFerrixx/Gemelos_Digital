@@ -117,6 +117,12 @@ class InboundConfig(BaseModel):
     putaway_load_time: Optional[float] = None  # F2: cargar pallet en muelle (s)
     # fija_por_sku | cercana_al_muelle | abc_rotacion (F3)
     slotting_strategy: Optional[str] = None
+    # F5a: prioridad de la flota compartida. picks_first (default historico:
+    # putaway solo con flota ociosa) | putaway_first (la recepcion manda).
+    putaway_priority: Optional[str] = None
+    # F5b: el stock recibido rescata backorders de la MISMA corrida (pick
+    # dinamico post-putaway). Solo modo deterministic; default false.
+    cross_dock_enabled: Optional[bool] = None
 
 
 class WavesConfig(BaseModel):

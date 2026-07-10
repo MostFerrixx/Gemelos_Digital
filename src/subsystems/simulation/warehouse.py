@@ -411,6 +411,13 @@ class AlmacenMejorado:
                     # F4: distancia de guardado (KPI por estrategia de slotting)
                     'putaway_distance_total': 0.0,
                     'max_putaway_distance': 0.0,
+                    # F5a: contencion cruzada (pallet listo esperando agente)
+                    'putaway_wait_events': 0,
+                    'putaway_wait_total': 0.0,
+                    'max_putaway_wait': 0.0,
+                    # F5b: cross-docking (backorders rescatados con stock del dia)
+                    'cross_dock_picks_created': 0,
+                    'cross_dock_units_rescued': 0,
                 }
                 self.inbound_process = InboundProcess(
                     self.env, self, self.inbound_config,
@@ -751,6 +758,10 @@ class AlmacenMejorado:
                 self.dispatcher.agregar_work_orders(putaway_wos)
                 print(f"[INBOUND] F2: {len(putaway_wos)} WOs de putaway "
                       f"pre-generadas (inelegibles hasta que llegue su camion)")
+            # INIT-7 F5b: cross-docking -- capturar los backorders de la
+            # allocation t=0 para rescatarlos cuando el putaway deposite
+            # stock de ese SKU (pick dinamico en la MISMA corrida).
+            self._preparar_cross_dock()
 
         print(f"[ALMACEN] Distribucion por tipo: {self.distribucion_tipos}")
         
@@ -834,7 +845,9 @@ class AlmacenMejorado:
                     cantidad=int(line['quantity']),
                     ubicacion=None,                # muelle real: al descargar
                     work_area=target['work_area'],
-                    pick_sequence=0,
+                    # F5b: pick_sequence REAL del destino (lo hereda el pick
+                    # de rescate cross-dock; estrategias de plan lo ordenan).
+                    pick_sequence=target.get('pick_sequence', 0),
                     location_id=target['location_id'],
                 )
                 wo.task_type = 'putaway'
@@ -849,6 +862,124 @@ class AlmacenMejorado:
             print(f"[INBOUND][WARN] {sin_destino} pallets sin destino de "
                   f"putaway (SKU fuera del plan maestro)")
         return wos
+
+    def _preparar_cross_dock(self) -> None:
+        """
+        F5b: captura los backorders de la allocation t=0 (unfilled_demand del
+        validation result) para rescatarlos durante la corrida cuando el
+        putaway deposite stock de ese SKU. Solo modo deterministic (en
+        estocastico no hay allocation real) y solo con el flag activo.
+        """
+        self.cross_dock_enabled = bool(
+            self.inbound_config.get('cross_dock_enabled', False))
+        self.cross_dock_backorders = []
+        self._xd_counter = 0
+        if not self.cross_dock_enabled:
+            return
+        mode = str(self.configuracion.get('order_generation_mode',
+                                          'stochastic')).lower()
+        if mode != 'deterministic':
+            print("[INBOUND][WARN] cross_dock_enabled requiere modo "
+                  "deterministic (allocation real); se DESACTIVA en esta "
+                  "corrida (comportamiento = turnos separados).")
+            self.cross_dock_enabled = False
+            return
+
+        # OJO: leer el validation result DIRECTO de la estrategia --
+        # self._last_validation_result se asigna DESPUES de este metodo en
+        # _generar_flujo_ordenes (bug real detectado en el smoke F5b: la
+        # allocation reportaba backorders pero el stash capturaba 0).
+        vr = (self.order_strategy.get_validation_result()
+              if hasattr(self.order_strategy, 'get_validation_result') else None)
+        unfilled = list(getattr(vr, 'unfilled_demand', []) or []) if vr else []
+        # Pedido original (prioridad/due_time/destino) para heredarlo en el pick.
+        orders_by_id = {}
+        parsed = getattr(self.order_strategy, 'parsed_orders', []) or []
+        for o in parsed:
+            orders_by_id[o.order_id] = o
+        for u in unfilled:
+            self.cross_dock_backorders.append({
+                'order_id': u.get('order_id'),
+                'sku_id': u.get('sku_id'),
+                'qty_pending': int(u.get('qty_unfilled', 0) or 0),
+                'order': orders_by_id.get(u.get('order_id')),
+            })
+        print(f"[INBOUND] F5b cross-dock ACTIVO: {len(self.cross_dock_backorders)} "
+              f"backorders en espera de stock entrante "
+              f"({sum(b['qty_pending'] for b in self.cross_dock_backorders)} u)")
+
+    def _rescatar_backorders_cross_dock(self, wo_putaway) -> None:
+        """
+        F5b: al depositarse un pallet, rescata backorders de ese SKU (FIFO por
+        orden del archivo) creando picks dinamicos desde la ubicacion donde el
+        putaway ACABA de guardar el stock. Los picks entran a la lista maestra
+        (extienden la corrida) y consumen el stock recien agregado.
+        """
+        if not getattr(self, 'cross_dock_enabled', False):
+            return
+        pendientes = [b for b in getattr(self, 'cross_dock_backorders', [])
+                      if b['sku_id'] == wo_putaway.sku_id and b['qty_pending'] > 0]
+        if not pendientes:
+            return
+
+        sku = self.catalogo_skus.get(wo_putaway.sku_id)
+        if sku is None:
+            return
+        disponible = int(wo_putaway.cantidad_inicial or 0)
+        nuevos = []
+        for bo in pendientes:
+            if disponible <= 0:
+                break
+            take = min(disponible, bo['qty_pending'])
+            order = bo.get('order')
+            staging_id = (self._resolver_staging_id(order)
+                          if order is not None else self._seleccionar_staging_id())
+            cantidades = self._validar_y_ajustar_cantidad(
+                sku=sku, cantidad_original=take,
+                work_area=wo_putaway.work_area)
+            for qty in cantidades:
+                self._xd_counter += 1
+                pick = WorkOrder(
+                    work_order_id=f"WO-XD-{self._xd_counter:04d}",
+                    order_id=bo['order_id'],
+                    tour_id=f"TOUR-XD-{self._xd_counter:04d}",
+                    sku=sku,
+                    cantidad=qty,
+                    ubicacion=wo_putaway.target_location,
+                    work_area=wo_putaway.work_area,
+                    pick_sequence=getattr(wo_putaway, 'pick_sequence', 0),
+                    staging_id=staging_id,
+                    qty_requested=qty,
+                    location_id=wo_putaway.location_id,
+                    priority=(order.priority if order is not None
+                              and order.priority is not None else 99),
+                    due_time=(order.due_time if order is not None else None),
+                )
+                nuevos.append(pick)
+            bo['qty_pending'] -= take
+            disponible -= take
+
+            m = getattr(self, 'inbound_metrics', None)
+            if m is not None:
+                m['cross_dock_units_rescued'] = (
+                    m.get('cross_dock_units_rescued', 0) + take)
+            self.registrar_evento('cross_dock_pick_created', {
+                'order_id': bo['order_id'],
+                'sku_id': bo['sku_id'],
+                'quantity': take,
+                'location_id': wo_putaway.location_id,
+                'from_pallet': getattr(wo_putaway, 'pallet_id', None),
+            })
+            print(f"[INBOUND] F5b: rescate cross-dock de {take}u {bo['sku_id']} "
+                  f"para {bo['order_id']} desde {wo_putaway.location_id} "
+                  f"(t={self.env.now:.0f}s)")
+
+        if nuevos:
+            m = getattr(self, 'inbound_metrics', None)
+            if m is not None:
+                m['cross_dock_picks_created'] = (
+                    m.get('cross_dock_picks_created', 0) + len(nuevos))
+            self.dispatcher.agregar_work_orders(nuevos)
 
     def marcar_pallet_listo(self, pallet, dock) -> None:
         """
@@ -880,6 +1011,7 @@ class AlmacenMejorado:
                 wo.target_location = target['cell']
                 wo.location_id = target['location_id']
                 wo.work_area = target['work_area']
+                wo.pick_sequence = target.get('pick_sequence', 0)
 
         wo.pallet_ready = True
         wo.tiempo_pallet_listo = float(self.env.now)
@@ -943,6 +1075,9 @@ class AlmacenMejorado:
             'dock_to_stock': dock_to_stock,
             'putaway_distance': dist,
         })
+
+        # F5b: el stock recien guardado puede rescatar backorders (cross-dock).
+        self._rescatar_backorders_cross_dock(wo)
 
     def consumir_stock_picking(self, wo, sim_now=None):
         """

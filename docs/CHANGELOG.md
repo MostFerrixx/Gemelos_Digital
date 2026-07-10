@@ -10,6 +10,34 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-10
+
+- **INIT-7 F5 — INBOUND, flujo mixto (INICIATIVA COMPLETA F0-F5).** Decision
+  4 del Director: AMBAS opciones conmutables por config. **F5a**
+  `inbound.putaway_priority` (`picks_first` default historico /
+  `putaway_first`: el dispatcher asigna el putaway pendiente mas viejo ANTES
+  de evaluar picks) + KPI de contencion cruzada `avg_putaway_wait` (pallet
+  listo esperando agente, medido en `_asignar_putaway`); smoke seed 42:
+  espera 1305s vs 88s, dock-to-stock 1323s vs 108s. **F5b**
+  `inbound.cross_dock_enabled` (solo deterministic): `_preparar_cross_dock`
+  captura los backorders de la allocation t=0 (LEIDOS DIRECTO de la
+  estrategia -- bug real: `_last_validation_result` se asigna despues) y
+  `_rescatar_backorders_cross_dock` crea picks dinamicos `WO-XD-####` al
+  depositarse stock del SKU (FIFO, tope=pallet, hereda prioridad/due_time/
+  destino del pedido original, pick_sequence real del destino); KPI
+  `fill_rate_effective_pct` en service_level (claves SOLO si hubo rescates
+  => metadata historica intacta, GATE PASS sin update). A/B: +
+  `avg_putaway_wait` y `fill_rate_effective_pct` en OPTIONAL_KPI_KEYS. UI:
+  selector prioridad + toggle cross-dock (tab Inbound); visor: grupos
+  "Flota compartida" y "Cross-docking"; Excel: secciones F5. 7 tests
+  (IN-50..56). Smoke F5b: pedido insaciable de SKU029 -> rescate de 24u a
+  t=349s, pick despachado a t=361s, fill-rate 66.5% -> 68.7% efectivo
+  (demo en temp_web/cfg_f5b_crossdock.json). Limitacion cosmetica
+  documentada: total_work_orders de metadata no cuenta los XD dinamicos.
+  164 passed + GATE PASS.
+
+---
+
 ## 2026-07-09 (cont. 2)
 
 - **INIT-7 F4 — INBOUND, KPIs (cierra el alcance v1 F0-F4).** Lo que hace

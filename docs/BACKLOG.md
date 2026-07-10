@@ -1,33 +1,19 @@
 # BACKLOG — Gemelo Digital de Almacen
 # Solo lo PENDIENTE. Lo cerrado vive en docs/CHANGELOG.md (no se repite aca).
 
-Actualizado: 2026-07-08 · Responsable: Cerebellum
+Actualizado: 2026-07-10 · Responsable: Cerebellum
+
+*(INIT-7 INBOUND completa F0-F5 el 2026-07-10 -> movida a CHANGELOG; plan y
+decisiones tecnicas en `docs/PLAN_INIT7_INBOUND.md`.)*
 
 ## Indice (de un vistazo)
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
-| INIT-7 — Inbound F5 flujo mixto (F0-F4 = v1 HECHO) | PAUSA (v1 completo) | Media | F5 +1-2 sesiones | Requiere decision 4 del Director |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
 | Distribucion real de `outbound_staging_distribution` en config canonico | PENDIENTE DECISION | -- | Trivial (config) | Decision de negocio del Director, no un bug |
-
----
-
-## INIT-7 — INBOUND: recepcion y almacenamiento (INICIATIVA ACTIVA)
-
-**ALCANCE v1 (F0-F4) COMPLETO.** Plan y decisiones del Director (2026-07-08):
-`docs/PLAN_INIT7_INBOUND.md`. F0 (dominio/datos), F1 (llegadas), F2 (putaway),
-F3 (slotting conmutable + UI) y F4 (KPIs + A/B comparable) HECHOS — ver
-CHANGELOG 2026-07-08/09 y decisiones tecnicas por fase en el plan. Queda solo
-la segunda etapa:
-- **F5 — Flujo mixto** (segunda etapa, requiere decision 4 del Director):
-  flota compartida pick+putaway con el stock entrante alimentando pedidos del
-  mismo dia (cross-docking implicito) vs turnos separados. Hoy inbound corre
-  junto al picking pero el stock recien guardado NO se pickea en la misma
-  corrida (las WOs de pick se fijan en t=0). F5 es abrir esa puerta. No
-  bloqueante: v1 ya entrega el valor (comparar estrategias de slotting).
 
 ---
 

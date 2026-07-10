@@ -974,6 +974,23 @@ const ControlsModule = {
             <div class="bottleneck-row"><span>Máxima</span><span>${fmt(ib.max_putaway_distance)} celdas</span></div>
         </div>`;
 
+        // INIT-7 F5a: contencion cruzada de la flota compartida.
+        const prioLabels = { picks_first: 'Picking primero', putaway_first: 'Recepción primero' };
+        html += `<div class="bottleneck-group">
+            <div class="bottleneck-group-title">Flota compartida: ${prioLabels[ib.putaway_priority] || ib.putaway_priority || '-'}</div>
+            <div class="bottleneck-row"><span>Espera pallet→agente (prom)</span><span>${fmt(ib.avg_putaway_wait)}s</span></div>
+            <div class="bottleneck-row"><span>Espera máxima</span><span>${fmt(ib.max_putaway_wait)}s</span></div>
+        </div>`;
+
+        // INIT-7 F5b: cross-docking (solo si esta activo o rescato algo).
+        if (ib.cross_dock_enabled || (ib.cross_dock_units_rescued || 0) > 0) {
+            html += `<div class="bottleneck-group">
+                <div class="bottleneck-group-title">Cross-docking</div>
+                <div class="bottleneck-row"><span>Unidades rescatadas</span><span>${ib.cross_dock_units_rescued || 0}</span></div>
+                <div class="bottleneck-row"><span>Picks dinámicos creados</span><span>${ib.cross_dock_picks_created || 0}</span></div>
+            </div>`;
+        }
+
         if (ib.dock_wait_events > 0) {
             html += `<div class="bottleneck-group">
                 <div class="bottleneck-group-title">Muelles</div>

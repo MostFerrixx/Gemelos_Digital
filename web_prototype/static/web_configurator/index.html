@@ -631,6 +631,27 @@
                                     <p class="help-text">Tiempo que tarda el operario en tomar el pallet del
                                         muelle antes de llevarlo a su ubicación.</p>
                                 </div>
+                                <div class="form-group">
+                                    <label for="inbound-putaway-priority">Prioridad de la flota compartida</label>
+                                    <select id="inbound-putaway-priority">
+                                        <option value="picks_first">Picking primero (putaway con capacidad ociosa)</option>
+                                        <option value="putaway_first">Recepción primero (guardar apenas llega)</option>
+                                    </select>
+                                    <p class="help-text">Con "Picking primero" los pallets pueden esperar horas en el
+                                        muelle si la flota está ocupada despachando. Con "Recepción primero" se guardan
+                                        apenas aterrizan, a costa del ritmo de picking. Compará ambos en Experimentos A/B
+                                        (KPI: espera pallet→agente).</p>
+                                </div>
+                                <div class="form-group">
+                                    <label class="toggle-label">
+                                        <input type="checkbox" id="inbound-cross-dock">
+                                        <span>Cross-docking: el stock del día rescata pedidos sin stock</span>
+                                    </label>
+                                    <p class="help-text">Solo en modo de pedidos <strong>Determinista</strong>: si un
+                                        pedido quedó sin stock al inicio y durante el día llega un camión con ese SKU,
+                                        se genera automáticamente el pick para cumplirlo en la misma corrida. El KPI
+                                        "fill-rate efectivo" muestra la mejora contra el fill-rate de apertura.</p>
+                                </div>
                             </div>
                         </div>
                     </div>
