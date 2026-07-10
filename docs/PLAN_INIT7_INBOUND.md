@@ -277,12 +277,13 @@ config antes de correr.** Dos flags nuevos en el bloque `inbound`:
 - **Smoke F5b** (pedido insaciable de SKU029 = stock total + 100, ASN trae
   24u): backorder 367u detectado, rescate de 24u a t=349s (al aterrizar el
   pallet), pick WO-XD-0001 asignado a los 0.4s y despachado a t=361s;
-  fill-rate 66.5% -> 68.7% efectivo. Demo conservada:
-  `temp_web/cfg_f5b_crossdock.json` + `temp_web/orders_xd.json`.
-- Limitacion cosmetica documentada: `total_work_orders` de la metadata se
-  fija en t=0; los picks XD creados a mitad de corrida no lo incrementan
-  (el visor puede mostrar 45/44). La TERMINACION es correcta (cuenta contra
-  lista_maestra viva). Se acepta hasta que moleste de verdad.
+  fill-rate 66.5% -> 68.7% efectivo. Demo conservada en
+  `examples/config_cross_dock_demo.json` (movida ahi en la auditoria
+  2026-07-10: temp_web/ tiene purga automatica de 24h).
+- ~~Limitacion cosmetica: total_work_orders no contaba altas dinamicas~~
+  **RESUELTA en la auditoria 2026-07-10:** el total se refresca en cada
+  `agregar_work_orders` (el visor ahora muestra 55/55 = 100%; el canonico
+  hace una sola llamada => baseline intacto).
 
 **Con F5 cerrado, INIT-7 esta COMPLETA (F0-F5): recepcion + putaway +
 slotting conmutable + KPIs + flujo mixto con prioridad configurable y

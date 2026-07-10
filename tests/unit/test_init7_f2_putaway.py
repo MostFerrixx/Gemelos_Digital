@@ -186,6 +186,18 @@ def test_in24_terminacion_espera_putaway(make_dispatcher, make_wo, fake_env):
     assert d.almacen.contador == 1                   # contador estandar
 
 
+def test_in26_total_wos_se_refresca_con_altas_dinamicas(make_dispatcher, make_wo):
+    """AUDIT 2026-07-10: el total de la metadata debe contar TODAS las altas
+    (putaway de la 2da llamada en t=0 y picks XD del cross-dock a mitad de
+    corrida). Antes se fijaba en la primera llamada y el visor mostraba
+    progreso >100% (55/44 en el demo)."""
+    d = make_dispatcher()
+    d.agregar_work_orders([make_wo()])
+    assert d.work_orders_total_inicial == 1
+    d.agregar_work_orders([make_wo(), make_wo()])   # 2da llamada (putaway/XD)
+    assert d.work_orders_total_inicial == 3          # refrescado, no congelado
+
+
 def test_in25_sin_putaway_el_flujo_no_cambia(make_dispatcher, make_operator):
     """Con inbound off (sin WOs putaway) los fallbacks devuelven None igual
     que antes: el gate byte-identico depende de esto."""

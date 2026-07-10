@@ -170,10 +170,13 @@ class DispatcherV11:
                 self.work_orders_pendientes.append(wo)
             wo.status = "released"
 
-        # FASE 2: Configurar contador inicial de WorkOrders para metadata
-        if not hasattr(self, 'work_orders_total_inicial') or self.work_orders_total_inicial == 0:
-            self.work_orders_total_inicial = len(self.lista_maestra_work_orders)
-            # print(f"[DISPATCHER] Total WorkOrders iniciales configurado: {self.work_orders_total_inicial}")
+        # FASE 2 / AUDIT 2026-07-10: total de WorkOrders para la metadata.
+        # Se REFRESCA en cada alta (antes se fijaba en la PRIMERA llamada:
+        # con inbound activo, el putaway de la 2da llamada y los picks XD
+        # dinamicos del cross-dock no contaban y el visor mostraba progreso
+        # >100%, p.ej. 55/44). El canonico hace UNA sola llamada => mismo
+        # valor de siempre => baseline byte-identico intacto.
+        self.work_orders_total_inicial = len(self.lista_maestra_work_orders)
 
         # print(f"[DISPATCHER] {self.env.now:.2f} - Agregados {len(work_orders)} WorkOrders. "
         #       f"Total pendientes: {len(self.work_orders_pendientes)}")

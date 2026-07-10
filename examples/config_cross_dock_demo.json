@@ -1,0 +1,88 @@
+{
+  "order_generation_mode": "deterministic",
+  "fulfillment_policy": "ship_partial",
+  "order_file_path": "examples/orders_cross_dock_demo.json",
+  "total_ordenes": 300,
+  "distribucion_tipos": {
+    "pequeno": {
+      "porcentaje": 60,
+      "volumen": 5
+    },
+    "mediano": {
+      "porcentaje": 30,
+      "volumen": 25
+    },
+    "grande": {
+      "porcentaje": 10,
+      "volumen": 80
+    }
+  },
+  "dispatch_strategy": "Ejecucion de Plan",
+  "radio_cercania": 100,
+  "radio_expansion_paso": 50,
+  "radio_max_expansiones": 5,
+  "cercania_tour_mode": "cost",
+  "tour_type": "Tour Mixto (Multi-Destino)",
+  "agent_types": [],
+  "layout_file": "layouts/WH1.tmx",
+  "sequence_file": "layouts/Warehouse_Logic.xlsx",
+  "work_area_equipment": {
+    "Area_Ground": "GroundOperator",
+    "Area_High": "Forklift",
+    "Area_Special": "Forklift"
+  },
+  "outbound_staging_distribution": {
+    "1": 100,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0
+  },
+  "num_operarios_terrestres": 2,
+  "num_montacargas": 2,
+  "num_operarios_total": 4,
+  "congestion": {
+    "enabled": true,
+    "mode": "timewindow",
+    "spawn_offset": 0.3,
+    "staggered_start": true,
+    "timewindow": {
+      "shadow": false,
+      "clearance": 0.05,
+      "dt_wait": 0.1,
+      "max_expansions": 20000,
+      "plan_horizon": 0,
+      "allow_diagonal": false
+    }
+  },
+  "outbound": {
+    "enabled": false,
+    "dispatch_policy": "interval",
+    "truck_interval": 90,
+    "truck_capacity": 8,
+    "loading_time": 2,
+    "zone_capacity_default": 8,
+    "slot_wait_alert": 60,
+    "slot_poll_dt": 0.1,
+    "dwell_scaffold": 10
+  },
+  "tiempos": {
+    "cell_size_m": 1,
+    "time_per_cell": 0.1,
+    "speed_factor_ground": 1,
+    "speed_factor_forklift": 0.8,
+    "tiempo_picking_por_linea": null,
+    "tiempo_horquilla": 2
+  },
+  "inbound": {
+    "enabled": true,
+    "arrival_mode": "deterministic",
+    "asn_file_path": "layouts/Inbound Test.json",
+    "unload_time_per_pallet": 15.0,
+    "slotting_strategy": "fija_por_sku",
+    "putaway_priority": "putaway_first",
+    "cross_dock_enabled": true
+  }
+}

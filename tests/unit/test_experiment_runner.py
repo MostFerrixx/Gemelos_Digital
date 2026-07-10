@@ -143,3 +143,28 @@ def test_progress_writer_fail(tmp_path):
         state = _json.load(f)
     assert state["status"] == "error"
     assert "replica exploto" in state["error"]
+
+
+def test_collect_paired_values_descarta_el_par_completo():
+    """AUDIT 2026-07-10: los None se filtran POR PAR (misma semilla), no por
+    lado -- antes, None en semillas distintas entre A y B desalineaba los
+    pares del t-test (comparaba replicas de semillas diferentes)."""
+    # seed1000: ambos ok | seed1001: A None | seed1002: B None | seed1003: ambos ok
+    results_a = [{"k": 10.0}, {"k": None}, {"k": 30.0}, {"k": 40.0}]
+    results_b = [{"k": 11.0}, {"k": 22.0}, {"k": None}, {"k": 44.0}]
+    pa, pb = experiment_runner._collect_paired_values("k", results_a, results_b)
+    # SOLO los pares completos, alineados por indice/semilla
+    assert pa == [10.0, 40.0]
+    assert pb == [11.0, 44.0]
+
+    # clave ausente en un lado -> par descartado (r.get -> None)
+    pa2, pb2 = experiment_runner._collect_paired_values(
+        "k", [{"k": 1.0}, {}], [{"k": 2.0}, {"k": 3.0}])
+    assert (pa2, pb2) == ([1.0], [2.0])
+
+    # build_compare_result usa el pareo: con todo None -> available False
+    rows = experiment_runner.build_compare_result(
+        [{"total_workorders_completed": None}],
+        [{"total_workorders_completed": 5}])
+    row = next(r for r in rows if r["kpi"] == "total_workorders_completed")
+    assert row["available"] is False

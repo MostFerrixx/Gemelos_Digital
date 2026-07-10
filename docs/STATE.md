@@ -21,7 +21,7 @@
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 164 passed, 1 deselected (~8s)
+python -m pytest -q                # 166 passed, 1 deselected (~8s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline 930a1e6f)
 ```
 
@@ -39,13 +39,14 @@ abc) -> KPIs (dock-to-stock, distancia, contencion) -> flujo mixto (F5):
 - **F5b `cross_dock_enabled`** (solo modo deterministic): backorders de la
   allocation t=0 se rescatan con el stock del dia (picks dinamicos WO-XD
   desde la ubicacion recien abastecida, heredan prioridad/due_time/destino).
-  KPI `fill_rate_effective_pct` (smoke: 66.5% -> 68.7%). Demo lista:
-  `temp_web/cfg_f5b_crossdock.json` + `temp_web/orders_xd.json` + replay en
-  `output/simulation_20260710_175610/`.
-- Todo opt-in; canonico intacto. Tests IN-01..56 (56 tests de inbound).
-- Limitacion cosmetica conocida: `total_work_orders` de la metadata se fija
-  en t=0 y no cuenta los picks XD dinamicos (el visor puede mostrar 45/44).
-  La terminacion es correcta. Documentada en el plan.
+  KPI `fill_rate_effective_pct`. Demo estable:
+  `examples/config_cross_dock_demo.json` (README en `examples/`).
+- Todo opt-in; canonico intacto. Tests IN-01..56 + auditoria.
+- **Auditoria 2026-07-10 (3 fixes):** total de WOs se refresca en cada alta
+  (visor ya no muestra >100% con inbound; verificado 55/55); A/B parea por
+  semilla antes de filtrar None (`_collect_paired_values`); demo movida a
+  `examples/` (temp_web tiene purga 24h). Pendiente mayor levantado:
+  MEJ-ROBUSTEZ-AGENTES (ver BACKLOG, requiere mini-plan + OK del Director).
 
 ## Que esta VIVO y ACTIVO ahora mismo (ademas de CLAUDE.md §3/§5)
 
@@ -82,5 +83,5 @@ una iniciativa nueva del Director.
 
 - `warehouse.db-shm` / `warehouse.db-wal`: WAL de SQLite, untracked pero ya
   en `.gitignore`.
-- Cosmetico: `total_work_orders` de metadata no cuenta picks XD dinamicos
-  (solo con cross-dock on; terminacion correcta).
+- MEJ-ROBUSTEZ-AGENTES (excepcion a mitad de tour = cuelgue; pre-existente,
+  baja probabilidad): en BACKLOG con mini-plan pendiente de OK.

@@ -10,6 +10,27 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-10 (cont.)
+
+- **AUDITORIA INIT-7 + 3 fixes.** Auditoria en frio de F0-F5 a pedido del
+  Director (suite+gate en frio, replay demo evento por evento, revision
+  critica de caminos nuevos). Sano: ciclo cross-dock integro, contabilidad
+  del dispatcher, coherencia de stock, opt-in real, visor tolera nulls.
+  Fixes aplicados: **(1)** `work_orders_total_inicial` se REFRESCA en cada
+  alta (antes se fijaba en la 1ra llamada: con inbound el visor mostraba
+  progreso 125% = 55/44; verificado ahora 55/55; canonico = 1 llamada =>
+  baseline intacto; test IN-26). **(2)** A/B: `_collect_paired_values`
+  parea por semilla ANTES de filtrar None (antes None en semillas distintas
+  desalineaba los pares del t-test; 3 call sites; test nuevo). **(3)** Demo
+  cross-dock movida de temp_web/ (purga 24h la habria borrado) a
+  `examples/` (trackeado, con README). Pendientes levantados a BACKLOG:
+  MEJ-ROBUSTEZ-AGENTES (tour sin try/except => cuelgue infinito si algo
+  revienta a mitad de tour; PRE-EXISTENTE, no regresion de INIT-7) +
+  menores (aviso UX cross-dock en modo estocastico, throughput picks-only,
+  LOCATION vacia en tabla). 166 passed + GATE PASS.
+
+---
+
 ## 2026-07-10
 
 - **INIT-7 F5 — INBOUND, flujo mixto (INICIATIVA COMPLETA F0-F5).** Decision
