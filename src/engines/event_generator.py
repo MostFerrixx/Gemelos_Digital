@@ -438,7 +438,9 @@ class EventGenerator:
             output_path: Path completo donde guardar el archivo JSON de métricas
         """
         import json
-        from core.replay_utils import build_service_level_summary, build_sla_summary
+        from core.replay_utils import (build_inbound_summary,
+                                        build_service_level_summary,
+                                        build_sla_summary)
 
         # Obtener estadísticas del dispatcher
         stats = self.almacen.dispatcher.obtener_estadisticas()
@@ -468,6 +470,11 @@ class EventGenerator:
         # ningun pedido -> available=False y orders_late=0 (score identico).
         sla_summary = build_sla_summary(self.almacen)
 
+        # INIT-7 F4: KPIs de inbound para comparar estrategias de slotting en el
+        # A/B. Con inbound off available=False -> avg_* = None (se filtran como
+        # los otros opcionales, no ensucian la media con ceros que no pasaron).
+        inbound_summary = build_inbound_summary(self.almacen)
+
         # Construir objeto de métricas
         metrics = {
             "total_workorders_completed": total_completed,
@@ -484,6 +491,10 @@ class EventGenerator:
             "service_level": service_level,
             "orders_late": sla_summary.get("orders_late", 0),
             "sla_summary": sla_summary,
+            # INIT-7 F4: comparables del slotting (None si inbound off).
+            "avg_dock_to_stock": inbound_summary.get("avg_dock_to_stock"),
+            "avg_putaway_distance": inbound_summary.get("avg_putaway_distance"),
+            "inbound_summary": inbound_summary,
             "timestamp": self.session_timestamp,
             "session_output_dir": self.session_output_dir
         }

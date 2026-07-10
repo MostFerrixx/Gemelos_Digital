@@ -53,7 +53,7 @@ igual que hoy se comparan estrategias de despacho.
 | F1 | Llegadas: `InboundProcess` (espejo de OutboundProcess), camiones segun ASN o intervalo estocastico, descarga a buffer de muelle, eventos al .jsonl + marcadores en visor | **HECHO 2026-07-08** |
 | F2 | Putaway: WO tipo `putaway` (muelle -> ubicacion) pre-generadas en t=0, tour de deposito en operators, stock dinamico | **HECHO 2026-07-09** |
 | F3 | Estrategias de slotting conmutables: `fija_por_sku` / `cercana_al_muelle` / `abc_rotacion` + selector en UI web | **HECHO 2026-07-09** |
-| F4 | KPIs: `inbound_summary` (dock-to-stock time, distancia putaway, utilizacion de muelles) con el patron build_X_summary -> metadata/API/visor/Excel | pendiente |
+| F4 | KPIs: `inbound_summary` (dock-to-stock time, distancia putaway, utilizacion de muelles) con el patron build_X_summary -> metadata/API/visor/Excel | **HECHO 2026-07-09** |
 | F5 | Flujo mixto inbound+outbound: flota compartida, prioridades pick vs putaway, stock entrante alimenta pedidos (requiere decision 4) | pendiente |
 
 ## Contratos de datos (F0)
@@ -190,11 +190,52 @@ igual que hoy se comparan estrategias de despacho.
   pallets (smoke con ASN canonico); bloque inbound de la UI valida limpio en
   el schema (sin claves desconocidas); config.json canonico sigue sin inbound.
 
-`enabled=false` (o bloque ausente) => comportamiento identico al historico;
-el gate byte-identico DEBE pasar sin actualizar baseline (F0-F3).
+### Decisiones tecnicas de F4 (2026-07-09)
+
+- **`build_inbound_summary(almacen)`** en `core/replay_utils.py` (mismo patron
+  que `build_bottleneck_summary`): consolida `almacen.inbound_metrics` en un
+  dict serializable, deriva promedios (dock-to-stock, distancia) y transporta
+  la `slotting_strategy`. `available=False` si inbound no corrio.
+- **KPIs:** dock-to-stock (tiempo de sim muelle->stock), distancia de guardado
+  por pallet (la palanca DIRECTA del slotting), contencion de muelles
+  (esperas, buffer pico), totales de recepcion/putaway.
+- **Distancia de putaway:** medida por operario como delta de
+  `total_distance_traveled` acotado al tour de putaway; acumulada en
+  `inbound_metrics` via `registrar_stock_putaway(distance=...)` y viajando
+  ademas en cada evento `inbound_pallet_stored`.
+- **Plomeria completa:** metadata del .jsonl -> `app_state` (parse en
+  SIMULATION_START) -> API (`inbound_summary` en /api/state) -> panel
+  "Recepcion (Inbound)" del visor (reusa clases de bottleneck) -> hoja Excel
+  "Inbound". Ademas `export_optimization_metrics` emite `avg_dock_to_stock` /
+  `avg_putaway_distance` como KPIs de nivel superior, agregados a
+  `OPTIONAL_KPI_KEYS` del experiment runner => el **A/B compara estrategias
+  de slotting con numeros** (t-test pareado, None-safe como fill_rate_pct).
+- **REGLA BN-05 respetada:** todo el summary es tiempo de SIMULACION o
+  distancia de grilla (deterministas); test IN-43 prohibe claves wall-clock.
+- **Baseline actualizado** (`930a1e6f...`, 4.920.393 bytes): F4 agrego SOLO la
+  clave `inbound_summary` a la metadata (linea 1) del .jsonl -- verificado que
+  los EVENTOS (linea 2+) quedan byte-identicos (sha `6e57752e...` con y sin
+  F4). Mismo caso que MEJ-BOTTLENECK: metadata nueva legitima, no cambio de
+  comportamiento.
+- **KPI discrimina** (smoke, seed 42): distancia avg cercana_al_muelle 29.4 <
+  abc 30.8 < fija 31.4 celdas -- la estrategia "cercana" recorre menos, como
+  se diseno. F4 hace medible lo que F3 hizo configurable.
+
+`enabled=false` (o bloque ausente) => comportamiento identico al historico
+EN LOS EVENTOS; desde F4 la metadata lleva `inbound_summary:{available:false}`
+(baseline `930a1e6f`). El gate DEBE pasar sin `--update-baseline`.
 
 ## Regla de validacion por fase
 
 Cada fase cierra con: `python -m pytest -q` verde + `python
-scripts/regression_gate.py` PASS (sin `--update-baseline` mientras
-`inbound.enabled=false` no este en el canonico) + docs al dia.
+scripts/regression_gate.py` PASS + docs al dia. (F4 reajusto el baseline una
+vez por la metadata nueva; de aca en mas el gate pasa sin update salvo cambio
+real de comportamiento.)
+
+## Alcance v1 COMPLETO (F0-F4)
+
+Con F4 cerrado, el alcance v1 aprobado por el Director esta HECHO: recepcion
+-> putaway -> stock, con 3 estrategias de slotting comparables por KPIs en el
+A/B. Falta solo **F5 (flujo mixto)**, segunda etapa que requiere la decision 4
+del Director (stock del dia disponible para picking del mismo dia vs turnos
+separados).

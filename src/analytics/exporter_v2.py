@@ -141,6 +141,8 @@ class AnalyticsExporter:
                     self._append_sla_summary_sheet(archivo_excel)
                     # MEJ-BOTTLENECK: anexar hoja 'Cuellos de Botella' al reporte.
                     self._append_bottleneck_sheet(archivo_excel)
+                    # INIT-7 F4: anexar hoja 'Inbound' (recepcion/putaway) al reporte.
+                    self._append_inbound_sheet(archivo_excel)
 
                     # 2. PIPELINE AUTOMATIZADO: Visualizer -> PNG
                     print("[2/2] Reporte de Excel generado. Creando imagen de heatmap...")
@@ -328,6 +330,55 @@ class AnalyticsExporter:
             print("[1/2] Hoja 'Cuellos de Botella' anexada al Excel")
         except Exception as e:
             print(f"[1/2] WARNING: no se pudo anexar hoja de cuellos de botella: {e}")
+
+    def _append_inbound_sheet(self, excel_path):
+        """INIT-7 F4: anexa una hoja 'Inbound' (recepcion/putaway) al reporte
+        Excel ya generado (mismo patron que _append_bottleneck_sheet). Es la
+        vista offline de los KPIs que hacen COMPARABLES las estrategias de
+        slotting en el experiment runner A/B. Con inbound apagado anota N/A."""
+        try:
+            import openpyxl
+            from core.replay_utils import build_inbound_summary
+            ib = build_inbound_summary(self.context.almacen)
+            wb = openpyxl.load_workbook(excel_path)
+            if 'Inbound' in wb.sheetnames:
+                del wb['Inbound']
+            ws = wb.create_sheet('Inbound')
+            ws.append(['Inbound (recepcion y almacenamiento)'])
+            ws.append([])
+            if not ib.get('available'):
+                ws.append(['Inbound desactivado en esta corrida -> N/A'])
+                wb.save(excel_path)
+                print("[1/2] Hoja 'Inbound' anexada al Excel (N/A)")
+                return
+
+            ws.append(['Estrategia de slotting', ib['slotting_strategy']])
+            ws.append(['Muelles de recepcion', ib['docks_count']])
+            ws.append([])
+            ws.append(['RECEPCION'])
+            ws.append(['Camiones recibidos', ib['trucks_received']])
+            ws.append(['Pallets descargados', ib['pallets_unloaded']])
+            ws.append(['Pallets guardados (putaway)', ib['pallets_stored']])
+            ws.append(['Unidades recibidas', ib['units_received']])
+            ws.append([])
+            ws.append(['DOCK-TO-STOCK (tiempo de sim de muelle a stock, s)'])
+            ws.append(['Promedio', ib['avg_dock_to_stock']])
+            ws.append(['Maximo', ib['max_dock_to_stock']])
+            ws.append([])
+            ws.append(['DISTANCIA DE GUARDADO (celdas -- palanca del slotting)'])
+            ws.append(['Promedio por pallet', ib['avg_putaway_distance']])
+            ws.append(['Maxima', ib['max_putaway_distance']])
+            ws.append(['Total recorrido', ib['putaway_distance_total']])
+            ws.append([])
+            ws.append(['MUELLES (contencion de recepcion)'])
+            ws.append(['Esperas de camion (eventos)', ib['dock_wait_events']])
+            ws.append(['Tiempo total esperando muelle (s)', ib['dock_wait_time']])
+            ws.append(['Espera maxima (s)', ib['max_dock_wait']])
+            ws.append(['Buffer pico (pallets en muelle)', ib['buffer_peak']])
+            wb.save(excel_path)
+            print("[1/2] Hoja 'Inbound' anexada al Excel")
+        except Exception as e:
+            print(f"[1/2] WARNING: no se pudo anexar hoja de inbound: {e}")
 
     # (PODA 2026-07-07: aqui vivian export_complete_analytics_with_buffer y
     #  _exportar_eventos_crudos_organizado -- 0 callers, y ademas escribian los

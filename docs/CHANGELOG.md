@@ -10,6 +10,29 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-09 (cont. 2)
+
+- **INIT-7 F4 — INBOUND, KPIs (cierra el alcance v1 F0-F4).** Lo que hace
+  COMPARABLES las 3 estrategias de slotting. `build_inbound_summary()` en
+  `core/replay_utils.py` (patron `build_bottleneck_summary`): consolida
+  `almacen.inbound_metrics` -> dock-to-stock (tiempo sim muelle->stock),
+  distancia de guardado por pallet (palanca directa del slotting), contencion
+  de muelles, totales. Distancia de putaway medida por operario (delta de
+  total_distance_traveled acotado al tour) -> inbound_metrics + evento
+  `inbound_pallet_stored`. Plomeria: metadata .jsonl -> app_state -> API
+  (`inbound_summary`) -> panel "Recepcion (Inbound)" del visor -> hoja Excel
+  "Inbound". `export_optimization_metrics` emite avg_dock_to_stock /
+  avg_putaway_distance -> `OPTIONAL_KPI_KEYS` del A/B (t-test pareado,
+  None-safe). REGLA BN-05: summary 100% deterministico (test IN-43 prohibe
+  wall-clock). 4 tests (IN-40..43). Baseline REAJUSTADO (`930a1e6f`,
+  4.920.393 bytes): F4 agrego SOLO `inbound_summary:{available:false}` a la
+  metadata (linea 1) -- eventos byte-identicos verificados (sha `6e57752e`
+  con y sin F4, mismo caso que MEJ-BOTTLENECK). Validado: 157 passed, GATE
+  PASS x2 con el baseline nuevo, KPI discrimina (dist avg cercana 29.4 <
+  abc 30.8 < fija 31.4 celdas), hoja Excel + panel visor OK.
+
+---
+
 ## 2026-07-09 (cont.)
 
 - **INIT-7 F3 — INBOUND, estrategias de slotting conmutables.** El valor de
