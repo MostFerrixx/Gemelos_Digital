@@ -10,6 +10,23 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-11 (cont. 2)
+
+- **INIT-8 F3 — TIEMPOS REALISTAS, velocidad segun carga (opt-in).** Bloque
+  `tiempos.velocidad_por_carga` (default off, canonico sin tocar => GATE
+  PASS sin update): factor de tiempo 1/(1 - min(kg*0.0084, 0.5)) calibrado
+  con Indian Army 2022 (22 kg => -18.5% de velocidad; test T831 verifica
+  1.35 -> 1.10 m/s). `cargo_peso` espejado en los 11 sitios de mutacion de
+  cargo_volume. Aplicado UNA vez a la entrada de `_recorrer_tramo`: el plan
+  espacio-temporal recibe el speed efectivo => reservas consistentes con la
+  ejecucion (cero riesgo de co-ocupacion). Forklift exento por default
+  (`aplica_forklift`). Penalizacion por giro DESCARTADA (escala vehicular,
+  no aplica a grilla peatonal de 1 m; y desincronizaria las reservas del
+  planner). Efecto medido: +2.6% makespan con flag on (seed 42). Tests
+  T830..834. 184 passed.
+
+---
+
 ## 2026-07-11 (cont.)
 
 - **INIT-8 F2 — TIEMPOS REALISTAS, activacion (volumen real + tiempos por

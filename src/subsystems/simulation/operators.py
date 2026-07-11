@@ -135,7 +135,39 @@ class BaseOperator:
         _cm = _tiempos.get("clases_manejo", {})
         self.clases_manejo = _cm if isinstance(_cm, dict) else {}
 
+        # INIT-8 F3: velocidad segun carga transportada (opt-in, default off).
+        # Calibracion (docs/PLAN_INIT8_TIEMPOS.md): Indian Army 2022 midio
+        # 1.35 m/s vacio -> 1.10 m/s con 22 kg = -18.5% => 0.0084 de
+        # reduccion relativa por kg. reduccion_max acota el piso (un humano
+        # cargado al limite no baja del 50% de su paso). Por defecto NO
+        # aplica a Forklift (la maquina carga, no el cuerpo del operario).
+        _vc = _tiempos.get("velocidad_por_carga", {}) or {}
+        self.vc_enabled = bool(_vc.get("enabled", False))
+        self.vc_reduccion_por_kg = float(_vc.get("reduccion_por_kg", 0.0084) or 0.0)
+        self.vc_reduccion_max = min(0.9, float(_vc.get("reduccion_max", 0.5) or 0.0))
+        self.vc_aplica_forklift = bool(_vc.get("aplica_forklift", False))
+        # Peso transportado (kg), espejo de cargo_volume (INIT-8 F3).
+        self.cargo_peso = 0.0
+
         logger.info(f"[AGENT] {self.id} ({self.type}) inicializado - Capacidad: {self.capacity}")
+
+    def _factor_carga_tiempo(self) -> float:
+        """
+        INIT-8 F3: multiplicador de TIEMPO por carga transportada (>= 1.0).
+        `speed` en _recorrer_tramo es un multiplicador de tiempo (Ground 1.0,
+        Forklift 0.8), asi que ir mas lento = factor > 1:
+            factor = 1 / (1 - min(peso_kg * reduccion_por_kg, reduccion_max))
+        Off / sin peso / Forklift (default) -> 1.0 EXACTO (gate intacto).
+        """
+        if not self.vc_enabled:
+            return 1.0
+        if self.type == 'Forklift' and not self.vc_aplica_forklift:
+            return 1.0
+        peso = float(getattr(self, 'cargo_peso', 0.0) or 0.0)
+        if peso <= 0.0:
+            return 1.0
+        reduccion = min(peso * self.vc_reduccion_por_kg, self.vc_reduccion_max)
+        return 1.0 / (1.0 - reduccion)
 
     def _clase_params(self, wo) -> tuple:
         """
@@ -224,13 +256,15 @@ class BaseOperator:
         """
         return (self.cargo_volume + volume) <= self.capacity
 
-    def add_cargo(self, volume: int):
-        """Add cargo volume to agent"""
+    def add_cargo(self, volume: int, peso: float = 0.0):
+        """Add cargo volume (and weight, INIT-8 F3) to agent"""
         self.cargo_volume += volume
+        self.cargo_peso += peso
 
     def clear_cargo(self):
         """Clear all cargo"""
         self.cargo_volume = 0
+        self.cargo_peso = 0.0
 
     def move_to(self, target_position: Tuple[int, int]):
         """
@@ -588,6 +622,13 @@ class BaseOperator:
         congela ni aborta (regla de oro 4.4). Si la exclusion NO esta activa, el lazo es
         identico al de las fases previas (byte-identico con flag off).
         """
+        # INIT-8 F3: velocidad segun carga -- se escala EL PARAMETRO antes de
+        # cualquier rama, asi el plan espacio-temporal (find_path_st recibe
+        # este speed => sus reservas usan la duracion real), la ejecucion del
+        # plan y el fallback estatico quedan CONSISTENTES entre si. Con el
+        # flag off el factor es 1.0 exacto (byte-identico).
+        speed = speed * self._factor_carga_tiempo()
+
         cm = getattr(self.almacen, 'congestion_manager', None)
         cell_mode = cm is not None and getattr(cm, 'cell_exclusion', False)
 
@@ -815,6 +856,7 @@ class BaseOperator:
             for wo in staging_wos:
                 yield self.env.timeout(self.discharge_time)
                 self.cargo_volume -= wo.cantidad_inicial * wo.sku.volumen
+                self.cargo_peso -= wo.cantidad_inicial * getattr(wo.sku, 'peso', 0.0)
                 self.almacen.dispatcher.notificar_completado_individual(self, wo)
             return
 
@@ -893,6 +935,7 @@ class BaseOperator:
             })
             yield self.env.timeout(self.discharge_time)
             self.cargo_volume -= wo.cantidad_inicial * wo.sku.volumen
+            self.cargo_peso -= wo.cantidad_inicial * getattr(wo.sku, 'peso', 0.0)
             self.almacen.dispatcher.notificar_completado_individual(self, wo)
             # crear el Pallet persistente + reservar la celda (obstaculo) + scaffold.
             self._outbound_place_pallet(slot, wo, staging_id)
@@ -1193,6 +1236,7 @@ class BaseOperator:
 
                 # Actualizar cargo parcialmente
                 self.cargo_volume -= wo_volume
+                self.cargo_peso -= wo.cantidad_inicial * getattr(wo.sku, 'peso', 0.0)
 
                 # Registrar evento de estado actualizado
                 self.almacen.registrar_evento('estado_agente', {
@@ -1233,6 +1277,7 @@ class BaseOperator:
 
         # PASO 5: Limpiar cargo final (por seguridad)
         self.cargo_volume = 0
+        self.cargo_peso = 0.0
         logger.debug(f"[{self.id}] t={self.env.now:.1f} Descarga completa en todos los stagings")
 
         self.almacen.registrar_evento('estado_agente', {
@@ -1291,6 +1336,7 @@ class BaseOperator:
                                  f"{getattr(wo, 'id', '?')}: {e2}")
 
         self.cargo_volume = 0
+        self.cargo_peso = 0.0
         self.status = "idle"
         try:
             self.almacen.registrar_evento('agent_tour_crashed', {
@@ -1391,6 +1437,7 @@ class BaseOperator:
             pallet = self.almacen.tomar_pallet_inbound(
                 getattr(wo, 'pallet_id', None))
         self.cargo_volume += wo.cantidad_inicial * wo.sku.volumen
+        self.cargo_peso += wo.cantidad_inicial * getattr(wo.sku, 'peso', 0.0)
         self.almacen.registrar_evento('inbound_putaway_started', {
             'pallet_id': getattr(wo, 'pallet_id', None),
             'work_order_id': wo.id,
@@ -1415,6 +1462,8 @@ class BaseOperator:
 
         self.cargo_volume = max(0, self.cargo_volume
                                 - wo.cantidad_inicial * wo.sku.volumen)
+        self.cargo_peso = max(0.0, self.cargo_peso
+                              - wo.cantidad_inicial * getattr(wo.sku, 'peso', 0.0))
         wo.cantidad_restante = 0
         # Stock += en la ubicacion real + dock-to-stock + distancia + evento.
         putaway_distance = self.total_distance_traveled - dist_before
@@ -1524,6 +1573,7 @@ class GroundOperator(BaseOperator):
         if wo:
             # Sumar el volumen ANTES de modificar cantidad_restante
             self.cargo_volume += wo.calcular_volumen_restante()
+            self.cargo_peso += wo.cantidad_restante * getattr(wo.sku, 'peso', 0.0)
             wo.status = 'picked'
             wo.cantidad_restante = 0
             # Fase 2: consume real stock at the picked location
@@ -1671,6 +1721,7 @@ class Forklift(BaseOperator):
         if wo:
             # Sumar el volumen ANTES de modificar cantidad_restante
             self.cargo_volume += wo.calcular_volumen_restante()
+            self.cargo_peso += wo.cantidad_restante * getattr(wo.sku, 'peso', 0.0)
             wo.cantidad_restante = 0
             if hasattr(wo, 'picking_executions'):
                 wo.picking_executions += 1

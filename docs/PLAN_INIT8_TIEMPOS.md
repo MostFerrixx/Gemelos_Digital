@@ -21,7 +21,7 @@ GENERAL) — hoy todos los SKUs son identicos para el motor.
 |---|---|---|
 | F1 | Catalogo fisico: hoja `SkuCatalog` (volumen/peso/clase por SKU, sintetico coherente), importer + data_manager + SKU del motor cargan peso/clase (SIN lector aun => gate intacto) | **HECHO 2026-07-11** |
 | F2 | Activacion: el motor consume volumen REAL (capacidad/tours) + tiempos por clase y peso (`tiempos.clases_manejo` + `por_kg`) + recargos estilo Blue Yonder. **UNICA actualizacion intencional de baseline de la iniciativa** | **HECHO 2026-07-11** |
-| F3 | Velocidad segun carga (curva calibrada) + opcional penalizacion por giro | pendiente |
+| F3 | Velocidad segun carga (curva calibrada) + opcional penalizacion por giro | **HECHO 2026-07-11** (giro DESCARTADO, ver decisiones) |
 | F4 | Variabilidad Log-Normal de tiempos (seeded) + packing por clase | pendiente |
 | F5 (diferida) | Fatiga dinamica acumulativa (Giacomelli 2026) | no planificada |
 
@@ -112,6 +112,35 @@ editando la hoja (el contrato no cambia).
   Kostrzewski 2016). Baseline actualizado: `8f9f78d5...`, 7.161.322 bytes.
 - Sin UI en F2: `clases_manejo` se edita en config.json (bloque avanzado);
   evaluar UI si el Director la pide tras F3/F4.
+
+## Decisiones tecnicas de F3 (2026-07-11)
+
+- **Bloque `tiempos.velocidad_por_carga`** (opt-in, default off; NO esta en
+  el canonico): `{enabled, reduccion_por_kg: 0.0084, reduccion_max: 0.5,
+  aplica_forklift: false}`. Calibracion: Indian Army 2022 (1.35 m/s vacio ->
+  1.10 m/s con 22 kg = -18.5% => 0.0084/kg). reduccion_max clampeada a 0.9.
+- **factor de TIEMPO** (>= 1.0): `speed` en `_recorrer_tramo` es
+  multiplicador de tiempo => factor = 1/(1 - reduccion). Aplicado UNA vez a
+  la ENTRADA de `_recorrer_tramo`: el plan espacio-temporal (find_path_st
+  recibe el speed efectivo => reservas con duracion real), la ejecucion del
+  plan y el fallback estatico quedan CONSISTENTES (cero riesgo de
+  co-ocupaciones por desincronizacion).
+- **`cargo_peso`**: espejo de cargo_volume en los 11 sitios de mutacion
+  (picks Ground/Forklift, 3 rutas de descarga, putaway load/deposito,
+  resets de fin de tour y _abort_tour, add/clear_cargo).
+- **Forklift exento por default** (`aplica_forklift: false`): la maquina
+  carga, no el cuerpo del operario. Activable explicito.
+- **OFF = identidad IEEE exacta** (speed * 1.0): gate PASS sin update con el
+  baseline de F2 (verificado).
+- **Efecto medido** (canonico + flag on, seed 42): makespan 5696 -> 5843 s
+  (+2.6%). Modesto porque lo pesado va en Forklift (exento) y los tours mixtos
+  promedian; crece con perfiles de pedidos pesados.
+- **Penalizacion por giro DESCARTADA**: el valor del doc (+10 s/giro, SAP
+  BRFplus) aplica a tramos vehiculares largos de DC real; en nuestra grilla
+  de celdas ~1 m un caminante gira constantemente y la penalizacion seria
+  absurda. Ademas insertaria dwells no planificados dentro de tramos ya
+  reservados por el planner espacio-temporal (riesgo de co-ocupacion). Se
+  reevalua solo si algun dia se modelan velocidades vehiculares por tramo.
 
 ## Regla de validacion por fase
 

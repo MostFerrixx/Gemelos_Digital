@@ -51,6 +51,19 @@ class PickTimeModel(BaseModel):
     minimo: Optional[float] = None
 
 
+class VelocidadPorCargaConfig(BaseModel):
+    """INIT-8 F3: velocidad segun carga transportada (opt-in, default off).
+    factor_tiempo = 1/(1 - min(kg*reduccion_por_kg, reduccion_max)).
+    Calibracion: Indian Army 2022 (22 kg => -18.5% => 0.0084/kg).
+    Lector: operators._factor_carga_tiempo (aplica en _recorrer_tramo,
+    consistente con el plan espacio-temporal)."""
+    model_config = ConfigDict(extra="allow")
+    enabled: Optional[bool] = None
+    reduccion_por_kg: Optional[float] = None
+    reduccion_max: Optional[float] = None
+    aplica_forklift: Optional[bool] = None
+
+
 class ClaseManejoConfig(BaseModel):
     """INIT-8 F2: parametros de tiempo por clase de manejo del SKU.
     t_final = t * mult + recargo. Neutro = {mult: 1.0, recargo: 0.0}.
@@ -72,6 +85,8 @@ class TiemposConfig(BaseModel):
     pick_time_model: Optional[PickTimeModel] = None
     # INIT-8 F2: {clase_manejo: {mult, recargo}} (hoja SkuCatalog)
     clases_manejo: Optional[Dict[str, ClaseManejoConfig]] = None
+    # INIT-8 F3: velocidad segun carga (opt-in)
+    velocidad_por_carga: Optional[VelocidadPorCargaConfig] = None
 
 
 class TimewindowConfig(BaseModel):
