@@ -128,6 +128,14 @@ class ExcelImporter:
                     result.add_warning("Sheet 'InboundDocks' not found - skipping "
                                        "(sin muelles de recepcion)")
 
+                # Process SkuCatalog sheet (optional, INIT-8 F1)
+                if 'SkuCatalog' in workbook.sheetnames:
+                    sheet = workbook['SkuCatalog']
+                    self._import_sku_catalog_attrs(sheet, conn, result)
+                else:
+                    result.add_warning("Sheet 'SkuCatalog' not found - skipping "
+                                       "(atributos fisicos de SKU en defaults)")
+
                 result.success = len(result.errors) == 0
                 
         except Exception as e:
@@ -411,6 +419,60 @@ class ExcelImporter:
 
         result.inbound_docks_imported = count
         print(f"[IMPORTER] Imported {count} inbound docks")
+
+    def _import_sku_catalog_attrs(self, sheet, conn: sqlite3.Connection,
+                                  result: ImportResult):
+        """
+        INIT-8 F1: enriquece sku_catalog con atributos fisicos por SKU desde
+        la hoja opcional 'SkuCatalog' (sku_code, volumen_m3, peso_kg,
+        clase_manejo).
+
+        F1 importa SOLO peso_kg y clase_manejo (columna DB `category`):
+        no tienen lector en el motor todavia => gate byte-identico intacto.
+        volumen_m3 se importa recien en INIT-8 F2 (fluye a SKU.volumen =>
+        capacidad/tours => cambio de comportamiento que va JUNTO con el
+        modelo de tiempos y UNA actualizacion de baseline documentada).
+        Ver docs/PLAN_INIT8_TIEMPOS.md.
+        """
+        print("[IMPORTER] Processing 'SkuCatalog' sheet (peso/clase; "
+              "volumen_m3 se activa en INIT-8 F2)...")
+
+        header_row = self._find_header_row(sheet, 'sku_code')
+        if not header_row:
+            header_row = 1
+
+        headers = self._get_headers(sheet, header_row)
+        count = 0
+
+        for row in sheet.iter_rows(min_row=header_row + 1, values_only=True):
+            if not row or not row[0]:
+                continue
+
+            data = self._row_to_dict(row, headers)
+
+            try:
+                sku_code = str(data.get('sku_code', '')).strip()
+                if not sku_code:
+                    continue
+                peso = data.get('peso_kg')
+                clase = data.get('clase_manejo')
+
+                updated = conn.execute("""
+                    UPDATE sku_catalog SET weight_kg = ?, category = ?
+                    WHERE sku_code = ?
+                """, (float(peso) if peso is not None else None,
+                      str(clase).strip() if clase else 'GENERAL',
+                      sku_code))
+                if updated.rowcount > 0:
+                    count += 1
+                else:
+                    result.add_warning(f"SkuCatalog: '{sku_code}' no existe "
+                                       f"en PickingLocations - ignorado")
+
+            except Exception as e:
+                result.add_warning(f"Skipping SkuCatalog row: {data} - {e}")
+
+        print(f"[IMPORTER] SKU attrs (peso/clase) actualizados: {count}")
 
     @staticmethod
     def _safe_int(value, default: int = 0) -> int:

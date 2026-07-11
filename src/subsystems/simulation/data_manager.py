@@ -435,10 +435,16 @@ class DataManager:
             sheet = workbook['InboundDocks']
             self._process_inbound_docks(sheet)
 
-        workbook.close()
-        
         # Build SKU catalog from Excel data
         self._build_sku_catalog_from_picking_points()
+
+        # INIT-8 F1: enriquecer el catalogo con atributos fisicos (peso/clase)
+        # de la hoja opcional SkuCatalog. volumen_m3 se activa en F2 (ver
+        # docs/PLAN_INIT8_TIEMPOS.md, estrategia de baseline).
+        if 'SkuCatalog' in workbook.sheetnames:
+            self._process_sku_catalog_attrs(workbook['SkuCatalog'])
+
+        workbook.close()
 
     def _build_sku_catalog_from_picking_points(self):
         """Build SKU catalog from loaded picking points (Excel fallback)."""
@@ -449,8 +455,46 @@ class DataManager:
                     'sku_code': sku_code,
                     'description': f'SKU {sku_code}',
                     'volume_m3': 0.01,
+                    'weight_kg': None,       # INIT-8 F1 (hoja SkuCatalog)
+                    'category': 'GENERAL',   # INIT-8 F1 (clase_manejo)
                     'equipment_required': punto.get('equipment_required', 'GroundOperator')
                 }
+
+    def _process_sku_catalog_attrs(self, sheet):
+        """
+        INIT-8 F1: fallback Excel de la hoja 'SkuCatalog' (espejo del
+        importer). Enriquece el catalogo en memoria con peso_kg y
+        clase_manejo; volumen_m3 NO se toma en F1 (fluye a SKU.volumen =>
+        cambiaria capacidad/tours; se activa con el modelo de tiempos en F2).
+        """
+        header_row = None
+        for idx, row in enumerate(sheet.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
+            if row and any(str(cell).strip() == 'sku_code' for cell in row if cell):
+                header_row = idx
+                break
+        if not header_row:
+            header_row = 1
+
+        headers = [str(c.value).strip() if c.value else '' for c in sheet[header_row]]
+        count = 0
+        for row in sheet.iter_rows(min_row=header_row + 1, values_only=True):
+            if not row or not row[0]:
+                continue
+            data = dict(zip(headers, row))
+            sku_code = str(data.get('sku_code', '')).strip()
+            entry = self.sku_catalog.get(sku_code)
+            if not entry:
+                continue
+            peso = data.get('peso_kg')
+            try:
+                entry['weight_kg'] = float(peso) if peso is not None else None
+            except (TypeError, ValueError):
+                entry['weight_kg'] = None
+            clase = data.get('clase_manejo')
+            entry['category'] = str(clase).strip() if clase else 'GENERAL'
+            count += 1
+        print(f"[DATA-MANAGER] Hoja 'SkuCatalog' cargada: atributos "
+              f"peso/clase para {count} SKUs")
 
     def _process_picking_locations(self, sheet):
         """
