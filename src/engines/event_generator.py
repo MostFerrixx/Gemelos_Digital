@@ -37,6 +37,29 @@ from analytics.context import SimulationContext
 from simulation_buffer import ReplayBuffer
 
 
+# MEJ-ROBUSTEZ (auditoria 2026-07-10): watchdog de NO-PROGRESO. Si ninguna WO
+# se cierra durante este lapso de tiempo de SIMULACION, la corrida esta
+# deadlockeada (p.ej. una WO en ubicacion inalcanzable de un TMX custom, o un
+# bug logico futuro: los agentes quedan en idle-loop de 0.5s y env.now crece
+# para siempre). El guard QA-3 de areas sin agente atrapa el caso estatico
+# ANTES de correr; esto es la red de ULTIMO recurso para lo dinamico.
+# 7200 s de sim >> cualquier hueco legitimo (esperar un camion inbound, olas).
+STALL_LIMIT_BASE_S = 7200.0
+
+
+def compute_stall_limit(inbound_schedule):
+    """Limite de no-progreso en segundos de SIM. Con agenda inbound, un hueco
+    legitimo puede durar hasta la ULTIMA llegada agendada (los agentes esperan
+    el camion sin completar nada): se extiende el limite a esa cota + base."""
+    max_arrival = 0.0
+    for truck in inbound_schedule or []:
+        try:
+            max_arrival = max(max_arrival, float(truck.get('arrival_time', 0)))
+        except (TypeError, ValueError):
+            continue
+    return max(STALL_LIMIT_BASE_S, max_arrival + STALL_LIMIT_BASE_S)
+
+
 class EventGenerator:
     """
     Motor puro de generacion de eventos para archivos .jsonl
@@ -296,18 +319,35 @@ class EventGenerator:
             # Ejecutar simulacion SimPy pura
             logger.info("[EVENT-GENERATOR] Ejecutando simulacion SimPy...")
             step_counter = 0
-            
+
+            # MEJ-ROBUSTEZ: watchdog de no-progreso (ver compute_stall_limit).
+            _stall_limit = compute_stall_limit(
+                getattr(self.almacen, 'inbound_schedule', []))
+            _last_done = -1
+            _t_last_progress = 0.0
+
             while not self.almacen.simulacion_ha_terminado():
                 try:
                     self.env.run(until=self.env.now + 1.0)
                     step_counter += 1
-                    
+
                     # Log cada 100 pasos
                     if step_counter % 100 == 0:
                         stats = self.almacen.dispatcher.obtener_estadisticas()
                         logger.info(f"[EVENT-GENERATOR] t={self.env.now:.1f}s | "
                               f"Completadas: {stats['completados']}/{stats['total']}")
-                
+
+                    # MEJ-ROBUSTEZ: si nada se cierra por > stall_limit de
+                    # tiempo de SIM, hay deadlock -> abortar con diagnostico
+                    # y seguir al volcado (el .jsonl parcial se conserva).
+                    _done = len(self.almacen.dispatcher.work_orders_completados)
+                    if _done != _last_done:
+                        _last_done = _done
+                        _t_last_progress = self.env.now
+                    elif self.env.now - _t_last_progress > _stall_limit:
+                        self._diagnosticar_stall(_stall_limit)
+                        break
+
                 except simpy.core.EmptySchedule:
                     if self.almacen.simulacion_ha_terminado():
                         break
@@ -427,6 +467,49 @@ class EventGenerator:
             traceback.print_exc()
             return False
     
+    def _diagnosticar_stall(self, stall_limit):
+        """
+        MEJ-ROBUSTEZ: banner de diagnostico al abortar por no-progreso.
+        Lista las WOs sin cerrar (con su work_area/ubicacion) y las areas que
+        la flota sirve, para que el problema sea accionable sin debuggear.
+        La corrida sigue al volcado: el .jsonl parcial + Excel se generan.
+        """
+        d = self.almacen.dispatcher
+        sin_cerrar = [wo for wo in d.lista_maestra_work_orders
+                      if wo not in d.work_orders_completados]
+        areas_flota = set()
+        for op in (self.operarios or []):
+            prios = getattr(op, 'work_area_priorities', {}) or {}
+            areas_flota.update(k for k, v in prios.items() if v < 999)
+
+        logger.error("=" * 70)
+        logger.error("[WATCHDOG] SIMULACION ABORTADA POR NO-PROGRESO")
+        logger.error(f"[WATCHDOG] Ninguna WO se cerro en {stall_limit:.0f}s de "
+                     f"sim (t={self.env.now:.0f}s). Deadlock probable.")
+        logger.error(f"[WATCHDOG] WOs sin cerrar: {len(sin_cerrar)} de "
+                     f"{len(d.lista_maestra_work_orders)}. Primeras 5:")
+        for wo in sin_cerrar[:5]:
+            logger.error(f"[WATCHDOG]   {wo.id} status={wo.status} "
+                         f"area={wo.work_area} ubicacion={wo.ubicacion} "
+                         f"task={getattr(wo, 'task_type', 'pick')}")
+        logger.error(f"[WATCHDOG] Areas servidas por la flota: "
+                     f"{sorted(areas_flota) or 'NINGUNA'}")
+        logger.error("[WATCHDOG] Causas tipicas: ubicacion inalcanzable en el "
+                     "TMX, area sin agente capaz (el guard QA-3 cubre el caso "
+                     "estatico), o pallet inbound que nunca aterrizo.")
+        logger.error("[WATCHDOG] El .jsonl PARCIAL se genera igual para "
+                     "inspeccion en el visor.")
+        logger.error("=" * 70)
+        try:
+            self.almacen.registrar_evento('simulation_stalled', {
+                'stall_limit_s': stall_limit,
+                'sim_time': float(self.env.now),
+                'unfinished_work_orders': len(sin_cerrar),
+                'unfinished_sample': [wo.id for wo in sin_cerrar[:10]],
+            })
+        except Exception:
+            pass
+
     def export_optimization_metrics(self, output_path: str):
         """
         Exporta métricas clave para optimización automática.
