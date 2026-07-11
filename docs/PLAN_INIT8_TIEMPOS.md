@@ -20,7 +20,7 @@ GENERAL) — hoy todos los SKUs son identicos para el motor.
 | Fase | Entrega | Estado |
 |---|---|---|
 | F1 | Catalogo fisico: hoja `SkuCatalog` (volumen/peso/clase por SKU, sintetico coherente), importer + data_manager + SKU del motor cargan peso/clase (SIN lector aun => gate intacto) | **HECHO 2026-07-11** |
-| F2 | Activacion: el motor consume volumen REAL (capacidad/tours) + tiempos por clase y peso (`tiempos.clases_manejo` + `por_kg`) + recargos estilo Blue Yonder. **UNICA actualizacion intencional de baseline de la iniciativa** | pendiente |
+| F2 | Activacion: el motor consume volumen REAL (capacidad/tours) + tiempos por clase y peso (`tiempos.clases_manejo` + `por_kg`) + recargos estilo Blue Yonder. **UNICA actualizacion intencional de baseline de la iniciativa** | **HECHO 2026-07-11** |
 | F3 | Velocidad segun carga (curva calibrada) + opcional penalizacion por giro | pendiente |
 | F4 | Variabilidad Log-Normal de tiempos (seeded) + packing por clase | pendiente |
 | F5 (diferida) | Fatiga dinamica acumulativa (Giacomelli 2026) | no planificada |
@@ -86,6 +86,32 @@ editando la hoja (el contrato no cambia).
 - data_manager: `sku_catalog` dicts exponen `weight_kg` y `category` (DB y
   fallback Excel).
 - warehouse.SKU: atributos `peso` y `clase` (sin consumidor en F1).
+
+## Decisiones tecnicas de F2 (2026-07-11)
+
+- **Formula final** (operators._compute_pick_time, INIT-4 extendida):
+  `t = (base + por_unidad*qty + por_volumen*vol + por_kg*peso_total)
+  * clase.mult + clase.recargo`, piso `minimo`. Rama de COMPAT EXACTA
+  intacta: configs/presets viejos sin los bloques -> tiempo historico
+  identico (pineado por T820).
+- **Calibracion canonica** (anclas del doc del Director):
+  `base=10 + por_unidad=2` => ~14 s/caja mediana con qty~2 (POMS 2007:
+  14.2 s/caja); `por_kg=0.15` (proxy fatigue-factor Blue Yonder: 85 kg =>
+  +12.8 s); recargo voluminoso 3 s (MTM caja grande/densa 2.16 s);
+  extra_grande mult 2.2 + recargo 15 s (linea blanca, dos puntos de agarre).
+  v1 AJUSTABLE editando config.json (sin codigo).
+- **Putaway load** tambien escala por clase (`_putaway_load_time`): pallet
+  de linea blanca 37 s vs 10 s plano.
+- **Volumen real activo**: importer + fallback Excel toman volumen_m3
+  (COALESCE si la celda falta). SKU.volumen ahora discrimina de verdad:
+  pequeno=1 unidad de carro, extra_grande=66-75 (carro ground de 150 =>
+  max 2 refrigeradores por viaje).
+- **Impacto medido (canonico, seed 42):** makespan 3122 -> 5696 s (+82%),
+  WOs 602 -> 615 (mas splits por volumen real), throughput 0.193 -> 0.108
+  wo/s (-44%). El mundo plano SOBREESTIMABA la capacidad ~2x (confirma
+  Kostrzewski 2016). Baseline actualizado: `8f9f78d5...`, 7.161.322 bytes.
+- Sin UI en F2: `clases_manejo` se edita en config.json (bloque avanzado);
+  evaluar UI si el Director la pide tras F3/F4.
 
 ## Regla de validacion por fase
 

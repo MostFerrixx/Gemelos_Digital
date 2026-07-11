@@ -69,9 +69,10 @@ def test_t801_hoja_canonica_completa_y_coherente():
     assert len(voles) > 40 and len(pesos) > 40  # variedad real, no plana
 
 
-def test_t802_importer_peso_clase_si_volumen_no(tmp_path):
-    """El pin de la estrategia de baseline F1: peso/clase entran a la DB,
-    volume_m3 queda INTACTO (0.01) hasta F2."""
+def test_t802_importer_volumen_peso_clase_activos(tmp_path):
+    """Contrato F2 (2026-07-11): el importer trae los TRES atributos fisicos.
+    El volumen real fue LA actualizacion intencional de baseline de INIT-8
+    (fluye a SKU.volumen => capacidad/tours), junto al modelo de tiempos."""
     from subsystems.database.database_manager import DatabaseManager
     from subsystems.database.importer import import_warehouse_data
 
@@ -89,16 +90,17 @@ def test_t802_importer_peso_clase_si_volumen_no(tmp_path):
                 "SELECT COUNT(DISTINCT category) FROM sku_catalog").fetchone()[0]
             vol_distintos = conn.execute(
                 "SELECT COUNT(DISTINCT volume_m3) FROM sku_catalog").fetchone()[0]
-            un_pesado = conn.execute(
-                "SELECT weight_kg FROM sku_catalog WHERE category = 'extra_grande' LIMIT 1"
-            ).fetchone()
+            fridge = conn.execute(
+                "SELECT weight_kg, volume_m3 FROM sku_catalog "
+                "WHERE category = 'extra_grande' LIMIT 1").fetchone()
         finally:
             conn.close()
 
         assert n_con_peso == 50           # peso importado
         assert n_clases == 5              # las 5 clases de manejo
-        assert vol_distintos == 1         # volume_m3 INTACTO (F2 lo activa)
-        assert un_pesado[0] >= 50.0       # extra_grande pesa como linea blanca
+        assert vol_distintos > 40         # volumen REAL activo (F2)
+        assert fridge[0] >= 50.0          # linea blanca pesa de verdad
+        assert fridge[1] >= 0.60          # y ocupa de verdad
     finally:
         DatabaseManager.reset_instance()
 
@@ -121,7 +123,7 @@ def test_t803_fallback_excel_enriquece_catalogo():
     e = dm.sku_catalog["SKU001"]
     assert e["weight_kg"] is not None and e["weight_kg"] > 0
     assert e["category"] in CLASES_VALIDAS
-    assert e["volume_m3"] == 0.01  # el fallback tampoco toca volumen en F1
+    assert e["volume_m3"] != 0.01  # F2: el fallback tambien activa el volumen real
 
 
 def test_t804_sku_atributos_fisicos_con_defaults_neutros():

@@ -462,10 +462,9 @@ class DataManager:
 
     def _process_sku_catalog_attrs(self, sheet):
         """
-        INIT-8 F1: fallback Excel de la hoja 'SkuCatalog' (espejo del
-        importer). Enriquece el catalogo en memoria con peso_kg y
-        clase_manejo; volumen_m3 NO se toma en F1 (fluye a SKU.volumen =>
-        cambiaria capacidad/tours; se activa con el modelo de tiempos en F2).
+        INIT-8 F1/F2: fallback Excel de la hoja 'SkuCatalog' (espejo del
+        importer). Enriquece el catalogo en memoria con volumen_m3 (ACTIVO
+        desde F2, junto con el modelo de tiempos), peso_kg y clase_manejo.
         """
         header_row = None
         for idx, row in enumerate(sheet.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
@@ -492,9 +491,16 @@ class DataManager:
                 entry['weight_kg'] = None
             clase = data.get('clase_manejo')
             entry['category'] = str(clase).strip() if clase else 'GENERAL'
+            # F2: volumen real activo (misma regla COALESCE que el importer)
+            vol = data.get('volumen_m3')
+            try:
+                if vol is not None:
+                    entry['volume_m3'] = float(vol)
+            except (TypeError, ValueError):
+                pass
             count += 1
         print(f"[DATA-MANAGER] Hoja 'SkuCatalog' cargada: atributos "
-              f"peso/clase para {count} SKUs")
+              f"volumen/peso/clase para {count} SKUs")
 
     def _process_picking_locations(self, sheet):
         """

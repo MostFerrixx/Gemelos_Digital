@@ -423,19 +423,16 @@ class ExcelImporter:
     def _import_sku_catalog_attrs(self, sheet, conn: sqlite3.Connection,
                                   result: ImportResult):
         """
-        INIT-8 F1: enriquece sku_catalog con atributos fisicos por SKU desde
-        la hoja opcional 'SkuCatalog' (sku_code, volumen_m3, peso_kg,
-        clase_manejo).
+        INIT-8 F1/F2: enriquece sku_catalog con los atributos fisicos por SKU
+        de la hoja opcional 'SkuCatalog' (sku_code, volumen_m3, peso_kg,
+        clase_manejo -> columna DB `category`).
 
-        F1 importa SOLO peso_kg y clase_manejo (columna DB `category`):
-        no tienen lector en el motor todavia => gate byte-identico intacto.
-        volumen_m3 se importa recien en INIT-8 F2 (fluye a SKU.volumen =>
-        capacidad/tours => cambio de comportamiento que va JUNTO con el
-        modelo de tiempos y UNA actualizacion de baseline documentada).
-        Ver docs/PLAN_INIT8_TIEMPOS.md.
+        F2 (2026-07-11) ACTIVO el volumen real: fluye a SKU.volumen =>
+        capacidad/splits de tours cambian. Fue LA actualizacion intencional
+        de baseline de INIT-8, junto con el modelo de tiempos por clase.
+        Ver docs/PLAN_INIT8_TIEMPOS.md (estrategia de baseline).
         """
-        print("[IMPORTER] Processing 'SkuCatalog' sheet (peso/clase; "
-              "volumen_m3 se activa en INIT-8 F2)...")
+        print("[IMPORTER] Processing 'SkuCatalog' sheet (volumen/peso/clase)...")
 
         header_row = self._find_header_row(sheet, 'sku_code')
         if not header_row:
@@ -456,12 +453,16 @@ class ExcelImporter:
                     continue
                 peso = data.get('peso_kg')
                 clase = data.get('clase_manejo')
+                vol = data.get('volumen_m3')
 
                 updated = conn.execute("""
-                    UPDATE sku_catalog SET weight_kg = ?, category = ?
+                    UPDATE sku_catalog
+                    SET weight_kg = ?, category = ?,
+                        volume_m3 = COALESCE(?, volume_m3)
                     WHERE sku_code = ?
                 """, (float(peso) if peso is not None else None,
                       str(clase).strip() if clase else 'GENERAL',
+                      float(vol) if vol is not None else None,
                       sku_code))
                 if updated.rowcount > 0:
                     count += 1

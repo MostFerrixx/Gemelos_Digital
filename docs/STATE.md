@@ -8,21 +8,21 @@
 
 ## Git
 
-- `main` = `c967f79` (merge F4) + INIT-7 F5 (rama `feature/init7-inbound-f0`,
-  a mergear y pushear al cierre). Push directo a main autorizado.
-- Baseline byte-identico vigente: `sha256=930a1e6f879420a8...`, 4.920.393
-  bytes, seed 42, Python 3.13.6 (`tests/baseline.json`; reajustado en F4 por
-  metadata nueva, eventos intactos). F5 NO lo toco (GATE PASS sin update:
-  las claves nuevas del service_level solo aparecen si hubo rescates
-  cross-dock, e inbound sigue ausente del canonico).
+- `main` = `dea35c8` (merge INIT-8 F1) + F2 en rama `feat/init8-tiempos-f1`
+  (a mergear y pushear al cierre). Push directo a main autorizado.
+- Baseline byte-identico vigente: **`sha256=8f9f78d5...`, 7.161.322 bytes**,
+  seed 42, Python 3.13.6 (`tests/baseline.json`). REAJUSTADO en INIT-8 F2
+  (LA actualizacion intencional de la iniciativa: volumen real + tiempos por
+  clase/peso calibrados en el canonico; impacto makespan +82%, throughput
+  -44% vs el mundo plano). Anterior: `930a1e6f` (INIT-7 F4).
 - REGLA pinneada por tests BN-05 e IN-43: la metadata del .jsonl NO puede
   contener valores wall-clock (rompe el determinismo del gate).
 
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 170 passed, 1 deselected (~8s)
-python scripts/regression_gate.py  # GATE PASS esperado (baseline 930a1e6f)
+python -m pytest -q                # 179 passed, 1 deselected (~9s)
+python scripts/regression_gate.py  # GATE PASS esperado (baseline 8f9f78d5)
 ```
 
 ## INIT-7 INBOUND — COMPLETA (F0-F5, 2026-07-08 a 2026-07-10)
@@ -89,15 +89,19 @@ distribuciones estocasticas).
 
 - **F1 HECHO (2026-07-11):** hoja `SkuCatalog` (50 SKUs, 5 clases de manejo
   con volumen/peso sinteticos coherentes, determinista); importer + fallback
-  Excel cargan peso/clase; `SKU.peso`/`SKU.clase` (defaults neutros, sin
-  lector). volumen_m3 real viaja en la hoja pero se ACTIVA en F2 (estrategia
-  de baseline: una sola actualizacion, junto con el modelo de tiempos).
-  Tests T801..804.
-- **Proxima fase: F2** — activar volumen real (capacidad/tours) + tiempos
-  por clase/peso (`tiempos.clases_manejo`, `por_kg`) calibrados con la tabla
-  del plan + recargos estilo Blue Yonder. ES la actualizacion intencional de
-  baseline de la iniciativa. Luego F3 (velocidad segun carga) y F4
-  (variabilidad Log-Normal + packing).
+  Excel; `SKU.peso`/`SKU.clase`. Tests T801..804.
+- **F2 HECHO (2026-07-11):** activacion — volumen real en el motor
+  (SKU.volumen: polera=1, refrigerador=66-75; carro de 150 => max 2) +
+  formula de tiempos por clase/peso calibrada en el canonico
+  (`pick_time_model.por_kg` + `tiempos.clases_manejo{mult,recargo}`) +
+  putaway load por clase. COMPAT EXACTA para configs viejas (T820).
+  **Baseline REAJUSTADO (LA actualizacion de la iniciativa):
+  `8f9f78d5...`, 7.161.322 bytes. Impacto: makespan +82%, throughput -44%
+  (el mundo plano sobreestimaba ~2x).** Tests T820..824.
+- **Proxima fase: F3** — velocidad segun carga transportada (curva
+  calibrada: vacio 1.35 m/s -> cargado ~1.10, tope 1.33 con ~47 kg) +
+  opcional penalizacion por giro. Luego F4 (variabilidad Log-Normal +
+  packing por clase).
 
 ## Siguiente prioridad
 

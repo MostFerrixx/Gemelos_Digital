@@ -42,12 +42,22 @@ LEGACY_KEYS_CONGESTION = {
 
 
 class PickTimeModel(BaseModel):
-    """INIT-4 C1: tiempo de pick escalable. Neutro = comportamiento historico."""
+    """INIT-4 C1 + INIT-8 F2: tiempo de pick escalable. Neutro = historico."""
     model_config = ConfigDict(extra="allow")
     base: Optional[float] = None
     por_unidad: Optional[float] = None
     por_volumen: Optional[float] = None
+    por_kg: Optional[float] = None   # INIT-8 F2: s por kg manipulado
     minimo: Optional[float] = None
+
+
+class ClaseManejoConfig(BaseModel):
+    """INIT-8 F2: parametros de tiempo por clase de manejo del SKU.
+    t_final = t * mult + recargo. Neutro = {mult: 1.0, recargo: 0.0}.
+    Lectores: operators._clase_params (pick y putaway load)."""
+    model_config = ConfigDict(extra="allow")
+    mult: Optional[float] = None
+    recargo: Optional[float] = None
 
 
 class TiemposConfig(BaseModel):
@@ -60,6 +70,8 @@ class TiemposConfig(BaseModel):
     tiempo_picking_por_linea: Optional[float] = None
     tiempo_horquilla: Optional[float] = None
     pick_time_model: Optional[PickTimeModel] = None
+    # INIT-8 F2: {clase_manejo: {mult, recargo}} (hoja SkuCatalog)
+    clases_manejo: Optional[Dict[str, ClaseManejoConfig]] = None
 
 
 class TimewindowConfig(BaseModel):

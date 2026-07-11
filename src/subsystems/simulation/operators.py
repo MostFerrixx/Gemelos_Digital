@@ -122,33 +122,70 @@ class BaseOperator:
         self.pick_time_base = float(_ptm_base) if _ptm_base is not None else None
         self.pick_time_por_unidad = float(_ptm.get("por_unidad", 0.0) or 0.0)
         self.pick_time_por_volumen = float(_ptm.get("por_volumen", 0.0) or 0.0)
+        # INIT-8 F2: termino por PESO (kg totales manipulados). Calibracion:
+        # proxy del "fatigue factor" de Blue Yonder LMS; con 0.15 s/kg un
+        # refrigerador de 85 kg agrega ~12.8 s por pick. Default 0 = neutro.
+        self.pick_time_por_kg = float(_ptm.get("por_kg", 0.0) or 0.0)
         self.pick_time_minimo = float(_ptm.get("minimo", 0.0) or 0.0)
+
+        # INIT-8 F2: parametros por CLASE DE MANEJO del SKU (hoja SkuCatalog).
+        # tiempos.clases_manejo = {clase: {mult, recargo}}. Ausente o clase
+        # desconocida => (1.0, 0.0) = neutro exacto. Calibracion en
+        # docs/PLAN_INIT8_TIEMPOS.md (MTM-Logistics, POMS 2007, Blue Yonder).
+        _cm = _tiempos.get("clases_manejo", {})
+        self.clases_manejo = _cm if isinstance(_cm, dict) else {}
 
         logger.info(f"[AGENT] {self.id} ({self.type}) inicializado - Capacidad: {self.capacity}")
 
+    def _clase_params(self, wo) -> tuple:
+        """
+        INIT-8 F2: (mult, recargo) de la clase de manejo del SKU de la WO.
+        Sin bloque clases_manejo, sin SKU o clase desconocida -> (1.0, 0.0),
+        el neutro exacto (gate intacto en configs viejas).
+        """
+        clase = getattr(getattr(wo, 'sku', None), 'clase', None) if wo else None
+        params = self.clases_manejo.get(clase) if clase else None
+        if not isinstance(params, dict):
+            return (1.0, 0.0)
+        try:
+            mult = float(params.get('mult', 1.0))
+            recargo = float(params.get('recargo', 0.0))
+        except (TypeError, ValueError):
+            return (1.0, 0.0)
+        return (mult, recargo)
+
     def _compute_pick_time(self, wo) -> float:
         """
-        INIT-4 (C1): tiempo de pick, opcionalmente escalado por cantidad/volumen.
+        INIT-4 (C1) + INIT-8 (F2): tiempo de pick escalado por cantidad,
+        volumen, PESO y CLASE DE MANEJO del producto.
 
-        Rama de COMPATIBILIDAD (neutra): si no hay 'base' y los factores son 0,
-        devuelve EXACTAMENTE el valor historico (picking_time o discharge_time).
-        Esto garantiza el gate byte-identico con configs sin pick_time_model.
+        Rama de COMPATIBILIDAD (neutra): sin 'base', factores en 0 y clase
+        neutra, devuelve EXACTAMENTE el valor historico (picking_time o
+        discharge_time) -- gate byte-identico con configs sin los bloques.
 
-        Rama ESCALADA: base + por_unidad*cantidad + por_volumen*volumen, acotado
-        por 'minimo'. 'base' en None reutiliza el tiempo historico como base.
-        El volumen se calcula sobre cantidad_inicial (estable, independiente del
-        estado de picking).
+        Rama ESCALADA (calibracion en docs/PLAN_INIT8_TIEMPOS.md):
+            t = (base + por_unidad*qty + por_volumen*vol + por_kg*peso_total)
+                * clase.mult + clase.recargo,  acotado por 'minimo'.
+        'base' en None reutiliza el tiempo historico como base. Cantidades
+        sobre cantidad_inicial (estable, independiente del estado de picking).
         """
         historico = self.picking_time if self.picking_time is not None else self.discharge_time
+        mult, recargo = self._clase_params(wo)
         # Compat exacta: sin parametros activos -> comportamiento de hoy.
         if (self.pick_time_base is None
                 and self.pick_time_por_unidad == 0.0
-                and self.pick_time_por_volumen == 0.0):
+                and self.pick_time_por_volumen == 0.0
+                and self.pick_time_por_kg == 0.0
+                and mult == 1.0 and recargo == 0.0):
             return historico
         base = self.pick_time_base if self.pick_time_base is not None else historico
         cantidad = wo.cantidad_inicial if wo else 0
         volumen = (wo.cantidad_inicial * wo.sku.volumen) if (wo and wo.sku) else 0
-        t = base + self.pick_time_por_unidad * cantidad + self.pick_time_por_volumen * volumen
+        peso = (wo.cantidad_inicial * getattr(wo.sku, 'peso', 0.0)) if (wo and wo.sku) else 0.0
+        t = (base + self.pick_time_por_unidad * cantidad
+             + self.pick_time_por_volumen * volumen
+             + self.pick_time_por_kg * peso)
+        t = t * mult + recargo
         return max(t, self.pick_time_minimo)
 
     def get_priority_for_work_area(self, work_area: str) -> int:
@@ -1274,6 +1311,17 @@ class BaseOperator:
     # INIT-7 F2: tour de putaway (inverso del pick)
     # ------------------------------------------------------------------
 
+    def _putaway_load_time(self, wo) -> float:
+        """
+        INIT-8 F2: tiempo de tomar el pallet del muelle, escalado por la
+        clase de manejo del SKU (un pallet de linea blanca no se carga como
+        uno de poleras). Sin clases_manejo -> valor plano historico exacto.
+        """
+        base = float(getattr(self.almacen, 'inbound_config', {})
+                     .get('putaway_load_time', 10.0))
+        mult, recargo = self._clase_params(wo)
+        return base * mult + recargo
+
     def _putaway_nav(self, destino, wo, goal_dwell: float = 0.0):
         """Navega al destino con el mismo primitivo del pick (_recorrer_tramo:
         congestion timewindow incluida). Fallback _jump_to si no hay path."""
@@ -1319,8 +1367,7 @@ class BaseOperator:
         # F4: distancia recorrida SOLO en este putaway (muelle + destino),
         # para el KPI de distancia de guardado por estrategia de slotting.
         dist_before = self.total_distance_traveled
-        load_time = float(getattr(self.almacen, 'inbound_config', {})
-                          .get('putaway_load_time', 10.0))
+        load_time = self._putaway_load_time(wo)
 
         self.status = "working"
         self.almacen.dispatcher.notificar_inicio_trabajo(self, wo)

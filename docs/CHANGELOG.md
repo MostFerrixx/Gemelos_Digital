@@ -10,6 +10,27 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-11 (cont.)
+
+- **INIT-8 F2 — TIEMPOS REALISTAS, activacion (volumen real + tiempos por
+  clase/peso).** LA actualizacion intencional de baseline de la iniciativa
+  (nuevo: `8f9f78d5...`, 7.161.322 bytes; commiteado junto). Formula
+  extendida en `_compute_pick_time`: `(base + por_unidad*qty +
+  por_volumen*vol + por_kg*peso) * clase.mult + clase.recargo` con rama de
+  COMPAT EXACTA para configs viejas (T820). Canonico calibrado con el doc
+  del Director: base 10 + 2/unidad (~14 s/caja POMS), por_kg 0.15
+  (fatigue-factor Blue Yonder), recargos por clase (MTM). Putaway load
+  escalado por clase (pallet linea blanca 37 s vs 10 s). Volumen real
+  activo en importer + fallback (SKU.volumen: polera=1, refrigerador=66-75
+  => carro de 150 lleva max 2). config_schema: `por_kg` +
+  `clases_manejo{mult,recargo}`. Tests T820..824 + T802/T803 re-pineados al
+  contrato F2. **Impacto medido (seed 42): makespan +82% (3122->5696 s),
+  throughput -44% -- el mundo plano sobreestimaba capacidad ~2x, como
+  predice Kostrzewski 2016.** 179 passed + gate PASS x2 con el baseline
+  nuevo.
+
+---
+
 ## 2026-07-11
 
 - **INIT-8 F1 — TIEMPOS REALISTAS, catalogo fisico por SKU.** Arranca la
