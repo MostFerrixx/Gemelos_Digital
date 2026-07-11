@@ -277,7 +277,14 @@ const TableModule = {
             let value = wo[col.key];
 
             // Format specific fields
-            if (value === null || value === undefined) {
+            // AUDIT menores 2026-07-10: una WO de putaway sin ubicacion aun
+            // no aterrizo (el muelle real se conoce al descargar). Heuristica
+            // por prefijo del id: agregar task_type al to_dict() cambiaria la
+            // metadata del .jsonl (baseline) por un cosmetico -- no vale.
+            if ((value === null || value === undefined) && col.key === 'location'
+                && String(wo.id || '').startsWith('WO-PUT')) {
+                value = '(en camión)';
+            } else if (value === null || value === undefined) {
                 value = '';
             } else if (col.key === 'location' || col.key === 'staging') {
                 // Format arrays as (x, y)

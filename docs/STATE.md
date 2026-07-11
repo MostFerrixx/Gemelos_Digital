@@ -82,9 +82,11 @@ abc) -> KPIs (dock-to-stock, distancia, contencion) -> flujo mixto (F5):
 
 ## Siguiente prioridad (sin decidir aun)
 
-INIT-7 cerrada por completo. Candidatos: INIT-3 v3 (capacidades por agente
-en el optimizador, listo para tomar), alguna decision pendiente de arriba, o
-una iniciativa nueva del Director.
+INIT-7 cerrada por completo (F0-F5 + auditoria + robustez + menores: aviso
+UX cross-dock, KPI `throughput_picks_per_s` comparable limpio, LOCATION
+"(en camion)"). Candidatos: INIT-3 v3 (capacidades por agente en el
+optimizador, listo para tomar), alguna decision pendiente de arriba, o una
+iniciativa nueva del Director.
 
 ## Bugs conocidos (no criticos)
 

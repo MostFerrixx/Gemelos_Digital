@@ -10,6 +10,24 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-10 (cont. 3)
+
+- **Menores de la auditoria INIT-7 (paquete de 3).** (1) UX cross-dock:
+  aviso visual naranja en el tab Inbound cuando el toggle esta activo con
+  pedidos Estocasticos (el motor ya se desactivaba solo, pero solo avisaba
+  por consola); reactivo al toggle Y al radio de modo de pedidos del paso 1.
+  (2) KPI `throughput_picks_per_s` (motor exporta `total_picks_completed` =
+  picks exitosos sin putaway ni failed; runner lo deriva y lo suma a
+  ALL_KPI_KEYS): comparable limpio entre configs con/sin inbound -- el
+  `throughput_wo_per_s` historico mezcla picks+putaway con el tiempo
+  extendido de la recepcion (verificado: 45 picks vs 55 totales en la demo,
+  0.0123 vs 0.0150 wo/s). (3) Tabla del visor: LOCATION muestra
+  "(en camion)" para WOs de putaway antes de aterrizar (heuristica por
+  prefijo WO-PUT en el frontend; agregar task_type al to_dict cambiaria la
+  metadata/baseline por un cosmetico). 170 passed + GATE PASS.
+
+---
+
 ## 2026-07-10 (cont. 2)
 
 - **MEJ-ROBUSTEZ-AGENTES — degradacion por WO + watchdog de no-progreso.**

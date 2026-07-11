@@ -64,13 +64,17 @@ def purge_stale_temp(max_age_hours=24):
 
 # KPIs leidos directamente de export_optimization_metrics() (event_generator.py).
 # "throughput_wo_per_s" es derivado (completadas / tiempo de sim).
+# "throughput_picks_per_s" (AUDIT 2026-07-10): SOLO picks exitosos -- con
+# inbound activo, throughput_wo_per_s mezcla picks+putaway con el tiempo
+# extendido de la recepcion; este es el comparable limpio entre configs
+# con/sin inbound.
 RAW_KPI_KEYS = [
     "total_workorders_completed",
     "total_workorders_failed",
     "total_simulation_time_seconds",
     "avg_completion_time_seconds",
 ]
-ALL_KPI_KEYS = RAW_KPI_KEYS + ["throughput_wo_per_s"]
+ALL_KPI_KEYS = RAW_KPI_KEYS + ["throughput_wo_per_s", "throughput_picks_per_s"]
 
 # MEJ-2 v2: nivel de servicio (fill_rate_pct). Puede ser None en modo
 # estocastico (sin validacion de stock, mismo comportamiento que INIT-5 en el
@@ -139,6 +143,9 @@ def run_one_replica(config_path, seed, keep_output=False):
     completed = metrics.get("total_workorders_completed", 0)
     sim_time = metrics.get("total_simulation_time_seconds", 0)
     metrics["throughput_wo_per_s"] = (completed / sim_time) if sim_time else 0.0
+    # AUDIT menores: picks-only (fallback = completadas para metrics viejos).
+    picks = metrics.get("total_picks_completed", completed)
+    metrics["throughput_picks_per_s"] = (picks / sim_time) if sim_time else 0.0
     metrics["_seed"] = seed
     metrics["_elapsed_wallclock_s"] = elapsed
     return metrics
