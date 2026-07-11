@@ -534,6 +534,15 @@ class EventGenerator:
         total_failed = total_wo - total_completed
         simulation_time = self.env.now
 
+        # AUDIT menores 2026-07-10: picks EXITOSOS solamente (sin putaway,
+        # sin WOs failed). Con inbound activo, throughput_wo_per_s mezcla
+        # picks+putaway con el tiempo extendido de la recepcion: comparar
+        # configs con/sin inbound por ese KPI es enganoso. Este es el limpio.
+        total_picks_completed = sum(
+            1 for wo in self.almacen.dispatcher.work_orders_completados
+            if getattr(wo, 'task_type', 'pick') != 'putaway'
+            and getattr(wo, 'status', '') != 'failed')
+
         # Calcular tiempo promedio de completación (si hay WOs completadas)
         avg_completion_time = simulation_time / max(total_completed, 1)
 
@@ -563,6 +572,8 @@ class EventGenerator:
             "total_workorders_completed": total_completed,
             "total_workorders_failed": total_failed,
             "total_workorders": total_wo,
+            # AUDIT menores: base del KPI limpio throughput_picks_per_s.
+            "total_picks_completed": total_picks_completed,
             "avg_completion_time_seconds": avg_completion_time,
             "total_simulation_time_seconds": simulation_time,
             "resource_costs": {

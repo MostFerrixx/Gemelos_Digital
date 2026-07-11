@@ -10,24 +10,10 @@ decisiones tecnicas en `docs/PLAN_INIT7_INBOUND.md`.)*
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
-| Menores de auditoria (UX cross-dock, throughput picks-only, LOCATION) | ABIERTO | Baja | ~1-2 h el paquete | Ninguno |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
 | Distribucion real de `outbound_staging_distribution` en config canonico | PENDIENTE DECISION | -- | Trivial (config) | Decision de negocio del Director, no un bug |
-
----
-
-## Menores de la auditoria 2026-07-10 (paquete ~1-2 h)
-
-1. **UX cross-dock:** si el toggle esta activo con pedidos en modo
-   Estocastico, el motor avisa por consola y se desactiva, pero la UI no
-   dice nada. Agregar aviso visual en el tab Inbound.
-2. **`throughput_wo_per_s` mezcla picks+putaway+XD** con el tiempo extendido
-   de la recepcion: comparar configs con/sin inbound por throughput es
-   enganoso. Opcion: KPI `throughput_picks_per_s` limpio o nota en la UI.
-3. **LOCATION vacia** en la tabla del visor para WOs de putaway antes de
-   aterrizar (podria decir "en camion"). Cosmetico puro.
 
 ---
 

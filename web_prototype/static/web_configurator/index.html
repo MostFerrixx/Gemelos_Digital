@@ -651,6 +651,11 @@
                                         pedido quedó sin stock al inicio y durante el día llega un camión con ese SKU,
                                         se genera automáticamente el pick para cumplirlo en la misma corrida. El KPI
                                         "fill-rate efectivo" muestra la mejora contra el fill-rate de apertura.</p>
+                                    <p class="help-text" id="inbound-crossdock-warn"
+                                       style="display:none; color: var(--color-accent-orange, #f0883e); font-weight: 600;">
+                                        ⚠ El modo de pedidos actual es <strong>Estocástico</strong> (paso 1): el
+                                        cross-docking se desactivará solo al correr (no hay pedidos reales que
+                                        rescatar). Cambiá a Determinista para usarlo.</p>
                                 </div>
                             </div>
                         </div>

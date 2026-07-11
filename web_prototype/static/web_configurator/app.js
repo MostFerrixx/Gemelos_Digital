@@ -120,6 +120,25 @@ class WebConfigurator {
         if (inboundMode) {
             inboundMode.addEventListener('change', () => this._updateInboundVisibility());
         }
+        // AUDIT menores 2026-07-10: aviso si cross-dock esta activo con
+        // pedidos Estocasticos (el motor lo desactivaria en silencio de cara
+        // a la UI; ahora se ve el porque sin ir a la consola).
+        const xdToggleEl = document.getElementById('inbound-cross-dock');
+        if (xdToggleEl) {
+            xdToggleEl.addEventListener('change', () => this._updateCrossDockWarning());
+        }
+        document.querySelectorAll('input[name="order-generation-mode"]').forEach(radio => {
+            radio.addEventListener('change', () => this._updateCrossDockWarning());
+        });
+    }
+
+    // AUDIT menores 2026-07-10: cross-dock requiere pedidos Deterministas.
+    _updateCrossDockWarning() {
+        const warn = document.getElementById('inbound-crossdock-warn');
+        const xd = document.getElementById('inbound-cross-dock');
+        if (!warn || !xd) return;
+        const mode = document.querySelector('input[name="order-generation-mode"]:checked')?.value;
+        warn.style.display = (xd.checked && mode === 'stochastic') ? 'block' : 'none';
     }
 
     // BK-01: muestra/oculta el campo radio_cercania segun estrategia seleccionada
@@ -153,6 +172,8 @@ class WebConfigurator {
         const stochGroup = document.getElementById('inbound-stochastic-group');
         if (asnGroup) asnGroup.style.display = mode === 'deterministic' ? 'block' : 'none';
         if (stochGroup) stochGroup.style.display = mode === 'stochastic' ? 'block' : 'none';
+        // AUDIT menores: recalcular el aviso de cross-dock (tambien al cargar).
+        this._updateCrossDockWarning();
     }
 
     // INIT-6 Opcion B: editor de destino_staging_map (destino -> staging_id).
