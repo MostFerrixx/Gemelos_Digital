@@ -21,7 +21,7 @@
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 166 passed, 1 deselected (~8s)
+python -m pytest -q                # 170 passed, 1 deselected (~8s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline 930a1e6f)
 ```
 
@@ -45,8 +45,15 @@ abc) -> KPIs (dock-to-stock, distancia, contencion) -> flujo mixto (F5):
 - **Auditoria 2026-07-10 (3 fixes):** total de WOs se refresca en cada alta
   (visor ya no muestra >100% con inbound; verificado 55/55); A/B parea por
   semilla antes de filtrar None (`_collect_paired_values`); demo movida a
-  `examples/` (temp_web tiene purga 24h). Pendiente mayor levantado:
-  MEJ-ROBUSTEZ-AGENTES (ver BACKLOG, requiere mini-plan + OK del Director).
+  `examples/` (temp_web tiene purga 24h).
+- **MEJ-ROBUSTEZ-AGENTES HECHO (2026-07-10):** (A) tours envueltos en
+  try/except (`_execute_pick_tour` extraido verbatim + `_abort_tour` +
+  `dispatcher.notificar_wo_fallida`: una excepcion ya NO revienta la corrida
+  entera, marca las WOs failed y la corrida completa) + (D) watchdog de
+  no-progreso en el engine (`compute_stall_limit`, diagnostico accionable,
+  volcado parcial: los deadlocks dinamicos ya no cuelgan para siempre).
+  La investigacion corrigio el diagnostico original: la excepcion era CRASH
+  TOTAL (no cuelgue silencioso) y el caso estatico ya lo cubria QA-3.
 
 ## Que esta VIVO y ACTIVO ahora mismo (ademas de CLAUDE.md §3/§5)
 
@@ -83,5 +90,3 @@ una iniciativa nueva del Director.
 
 - `warehouse.db-shm` / `warehouse.db-wal`: WAL de SQLite, untracked pero ya
   en `.gitignore`.
-- MEJ-ROBUSTEZ-AGENTES (excepcion a mitad de tour = cuelgue; pre-existente,
-  baja probabilidad): en BACKLOG con mini-plan pendiente de OK.

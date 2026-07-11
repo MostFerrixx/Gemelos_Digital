@@ -10,6 +10,33 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-10 (cont. 2)
+
+- **MEJ-ROBUSTEZ-AGENTES — degradacion por WO + watchdog de no-progreso.**
+  La investigacion CORRIGIO el diagnostico de la auditoria: una excepcion a
+  mitad de tour NO colgaba en silencio -- propagaba a env.run() y REVENTABA
+  la corrida ENTERA (verificado empiricamente; sin .jsonl ni Excel); y el
+  cuelgue estatico obvio (area sin agente) ya lo cubria el guard QA-3
+  pre-vuelo. Solucion A+D (mejor que la propuesta original): **(A)** cuerpo
+  del tour de picks extraido VERBATIM a `_execute_pick_tour` (274 lineas,
+  validado por gate byte-identico) y ambos tours envueltos en try/except ->
+  `_abort_tour` marca las WOs no completadas via
+  `dispatcher.notificar_wo_fallida` (status='failed', cuentan como cerradas
+  para la terminacion, NO inflan el KPI de exitosas; evento
+  `agent_tour_crashed`), el agente sobrevive. Fallar rapido, sin reintentos
+  (re-encolar puede re-crashear en loop). **(D)** watchdog de no-progreso en
+  el loop del engine (`compute_stall_limit`: 7200s de sim + extension por la
+  ultima llegada inbound): si nada se cierra en ese lapso, aborta con
+  diagnostico accionable (WOs huerfanas + areas de la flota) y genera el
+  volcado PARCIAL. Cubre los cuelgues dinamicos que QA-3 no ve (ubicacion
+  inalcanzable, bugs logicos). 4 tests (RB01..04). Validado: 170 passed +
+  GATE PASS (extraccion verbatim confirmada) + smoke A (excepcion inyectada:
+  corrida completa con 20 failed y 582 exitosas, antes se perdia todo) +
+  smoke B (deadlock inyectado: watchdog aborta a los 4200s de sim con
+  diagnostico y jsonl parcial, antes colgaba para siempre).
+
+---
+
 ## 2026-07-10 (cont.)
 
 - **AUDITORIA INIT-7 + 3 fixes.** Auditoria en frio de F0-F5 a pedido del

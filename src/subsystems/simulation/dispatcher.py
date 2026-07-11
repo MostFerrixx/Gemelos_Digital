@@ -1411,6 +1411,64 @@ class DispatcherV11:
         logger.debug(f"[DISPATCHER] {self.env.now:.2f} - {operator_id} staged WO {wo.id} "
               f"({len(self.work_orders_completados)}/{len(self.lista_maestra_work_orders)})")
 
+    def notificar_wo_fallida(self, operator: Any, work_order: Any) -> None:
+        """
+        MEJ-ROBUSTEZ (auditoria 2026-07-10): cierra una WO cuyo tour ABORTO
+        por excepcion. Decision de diseno: FALLAR RAPIDO, sin reintentos
+        (re-encolar puede re-crashear en loop con el mismo dato corrupto; un
+        crash es excepcional y es mas honesto reportarlo que esconderlo).
+
+        La WO cuenta como CERRADA para la terminacion (entra a
+        work_orders_completados: sin esto la simulacion nunca termina) pero
+        NO incrementa el contador de completadas del almacen (no es un
+        exito) y queda con status='failed' visible en eventos y visor.
+        """
+        operator_id = f"{operator.type}_{operator.id}"
+        wo = work_order
+
+        if operator_id in self.work_orders_asignados:
+            if wo in self.work_orders_asignados[operator_id]:
+                self.work_orders_asignados[operator_id].remove(wo)
+        if operator_id in self.work_orders_en_progreso:
+            if self.work_orders_en_progreso[operator_id] == wo:
+                del self.work_orders_en_progreso[operator_id]
+
+        if wo not in self.work_orders_completados:
+            self.work_orders_completados.append(wo)
+
+        wo.status = "failed"
+        wo.tiempo_fin = self.env.now
+
+        self.almacen.registrar_evento('work_order_update', {
+            'id': wo.id,
+            'order_id': wo.order_id,
+            'tour_id': getattr(wo, 'tour_id', None),
+            'sku_id': wo.sku_id,
+            'product': wo.sku_name,
+            'status': 'failed',
+            'assigned_agent_id': wo.assigned_agent_id,
+            'priority': getattr(wo, 'priority', 99),
+            'items': getattr(wo, 'items', 1),
+            'total_qty': wo.cantidad_total,
+            'qty_requested': wo.cantidad_inicial,
+            'qty_picked': wo.cantidad_inicial - wo.cantidad_restante,
+            'volume': getattr(wo, 'volume', wo.volumen_restante),
+            'location': wo.ubicacion,
+            'pick_sequence': getattr(wo, 'pick_sequence', None),
+            'staging': wo.staging_id,
+            'work_group': wo.work_group,
+            'work_area': wo.work_area,
+            'executions': getattr(wo, 'picking_executions', 0),
+            'start_time': getattr(wo, 'tiempo_inicio', None),
+            'progress': 0,
+            'tiempo_fin': wo.tiempo_fin
+        })
+
+        logger.error(f"[DISPATCHER] {self.env.now:.2f} - {operator_id} FALLO "
+                     f"WO {wo.id} (tour abortado) "
+                     f"({len(self.work_orders_completados)}/"
+                     f"{len(self.lista_maestra_work_orders)} cerradas)")
+
     def finalizar_tour(self, operator: Any) -> None:
         """
         Mark operator as available after completing all staging.
