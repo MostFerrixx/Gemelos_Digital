@@ -8,8 +8,7 @@
 
 ## Git
 
-- `main` = `dea35c8` (merge INIT-8 F1) + F2 en rama `feat/init8-tiempos-f1`
-  (a mergear y pushear al cierre). Push directo a main autorizado.
+- `main` = `e91252b` (INIT-8 F3), pusheado. Push directo a main autorizado.
 - Baseline byte-identico vigente: **`sha256=8f9f78d5...`, 7.161.322 bytes**,
   seed 42, Python 3.13.6 (`tests/baseline.json`). REAJUSTADO en INIT-8 F2
   (LA actualizacion intencional de la iniciativa: volumen real + tiempos por
@@ -111,8 +110,8 @@ distribuciones estocasticas).
 
 ## Siguiente prioridad
 
-INIT-8 F2, salvo cambio de rumbo del Director. (INIT-7 quedo cerrada
-completa el 2026-07-10; backlog diferido: INIT-3 v3, BK-02, INIT-6 C,
+INIT-8 F4 (ultima fase: variabilidad Log-Normal + packing por clase), salvo
+cambio de rumbo del Director. (Backlog diferido: INIT-3 v3, BK-02, INIT-6 C,
 distribucion real de staging.)
 
 ## Bugs conocidos (no criticos)
