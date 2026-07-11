@@ -10,6 +10,29 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-11
+
+- **INIT-8 F1 — TIEMPOS REALISTAS, catalogo fisico por SKU.** Arranca la
+  iniciativa (plan + tabla de calibracion con fuentes en
+  `docs/PLAN_INIT8_TIEMPOS.md`, basada en el doc del Director "Ingenieria de
+  Tiempos y Movimientos en CD": MTM-Logistics, regresion POMS 2007,
+  biomecanica de carga, playbooks SAP EWM/Manhattan/Blue Yonder, Law/Simio).
+  Hallazgo: la DB tenia columnas volume_m3/weight_kg/category con datos
+  PLANOS (todos los SKUs identicos). Entregado: hoja `SkuCatalog` en el
+  Excel canonico (50 SKUs, 5 clases de manejo pequeno->extra_grande con
+  volumen/peso sinteticos coherentes, generacion determinista seed 8);
+  importer + fallback Excel del data_manager cargan peso_kg y clase_manejo
+  (DB `category`); `SKU` del motor gana `peso`/`clase` (defaults neutros).
+  **Estrategia de baseline decidida:** volumen_m3 real viaja en la hoja pero
+  NO se importa en F1 (fluye a SKU.volumen => capacidad/tours); se activa en
+  F2 JUNTO con el modelo de tiempos = UNA sola actualizacion intencional.
+  Correccion del doc del Director a la propuesta original: F4 usara
+  Log-Normal (no Triangular). 4 tests (T801..804; T802 pinea volume_m3
+  intacto). Validado: 174 passed + GATE PASS byte-identico CON el catalogo
+  cargado (los atributos fluyen sin tocar comportamiento).
+
+---
+
 ## 2026-07-10 (cont. 3)
 
 - **Menores de la auditoria INIT-7 (paquete de 3).** (1) UX cross-dock:

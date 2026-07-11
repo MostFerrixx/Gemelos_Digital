@@ -14,13 +14,18 @@ from .order_strategies import create_order_strategy, OrderGenerationStrategy
 class SKU:
     """Stock Keeping Unit - Represents a product in the warehouse"""
 
-    def __init__(self, sku_id: str, volumen: int, descripcion: str = ""):
+    def __init__(self, sku_id: str, volumen: int, descripcion: str = "",
+                 peso: float = 0.0, clase: str = "GENERAL"):
         self.id = sku_id
         self.volumen = volumen
         self.descripcion = descripcion
+        # INIT-8 F1: atributos fisicos reales (hoja SkuCatalog). Sin lector
+        # en el motor hasta F2 (tiempos por clase/peso) => gate intacto.
+        self.peso = peso          # kg por unidad
+        self.clase = clase        # pequeno|mediano|voluminoso|pesado|extra_grande
 
     def __repr__(self):
-        return f"SKU({self.id}, vol={self.volumen})"
+        return f"SKU({self.id}, vol={self.volumen}, peso={self.peso}, {self.clase})"
 
 
 class WorkOrder:
@@ -527,10 +532,14 @@ class AlmacenMejorado:
             volumen_int = max(1, int(volume_m3 * 100))  # Convert to internal units
             
             # Create SKU object with real data
+            # INIT-8 F1: peso y clase de manejo desde la hoja SkuCatalog
+            # (defaults neutros si no esta; sin lector hasta F2).
             sku = SKU(
                 sku_id=sku_code,
                 volumen=volumen_int,
-                descripcion=sku_info.get('description', f'SKU {sku_code}')
+                descripcion=sku_info.get('description', f'SKU {sku_code}'),
+                peso=float(sku_info.get('weight_kg') or 0.0),
+                clase=str(sku_info.get('category') or 'GENERAL'),
             )
             self.catalogo_skus[sku_code] = sku
         

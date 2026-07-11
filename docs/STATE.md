@@ -4,7 +4,7 @@
 > presente, nada mas. Historial -> `docs/CHANGELOG.md`. Pendientes ->
 > `docs/BACKLOG.md`. Identidad/reglas/arquitectura -> `CLAUDE.md`.
 
-**Ultima actualizacion:** 2026-07-10
+**Ultima actualizacion:** 2026-07-11
 
 ## Git
 
@@ -80,13 +80,30 @@ abc) -> KPIs (dock-to-stock, distancia, contencion) -> flujo mixto (F5):
 3. **`outbound_staging_distribution` real** en el canonico: tuning de
    negocio (hoy 100% zona 1); cambiarlo rompe baseline intencionalmente.
 
-## Siguiente prioridad (sin decidir aun)
+## INICIATIVA ACTIVA: INIT-8 TIEMPOS REALISTAS POR PRODUCTO
 
-INIT-7 cerrada por completo (F0-F5 + auditoria + robustez + menores: aviso
-UX cross-dock, KPI `throughput_picks_per_s` comparable limpio, LOCATION
-"(en camion)"). Candidatos: INIT-3 v3 (capacidades por agente en el
-optimizador, listo para tomar), alguna decision pendiente de arriba, o una
-iniciativa nueva del Director.
+Plan + tabla de calibracion con fuentes: **`docs/PLAN_INIT8_TIEMPOS.md`**
+(fundamento: doc del Director "Ingenieria de Tiempos y Movimientos en CD",
+Google Drive 2026-07-11 — MTM, biomecanica de carga, playbooks WMS,
+distribuciones estocasticas).
+
+- **F1 HECHO (2026-07-11):** hoja `SkuCatalog` (50 SKUs, 5 clases de manejo
+  con volumen/peso sinteticos coherentes, determinista); importer + fallback
+  Excel cargan peso/clase; `SKU.peso`/`SKU.clase` (defaults neutros, sin
+  lector). volumen_m3 real viaja en la hoja pero se ACTIVA en F2 (estrategia
+  de baseline: una sola actualizacion, junto con el modelo de tiempos).
+  Tests T801..804.
+- **Proxima fase: F2** — activar volumen real (capacidad/tours) + tiempos
+  por clase/peso (`tiempos.clases_manejo`, `por_kg`) calibrados con la tabla
+  del plan + recargos estilo Blue Yonder. ES la actualizacion intencional de
+  baseline de la iniciativa. Luego F3 (velocidad segun carga) y F4
+  (variabilidad Log-Normal + packing).
+
+## Siguiente prioridad
+
+INIT-8 F2, salvo cambio de rumbo del Director. (INIT-7 quedo cerrada
+completa el 2026-07-10; backlog diferido: INIT-3 v3, BK-02, INIT-6 C,
+distribucion real de staging.)
 
 ## Bugs conocidos (no criticos)
 
