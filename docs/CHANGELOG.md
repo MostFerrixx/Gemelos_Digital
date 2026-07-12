@@ -10,6 +10,26 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-11 (cont. 4)
+
+- **AUDITORIA INIT-8 (solo documentar, sin aplicar).** A pedido del Director,
+  auditoria completa de F1-F4. Base SANA: 189 passed + GATE PASS en frio;
+  verificado que el modo estocastico canonico SI usa peso/clase, el split de
+  capacidad tolera el volumen real, no hay doble-muestreo en descargas/
+  putaway, y la reproducibilidad con variabilidad on es correcta (sha
+  identico). 4 hallazgos documentados en `docs/BACKLOG.md` (AUD8-1..4): (1)
+  MEDIA — el goal_dwell del tramo->staging ignora el packing => con pack
+  activo la permanencia real excede la reserva del planner y las
+  co-ocupaciones suben 8->41 (evidencia dura seed 42); solo con packing/
+  variabilidad on (opt-in, gate no afectado). (2) MEDIA — `distribucion_tipos`
+  es letra muerta (el filtro `tipo[:3].upper() in sku.id` nunca matchea);
+  pre-existente pero INIT-8 lo vuelve relevante (hay clases reales que la
+  mezcla de pedidos podria respetar). (3) BAJA — cache `_t_pick_muestreado`
+  sin invalidar en re-pick. (4) TRIVIAL — comentario obsoleto "_compute_pick_
+  time es puro". Ninguno bloquea; el Director decide cuando/si aplicarlos.
+
+---
+
 ## 2026-07-11 (cont. 3)
 
 - **INIT-8 F4 — TIEMPOS REALISTAS, variabilidad Log-Normal + packing por

@@ -124,3 +124,9 @@ nueva del Director.
 
 - `warehouse.db-shm` / `warehouse.db-wal`: WAL de SQLite, untracked pero ya
   en `.gitignore`.
+- **Auditoria INIT-8 (2026-07-11), AUD8-1..4 en BACKLOG, sin aplicar:**
+  AUD8-1 (MEDIA) goal_dwell del tramo->staging ignora packing => co-ocupaciones
+  8->41 con pack on (solo opt-in, gate intacto); AUD8-2 (MEDIA)
+  `distribucion_tipos` letra muerta (filtro nunca matchea, mezcla uniforme);
+  AUD8-3 (BAJA) cache `_t_pick_muestreado` sin invalidar; AUD8-4 (TRIVIAL)
+  comentario obsoleto. El Director decide cuando aplicarlos.
