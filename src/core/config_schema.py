@@ -65,12 +65,25 @@ class VelocidadPorCargaConfig(BaseModel):
 
 
 class ClaseManejoConfig(BaseModel):
-    """INIT-8 F2: parametros de tiempo por clase de manejo del SKU.
-    t_final = t * mult + recargo. Neutro = {mult: 1.0, recargo: 0.0}.
-    Lectores: operators._clase_params (pick y putaway load)."""
+    """INIT-8 F2/F4: parametros de tiempo por clase de manejo del SKU.
+    Pick/putaway-load: t_final = t * mult + recargo. Descarga en staging:
+    discharge + pack (segundos de empaque por clase, F4, default 0).
+    Neutro = {mult: 1.0, recargo: 0.0, pack: 0.0}.
+    Lectores: operators._clase_params / _clase_pack."""
     model_config = ConfigDict(extra="allow")
     mult: Optional[float] = None
     recargo: Optional[float] = None
+    pack: Optional[float] = None
+
+
+class VariabilidadConfig(BaseModel):
+    """INIT-8 F4: variabilidad Log-Normal de tiempos (opt-in, default off).
+    Media preservada (E[X] = t); cv = coef. de variacion. Log-Normal y NO
+    Normal/Triangular por Law/Simio 2024 (acotada en 0, cola derecha).
+    Reproducible bajo WAREHOUSE_SEED. Lector: operators._tiempo_estocastico."""
+    model_config = ConfigDict(extra="allow")
+    enabled: Optional[bool] = None
+    cv: Optional[float] = None
 
 
 class TiemposConfig(BaseModel):
@@ -87,6 +100,8 @@ class TiemposConfig(BaseModel):
     clases_manejo: Optional[Dict[str, ClaseManejoConfig]] = None
     # INIT-8 F3: velocidad segun carga (opt-in)
     velocidad_por_carga: Optional[VelocidadPorCargaConfig] = None
+    # INIT-8 F4: variabilidad Log-Normal de tiempos (opt-in)
+    variabilidad: Optional[VariabilidadConfig] = None
 
 
 class TimewindowConfig(BaseModel):

@@ -8,7 +8,7 @@
 
 ## Git
 
-- `main` = `e91252b` (INIT-8 F3), pusheado. Push directo a main autorizado.
+- `main` = INIT-8 completa (F4 al cierre), pusheado. Push directo a main autorizado.
 - Baseline byte-identico vigente: **`sha256=8f9f78d5...`, 7.161.322 bytes**,
   seed 42, Python 3.13.6 (`tests/baseline.json`). REAJUSTADO en INIT-8 F2
   (LA actualizacion intencional de la iniciativa: volumen real + tiempos por
@@ -20,7 +20,7 @@
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 184 passed, 1 deselected (~9s)
+python -m pytest -q                # 189 passed, 1 deselected (~10s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline 8f9f78d5)
 ```
 
@@ -104,15 +104,21 @@ distribuciones estocasticas).
   de `_recorrer_tramo` (consistente con el planner). Efecto: +2.6% makespan
   con flag on. Penalizacion por giro DESCARTADA (razones en el plan).
   Tests T830..834.
-- **Proxima fase: F4 (ultima)** — variabilidad Log-Normal de tiempos
-  (seeded, CV configurable; jamas Normal ni Triangular — doc del Director)
-  + packing por clase en la descarga.
+- **F4 HECHO (2026-07-11) — INICIATIVA COMPLETA (F1-F4):** variabilidad
+  Log-Normal opt-in (`tiempos.variabilidad{enabled, cv}`, media preservada,
+  reproducible bajo seed: 2 corridas -> sha identico) + packing por clase
+  (clave `pack` en clases_manejo). REGLA CRITICA implementada: una muestra
+  por WO cacheada (`_tiempo_pick_final`) porque el pick se consulta 2 veces
+  (reserva del planner + timeout); descargas/putaway reservan y esperan con
+  el MISMO valor muestreado. Efecto: +17% makespan con cv 0.25 + packs de
+  ejemplo. Tests T840..844.
 
-## Siguiente prioridad
+## Siguiente prioridad (sin decidir aun)
 
-INIT-8 F4 (ultima fase: variabilidad Log-Normal + packing por clase), salvo
-cambio de rumbo del Director. (Backlog diferido: INIT-3 v3, BK-02, INIT-6 C,
-distribucion real de staging.)
+INIT-8 COMPLETA (F1-F4, 2026-07-11). Candidatos: UI para los bloques de
+tiempos de INIT-8 (hoy se editan en config.json), INIT-3 v3 (capacidades por
+agente en el optimizador), decisiones pendientes de arriba, o iniciativa
+nueva del Director.
 
 ## Bugs conocidos (no criticos)
 

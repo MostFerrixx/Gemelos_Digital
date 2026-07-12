@@ -22,7 +22,7 @@ GENERAL) — hoy todos los SKUs son identicos para el motor.
 | F1 | Catalogo fisico: hoja `SkuCatalog` (volumen/peso/clase por SKU, sintetico coherente), importer + data_manager + SKU del motor cargan peso/clase (SIN lector aun => gate intacto) | **HECHO 2026-07-11** |
 | F2 | Activacion: el motor consume volumen REAL (capacidad/tours) + tiempos por clase y peso (`tiempos.clases_manejo` + `por_kg`) + recargos estilo Blue Yonder. **UNICA actualizacion intencional de baseline de la iniciativa** | **HECHO 2026-07-11** |
 | F3 | Velocidad segun carga (curva calibrada) + opcional penalizacion por giro | **HECHO 2026-07-11** (giro DESCARTADO, ver decisiones) |
-| F4 | Variabilidad Log-Normal de tiempos (seeded) + packing por clase | pendiente |
+| F4 | Variabilidad Log-Normal de tiempos (seeded) + packing por clase | **HECHO 2026-07-11** |
 | F5 (diferida) | Fatiga dinamica acumulativa (Giacomelli 2026) | no planificada |
 
 ## Estrategia de baseline (decidida en F1)
@@ -141,6 +141,41 @@ editando la hoja (el contrato no cambia).
   absurda. Ademas insertaria dwells no planificados dentro de tramos ya
   reservados por el planner espacio-temporal (riesgo de co-ocupacion). Se
   reevalua solo si algun dia se modelan velocidades vehiculares por tramo.
+
+## Decisiones tecnicas de F4 (2026-07-11) — INICIATIVA COMPLETA
+
+- **Bloque `tiempos.variabilidad`** (opt-in, default off; NO en el canonico):
+  `{enabled, cv: 0.25}`. Log-Normal con MEDIA PRESERVADA: sigma^2 =
+  ln(1+cv^2), mu = ln(t) - sigma^2/2 => E[X] = t exacto. Log-Normal y NO
+  Normal (tiempos negativos) ni Triangular (muletilla sin datos) — la
+  correccion metodologica del doc del Director (Law/Simio 2024). Usa el
+  `random` global => reproducible bajo WAREHOUSE_SEED (verificado: 2
+  corridas seed 42 -> sha identico).
+- **REGLA CRITICA implementada — una muestra por WO:** `_compute_pick_time`
+  se llama DOS veces por pick (reserva del planner via _pick_dwell_estimate
+  y timeout real). `_tiempo_pick_final` muestrea UNA vez y CACHEA en la WO
+  (`_t_pick_muestreado`) => plan espacio-temporal y ejecucion consistentes.
+  Igual patron en descarga (reserva de celda + timeout con el MISMO valor),
+  putaway load (goal_dwell + timeout) y deposito.
+- **Packing por clase:** clave `pack` (segundos) en `tiempos.clases_manejo`;
+  descarga en staging = discharge_time + pack, luego muestreada. pack=0 o
+  clase desconocida => discharge_time INTACTO (mismo objeto, neutro exacto).
+- **Neutralidad de identidad:** con variabilidad off, _tiempo_estocastico
+  devuelve t SIN tocar (mismo objeto, ni float()) => GATE PASS sin update
+  (verificado). La estimacion de goal_dwell del tramo a staging
+  (discharge*n) queda determinista (media): mismo estatus de estimacion
+  que hoy, documentado.
+- **Efecto medido** (canonico + variabilidad cv 0.25 + packs de ejemplo
+  3/5/10/8/20 s, seed 42): makespan 5696 -> 6674 s (+17%). La varianza crea
+  colas y esperas que el promedio esconde (Kostrzewski/Law: los modelos
+  deterministas sobreestiman capacidad).
+
+**INIT-8 COMPLETA (F1-F4).** El simulador distingue fisicamente los
+productos (catalogo), los tiempos escalan por clase/peso (calibrados con
+fuentes), la marcha se degrada con la carga (opt-in) y los tiempos pueden
+ser humanos (Log-Normal opt-in). Todos los bloques editables en config.json;
+sin UI dedicada (evaluar si el Director la pide). F5 (fatiga dinamica
+acumulativa) queda diferida sin planificar.
 
 ## Regla de validacion por fase
 

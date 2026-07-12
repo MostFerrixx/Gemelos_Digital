@@ -10,6 +10,25 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-11 (cont. 3)
+
+- **INIT-8 F4 — TIEMPOS REALISTAS, variabilidad Log-Normal + packing por
+  clase (INICIATIVA COMPLETA F1-F4).** Bloque `tiempos.variabilidad`
+  (opt-in, off; canonico intacto => GATE PASS sin update): Log-Normal con
+  MEDIA preservada (E[X]=t; sigma de cv), acotada en 0, cola derecha — la
+  correccion metodologica del doc del Director (Law/Simio: JAMAS Normal ni
+  Triangular). Reproducible bajo WAREHOUSE_SEED (2 corridas -> sha
+  identico). REGLA CRITICA: una muestra por WO — `_tiempo_pick_final`
+  cachea en la WO porque _compute_pick_time se llama 2 veces (reserva del
+  planner + timeout real); mismo patron en descarga/putaway (reserva y
+  timeout con el MISMO valor) => plan espacio-temporal consistente.
+  Packing: clave `pack` por clase en clases_manejo (descarga = discharge +
+  pack; 0 = neutro de objeto exacto). Efecto medido: makespan 5696 -> 6674 s
+  (+17%) con cv 0.25 + packs de ejemplo — la varianza crea colas que el
+  promedio esconde. Tests T840..844. 189 passed.
+
+---
+
 ## 2026-07-11 (cont. 2)
 
 - **INIT-8 F3 — TIEMPOS REALISTAS, velocidad segun carga (opt-in).** Bloque

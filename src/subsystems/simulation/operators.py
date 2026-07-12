@@ -6,6 +6,9 @@ Digital Twin Warehouse Simulator
 Contains agent classes (GroundOperator, Forklift) and factory function
 """
 
+import math
+import random
+
 import simpy
 
 import logging
@@ -149,7 +152,76 @@ class BaseOperator:
         # Peso transportado (kg), espejo de cargo_volume (INIT-8 F3).
         self.cargo_peso = 0.0
 
+        # INIT-8 F4: variabilidad Log-Normal de tiempos (opt-in, default off).
+        # Los humanos no son robots: la Log-Normal es la eleccion correcta
+        # (acotada en 0, cola derecha; Law/Simio 2024 -- JAMAS Normal, que
+        # genera tiempos negativos, ni Triangular, muletilla sin datos).
+        # Parametrizada para conservar la MEDIA: E[X] = t exacto =>
+        # sigma^2 = ln(1+cv^2), mu = ln(t) - sigma^2/2. Usa el `random`
+        # global (WAREHOUSE_SEED) => reproducible bajo semilla.
+        _var = _tiempos.get("variabilidad", {}) or {}
+        self.var_enabled = bool(_var.get("enabled", False))
+        _cv = max(0.0, float(_var.get("cv", 0.25) or 0.0))
+        self.var_sigma = math.sqrt(math.log(1.0 + _cv * _cv)) if _cv > 0 else 0.0
+
         logger.info(f"[AGENT] {self.id} ({self.type}) inicializado - Capacidad: {self.capacity}")
+
+    def _tiempo_estocastico(self, t):
+        """
+        INIT-8 F4: muestrea una Log-Normal con MEDIA = t (identidad si el
+        flag esta off o t <= 0: devuelve t SIN tocar, mismo objeto => gate
+        byte-identico). sigma precalculada de cv en __init__.
+        """
+        if not self.var_enabled or t is None or self.var_sigma <= 0.0:
+            return t
+        t_f = float(t)
+        if t_f <= 0.0:
+            return t
+        mu = math.log(t_f) - 0.5 * self.var_sigma * self.var_sigma
+        return random.lognormvariate(mu, self.var_sigma)
+
+    def _tiempo_pick_final(self, wo):
+        """
+        INIT-8 F4: tiempo de pick FINAL, muestreado UNA sola vez por WO y
+        cacheado en ella. CRITICO: _compute_pick_time se llama DOS veces por
+        pick (la reserva del planner via _pick_dwell_estimate y el timeout
+        real de _do_picking_at); ambas deben ver LA MISMA muestra o el plan
+        espacio-temporal queda desincronizado de la ejecucion.
+        Con variabilidad off devuelve _compute_pick_time tal cual.
+        """
+        cached = getattr(wo, '_t_pick_muestreado', None) if wo else None
+        if cached is not None:
+            return cached
+        t = self._tiempo_estocastico(self._compute_pick_time(wo))
+        if wo is not None:
+            try:
+                wo._t_pick_muestreado = t
+            except Exception:
+                pass
+        return t
+
+    def _clase_pack(self, wo) -> float:
+        """INIT-8 F4: segundos de PACKING por clase de manejo (clave 'pack'
+        de tiempos.clases_manejo, default 0.0 = neutro)."""
+        clase = getattr(getattr(wo, 'sku', None), 'clase', None) if wo else None
+        params = self.clases_manejo.get(clase) if clase else None
+        if not isinstance(params, dict):
+            return 0.0
+        try:
+            return float(params.get('pack', 0.0) or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _tiempo_descarga_final(self, wo):
+        """
+        INIT-8 F4: descarga en staging = discharge_time + packing por clase,
+        muestreado. Neutralidad exacta: con pack=0 y variabilidad off
+        devuelve self.discharge_time SIN tocar (mismo objeto/tipo).
+        Llamar UNA vez por WO y usar el valor para reserva Y timeout.
+        """
+        pack = self._clase_pack(wo)
+        base = self.discharge_time if pack == 0.0 else float(self.discharge_time) + pack
+        return self._tiempo_estocastico(base)
 
     def _factor_carga_tiempo(self) -> float:
         """
@@ -493,11 +565,12 @@ class BaseOperator:
     def _pick_dwell_estimate(self, wo) -> float:
         """
         MEJ-4: duracion estimada de la PERMANENCIA en el punto de picking.
-        Base: tiempo de pick (puro, sin RNG). Forklift lo redefine sumando los
-        dos movimientos de horquilla. Se usa para el destino-con-permanencia.
+        Base: tiempo de pick FINAL (F4: muestreado UNA vez y cacheado en la
+        WO => la reserva del planner y el timeout real ven la MISMA muestra).
+        Forklift lo redefine sumando los dos movimientos de horquilla.
         """
         try:
-            return float(self._compute_pick_time(wo))
+            return float(self._tiempo_pick_final(wo))
         except Exception:
             return 0.0
 
@@ -854,7 +927,7 @@ class BaseOperator:
         if zone is None:
             # fallback de seguridad: descarga simple sin aforo
             for wo in staging_wos:
-                yield self.env.timeout(self.discharge_time)
+                yield self.env.timeout(self._tiempo_descarga_final(wo))
                 self.cargo_volume -= wo.cantidad_inicial * wo.sku.volumen
                 self.cargo_peso -= wo.cantidad_inicial * getattr(wo.sku, 'peso', 0.0)
                 self.almacen.dispatcher.notificar_completado_individual(self, wo)
@@ -916,6 +989,9 @@ class BaseOperator:
             # consolida (Pallet + metricas + scaffold); la reserva duplicada del mismo id
             # es inofensiva (is_free ignora el propio id; release elimina todas).
             slot.assign("PALLET:" + str(wo.id))
+            # INIT-8 F4: descarga + packing por clase, muestreado UNA vez --
+            # la reserva de la celda y el timeout usan el MISMO valor.
+            _t_desc = self._tiempo_descarga_final(wo)
             _rt = getattr(self.almacen, 'reservation_table', None)
             if _rt is not None:
                 try:
@@ -924,7 +1000,7 @@ class BaseOperator:
                     # movimiento del agente, que comparte id). El pallet (obstaculo
                     # persistente) lo reserva place_pallet despues, ya sin solape.
                     _rt.reserve(slot.cell, float(self.env.now),
-                                float(self.env.now) + float(self.discharge_time), self.id)
+                                float(self.env.now) + float(_t_desc), self.id)
                 except Exception:
                     pass
             self.status = "unloading"
@@ -933,7 +1009,7 @@ class BaseOperator:
                 'position': self.current_position, 'status': self.status,
                 'current_task': wo.id, 'cargo_volume': self.cargo_volume,
             })
-            yield self.env.timeout(self.discharge_time)
+            yield self.env.timeout(_t_desc)
             self.cargo_volume -= wo.cantidad_inicial * wo.sku.volumen
             self.cargo_peso -= wo.cantidad_inicial * getattr(wo.sku, 'peso', 0.0)
             self.almacen.dispatcher.notificar_completado_individual(self, wo)
@@ -1230,9 +1306,12 @@ class BaseOperator:
 
                 # MEJ-4 (F1): reservar la permanencia de la descarga (era la
                 # fuga principal: hotspot staging con 4 agentes superpuestos).
-                self._tw_reserve_dwell(self.discharge_time)
+                # INIT-8 F4: descarga + packing por clase, muestreado UNA vez
+                # -- la reserva y el timeout usan el MISMO valor.
+                _t_desc = self._tiempo_descarga_final(wo)
+                self._tw_reserve_dwell(_t_desc)
                 # Timeout individual por WO
-                yield self.env.timeout(self.discharge_time)
+                yield self.env.timeout(_t_desc)
 
                 # Actualizar cargo parcialmente
                 self.cargo_volume -= wo_volume
@@ -1366,7 +1445,9 @@ class BaseOperator:
         base = float(getattr(self.almacen, 'inbound_config', {})
                      .get('putaway_load_time', 10.0))
         mult, recargo = self._clase_params(wo)
-        return base * mult + recargo
+        # INIT-8 F4: muestreado (identidad con variabilidad off). Se computa
+        # UNA vez en _execute_putaway_tour y alimenta goal_dwell Y timeout.
+        return float(self._tiempo_estocastico(base * mult + recargo))
 
     def _putaway_nav(self, destino, wo, goal_dwell: float = 0.0):
         """Navega al destino con el mismo primitivo del pick (_recorrer_tramo:
@@ -1457,8 +1538,11 @@ class BaseOperator:
             'current_task': wo.id, 'current_work_area': wo.work_area,
             'cargo_volume': self.cargo_volume
         })
-        self._tw_reserve_dwell(float(self.discharge_time))
-        yield self.env.timeout(float(self.discharge_time))
+        # INIT-8 F4: deposito muestreado UNA vez (sin pack: el putaway guarda,
+        # no empaca) -- reserva y timeout con el MISMO valor.
+        _t_dep = float(self._tiempo_estocastico(float(self.discharge_time)))
+        self._tw_reserve_dwell(_t_dep)
+        yield self.env.timeout(_t_dep)
 
         self.cargo_volume = max(0, self.cargo_volume
                                 - wo.cantidad_inicial * wo.sku.volumen)
@@ -1546,9 +1630,10 @@ class GroundOperator(BaseOperator):
             'cargo_volume': self.cargo_volume
         })
 
-        # INIT-4 C1: tiempo de pick (escala con cantidad/volumen si esta activo;
-        # neutro -> picking_time o discharge_time, igual que antes).
-        picking_duration = self._compute_pick_time(wo)
+        # INIT-4 C1 + INIT-8 F4: tiempo de pick final (escala por clase/peso
+        # y, con variabilidad on, muestreado UNA vez -- misma muestra que la
+        # reserva del planner via _pick_dwell_estimate).
+        picking_duration = self._tiempo_pick_final(wo)
         # MEJ-4 (F1): la permanencia del picking se reserva en la tabla.
         self._tw_reserve_dwell(picking_duration)
         yield self.env.timeout(picking_duration)
@@ -1657,8 +1742,9 @@ class Forklift(BaseOperator):
         LIFT_TIME = self.lift_time
         # MEJ-4 (F1): reservar la permanencia COMPLETA (lift + pick + lower) de
         # una vez. _compute_pick_time es puro (sin RNG): calcularlo aqui no
-        # altera el comportamiento.
-        _pick_est = self._compute_pick_time(wo)
+        # altera el comportamiento. (F4: _tiempo_pick_final cachea la muestra
+        # en la WO, asi el timeout de abajo usa EL MISMO valor.)
+        _pick_est = self._tiempo_pick_final(wo)
         self._tw_reserve_dwell(LIFT_TIME + _pick_est + LIFT_TIME)
         self.status = "lifting"
         logger.debug(f"[{self.id}] t={self.env.now:.1f} Elevando horquilla")
@@ -1691,9 +1777,9 @@ class Forklift(BaseOperator):
             'cargo_volume': self.cargo_volume
         })
 
-        # INIT-4 C1: tiempo de pick (escala con cantidad/volumen si esta activo;
-        # neutro -> picking_time o discharge_time, igual que antes).
-        picking_duration = self._compute_pick_time(wo)
+        # INIT-4 C1 + INIT-8 F4: tiempo de pick final (misma muestra cacheada
+        # que la reserva de arriba).
+        picking_duration = self._tiempo_pick_final(wo)
         yield self.env.timeout(picking_duration)
 
         logger.debug(f"[{self.id}] t={self.env.now:.1f} Bajando horquilla")

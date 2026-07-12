@@ -47,6 +47,9 @@ def _operator(tiempos=None, discharge_time=5.0):
     op.pick_time_minimo = float(_ptm.get("minimo", 0.0) or 0.0)
     _cm = _tiempos.get("clases_manejo", {})
     op.clases_manejo = _cm if isinstance(_cm, dict) else {}
+    # F4: variabilidad off (identidad) para estos tests deterministas
+    op.var_enabled = False
+    op.var_sigma = 0.0
     return op
 
 
