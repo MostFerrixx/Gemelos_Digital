@@ -212,6 +212,22 @@ class BaseOperator:
         except (TypeError, ValueError):
             return 0.0
 
+    def _staging_dwell_estimate(self, staging_wos) -> float:
+        """
+        AUD8-1 (auditoria INIT-8): permanencia estimada en el staging para la
+        reserva del planner (goal_dwell del tramo de llegada). Antes era
+        `discharge * n` SIN el packing por clase (F4): con pack activo la
+        descarga real EXCEDIA la reserva y otros agentes ruteaban a traves
+        (co-ocupaciones 8 -> 41 en el smoke de la auditoria).
+
+        Estimacion = discharge*n + sum(pack por clase). Es la MEDIA correcta
+        tambien con variabilidad on (E[X]=t). Neutralidad exacta: con packs
+        en 0 el termino agregado es 0.0 y `x + 0.0 == x` (identidad IEEE)
+        => byte-identico con el canonico.
+        """
+        base = float(self.discharge_time) * len(staging_wos)
+        return base + sum(self._clase_pack(wo) for wo in staging_wos)
+
     def _tiempo_descarga_final(self, wo):
         """
         INIT-8 F4: descarga en staging = discharge_time + packing por clase,
@@ -1258,7 +1274,8 @@ class BaseOperator:
                             return_path, self.default_speed,
                             on_before=_on_before, on_after=_on_after,
                             time_per_cell=TIME_PER_CELL,
-                            goal_dwell=float(self.discharge_time) * len(staging_wos)
+                            # AUD8-1: la reserva incluye el packing por clase
+                            goal_dwell=self._staging_dwell_estimate(staging_wos)
                         )
 
                         self.total_distance_traveled += len(return_path) - 1

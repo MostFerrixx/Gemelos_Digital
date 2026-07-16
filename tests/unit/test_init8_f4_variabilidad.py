@@ -111,3 +111,17 @@ def test_t844_putaway_load_muestreado():
     media = sum(op._putaway_load_time(FakeWO(clase="pesado"))
                 for _ in range(n)) / n
     assert media == pytest.approx(20.0, rel=0.03)
+
+
+def test_t845_aud81_dwell_de_staging_incluye_pack():
+    """AUD8-1: la reserva del planner para el staging suma el packing por
+    clase. Con packs 0 -> discharge*n EXACTO (identidad IEEE, gate)."""
+    clases = {"extra_grande": {"pack": 20.0}, "pequeno": {"pack": 3.0}}
+    op = _operator(var=None, clases=clases, discharge_time=5)
+    wos = [FakeWO(clase="extra_grande"), FakeWO(clase="pequeno"),
+           FakeWO(clase="GENERAL")]
+    # 5*3 + 20 + 3 + 0 = 38
+    assert op._staging_dwell_estimate(wos) == 38.0
+    # sin packs: EXACTO discharge*n (neutralidad byte-identica)
+    op2 = _operator(var=None, clases={}, discharge_time=5)
+    assert op2._staging_dwell_estimate(wos) == 15.0
