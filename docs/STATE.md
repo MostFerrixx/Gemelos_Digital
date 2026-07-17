@@ -4,24 +4,24 @@
 > presente, nada mas. Historial -> `docs/CHANGELOG.md`. Pendientes ->
 > `docs/BACKLOG.md`. Identidad/reglas/arquitectura -> `CLAUDE.md`.
 
-**Ultima actualizacion:** 2026-07-11
+**Ultima actualizacion:** 2026-07-12
 
 ## Git
 
-- `main` = INIT-8 completa (F4 al cierre), pusheado. Push directo a main autorizado.
-- Baseline byte-identico vigente: **`sha256=8f9f78d5...`, 7.161.322 bytes**,
-  seed 42, Python 3.13.6 (`tests/baseline.json`). REAJUSTADO en INIT-8 F2
-  (LA actualizacion intencional de la iniciativa: volumen real + tiempos por
-  clase/peso calibrados en el canonico; impacto makespan +82%, throughput
-  -44% vs el mundo plano). Anterior: `930a1e6f` (INIT-7 F4).
+- `main` = AUD8-1 + AUD8-2 aplicados (al cierre), pusheado. Push directo autorizado.
+- Baseline byte-identico vigente: **`sha256=cbdb3073...`, 10.039.886 bytes**,
+  seed 42, Python 3.13.6 (`tests/baseline.json`). REAJUSTADO en AUD8-2
+  (la mezcla estocastica ahora filtra por clase real => stream RNG distinto;
+  mezcla esperada identica al espejo del catalogo). Anteriores: `8f9f78d5`
+  (INIT-8 F2), `930a1e6f` (INIT-7 F4).
 - REGLA pinneada por tests BN-05 e IN-43: la metadata del .jsonl NO puede
   contener valores wall-clock (rompe el determinismo del gate).
 
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 189 passed, 1 deselected (~10s)
-python scripts/regression_gate.py  # GATE PASS esperado (baseline 8f9f78d5)
+python -m pytest -q                # 192 passed, 1 deselected (~10s)
+python scripts/regression_gate.py  # GATE PASS esperado (baseline cbdb3073)
 ```
 
 ## INIT-7 INBOUND — COMPLETA (F0-F5, 2026-07-08 a 2026-07-10)
@@ -124,9 +124,6 @@ nueva del Director.
 
 - `warehouse.db-shm` / `warehouse.db-wal`: WAL de SQLite, untracked pero ya
   en `.gitignore`.
-- **Auditoria INIT-8 (2026-07-11), AUD8-1..4 en BACKLOG, sin aplicar:**
-  AUD8-1 (MEDIA) goal_dwell del tramo->staging ignora packing => co-ocupaciones
-  8->41 con pack on (solo opt-in, gate intacto); AUD8-2 (MEDIA)
-  `distribucion_tipos` letra muerta (filtro nunca matchea, mezcla uniforme);
-  AUD8-3 (BAJA) cache `_t_pick_muestreado` sin invalidar; AUD8-4 (TRIVIAL)
-  comentario obsoleto. El Director decide cuando aplicarlos.
+- Auditoria INIT-8: AUD8-1 y AUD8-2 APLICADOS (2026-07-12, ver CHANGELOG).
+  Quedan AUD8-3 (BAJA: cache `_t_pick_muestreado` sin invalidar) y AUD8-4
+  (TRIVIAL: comentario obsoleto) en BACKLOG.

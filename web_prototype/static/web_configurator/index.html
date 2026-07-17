@@ -225,20 +225,20 @@
 
                         <div class="card">
                             <div class="card-header">
-                                <h3>Distribución de Tipos</h3>
+                                <h3>Distribución por Clase de Manejo</h3>
                                 <span id="validation-percentages" class="badge badge-success">✓ 100%</span>
                             </div>
                             <div class="card-body">
+                                <p class="description-text">Qué proporción de los pedidos estocásticos cae en
+                                    cada clase de producto. Las clases y su física real (volumen, peso) viven en
+                                    la hoja <code>SkuCatalog</code> del Excel — acá solo se controla la mezcla.
+                                    Debe sumar 100%.</p>
                                 <div class="distribution-grid">
                                     <div class="dist-item">
                                         <h4>Pequeño</h4>
                                         <div class="form-group">
                                             <label>% Distribución</label>
-                                            <input type="number" id="pct-pequeno" value="60" class="pct-input">
-                                        </div>
-                                        <div class="form-group">
-                                            <label>Volumen (L)</label>
-                                            <input type="number" id="vol-pequeno" value="5">
+                                            <input type="number" id="pct-pequeno" value="36" class="pct-input">
                                         </div>
                                     </div>
                                     <div class="dist-item">
@@ -247,20 +247,26 @@
                                             <label>% Distribución</label>
                                             <input type="number" id="pct-mediano" value="30" class="pct-input">
                                         </div>
+                                    </div>
+                                    <div class="dist-item">
+                                        <h4>Voluminoso</h4>
                                         <div class="form-group">
-                                            <label>Volumen (L)</label>
-                                            <input type="number" id="vol-mediano" value="25">
+                                            <label>% Distribución</label>
+                                            <input type="number" id="pct-voluminoso" value="16" class="pct-input">
                                         </div>
                                     </div>
                                     <div class="dist-item">
-                                        <h4>Grande</h4>
+                                        <h4>Pesado</h4>
                                         <div class="form-group">
                                             <label>% Distribución</label>
-                                            <input type="number" id="pct-grande" value="10" class="pct-input">
+                                            <input type="number" id="pct-pesado" value="12" class="pct-input">
                                         </div>
+                                    </div>
+                                    <div class="dist-item">
+                                        <h4>Extra grande</h4>
                                         <div class="form-group">
-                                            <label>Volumen (L)</label>
-                                            <input type="number" id="vol-grande" value="80">
+                                            <label>% Distribución</label>
+                                            <input type="number" id="pct-extra-grande" value="6" class="pct-input">
                                         </div>
                                     </div>
                                 </div>

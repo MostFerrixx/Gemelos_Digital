@@ -39,6 +39,18 @@ def _coerce_float(value):
         return None
 
 
+def skus_por_clase(catalogo_values, clase):
+    """
+    AUD8-2 (auditoria INIT-8): SKUs cuya CLASE DE MANEJO (SKU.clase, hoja
+    SkuCatalog / INIT-8 F1) coincide con la clave de distribucion_tipos.
+    Devuelve [] si ninguna coincide: el caller decide el fallback (todos los
+    SKUs + WARN). Reemplaza al filtro historico por substring del id, que
+    nunca matcheaba ('PEQ' in 'SKU001') y dejaba la mezcla uniforme.
+    """
+    return [s for s in catalogo_values
+            if getattr(s, 'clase', 'GENERAL') == clase]
+
+
 @dataclass
 class OrderItem:
     """Represents a single item within an order"""
@@ -192,6 +204,7 @@ class StochasticOrderStrategy(OrderGenerationStrategy):
         all_work_orders = []
         wo_adjusted_count = 0
         sku_sin_ubicacion_count = 0
+        _tipos_sin_skus_avisados = set()  # AUD8-2: WARN una vez por tipo
 
         for order_num in range(1, almacen.total_ordenes + 1):
             # Determine order type based on distribution
@@ -205,10 +218,21 @@ class StochasticOrderStrategy(OrderGenerationStrategy):
                     tipo_seleccionado = tipo
                     break
 
-            # Select SKU of chosen type
-            skus_tipo = [sku for sku in almacen.catalogo_skus.values()
-                        if tipo_seleccionado[:3].upper() in sku.id]
+            # AUD8-2 (auditoria INIT-8): seleccionar SKU por CLASE DE MANEJO
+            # real (SKU.clase, hoja SkuCatalog). El filtro historico
+            # (`tipo[:3].upper() in sku.id`) buscaba 'PEQ'/'MED'/'GRA' dentro
+            # de 'SKU001'... => NUNCA matcheaba y la mezcla era uniforme
+            # (distribucion_tipos era letra muerta). Ahora las claves de
+            # distribucion_tipos son clases de manejo y la mezcla es
+            # CONTROLABLE de verdad.
+            skus_tipo = skus_por_clase(almacen.catalogo_skus.values(),
+                                       tipo_seleccionado)
             if not skus_tipo:
+                if tipo_seleccionado not in _tipos_sin_skus_avisados:
+                    _tipos_sin_skus_avisados.add(tipo_seleccionado)
+                    print(f"[STOCHASTIC][WARN] distribucion_tipos: la clase "
+                          f"'{tipo_seleccionado}' no tiene SKUs en el catalogo; "
+                          f"fallback a TODOS (mezcla uniforme en ese tipo).")
                 skus_tipo = list(almacen.catalogo_skus.values())
 
             sku = random.choice(skus_tipo)

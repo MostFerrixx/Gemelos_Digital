@@ -208,25 +208,27 @@ class WebConfigurationManager:
                 errors.append("total_ordenes must be greater than 0")
             
             # Validate distribucion_tipos
+            # AUD8-2 (2026-07-11): las claves son CLASES DE MANEJO reales
+            # (SKU.clase de la hoja SkuCatalog), NO una lista fija de 3 tipos.
+            # 'volumen' quedo DEPRECATED (la fisica vive en el catalogo): se
+            # tolera si un preset viejo lo trae, pero ya no se exige.
             if 'distribucion_tipos' in config:
                 dist = config['distribucion_tipos']
-                total_pct = 0
-                
-                for tipo in ['pequeno', 'mediano', 'grande']:
-                    if tipo not in dist:
-                        errors.append(f"Missing distribution type: {tipo}")
-                        continue
-                    
-                    if 'porcentaje' not in dist[tipo]:
-                        errors.append(f"Missing percentage for {tipo}")
-                    else:
-                        total_pct += dist[tipo]['porcentaje']
-                    
-                    if 'volumen' not in dist[tipo]:
-                        errors.append(f"Missing volume for {tipo}")
-                
-                if total_pct != 100:
-                    errors.append(f"Distribution percentages must sum to 100% (current: {total_pct}%)")
+                if not isinstance(dist, dict) or not dist:
+                    errors.append("distribucion_tipos must be a non-empty object")
+                else:
+                    total_pct = 0
+                    for tipo, cfg_tipo in dist.items():
+                        if not isinstance(cfg_tipo, dict) or 'porcentaje' not in cfg_tipo:
+                            errors.append(f"Missing percentage for {tipo}")
+                            continue
+                        pct = cfg_tipo['porcentaje']
+                        if not isinstance(pct, (int, float)) or pct < 0:
+                            errors.append(f"Invalid percentage for {tipo}: {pct!r}")
+                            continue
+                        total_pct += pct
+                    if total_pct != 100:
+                        errors.append(f"Distribution percentages must sum to 100% (current: {total_pct}%)")
             else:
                 errors.append("Missing distribucion_tipos")
             

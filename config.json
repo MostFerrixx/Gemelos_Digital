@@ -5,16 +5,19 @@
   "total_ordenes": 300,
   "distribucion_tipos": {
     "pequeno": {
-      "porcentaje": 60,
-      "volumen": 5
+      "porcentaje": 36
     },
     "mediano": {
-      "porcentaje": 30,
-      "volumen": 25
+      "porcentaje": 30
     },
-    "grande": {
-      "porcentaje": 10,
-      "volumen": 80
+    "voluminoso": {
+      "porcentaje": 16
+    },
+    "pesado": {
+      "porcentaje": 12
+    },
+    "extra_grande": {
+      "porcentaje": 6
     }
   },
   "dispatch_strategy": "Ejecucion de Plan",

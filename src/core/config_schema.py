@@ -184,9 +184,14 @@ class AgentTypeConfig(BaseModel):
 
 
 class DistribucionTipo(BaseModel):
+    """AUD8-2 (2026-07-11): las claves de distribucion_tipos son CLASES DE
+    MANEJO reales (SKU.clase de la hoja SkuCatalog); la mezcla estocastica
+    filtra por clase. `volumen` es DEPRECATED (el volumen real viene del
+    catalogo desde INIT-8 F2): se acepta sin warning por presets viejos,
+    pero el motor NO lo lee."""
     model_config = ConfigDict(extra="allow")
     porcentaje: Optional[float] = None
-    volumen: Optional[float] = None
+    volumen: Optional[float] = None  # DEPRECATED (sin lector desde AUD8-2)
 
 
 class WarehouseConfig(BaseModel):

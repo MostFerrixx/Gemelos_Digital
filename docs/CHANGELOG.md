@@ -10,6 +10,34 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-12
+
+- **AUD8-1 + AUD8-2 aplicados (fixes de la auditoria INIT-8).**
+  **AUD8-1** (`e09a089`): `_staging_dwell_estimate` — la reserva del planner
+  para el tramo->staging ahora suma el packing por clase (antes discharge*n
+  y la descarga real excedia la reserva). Evidencia: co-ocupaciones con
+  pack=30 caen 41 -> 23 (-44%; el residuo sobre el base 8 es congestion
+  organica por mas tiempo fisico en staging). Neutralidad IEEE (+0.0) =>
+  gate intacto. Test T845.
+  **AUD8-2**: `distribucion_tipos` reconectada a las CLASES DE MANEJO reales
+  (`skus_por_clase` filtra por SKU.clase; el filtro historico por substring
+  del id nunca matcheaba y la mezcla era uniforme). Canonico: claves = 5
+  clases (36/30/16/12/6, espejo del catalogo), campo `volumen` DEPRECATED
+  (la fisica vive en SkuCatalog; schema y validador web lo toleran sin
+  exigirlo). UI: card "Distribucion por Clase de Manejo" con 5 porcentajes
+  (sin campos de volumen), constante CLASES_DISTRIBUCION compartida por
+  listeners/validacion/load/build; presets viejos cargan lo que matchea y el
+  badge de suma avisa. Validador web reescrito (claves flexibles, porcentaje
+  numerico, suma 100). **Baseline REAJUSTADO** (`cbdb3073...`, 10.039.886
+  bytes): el metodo de seleccion cambia el stream RNG; como los porcentajes
+  canonicos espejan el catalogo, la mezcla ESPERADA es la misma — el valor
+  es la CONTROLABILIDAD, demostrada: con extra_grande al 50% el makespan
+  escala 7440 -> 21019 s (2.8x) y las WOs 666 -> 868 (antes esos porcentajes
+  no hacian nada). Test nuevo test_aud82_distribucion_clases. 192 passed +
+  GATE PASS x2. Quedan AUD8-3/4 (baja/trivial) en BACKLOG.
+
+---
+
 ## 2026-07-11 (cont. 4)
 
 - **AUDITORIA INIT-8 (solo documentar, sin aplicar).** A pedido del Director,

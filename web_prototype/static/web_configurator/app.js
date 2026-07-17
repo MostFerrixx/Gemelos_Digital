@@ -335,10 +335,19 @@ class WebConfigurator {
         });
     }
 
+    // AUD8-2: las claves de distribucion_tipos son CLASES DE MANEJO reales
+    // (hoja SkuCatalog / INIT-8). [claveConfig, idInput, defaultPct]
+    static CLASES_DISTRIBUCION = [
+        ['pequeno', 'pct-pequeno', 36],
+        ['mediano', 'pct-mediano', 30],
+        ['voluminoso', 'pct-voluminoso', 16],
+        ['pesado', 'pct-pesado', 12],
+        ['extra_grande', 'pct-extra-grande', 6],
+    ];
+
     setupValidations() {
-        // Percentages validation for Carga de Trabajo
-        const pctInputs = ['pct-pequeno', 'pct-mediano', 'pct-grande'];
-        pctInputs.forEach(id => {
+        // Percentages validation for Carga de Trabajo (AUD8-2: 5 clases)
+        WebConfigurator.CLASES_DISTRIBUCION.forEach(([, id]) => {
             const input = document.getElementById(id);
             if (input) {
                 input.addEventListener('input', () => this.validatePercentages());
@@ -355,10 +364,10 @@ class WebConfigurator {
     }
 
     validatePercentages() {
-        const pequeno = parseInt(document.getElementById('pct-pequeno').value) || 0;
-        const mediano = parseInt(document.getElementById('pct-mediano').value) || 0;
-        const grande = parseInt(document.getElementById('pct-grande').value) || 0;
-        const total = pequeno + mediano + grande;
+        // AUD8-2: suma sobre las 5 clases de manejo
+        const total = WebConfigurator.CLASES_DISTRIBUCION.reduce((acc, [, id]) => {
+            return acc + (parseInt(document.getElementById(id)?.value) || 0);
+        }, 0);
 
         const label = document.getElementById('validation-percentages');
         if (total === 100) {
@@ -941,14 +950,15 @@ class WebConfigurator {
         // Tab 1: Carga de Trabajo
         document.getElementById('total-ordenes').value = config.total_ordenes || 300;
 
+        // AUD8-2: distribucion por CLASE DE MANEJO (5 clases; el campo
+        // volumen quedo DEPRECATED -- la fisica vive en la hoja SkuCatalog).
+        // Un preset viejo (3 tipos con 'grande') carga pequeno/mediano y deja
+        // las clases nuevas en su default; el badge de suma avisa si != 100.
         const dist = config.distribucion_tipos || {};
-        document.getElementById('pct-pequeno').value = dist.pequeno?.porcentaje || 60;
-        document.getElementById('pct-mediano').value = dist.mediano?.porcentaje || 30;
-        document.getElementById('pct-grande').value = dist.grande?.porcentaje || 10;
-
-        document.getElementById('vol-pequeno').value = dist.pequeno?.volumen || 5;
-        document.getElementById('vol-mediano').value = dist.mediano?.volumen || 25;
-        document.getElementById('vol-grande').value = dist.grande?.volumen || 80;
+        WebConfigurator.CLASES_DISTRIBUCION.forEach(([clave, id, defPct]) => {
+            const el = document.getElementById(id);
+            if (el) el.value = dist[clave]?.porcentaje ?? defPct;
+        });
         // MEJ-3: capacidad_carro eliminada (el motor nunca la leyo; la capacidad
         // real es agent_types[].capacity, editable en Flota de Agentes).
 
@@ -1119,20 +1129,14 @@ class WebConfigurator {
             order_file_path: this.uploadedOrderFilePath || '',
 
             total_ordenes: parseInt(document.getElementById('total-ordenes').value),
-            distribucion_tipos: {
-                pequeno: {
-                    porcentaje: parseInt(document.getElementById('pct-pequeno').value),
-                    volumen: parseInt(document.getElementById('vol-pequeno').value)
-                },
-                mediano: {
-                    porcentaje: parseInt(document.getElementById('pct-mediano').value),
-                    volumen: parseInt(document.getElementById('vol-mediano').value)
-                },
-                grande: {
-                    porcentaje: parseInt(document.getElementById('pct-grande').value),
-                    volumen: parseInt(document.getElementById('vol-grande').value)
-                }
-            },
+            // AUD8-2: claves = clases de manejo reales; sin 'volumen'
+            // (DEPRECATED: la fisica del producto vive en SkuCatalog).
+            distribucion_tipos: Object.fromEntries(
+                WebConfigurator.CLASES_DISTRIBUCION.map(([clave, id, defPct]) => [
+                    clave,
+                    { porcentaje: parseInt(document.getElementById(id)?.value) || defPct }
+                ])
+            ),
             // Tab 2: Estrategias
             dispatch_strategy: document.getElementById('dispatch-strategy').value,
             radio_cercania: parseInt(document.getElementById('radio-cercania')?.value) || 100,
