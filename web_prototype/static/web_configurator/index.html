@@ -409,6 +409,122 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- INIT-8: Modelo de tiempo de pick (calibrado con fuentes) -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Tiempo de Pick por Producto</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Fórmula del tiempo de cada pick:
+                                <code>(base + s/unidad·cant + s/kg·peso) × mult. clase + recargo clase</code>.
+                                Calibración con fuentes en <code>docs/PLAN_INIT8_TIEMPOS.md</code>
+                                (MTM-Logistics, regresión POMS, Blue Yonder).</p>
+                            <div class="form-group">
+                                <label>Base por pick (s) <em style="font-weight:normal;color:#888;">(vacío = usar tiempo histórico)</em></label>
+                                <input type="number" id="ptm-base" min="0" step="0.5" value="" placeholder="10">
+                                <span class="help-text">Acercarse, escanear, posicionar. Calibrado: 10 s (POMS: ~14 s/caja con 2 unidades).</span>
+                            </div>
+                            <div class="form-group">
+                                <label>Por unidad (s/u)</label>
+                                <input type="number" id="ptm-por-unidad" min="0" step="0.5" value="2">
+                                <span class="help-text">Cada unidad extra agrega su agarre y colocación. Calibrado: 2 s/u.</span>
+                            </div>
+                            <div class="form-group">
+                                <label>Por volumen (s por unidad de volumen)</label>
+                                <input type="number" id="ptm-por-volumen" min="0" step="0.05" value="0">
+                                <span class="help-text">Término opcional; el efecto del tamaño ya lo captura la clase de manejo.</span>
+                            </div>
+                            <div class="form-group">
+                                <label>Por peso (s/kg)</label>
+                                <input type="number" id="ptm-por-kg" min="0" step="0.05" value="0.15">
+                                <span class="help-text">Proxy del "fatigue factor" de Blue Yonder: un refrigerador de 85 kg agrega ~13 s. Calibrado: 0.15 s/kg.</span>
+                            </div>
+                            <div class="form-group">
+                                <label>Mínimo (s)</label>
+                                <input type="number" id="ptm-minimo" min="0" step="0.5" value="5">
+                                <span class="help-text">Piso: ningún pick baja de este tiempo.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- INIT-8: Clases de manejo (mult / recargo / pack por clase) -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Clases de Manejo</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Cómo escala el tiempo según el tipo de producto
+                                (las clases de cada SKU viven en la hoja <code>SkuCatalog</code> del Excel).
+                                <strong>Mult.</strong> multiplica el tiempo de pick, <strong>Recargo</strong> suma
+                                segundos fijos, <strong>Pack</strong> agrega empaque en la descarga (0 = sin empaque).</p>
+                            <div class="distribution-grid" id="clases-manejo-grid">
+                                <!-- Filas generadas por app.js (CLASES_MANEJO_UI) -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- INIT-8 F3: Velocidad segun carga (opt-in) -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Velocidad según Carga</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">El operario cargado camina más lento (biomecánica real:
+                                1.35 m/s vacío → 1.10 m/s con 22 kg). Apagado = velocidad constante histórica.</p>
+                            <div class="form-group">
+                                <label class="toggle-label">
+                                    <input type="checkbox" id="vc-enabled">
+                                    <span>Activar velocidad según carga</span>
+                                </label>
+                            </div>
+                            <div id="vc-options" style="display:none;">
+                                <div class="form-group">
+                                    <label>Reducción por kg (fracción de velocidad)</label>
+                                    <input type="number" id="vc-reduccion-kg" min="0" max="0.05" step="0.0001" value="0.0084">
+                                    <span class="help-text">Calibrado: 0.0084/kg (Indian Army 2022: 22 kg ⇒ −18.5%).</span>
+                                </div>
+                                <div class="form-group">
+                                    <label>Reducción máxima (0–0.9)</label>
+                                    <input type="number" id="vc-reduccion-max" min="0" max="0.9" step="0.05" value="0.5">
+                                    <span class="help-text">Piso de velocidad: con 0.5, un humano al límite no baja del 50% de su paso.</span>
+                                </div>
+                                <div class="form-group">
+                                    <label class="toggle-label">
+                                        <input type="checkbox" id="vc-aplica-forklift">
+                                        <span>Aplicar también a montacargas</span>
+                                    </label>
+                                    <span class="help-text">Por defecto NO: la máquina carga el peso, no el cuerpo del operario.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- INIT-8 F4: Variabilidad humana (opt-in) -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Variabilidad Humana</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Los humanos no son robots: los tiempos siguen una
+                                distribución Log-Normal (media preservada, nunca negativa, cola derecha —
+                                Law/Simio). Reproducible bajo semilla: el A/B sigue funcionando. Los promedios
+                                deterministas <em>sobreestiman</em> la capacidad y esconden cuellos de botella.</p>
+                            <div class="form-group">
+                                <label class="toggle-label">
+                                    <input type="checkbox" id="var-enabled">
+                                    <span>Activar variabilidad de tiempos</span>
+                                </label>
+                            </div>
+                            <div id="var-options" style="display:none;">
+                                <div class="form-group">
+                                    <label>Coeficiente de variación (CV)</label>
+                                    <input type="number" id="var-cv" min="0.05" max="1" step="0.05" value="0.25">
+                                    <span class="help-text">Dispersión relativa (σ/μ). 0.25 = variación humana típica; 0.5 = operación muy irregular.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Tab 3: Flota de Agentes -->

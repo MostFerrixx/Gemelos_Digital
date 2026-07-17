@@ -8,12 +8,12 @@
 
 ## Git
 
-- `main` = auditoria INIT-8 cerrada (AUD8-1..4 aplicados), pusheado. Push directo autorizado.
-- Baseline byte-identico vigente: **`sha256=cbdb3073...`, 10.039.886 bytes**,
-  seed 42, Python 3.13.6 (`tests/baseline.json`). REAJUSTADO en AUD8-2
-  (la mezcla estocastica ahora filtra por clase real => stream RNG distinto;
-  mezcla esperada identica al espejo del catalogo). Anteriores: `8f9f78d5`
-  (INIT-8 F2), `930a1e6f` (INIT-7 F4).
+- `main` = UI de tiempos INIT-8 (al cierre), pusheado. Push directo autorizado.
+- Baseline byte-identico vigente: **`sha256=2233b3c6...`, 10.039.862 bytes**,
+  seed 42, Python 3.13.6 (`tests/baseline.json`). REAJUSTADO al normalizar
+  el canonico a enteros JS-estables (10.0 -> 10; solo metadata, eventos
+  identicos) para que GUARDAR desde la UI sea un no-op byte-identico.
+  Anteriores: `cbdb3073` (AUD8-2), `8f9f78d5` (INIT-8 F2).
 - REGLA pinneada por tests BN-05 e IN-43: la metadata del .jsonl NO puede
   contener valores wall-clock (rompe el determinismo del gate).
 
@@ -21,7 +21,7 @@
 
 ```
 python -m pytest -q                # 193 passed, 1 deselected (~10s)
-python scripts/regression_gate.py  # GATE PASS esperado (baseline cbdb3073)
+python scripts/regression_gate.py  # GATE PASS esperado (baseline 2233b3c6)
 ```
 
 ## INIT-7 INBOUND — COMPLETA (F0-F5, 2026-07-08 a 2026-07-10)
@@ -115,10 +115,12 @@ distribuciones estocasticas).
 
 ## Siguiente prioridad (sin decidir aun)
 
-INIT-8 COMPLETA (F1-F4, 2026-07-11). Candidatos: UI para los bloques de
-tiempos de INIT-8 (hoy se editan en config.json), INIT-3 v3 (capacidades por
-agente en el optimizador), decisiones pendientes de arriba, o iniciativa
-nueva del Director.
+INIT-8 COMPLETA (F1-F4 + auditoria 4/4 + UI de tiempos, 2026-07-12).
+Candidatos: INIT-3 v3 (capacidades por agente en el optimizador, listo para
+tomar), decisiones pendientes de arriba, o iniciativa nueva del Director.
+Hallazgo colateral anotado: guardar el canonico desde la UI lo bloquea el
+guard de flota vacia (agent_types=[] + fallback por contadores que la UI no
+representa) — UX pre-existente, evaluar si molesta.
 
 ## Bugs conocidos (no criticos)
 

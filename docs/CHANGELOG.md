@@ -10,6 +10,32 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-12 (cont. 2)
+
+- **UI para los bloques de tiempos de INIT-8 (tab Estrategias).** 4 cards
+  nuevas con la guia de 3 niveles: "Tiempo de Pick por Producto"
+  (pick_time_model: base/por_unidad/por_volumen/por_kg/minimo, base vacia =
+  usar historico), "Clases de Manejo" (grid de 6 clases x mult/recargo/pack,
+  filas generadas por CLASES_MANEJO_UI), "Velocidad segun Carga" (F3:
+  toggle + reduccion_por_kg/max + aplica_forklift) y "Variabilidad Humana"
+  (F4: toggle + cv). Patron base-preserve + overrides sobre el bloque
+  tiempos; los opt-in F3/F4 solo se emiten con el toggle activo o si ya
+  existian (canonico limpio se conserva limpio). **Estabilidad critica de
+  round-trip:** el config viaja por JSON.parse de JS (10.0 -> 10) y va en la
+  metadata del .jsonl => se NORMALIZO el canonico a enteros donde JS lo
+  haria (float integral -> int, 12 valores) y se reajusto el baseline UNA
+  vez (`2233b3c6...`, 10.039.862 bytes = exactamente 24 bytes menos, los 12
+  ".0" removidos de la linea 1; eventos identicos). La clave `pack` solo se
+  escribe si es > 0 o ya existia. VERIFICADO EN NAVEGADOR REAL: campos
+  poblados con los valores canonicos, serializeConfig().tiempos DEEP-IGUAL
+  al canonico (round-trip byte-estable), toggles opt-in emiten/omiten el
+  bloque correctamente, grid renderizado (screenshot). Hallazgo colateral
+  pre-existente documentado: guardar el canonico desde la UI lo bloquea el
+  guard de flota vacia (agent_types=[] usa el fallback por contadores que
+  la UI no representa) — no es de esta tarea. 193 passed + GATE PASS.
+
+---
+
 ## 2026-07-12 (cont.)
 
 - **AUD8-3 + AUD8-4 aplicados — auditoria INIT-8 CERRADA (4/4).**

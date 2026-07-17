@@ -130,6 +130,13 @@ class WebConfigurator {
         document.querySelectorAll('input[name="order-generation-mode"]').forEach(radio => {
             radio.addEventListener('change', () => this._updateCrossDockWarning());
         });
+
+        // INIT-8 UI: grid de clases de manejo + toggles de F3/F4.
+        this._renderClasesManejoGrid();
+        const vcTog = document.getElementById('vc-enabled');
+        if (vcTog) vcTog.addEventListener('change', () => this._updateTiemposInit8Visibility());
+        const varTog = document.getElementById('var-enabled');
+        if (varTog) varTog.addEventListener('change', () => this._updateTiemposInit8Visibility());
     }
 
     // AUDIT menores 2026-07-10: cross-dock requiere pedidos Deterministas.
@@ -344,6 +351,49 @@ class WebConfigurator {
         ['pesado', 'pct-pesado', 12],
         ['extra_grande', 'pct-extra-grande', 6],
     ];
+
+    // INIT-8 UI: clases de manejo del grid de tiempos.
+    // [claveConfig, idBase, etiqueta, defaults {mult, recargo, pack}]
+    static CLASES_MANEJO_UI = [
+        ['pequeno', 'cm-pequeno', 'Pequeño', { mult: 0.8, recargo: 0, pack: 0 }],
+        ['mediano', 'cm-mediano', 'Mediano', { mult: 1, recargo: 0, pack: 0 }],
+        ['voluminoso', 'cm-voluminoso', 'Voluminoso', { mult: 1.3, recargo: 3, pack: 0 }],
+        ['pesado', 'cm-pesado', 'Pesado', { mult: 1.5, recargo: 5, pack: 0 }],
+        ['extra_grande', 'cm-extra-grande', 'Extra grande', { mult: 2.2, recargo: 15, pack: 0 }],
+        ['GENERAL', 'cm-general', 'GENERAL (sin clase)', { mult: 1, recargo: 0, pack: 0 }],
+    ];
+
+    // INIT-8 UI: filas del grid de clases de manejo (mult / recargo / pack).
+    _renderClasesManejoGrid() {
+        const grid = document.getElementById('clases-manejo-grid');
+        if (!grid) return;
+        grid.innerHTML = WebConfigurator.CLASES_MANEJO_UI.map(([, idBase, etiqueta, d]) => `
+            <div class="dist-item">
+                <h4>${etiqueta}</h4>
+                <div class="form-group">
+                    <label>Mult. de tiempo</label>
+                    <input type="number" id="${idBase}-mult" min="0.1" step="0.1" value="${d.mult}">
+                </div>
+                <div class="form-group">
+                    <label>Recargo (s)</label>
+                    <input type="number" id="${idBase}-recargo" min="0" step="0.5" value="${d.recargo}">
+                </div>
+                <div class="form-group">
+                    <label>Pack (s)</label>
+                    <input type="number" id="${idBase}-pack" min="0" step="0.5" value="${d.pack}">
+                </div>
+            </div>`).join('');
+    }
+
+    // INIT-8 UI: visibilidad de los bloques opt-in (F3/F4).
+    _updateTiemposInit8Visibility() {
+        const vc = document.getElementById('vc-enabled');
+        const vcOpts = document.getElementById('vc-options');
+        if (vc && vcOpts) vcOpts.style.display = vc.checked ? 'block' : 'none';
+        const va = document.getElementById('var-enabled');
+        const vaOpts = document.getElementById('var-options');
+        if (va && vaOpts) vaOpts.style.display = va.checked ? 'block' : 'none';
+    }
 
     setupValidations() {
         // Percentages validation for Carga de Trabajo (AUD8-2: 5 clases)
@@ -1071,6 +1121,44 @@ class WebConfigurator {
         if (liftEl) liftEl.value = lift;
         this._updateTiemposPreset(tpc, sfk, pick, lift);
 
+        // INIT-8 UI: modelo de tiempo de pick (base null = usar historico).
+        const ptm = t.pick_time_model || {};
+        const _setNum = (id, val, fallback) => {
+            const el = document.getElementById(id);
+            if (el) el.value = (val != null) ? val : fallback;
+        };
+        const ptmBaseEl = document.getElementById('ptm-base');
+        if (ptmBaseEl) ptmBaseEl.value = (ptm.base != null) ? ptm.base : '';
+        _setNum('ptm-por-unidad', ptm.por_unidad, 0);
+        _setNum('ptm-por-volumen', ptm.por_volumen, 0);
+        _setNum('ptm-por-kg', ptm.por_kg, 0);
+        _setNum('ptm-minimo', ptm.minimo, 0);
+
+        // INIT-8 UI: grid de clases de manejo (config manda; sin bloque =
+        // defaults calibrados del grid).
+        const cm = t.clases_manejo || {};
+        WebConfigurator.CLASES_MANEJO_UI.forEach(([clave, idBase, , d]) => {
+            const e = cm[clave] || {};
+            _setNum(`${idBase}-mult`, e.mult, d.mult);
+            _setNum(`${idBase}-recargo`, e.recargo, d.recargo);
+            _setNum(`${idBase}-pack`, e.pack, d.pack);
+        });
+
+        // INIT-8 UI: bloques opt-in F3/F4 (ausentes = apagados).
+        const vc = t.velocidad_por_carga || {};
+        const vcEnabledEl = document.getElementById('vc-enabled');
+        if (vcEnabledEl) vcEnabledEl.checked = vc.enabled === true;
+        _setNum('vc-reduccion-kg', vc.reduccion_por_kg, 0.0084);
+        _setNum('vc-reduccion-max', vc.reduccion_max, 0.5);
+        const vcFkEl = document.getElementById('vc-aplica-forklift');
+        if (vcFkEl) vcFkEl.checked = vc.aplica_forklift === true;
+
+        const va = t.variabilidad || {};
+        const varEnabledEl = document.getElementById('var-enabled');
+        if (varEnabledEl) varEnabledEl.checked = va.enabled === true;
+        _setNum('var-cv', va.cv, 0.25);
+        this._updateTiemposInit8Visibility();
+
         // Trigger validations
         this.validatePercentages();
         this.validateStagingDistribution();
@@ -1276,6 +1364,62 @@ class WebConfigurator {
             (pickRaw !== '' && pickRaw != null && !isNaN(parseFloat(pickRaw)))
             ? parseFloat(pickRaw) : null;
         if (!isNaN(liftVal) && liftVal >= 0) baseTiempos.tiempo_horquilla       = liftVal;
+
+        // INIT-8 UI: modelo de tiempo de pick (base-preserve + overrides;
+        // base vacia = null = usar tiempo historico del agente).
+        const basePtm = baseTiempos.pick_time_model || {};
+        const ptmBaseRaw = document.getElementById('ptm-base')?.value;
+        basePtm.base = (ptmBaseRaw !== '' && ptmBaseRaw != null
+                        && !isNaN(parseFloat(ptmBaseRaw)))
+                       ? parseFloat(ptmBaseRaw) : null;
+        const _numOrKeep = (id, obj, key) => {
+            const v = parseFloat(document.getElementById(id)?.value);
+            if (!isNaN(v) && v >= 0) obj[key] = v;
+        };
+        _numOrKeep('ptm-por-unidad', basePtm, 'por_unidad');
+        _numOrKeep('ptm-por-volumen', basePtm, 'por_volumen');
+        _numOrKeep('ptm-por-kg', basePtm, 'por_kg');
+        _numOrKeep('ptm-minimo', basePtm, 'minimo');
+        baseTiempos.pick_time_model = basePtm;
+
+        // INIT-8 UI: clases de manejo (por clase: base-preserve + overrides).
+        const baseCm = baseTiempos.clases_manejo || {};
+        WebConfigurator.CLASES_MANEJO_UI.forEach(([clave, idBase]) => {
+            const entrada = baseCm[clave] || {};
+            const m = parseFloat(document.getElementById(`${idBase}-mult`)?.value);
+            if (!isNaN(m) && m > 0) entrada.mult = m;
+            _numOrKeep(`${idBase}-recargo`, entrada, 'recargo');
+            // pack: solo si es > 0 o la clave ya existia -- un canonico sin
+            // packs se conserva SIN la clave (estabilidad byte-identica del
+            // round-trip: el config viaja en la metadata del .jsonl/gate).
+            const p = parseFloat(document.getElementById(`${idBase}-pack`)?.value);
+            if (!isNaN(p) && p >= 0 && (p > 0 || 'pack' in entrada)) entrada.pack = p;
+            baseCm[clave] = entrada;
+        });
+        baseTiempos.clases_manejo = baseCm;
+
+        // INIT-8 UI: bloques opt-in F3/F4. Solo se emiten si el toggle esta
+        // activo O el bloque ya existia (un canonico limpio se conserva
+        // limpio: mismo patron que el bloque inbound).
+        const vcOn = document.getElementById('vc-enabled')?.checked ?? false;
+        if (vcOn || baseTiempos.velocidad_por_carga) {
+            const baseVc = baseTiempos.velocidad_por_carga || {};
+            baseVc.enabled = vcOn;
+            _numOrKeep('vc-reduccion-kg', baseVc, 'reduccion_por_kg');
+            _numOrKeep('vc-reduccion-max', baseVc, 'reduccion_max');
+            baseVc.aplica_forklift =
+                document.getElementById('vc-aplica-forklift')?.checked ?? false;
+            baseTiempos.velocidad_por_carga = baseVc;
+        }
+        const varOn = document.getElementById('var-enabled')?.checked ?? false;
+        if (varOn || baseTiempos.variabilidad) {
+            const baseVar = baseTiempos.variabilidad || {};
+            baseVar.enabled = varOn;
+            const cvVal = parseFloat(document.getElementById('var-cv')?.value);
+            if (!isNaN(cvVal) && cvVal > 0) baseVar.cv = cvVal;
+            baseTiempos.variabilidad = baseVar;
+        }
+
         config.tiempos = baseTiempos;
 
         return config;

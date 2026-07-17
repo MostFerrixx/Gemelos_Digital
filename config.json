@@ -79,36 +79,36 @@
     "tiempo_picking_por_linea": null,
     "tiempo_horquilla": 2,
     "pick_time_model": {
-      "base": 10.0,
-      "por_unidad": 2.0,
-      "por_volumen": 0.0,
+      "base": 10,
+      "por_unidad": 2,
+      "por_volumen": 0,
       "por_kg": 0.15,
-      "minimo": 5.0
+      "minimo": 5
     },
     "clases_manejo": {
       "pequeno": {
         "mult": 0.8,
-        "recargo": 0.0
+        "recargo": 0
       },
       "mediano": {
-        "mult": 1.0,
-        "recargo": 0.0
+        "mult": 1,
+        "recargo": 0
       },
       "voluminoso": {
         "mult": 1.3,
-        "recargo": 3.0
+        "recargo": 3
       },
       "pesado": {
         "mult": 1.5,
-        "recargo": 5.0
+        "recargo": 5
       },
       "extra_grande": {
         "mult": 2.2,
-        "recargo": 15.0
+        "recargo": 15
       },
       "GENERAL": {
-        "mult": 1.0,
-        "recargo": 0.0
+        "mult": 1,
+        "recargo": 0
       }
     }
   }
