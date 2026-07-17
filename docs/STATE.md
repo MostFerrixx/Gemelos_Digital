@@ -8,7 +8,7 @@
 
 ## Git
 
-- `main` = AUD8-1 + AUD8-2 aplicados (al cierre), pusheado. Push directo autorizado.
+- `main` = auditoria INIT-8 cerrada (AUD8-1..4 aplicados), pusheado. Push directo autorizado.
 - Baseline byte-identico vigente: **`sha256=cbdb3073...`, 10.039.886 bytes**,
   seed 42, Python 3.13.6 (`tests/baseline.json`). REAJUSTADO en AUD8-2
   (la mezcla estocastica ahora filtra por clase real => stream RNG distinto;
@@ -20,7 +20,7 @@
 ## Red de seguridad (correr tras CUALQUIER cambio de motor)
 
 ```
-python -m pytest -q                # 192 passed, 1 deselected (~10s)
+python -m pytest -q                # 193 passed, 1 deselected (~10s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline cbdb3073)
 ```
 
@@ -124,6 +124,5 @@ nueva del Director.
 
 - `warehouse.db-shm` / `warehouse.db-wal`: WAL de SQLite, untracked pero ya
   en `.gitignore`.
-- Auditoria INIT-8: AUD8-1 y AUD8-2 APLICADOS (2026-07-12, ver CHANGELOG).
-  Quedan AUD8-3 (BAJA: cache `_t_pick_muestreado` sin invalidar) y AUD8-4
-  (TRIVIAL: comentario obsoleto) en BACKLOG.
+- Auditoria INIT-8: los 4 hallazgos (AUD8-1..4) APLICADOS el 2026-07-12
+  (ver CHANGELOG). Sin pendientes de la auditoria.

@@ -10,6 +10,22 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-12 (cont.)
+
+- **AUD8-3 + AUD8-4 aplicados — auditoria INIT-8 CERRADA (4/4).**
+  **AUD8-3**: la cache de la muestra de pick ahora tiene ciclo de vida
+  completo — con variabilidad OFF ni se escribe (camino determinista directo,
+  sin contaminar la WO con atributos); con ON se cachea durante el pick
+  (reserva del planner y timeout ven la misma muestra) y se INVALIDA al
+  completarlo (`_invalidar_pick_muestreado` en ambos `_do_picking_at`): un
+  re-pick del mismo objeto WO muestrea de nuevo en vez de reusar la muestra
+  vieja. **AUD8-4**: comentario obsoleto del Forklift reescrito (afirmaba
+  "_compute_pick_time es puro (sin RNG)", falso desde F4). Test T846.
+  Validado: 193 passed + GATE PASS sin update + reproducibilidad con
+  variabilidad on intacta (2 corridas seed 42 -> sha identico 6b1bfe3c).
+
+---
+
 ## 2026-07-12
 
 - **AUD8-1 + AUD8-2 aplicados (fixes de la auditoria INIT-8).**

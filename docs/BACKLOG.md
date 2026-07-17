@@ -5,56 +5,16 @@ Actualizado: 2026-07-11 · Responsable: Cerebellum
 
 *(INIT-7 INBOUND completa F0-F5 el 2026-07-10; INIT-8 TIEMPOS completa F1-F4
 el 2026-07-11 -> ambas en CHANGELOG. Auditoria de INIT-8 el 2026-07-11:
-AUD8-1 y AUD8-2 APLICADOS el 2026-07-12 (ver CHANGELOG); quedan AUD8-3/4 abajo.)*
+los 4 hallazgos AUD8-1..4 quedaron APLICADOS el 2026-07-12, ver CHANGELOG.)*
 
 ## Indice (de un vistazo)
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
-| AUD8-3 — cache `_t_pick_muestreado` sin invalidar en re-pick | ABIERTO (auditoria INIT-8) | Baja | ~20 min | Ninguno |
-| AUD8-4 — comentario obsoleto "_compute_pick_time es puro" | ABIERTO (auditoria INIT-8) | Trivial | ~5 min | Ninguno |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
 | Distribucion real de `outbound_staging_distribution` en config canonico | PENDIENTE DECISION | -- | Trivial (config) | Decision de negocio del Director, no un bug |
-
----
-
-## Auditoria INIT-8 (2026-07-11) — hallazgos documentados, NO aplicados
-
-Auditoria completa de INIT-8 F1-F4 a pedido del Director (solo documentar).
-Base SANA: 189 passed + GATE PASS byte-identico en frio. Verificado ademas:
-el modo estocastico (canonico) SI ejercita peso/clase (usa
-`almacen.catalogo_skus` reales); el split de capacidad tolera el volumen
-real (extra_grande ~75 unidades caen en Forklift cap 1000, guard WH04
-cubre el resto); descargas/putaway NO tienen doble-muestreo (guardan la
-muestra en variable local); reproducibilidad con variabilidad on OK
-(2 corridas seed 42 -> sha identico).
-
-### AUD8-3 — cache `_t_pick_muestreado` sin invalidar (BAJA)
-
-`operators.py:190-199`: `_tiempo_pick_final` cachea la muestra en la WO
-(`wo._t_pick_muestreado`) para que la reserva del planner y el timeout real
-usen el MISMO valor (correcto y necesario). Pero la cache NO se invalida: si
-el mismo objeto WO se re-pickeara (`picking_executions` puede incrementar en
-`_do_picking_at`), devolveria la muestra vieja en vez de una nueva
-independiente. Impacto BAJO (el re-pick del mismo objeto es raro; en el flujo
-normal `cantidad_restante=0` cierra la WO). Ademas la cache escribe el
-atributo en la WO incluso con variabilidad OFF (contaminacion cosmetica, no
-observable: to_dict() no lo serializa). **Fix (~20 min):** invalidar la cache
-al cerrar el pick (o solo cachear con `var_enabled`), y un test que re-pickee
-el mismo objeto. Confirmar que no altera el consumo del RNG en el flujo
-normal (gate).
-
-### AUD8-4 — comentario obsoleto (TRIVIAL)
-
-`operators.py:1744` (Forklift `_do_picking_at`): el comentario dice
-"_compute_pick_time es puro (sin RNG): calcularlo aqui no altera el
-comportamiento". Con F4 el flujo real usa `_tiempo_pick_final` (que SI tiene
-RNG cuando variabilidad esta on). El comentario ya aclara el F4 a
-continuacion, pero la primera frase quedo enganosa. **Fix (~5 min):**
-reescribir para que refleje que la muestra se cachea (por eso la reserva y el
-timeout coinciden), sin afirmar pureza.
 
 ---
 

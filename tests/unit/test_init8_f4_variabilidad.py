@@ -125,3 +125,26 @@ def test_t845_aud81_dwell_de_staging_incluye_pack():
     # sin packs: EXACTO discharge*n (neutralidad byte-identica)
     op2 = _operator(var=None, clases={}, discharge_time=5)
     assert op2._staging_dwell_estimate(wos) == 15.0
+
+
+def test_t846_aud83_cache_se_invalida_y_off_no_contamina():
+    """AUD8-3: (a) tras cerrar el pick, un re-pick del MISMO objeto WO
+    muestrea de nuevo (la cache se invalida); (b) con variabilidad OFF no se
+    escribe ningun atributo en la WO (sin contaminacion) y el valor es el
+    determinista directo."""
+    op = _operator(var={"enabled": True, "cv": 0.4})
+    random.seed(3)
+    wo = FakeWO()
+    t1 = op._tiempo_pick_final(wo)
+    assert op._tiempo_pick_final(wo) == t1          # cache viva durante el pick
+    op._invalidar_pick_muestreado(wo)               # pick completado
+    t2 = op._tiempo_pick_final(wo)                  # re-pick: muestra NUEVA
+    assert t2 != t1
+    # invalidar sin cache previa: no crashea
+    op._invalidar_pick_muestreado(FakeWO())
+
+    # var OFF: camino determinista directo, sin atributo en la WO
+    op_off = _operator(var=None)
+    wo_off = FakeWO()
+    assert op_off._tiempo_pick_final(wo_off) == 5
+    assert not hasattr(wo_off, '_t_pick_muestreado')

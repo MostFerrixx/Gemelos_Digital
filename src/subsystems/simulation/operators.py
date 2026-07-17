@@ -187,8 +187,14 @@ class BaseOperator:
         pick (la reserva del planner via _pick_dwell_estimate y el timeout
         real de _do_picking_at); ambas deben ver LA MISMA muestra o el plan
         espacio-temporal queda desincronizado de la ejecucion.
-        Con variabilidad off devuelve _compute_pick_time tal cual.
+
+        AUD8-3: con variabilidad OFF no hay cache (el valor es determinista
+        y no contamina la WO con atributos); la cache se INVALIDA al cerrar
+        el pick (_invalidar_pick_muestreado) para que un eventual re-pick
+        del mismo objeto muestree de nuevo.
         """
+        if not self.var_enabled:
+            return self._compute_pick_time(wo)
         cached = getattr(wo, '_t_pick_muestreado', None) if wo else None
         if cached is not None:
             return cached
@@ -199,6 +205,15 @@ class BaseOperator:
             except Exception:
                 pass
         return t
+
+    def _invalidar_pick_muestreado(self, wo):
+        """AUD8-3: cierra el ciclo de vida de la muestra de pick (se llama al
+        completar el pick en _do_picking_at). Un re-pick del mismo objeto WO
+        vuelve a muestrear en vez de reusar la muestra vieja."""
+        try:
+            del wo._t_pick_muestreado
+        except AttributeError:
+            pass
 
     def _clase_pack(self, wo) -> float:
         """INIT-8 F4: segundos de PACKING por clase de manejo (clave 'pack'
@@ -1678,6 +1693,8 @@ class GroundOperator(BaseOperator):
             self.cargo_peso += wo.cantidad_restante * getattr(wo.sku, 'peso', 0.0)
             wo.status = 'picked'
             wo.cantidad_restante = 0
+            # AUD8-3: la muestra de pick cierra su ciclo con el pick.
+            self._invalidar_pick_muestreado(wo)
             # Fase 2: consume real stock at the picked location
             self.almacen.consumir_stock_picking(wo, self.env.now)
             progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
@@ -1757,10 +1774,11 @@ class Forklift(BaseOperator):
     def _do_picking_at(self, wo):
         """Secuencia de picking Forklift: lift + timeout + lower."""
         LIFT_TIME = self.lift_time
-        # MEJ-4 (F1): reservar la permanencia COMPLETA (lift + pick + lower) de
-        # una vez. _compute_pick_time es puro (sin RNG): calcularlo aqui no
-        # altera el comportamiento. (F4: _tiempo_pick_final cachea la muestra
-        # en la WO, asi el timeout de abajo usa EL MISMO valor.)
+        # MEJ-4 (F1): reservar la permanencia COMPLETA (lift + pick + lower)
+        # de una vez. F4/AUD8-4: _tiempo_pick_final muestrea UNA vez por WO y
+        # cachea la muestra, asi el timeout del pick de abajo usa EL MISMO
+        # valor que esta reserva (con variabilidad off es determinista, sin
+        # cache ni RNG: identico al comportamiento historico).
         _pick_est = self._tiempo_pick_final(wo)
         self._tw_reserve_dwell(LIFT_TIME + _pick_est + LIFT_TIME)
         self.status = "lifting"
@@ -1833,6 +1851,8 @@ class Forklift(BaseOperator):
 
         if wo:
             wo.status = 'picked'
+            # AUD8-3: la muestra de pick cierra su ciclo con el pick.
+            self._invalidar_pick_muestreado(wo)
             # Fase 2: consume real stock at the picked location
             self.almacen.consumir_stock_picking(wo, self.env.now)
             progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
