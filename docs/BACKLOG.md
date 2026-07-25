@@ -1,7 +1,7 @@
 # BACKLOG — Gemelo Digital de Almacen
 # Solo lo PENDIENTE. Lo cerrado vive en docs/CHANGELOG.md (no se repite aca).
 
-Actualizado: 2026-07-11 · Responsable: Cerebellum
+Actualizado: 2026-07-12 · Responsable: Cerebellum
 
 *(INIT-7 INBOUND completa F0-F5 el 2026-07-10; INIT-8 TIEMPOS completa F1-F4
 el 2026-07-11 -> ambas en CHANGELOG. Auditoria de INIT-8 el 2026-07-11:
@@ -11,10 +11,27 @@ los 4 hallazgos AUD8-1..4 quedaron APLICADOS el 2026-07-12, ver CHANGELOG.)*
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
+| BK-05 — guard de flota vacia bloquea guardar el canonico desde la UI | ABIERTO (hallazgo 2026-07-12) | Baja-Media (UX) | ~1 h | Decision de diseno |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
 | Distribucion real de `outbound_staging_distribution` en config canonico | PENDIENTE DECISION | -- | Trivial (config) | Decision de negocio del Director, no un bug |
+
+---
+
+## BK-05 — guard de flota vacia al guardar el canonico desde la UI
+
+**Hallazgo colateral de la tarea de UI de tiempos (2026-07-12), PRE-EXISTENTE.**
+El config canonico usa `agent_types: []` + los contadores legacy
+(`num_operarios_terrestres`/`num_montacargas`) como fallback de flota. La UI
+de Flota solo representa GRUPOS (`agent_types`), asi que al serializar el
+canonico produce `agent_types: []` y el validador web lo rechaza ("flota
+vacia") aunque el motor correria perfectamente con el fallback. Consecuencia:
+NO se puede guardar el canonico desde el configurador sin antes crear grupos.
+Opciones: (a) el validador acepta flota vacia si los contadores legacy > 0;
+(b) la UI materializa los contadores como grupos visibles al cargar (y el
+canonico migra a agent_types explicito = cambio de baseline); (c) dejarlo y
+documentar. Decision de diseno del Director.
 
 ---
 

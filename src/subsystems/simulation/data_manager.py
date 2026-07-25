@@ -440,7 +440,7 @@ class DataManager:
 
         # INIT-8 F1: enriquecer el catalogo con atributos fisicos (peso/clase)
         # de la hoja opcional SkuCatalog. volumen_m3 se activa en F2 (ver
-        # docs/PLAN_INIT8_TIEMPOS.md, estrategia de baseline).
+        # docs/antiguos/PLAN_INIT8_TIEMPOS.md, estrategia de baseline).
         if 'SkuCatalog' in workbook.sheetnames:
             self._process_sku_catalog_attrs(workbook['SkuCatalog'])
 

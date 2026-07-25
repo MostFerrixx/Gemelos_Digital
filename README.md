@@ -1,10 +1,10 @@
 # Gemelo Digital de Almacen
 
-**Version:** V12.1 (Allocation Layer + INIT-1/3/4 + MEJ-1/2/3/4)
+**Version:** V12.1 (Allocation Layer + INIT-1/3/4/5/6/7/8 + MEJ-1/2/3/4)
 **Estado:** En desarrollo activo - todo en `main`, ver `docs/STATE.md` para
 el detalle operativo vigente (rama, baseline, decisiones pendientes)
 **Arquitectura:** Headless (SimPy) + Replay + GUI web
-**Actualizado:** 2026-07-05
+**Actualizado:** 2026-07-12
 
 ---
 
@@ -52,9 +52,11 @@ Toca principalmente `data_manager.py` (`get_available_stock`), `warehouse.py`
 
 ## 2.1 Capacidades adicionales del motor (opt-in)
 
-Sobre la base V12.1 se anadieron features **opt-in con defaults neutros**: si no
-se activan, el motor se comporta como antes (corrida con `WAREHOUSE_SEED=42`
-byte-identica al baseline). Se activan desde `config.json`.
+Sobre la base V12.1 se anadieron features nuevas. La mayoria son **opt-in con
+defaults neutros** (si no se activan, el motor se comporta igual y la corrida
+con `WAREHOUSE_SEED=42` es byte-identica al baseline); las de INIT-6/8 marcadas
+como ACTIVAS ya forman parte del comportamiento canonico. Se configuran desde
+`config.json` o la UI web.
 
 - **Tiempos de pick realistas** (INIT-4 C1): el tiempo de recogida puede escalar
   con la cantidad/volumen de la WorkOrder en vez de ser fijo
@@ -69,15 +71,33 @@ byte-identica al baseline). Se activan desde `config.json`.
   el visor web, la API y una hoja Excel.
 - **Reproducibilidad** (`WAREHOUSE_SEED`): semilla determinista via variable de
   entorno para corridas comparables.
+- **Staging por zona real + destino de negocio** (INIT-6): 7 zonas fisicas de
+  staging (hoja Excel `OutboundStaging`); cada camion sirve UNA zona por viaje
+  y los pedidos pueden mapear un `destino` (tienda/ruta) a su zona
+  (`destino_staging_map`, editable en la UI).
+- **Inbound completo** (INIT-7, opt-in): camiones de recepcion en muelles
+  (hoja `InboundDocks`), putaway con la flota compartida, slotting conmutable
+  (fija por SKU / cercana al muelle / ABC por rotacion), KPIs dock-to-stock, y
+  flujo mixto con prioridad configurable pick-vs-putaway y cross-docking (el
+  stock del dia rescata pedidos sin stock). Tab "Inbound" en el configurador.
+  Detalle: `docs/antiguos/PLAN_INIT7_INBOUND.md`.
+- **Tiempos realistas por producto** (INIT-8, nucleo ACTIVO en el canonico):
+  catalogo fisico por SKU (hoja `SkuCatalog`: volumen/peso/clase de manejo),
+  tiempos de pick calibrados con literatura (MTM, POMS, Blue Yonder) que
+  escalan por clase y peso, y mezcla de pedidos por clase real. Opt-in
+  adicionales: velocidad segun carga transportada y variabilidad Log-Normal
+  de tiempos (seeded). UI completa en tabs Carga y Estrategias. El "mundo
+  plano" previo sobreestimaba la capacidad del almacen ~2x. Detalle y tabla
+  de calibracion con fuentes: `docs/antiguos/PLAN_INIT8_TIEMPOS.md`.
 
-Detalle e implementacion: `docs/antiguos/PLAN_INIT4.md` y la seccion "Flags opt-in" de
-`CLAUDE.md` / `docs/STATE.md`.
+Detalle e implementacion: los planes en `docs/antiguos/` y la seccion de flags
+de `CLAUDE.md` (§5) / `docs/STATE.md`.
 
 ---
 
 ## 2.2 Calidad y realismo (MEJ-1 / MEJ-3 / MEJ-4, 2026-07-04)
 
-- **Red de seguridad automatizada (MEJ-1):** suite pytest (~73 tests, <10 s) +
+- **Red de seguridad automatizada (MEJ-1):** suite pytest (~193 tests, ~10 s) +
   gate de regresion byte-identico en un comando (~15 s) + CI en GitHub Actions.
   Ver seccion "Tests y gate de regresion" abajo.
 - **Esquema unico de configuracion (MEJ-3):** `src/core/config_schema.py` es la
@@ -200,7 +220,7 @@ python entry_points/run_optimization.py
 ### Tests y gate de regresion (MEJ-1)
 
 ```bash
-make test    # suite pytest de red de seguridad (~59 tests, <10 s)
+make test    # suite pytest de red de seguridad (~193 tests, ~10 s)
 make gate    # gate byte-identico: corre la sim canonica con seed 42 y
              # compara SHA256 contra tests/baseline.json (~30 s)
 ```
@@ -276,9 +296,13 @@ Parametros tipicos: `total_ordenes`, `agent_types` (operarios y montacargas con
 capacidad y prioridades de zona), `dispatch_strategy`, `tour_type`,
 `fulfillment_policy`, `layout_file`, `sequence_file`.
 
-Flags **opt-in** (ausentes del `config.json` canonico a proposito; el motor los lee
-con defaults neutros): `tiempos.pick_time_model`, `priority_dispatch_enabled`,
-`waves` (ver seccion 2.1). La variable de entorno `WAREHOUSE_SEED` fija la semilla.
+Flags **opt-in** (ausentes del `config.json` canonico a proposito; el motor los
+lee con defaults neutros): `priority_dispatch_enabled`, `waves`, `inbound`
+(INIT-7 completo), `tiempos.velocidad_por_carga` y `tiempos.variabilidad`
+(INIT-8 F3/F4). Desde INIT-8 F2, `tiempos.pick_time_model` y
+`tiempos.clases_manejo` estan CALIBRADOS Y ACTIVOS en el canonico (ya no son
+opt-in): el tiempo de pick escala por clase de manejo y peso del producto.
+La variable de entorno `WAREHOUSE_SEED` fija la semilla.
 
 A diferencia de esos flags, el bloque **`congestion`** (evasion de colisiones /
 ruteo por reserva espacio-temporal, Iniciativa 2 + MEJ-4) SI esta presente y

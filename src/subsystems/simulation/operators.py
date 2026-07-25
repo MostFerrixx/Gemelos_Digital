@@ -134,12 +134,12 @@ class BaseOperator:
         # INIT-8 F2: parametros por CLASE DE MANEJO del SKU (hoja SkuCatalog).
         # tiempos.clases_manejo = {clase: {mult, recargo}}. Ausente o clase
         # desconocida => (1.0, 0.0) = neutro exacto. Calibracion en
-        # docs/PLAN_INIT8_TIEMPOS.md (MTM-Logistics, POMS 2007, Blue Yonder).
+        # docs/antiguos/PLAN_INIT8_TIEMPOS.md (MTM-Logistics, POMS 2007, Blue Yonder).
         _cm = _tiempos.get("clases_manejo", {})
         self.clases_manejo = _cm if isinstance(_cm, dict) else {}
 
         # INIT-8 F3: velocidad segun carga transportada (opt-in, default off).
-        # Calibracion (docs/PLAN_INIT8_TIEMPOS.md): Indian Army 2022 midio
+        # Calibracion (docs/antiguos/PLAN_INIT8_TIEMPOS.md): Indian Army 2022 midio
         # 1.35 m/s vacio -> 1.10 m/s con 22 kg = -18.5% => 0.0084 de
         # reduccion relativa por kg. reduccion_max acota el piso (un humano
         # cargado al limite no baja del 50% de su paso). Por defecto NO
@@ -298,7 +298,7 @@ class BaseOperator:
         neutra, devuelve EXACTAMENTE el valor historico (picking_time o
         discharge_time) -- gate byte-identico con configs sin los bloques.
 
-        Rama ESCALADA (calibracion en docs/PLAN_INIT8_TIEMPOS.md):
+        Rama ESCALADA (calibracion en docs/antiguos/PLAN_INIT8_TIEMPOS.md):
             t = (base + por_unidad*qty + por_volumen*vol + por_kg*peso_total)
                 * clase.mult + clase.recargo,  acotado por 'minimo'.
         'base' en None reutiliza el tiempo historico como base. Cantidades

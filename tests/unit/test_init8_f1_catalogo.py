@@ -7,7 +7,7 @@ Pinea:
   clase, todos los sku_code existen en PickingLocations.
 - Importer: actualiza weight_kg y category en DB pero NO volume_m3
   (estrategia de baseline F1: el volumen se activa en F2 JUNTO con el
-  modelo de tiempos -- docs/PLAN_INIT8_TIEMPOS.md).
+  modelo de tiempos -- docs/antiguos/PLAN_INIT8_TIEMPOS.md).
 - Fallback Excel del data_manager enriquece el catalogo en memoria.
 - SKU del motor: atributos peso/clase con defaults neutros.
 """

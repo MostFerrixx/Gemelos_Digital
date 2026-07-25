@@ -10,6 +10,28 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-07-12 (cont. 3)
+
+- **Actualizacion documental completa + triage a docs/antiguos/.** A pedido
+  del Director. Movidos con git mv (criterios en el ADDENDUM de
+  `docs/META_DOCUMENTACION.md`): `PLAN_INIT7_INBOUND.md` y
+  `PLAN_INIT8_TIEMPOS.md` (iniciativas completas; siguen siendo LA
+  referencia de decisiones, solo cambia la casa — mismo criterio que
+  PLAN_INIT4), `COMO_FUNCIONA_EL_PROGRAMA.md` (congelado en Iniciativa 3),
+  `INSTRUCCIONES_PROYECTO_COWORK.md` (superado por CLAUDE.md),
+  `PROPUESTA_MEJORA_DISENO_UI.md` (propuesta ejecutada, items D-xx
+  implementados) y `staging_tiles_WH1.svg` (asset huerfano). Se quedan:
+  VISION_PRODUCTO (brujula viva) e INSTRUCCIONES_LAYOUT (flujo TMX vigente).
+  Referencias en codigo/tests/CLAUDE/STATE actualizadas a las rutas nuevas
+  (CHANGELOG conserva rutas historicas: append-only). Al dia: CLAUDE.md
+  (inbound.py en §3, ~193 tests en §4, bloque INIT-8 completo en §5),
+  README (features INIT-6/7/8, flags activos vs opt-in, conteos, header),
+  STATE reescrito slim (historial -> CHANGELOG/planes), BACKLOG con BK-05
+  formalizado (guard de flota vacia al guardar el canonico desde la UI).
+  193 passed (docs-only, motor intacto).
+
+---
+
 ## 2026-07-12 (cont. 2)
 
 - **UI para los bloques de tiempos de INIT-8 (tab Estrategias).** 4 cards

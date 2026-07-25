@@ -57,6 +57,7 @@ Núcleo de simulación (sano y principal): `src/subsystems/simulation/`
 (`warehouse.py`, `dispatcher.py` [DispatcherV11, doble barrido], `operators.py`,
 `order_strategies.py`, `data_manager.py`, `assignment_calculator.py`,
 `route_calculator.py`, `pathfinder.py`, `layout_manager.py`, `outbound.py`,
+`inbound.py` [INIT-7: recepción/putaway/slotting, opt-in],
 más la capa de congestión de la Iniciativa 2: `congestion_manager.py`,
 `reservation_table.py`, `spacetime_planner.py` — VIVA y **ACTIVA** en el
 config canónico, ver §5).
@@ -93,7 +94,7 @@ poda en limpieza:
 - `_legacy/tests_rotos/` y `_legacy/tests_gui/` (el viejo `tests/` completo,
   archivado en MEJ-1): importan módulos borrados/archivados; NO ejecutan.
   **El `tests/` actual SÍ es la red de seguridad viva (MEJ-1, 2026-07-04):**
-  `python -m pytest -q` (~59 unit tests, <10 s) + `python scripts/regression_gate.py`
+  `python -m pytest -q` (~193 unit tests, ~10 s) + `python scripts/regression_gate.py`
   (gate byte-idéntico, ~30 s). Córrelos tras cualquier cambio en el motor.
 
 Fuente de datos canónica = **la RAÍZ** (`config.json`, `layouts/WH1.tmx`,
@@ -165,7 +166,29 @@ defaults que reproducen el comportamiento histórico. Por eso una corrida sin el
   dinamicos WO-XD; KPI `fill_rate_effective_pct`). Lectores: `warehouse.py`
   + `inbound.py` + `dispatcher._asignar_putaway` +
   `operators._execute_putaway_tour` + `replay_utils.build_inbound_summary`.
-  Contrato y decisiones en `docs/PLAN_INIT7_INBOUND.md`.
+  Contrato y decisiones en `docs/antiguos/PLAN_INIT7_INBOUND.md`.
+- **INIT-8 — tiempos realistas por producto** (completa 2026-07-11/12; plan
+  con tabla de calibracion y fuentes en `docs/antiguos/PLAN_INIT8_TIEMPOS.md`):
+  - **ACTIVO en el canonico:** catalogo fisico por SKU (hoja Excel
+    `SkuCatalog`: volumen_m3/peso_kg/clase_manejo -> `SKU.volumen/peso/clase`;
+    5 clases pequeno..extra_grande) + formula de pick calibrada
+    `tiempos.pick_time_model` (base 10 + 2/unidad + 0.15/kg, min 5) +
+    `tiempos.clases_manejo` {mult, recargo, pack} + putaway load por clase.
+    El mundo plano pre-INIT-8 sobreestimaba capacidad ~2x.
+  - **AUD8-2:** las claves de `distribucion_tipos` son las CLASES DE MANEJO
+    (la mezcla estocastica filtra por `SKU.clase`; campo `volumen` DEPRECATED).
+  - **Opt-in (default off):** `tiempos.velocidad_por_carga` {enabled,
+    reduccion_por_kg 0.0084, reduccion_max, aplica_forklift} (el operario
+    cargado camina mas lento; Forklift exento) y `tiempos.variabilidad`
+    {enabled, cv} (Log-Normal media-preservada, seeded; JAMAS Normal ni
+    Triangular). Lectores: `operators.py` (`_compute_pick_time`,
+    `_clase_params/_clase_pack`, `_factor_carga_tiempo`,
+    `_tiempo_estocastico/_tiempo_pick_final`).
+  - **UI:** cards en tab Estrategias (pick model, clases, F3, F4) + card
+    "Distribucion por Clase de Manejo" en tab Carga. REGLA de round-trip:
+    el config viaja por JSON de JS (10.0->10) y va en la metadata del
+    .jsonl => los valores canonicos se mantienen JS-estables (enteros donde
+    JS los produciria); claves opcionales solo se emiten si != neutro.
 - **`cercania_tour_mode`** ("cost" default / "greedy_nn"): BK-03; greedy descartado.
 - Refactor **Template Method** en `operators.py`: `BaseOperator.agent_process()` +
   hook `_do_picking_at()` por subclase (Ground/Forklift). Logging por nivel en todo

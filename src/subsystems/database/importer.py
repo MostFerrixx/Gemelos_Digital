@@ -430,7 +430,7 @@ class ExcelImporter:
         F2 (2026-07-11) ACTIVO el volumen real: fluye a SKU.volumen =>
         capacidad/splits de tours cambian. Fue LA actualizacion intencional
         de baseline de INIT-8, junto con el modelo de tiempos por clase.
-        Ver docs/PLAN_INIT8_TIEMPOS.md (estrategia de baseline).
+        Ver docs/antiguos/PLAN_INIT8_TIEMPOS.md (estrategia de baseline).
         """
         print("[IMPORTER] Processing 'SkuCatalog' sheet (volumen/peso/clase)...")
 

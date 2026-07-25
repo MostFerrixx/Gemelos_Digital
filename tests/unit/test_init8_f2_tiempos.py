@@ -10,7 +10,7 @@ Pinea:
   * clase.mult + clase.recargo, con piso 'minimo'.
 - Clase desconocida / sin SKU -> neutro (1.0, 0.0).
 - Putaway load escalado por clase.
-- El config canonico trae la calibracion (docs/PLAN_INIT8_TIEMPOS.md).
+- El config canonico trae la calibracion (docs/antiguos/PLAN_INIT8_TIEMPOS.md).
 """
 import json
 import os

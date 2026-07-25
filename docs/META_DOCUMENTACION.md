@@ -157,6 +157,23 @@ recortar `docs/BACKLOG.md` a lo que sigue abierto.
   una iniciativa cerrada) — revisar en una proxima sesion si alguno merece
   demoverse tambien.
 
+**ADDENDUM 2026-07-12 — triage ejecutado (a pedido del Director):**
+- A `docs/antiguos/` (git mv): `PLAN_INIT7_INBOUND.md` y
+  `PLAN_INIT8_TIEMPOS.md` (iniciativas COMPLETAS: mismo criterio que
+  PLAN_INIT4 — el plan ejecutado es historial; siguen siendo LA referencia
+  de decisiones tecnicas, solo cambia la casa); `COMO_FUNCIONA_EL_PROGRAMA.md`
+  (congelado en Iniciativa 3, superado por CLAUDE.md + la suite de tests
+  como verdad viva); `INSTRUCCIONES_PROYECTO_COWORK.md` (referenciaba los
+  PROGRESO_* ya archivados; CLAUDE.md es la identidad vigente);
+  `PROPUESTA_MEJORA_DISENO_UI.md` (propuesta EJECUTADA: los items D-xx
+  viven implementados en el CSS/JS); `staging_tiles_WH1.svg` (asset huerfano
+  sin referencias).
+- Se QUEDAN en `docs/`: `VISION_PRODUCTO.md` (brujula estrategica viva) e
+  `INSTRUCCIONES_LAYOUT_PERSONALIZADO.md` (el flujo Tiled/TMX sigue vigente).
+- Las referencias en codigo/tests/CLAUDE/STATE se actualizaron a las rutas
+  nuevas; el CHANGELOG conserva las rutas historicas (append-only, no se
+  editan entradas viejas).
+
 ## 6. Que NO se hizo (limites deliberados)
 
 No se toco el sistema de memoria persistente de Claude Code

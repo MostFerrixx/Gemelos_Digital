@@ -104,7 +104,7 @@ class AsnError(ValueError):
 
 def load_asn_trucks(asn_path: str) -> List[Dict[str, Any]]:
     """
-    Lee y valida un archivo ASN (contrato en docs/PLAN_INIT7_INBOUND.md).
+    Lee y valida un archivo ASN (contrato en docs/antiguos/PLAN_INIT7_INBOUND.md).
 
     Devuelve la lista de camiones ORDENADA por arrival_time (el contrato pide
     orden cronologico, pero se tolera y reordena si viene desordenado).
