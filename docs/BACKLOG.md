@@ -11,11 +11,45 @@ los 4 hallazgos AUD8-1..4 quedaron APLICADOS el 2026-07-12, ver CHANGELOG.)*
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
-| BK-05 — guard de flota vacia bloquea guardar el canonico desde la UI | ABIERTO (hallazgo 2026-07-12) | Baja-Media (UX) | ~1 h | Decision de diseno |
+| BK-06 — capacidad por area vs. flota heterogenea (BUG de motor) | PLAN PROPUESTO (2026-07-25) | **Alta** | Medio-Alto | Aprobacion del plan por el Director |
+| BK-05 — guard de flota vacia bloquea guardar el canonico desde la UI | ABIERTO (hallazgo 2026-07-12) | Baja-Media (UX) | ~1 h (opcion a) | Opcion (b) BLOQUEADA por BK-06 |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
 | Distribucion real de `outbound_staging_distribution` en config canonico | PENDIENTE DECISION | -- | Trivial (config) | Decision de negocio del Director, no un bug |
+
+---
+
+## BK-06 — capacidad por area vs. flota heterogenea (BUG de motor)
+
+**Hallazgo 2026-07-25, al intentar BK-05 opcion (b).** Plan completo con RCA,
+alternativas de semantica y validacion: `docs/PLAN_BK06_CAPACIDAD_AREA.md`.
+
+La clave `capacity` de `agent_types` alimenta dos cosas distintas: la capacidad
+fisica del operario y el divisor que dimensiona WOs por area
+(`warehouse._validar_y_ajustar_cantidad`). Con el canonico (`agent_types: []`)
+la segunda via queda ciega: `operator_capacities = {}` y todo se dimensiona a
+150, aunque los montacargas se instancien con capacidad 1000 (verificado en la
+corrida canonica). Las WOs de `Area_High`/`Area_Special` se dimensionan a 1/6,6
+de la capacidad real del equipo que las mueve; 40 WOs divididas en el canonico.
+
+Poblar `agent_types` de forma ingenua NO lo arregla: rompe la simulacion. El
+`work_area_priorities` del ground incluye `Area_High`/`Area_Special`, asi que
+recibe WOs dimensionadas para montacargas (1000) que nunca puede levantar (150)
+-> `_seleccionar_primera_wo` devuelve la WO oversized y
+`_construir_tour_por_secuencia` la rechaza, en bucle.
+
+**Medicion (2 corridas, seed 42):** canonico 666 WOs / 7440 s / 0 errores vs.
+`agent_types` ingenuo 626 WOs (-40) / 7955 s (+6,9%) / **9.341**
+`[DISPATCHER ERROR]` sobre 5 WOs huerfanas.
+
+**Causa raiz:** `work_area_equipment` ya declara que equipo sirve cada area
+(MEJ-3 QA-3) y lo consultan 3 capas (event_generator, config_manager,
+fleet-manager.js), pero **el hot-path de simulacion no lo mira**: el motor
+decide compatibilidad solo por `work_area_priorities`, que puede contradecirlo.
+
+Rompe el baseline byte-identico de forma intencional (no hay version que lo
+preserve). Bloquea BK-05 opcion (b) e INIT-3 v3.
 
 ---
 
@@ -32,6 +66,12 @@ Opciones: (a) el validador acepta flota vacia si los contadores legacy > 0;
 (b) la UI materializa los contadores como grupos visibles al cargar (y el
 canonico migra a agent_types explicito = cambio de baseline); (c) dejarlo y
 documentar. Decision de diseno del Director.
+
+**ACTUALIZACION 2026-07-25: la opcion (b) esta BLOQUEADA por BK-06.** Se
+intento y se midio: migrar el canonico a `agent_types` explicito sobre la
+semantica actual degrada la simulacion (-40 WOs, +6,9% de makespan, 9.341
+errores de dispatcher). No es una migracion cosmetica. La opcion (a) sigue
+disponible y NO depende de BK-06.
 
 ---
 
