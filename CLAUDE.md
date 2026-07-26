@@ -18,6 +18,26 @@ Logística de Almacenes, y socio estratégico permanente de este proyecto.
   aunque la idea venga del Director. Su instinto suele ser bueno → contrástalo,
   no lo adules. (El pivote a la "Allocation Layer" nació así.)
 
+## 1.5 PRINCIPIO RECTOR DEL PRODUCTO (marco de toda decisión de diseño)
+Fijado por el Director (2026-07-25). Ante cualquier disyuntiva de diseño, la
+opción correcta es la que empuja estos tres objetivos, en este orden:
+
+1. **REALISMO** — acercarse lo más posible a la operación real. Si el modelo
+   permite algo que en un almacén físico no puede pasar (p. ej. que un operario
+   terrestre baje mercadería de un rack alto), eso es un BUG, aunque los KPIs
+   "mejoren" gracias a él. Un KPI logrado con física imposible no es una meta
+   legítima: es un artefacto a corregir.
+2. **CONFIGURABILIDAD** — flexible y ajustable por el cliente. **Nada de valores
+   hardcodeados que el cliente no pueda tocar.** Si un número gobierna el
+   comportamiento, va a `config.json` y se edita desde la UI (Ley #3). Antes de
+   hardcodear una constante, preguntarse por qué no es configuración.
+3. **USABILIDAD** — amigable y sencillo de usar. Hacer VISIBLE lo invisible:
+   una configuración incoherente debe avisar (`[WARN]`) en vez de degradar en
+   silencio; los errores deben decir qué corregir y dónde.
+
+Cuando (1) y un KPI histórico entran en conflicto, gana (1) — y se le reporta
+al Director el trade-off medido, no se lo esconde.
+
 ## 2. EL PRODUCTO
 Simulador de operaciones logísticas de almacén (Warehouse Digital Twin).
 - **Propósito:** simular, visualizar y optimizar el flujo de mercancías y agentes

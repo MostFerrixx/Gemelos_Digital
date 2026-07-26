@@ -16,6 +16,9 @@ import logging
 logger = logging.getLogger(__name__)
 from typing import List, Dict, Any, Optional, Tuple
 
+# BK-06 F1: fuente unica de verdad de que equipo atiende cada area.
+from core.work_areas import effective_work_area_priorities
+
 
 def determinar_staging_destino(work_orders: List[Any], data_manager: Any) -> Tuple[int, Tuple[int, int]]:
     """
@@ -78,7 +81,14 @@ class BaseOperator:
         self.configuracion = configuracion
         self.capacity = capacity
         self.discharge_time = discharge_time
-        self.work_area_priorities = work_area_priorities
+        # BK-06 F1: el mapa `work_area_equipment` MANDA sobre lo declarado.
+        # Se filtra una sola vez aca: todo el motor (dispatcher,
+        # assignment_calculator, event_generator) consulta
+        # get_priority_for_work_area/can_handle_work_area, que leen este dict.
+        # Las declaradas se conservan aparte para diagnostico/UI.
+        self.work_area_priorities_declaradas = dict(work_area_priorities or {})
+        self.work_area_priorities = effective_work_area_priorities(
+            configuracion, agent_type, work_area_priorities, agent_id=agent_id)
         self.pathfinder = pathfinder
         self.layout_manager = layout_manager
         self.simulador = simulador

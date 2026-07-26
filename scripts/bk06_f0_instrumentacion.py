@@ -203,7 +203,12 @@ def main():
     print("\n--- COHERENCIA work_area_equipment vs work_area_priorities ---")
     for op in operarios:
         incoherentes = []
-        for area in op.work_area_priorities.keys():
+        # BK-06 F1: tras el fix, work_area_priorities ya viene FILTRADO por el
+        # mapa; hay que mirar las DECLARADAS para seguir viendo la incoherencia
+        # de config (el motor ademas la avisa con [WARN][CONFIG] al arrancar).
+        declaradas = getattr(op, 'work_area_priorities_declaradas',
+                             op.work_area_priorities)
+        for area in declaradas.keys():
             if area in equipo_area and equipo_area[area] != op.type:
                 incoherentes.append("%s(->%s)" % (area, equipo_area[area]))
         if incoherentes:

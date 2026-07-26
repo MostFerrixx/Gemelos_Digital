@@ -27,6 +27,7 @@ from subsystems.simulation.route_calculator import RouteCalculator
 # Imports de core
 from core.config_manager import ConfigurationManager, ConfigurationError
 from core.config_utils import get_default_config
+from core.work_areas import expected_equipment_for_area
 from core.replay_utils import volcar_replay_a_archivo
 
 # Imports de analytics
@@ -255,17 +256,10 @@ class EventGenerator:
     def _expected_equipment_for_area(self, area):
         # QA-3 (Opcion B): tipo capaz de un area. FUENTE DE VERDAD = el mapa explicito
         # config['work_area_equipment'] (editable en la UI). La convencion de nombres
-        # (regex) queda SOLO como fallback para configs viejas sin el mapa. Misma logica en
-        # config_manager._expected_equipment_for_area y fleet-manager.js.
-        wae = (self.configuracion or {}).get('work_area_equipment', {})
-        if isinstance(wae, dict):
-            t = wae.get(area)
-            if t:
-                return t
-        import re
-        if re.search(r'ground|piso|floor|suelo|terrestre|level[_-]?0|l0', str(area), re.I):
-            return 'GroundOperator'
-        return 'Forklift'
+        # (regex) queda SOLO como fallback para configs viejas sin el mapa.
+        # BK-06 F1: la logica ya no se duplica aca; vive en core.work_areas y la
+        # comparte el motor (operators.py). Este metodo queda como fachada.
+        return expected_equipment_for_area(self.configuracion, area)
 
     def _validar_flota_cubre_areas(self):
         """QA-1/QA-2/QA-3: valida la flota construida ANTES de env.run. Devuelve (ok, msg).
