@@ -10,6 +10,9 @@ import random
 from typing import Optional, List, Dict, Any
 from .order_strategies import create_order_strategy, OrderGenerationStrategy
 
+# BK-06 F2: capacidad por area derivada de la flota real + el mapa de equipos.
+from core.fleet import capacidades_por_area
+
 
 class SKU:
     """Stock Keeping Unit - Represents a product in the warehouse"""
@@ -461,25 +464,32 @@ class AlmacenMejorado:
             configuracion=configuracion
         )
 
-        # BUGFIX CAPACITY VALIDATION: Extract operator capacities from configuration
-        self.operator_capacities = {}  # {work_area: max_capacity}
-        agent_types = configuracion.get('agent_types', [])
+        # ============================================================
+        # BK-06 F2: CAPACIDAD DE DIMENSIONADO POR AREA
+        # ============================================================
+        # ANTES: se leia SOLO `agent_types`; con el canonico (`agent_types: []`)
+        # el dict quedaba vacio y TODAS las areas se dimensionaban con el
+        # default 150, aunque el area la atendieran montacargas de 1000. Las WOs
+        # de Area_High/Area_Special salian 6,7x mas chicas de lo que el equipo
+        # real podia mover (ver docs/PLAN_BK06_CAPACIDAD_AREA.md).
+        #
+        # AHORA: la flota se resuelve SIEMPRE (incluido el fallback legacy por
+        # contadores) con `core.fleet.resolver_flota`, y la capacidad de cada
+        # area sale de los agentes que el mapa `work_area_equipment` asigna a
+        # esa area.
+        #
+        # RED DE SEGURIDAD: se toma el MINIMO de los agentes compatibles, no el
+        # maximo. Con flota homogenea por tipo da igual; con flota heterogenea
+        # garantiza que toda WO generada quepa en CUALQUIER agente que pueda
+        # tomarla -> el bucle de WOs irrecogibles se vuelve imposible por
+        # construccion, no por suerte.
+        self.operator_capacities, self.max_operator_capacity = \
+            capacidades_por_area(configuracion)
 
-        for agent_config in agent_types:
-            agent_type = agent_config.get('type')
-            capacity = agent_config.get('capacity', 0)
-            work_areas = agent_config.get('work_area_priorities', {})
-
-            # For each work area this agent can handle, track max capacity
-            for work_area in work_areas.keys():
-                current_max = self.operator_capacities.get(work_area, 0)
-                self.operator_capacities[work_area] = max(current_max, capacity)
-
-        # Compute global max capacity (for fallback)
-        self.max_operator_capacity = max(
-            [agent.get('capacity', 0) for agent in agent_types],
-            default=150  # Fallback if no agents defined
-        )
+        if not self.operator_capacities:
+            print("[ALMACEN][WARN] No se pudo derivar capacidad por area de la "
+                  "flota; se usa el fallback global. Revisa work_area_equipment "
+                  "y la configuracion de agentes.")
 
         print(f"[ALMACEN] AlmacenMejorado inicializado:")
         print(f"  - Total ordenes configuradas: {self.total_ordenes}")

@@ -224,7 +224,12 @@ class WarehouseConfig(BaseModel):
     # --- Flota (operators.py) ---
     agent_types: Optional[List[AgentTypeConfig]] = None
     work_area_equipment: Optional[Dict[str, str]] = None  # QA-3 Opcion B
-    # Fallback historico cuando agent_types esta vacio (operators.crear_operarios):
+    # BK-06 F2: parametros por defecto de cada tipo de agente (capacity,
+    # discharge_time, work_area_priorities). Antes estaban HARDCODEADOS en
+    # operators.crear_operarios; ahora son configurables. Ausente -> defaults
+    # historicos de core.fleet.HISTORIC_FLEET_DEFAULTS (comportamiento intacto).
+    fleet_defaults: Optional[Dict[str, AgentTypeConfig]] = None
+    # Fallback historico cuando agent_types esta vacio (core.fleet.resolver_flota):
     num_operarios_terrestres: Optional[int] = None
     num_montacargas: Optional[int] = None
     # LEGACY-INFORMATIVO: solo se imprime (warehouse.py) y lo exige REQUIRED_KEYS.

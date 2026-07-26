@@ -16,8 +16,9 @@ import logging
 logger = logging.getLogger(__name__)
 from typing import List, Dict, Any, Optional, Tuple
 
-# BK-06 F1: fuente unica de verdad de que equipo atiende cada area.
+# BK-06 F1/F2: fuentes unicas de verdad de areas y flota.
 from core.work_areas import effective_work_area_priorities
+from core.fleet import resolver_flota
 
 
 def determinar_staging_destino(work_orders: List[Any], data_manager: Any) -> Tuple[int, Tuple[int, int]]:
@@ -1916,113 +1917,50 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
     operarios: List[BaseOperator] = []
     procesos_operarios: List[Any] = []
 
-    # Get agent configuration from agent_types array
-    agent_types_config = configuracion.get('agent_types', [])
+    # BK-06 F2: la flota se resuelve en UN SOLO lugar (core.fleet.resolver_flota),
+    # compartido con warehouse.py. Antes habia dos ramas duplicadas aca (una por
+    # agent_types y otra por contadores legacy) con las capacidades HARDCODEADAS
+    # (150/1000) que warehouse no podia ver -> bug de dimensionado por area
+    # (ver docs/PLAN_BK06_CAPACIDAD_AREA.md). Ahora ambos leen la misma flota.
+    flota = resolver_flota(configuracion)
 
-    if not agent_types_config:
-        # Fallback: Create default agents from legacy config
-        logger.info("[OPERATORS] No agent_types encontrado, usando configuracion legacy...")
-
-        num_terrestres = configuracion.get('num_operarios_terrestres', 2)
-        num_montacargas = configuracion.get('num_montacargas', 1)
-
-        # Create ground operators
-        for i in range(num_terrestres):
-            agent_id = f"GroundOp-{i+1:02d}"
-            operator = GroundOperator(
-                agent_id=agent_id,
-                env=env,
-                almacen=almacen,
-                configuracion=configuracion,
-                capacity=150,
-                discharge_time=5,
-                work_area_priorities={"Area_Ground": 1, "Area_High": 2, "Area_Special": 3},
-                pathfinder=pathfinder,
-                layout_manager=layout_manager,
-                simulador=simulador
-            )
-            operarios.append(operator)
-            operator.spawn_index = len(operarios) - 1  # Iniciativa #2 / Fase 2
-            proceso = env.process(operator.agent_process())
-            procesos_operarios.append(proceso)
-
-        # Create forklifts
-        for i in range(num_montacargas):
-            agent_id = f"Forklift-{i+1:02d}"
-            forklift = Forklift(
-                agent_id=agent_id,
-                env=env,
-                almacen=almacen,
-                configuracion=configuracion,
-                capacity=1000,
-                discharge_time=5,
-                work_area_priorities={"Area_High": 1, "Area_Special": 2},
-                pathfinder=pathfinder,
-                layout_manager=layout_manager,
-                simulador=simulador
-            )
-            operarios.append(forklift)
-            forklift.spawn_index = len(operarios) - 1  # Iniciativa #2 / Fase 2
-            proceso = env.process(forklift.agent_process())
-            procesos_operarios.append(proceso)
-
+    if configuracion.get('agent_types'):
+        logger.info(f"[OPERATORS] Creando {len(flota)} agentes desde agent_types...")
     else:
-        # Create agents from agent_types configuration
-        logger.info(f"[OPERATORS] Creando {len(agent_types_config)} agentes desde agent_types...")
+        logger.info(f"[OPERATORS] Sin agent_types: {len(flota)} agentes derivados "
+                    f"de los contadores legacy...")
 
-        for idx, agent_config in enumerate(agent_types_config):
-            agent_type = agent_config.get('type', 'GroundOperator')
-            capacity = agent_config.get('capacity', 150)
-            discharge_time = agent_config.get('discharge_time', 5)
-            work_area_priorities = agent_config.get('work_area_priorities', {})
+    # Constructor por tipo. Los IDs se numeran por tipo y el orden de `flota`
+    # fija el spawn_index (Iniciativa #2 / Fase 2).
+    constructores = {"GroundOperator": GroundOperator, "Forklift": Forklift}
+    prefijos = {"GroundOperator": "GroundOp", "Forklift": "Forklift"}
 
-            # Generate unique ID
-            if agent_type == "GroundOperator":
-                # Count existing ground operators
-                ground_count = sum(1 for op in operarios if op.type == "GroundOperator")
-                agent_id = f"GroundOp-{ground_count+1:02d}"
+    for spec in flota:
+        agent_type = spec.get('type', 'GroundOperator')
+        constructor = constructores.get(agent_type)
 
-                operator = GroundOperator(
-                    agent_id=agent_id,
-                    env=env,
-                    almacen=almacen,
-                    configuracion=configuracion,
-                    capacity=capacity,
-                    discharge_time=discharge_time,
-                    work_area_priorities=work_area_priorities,
-                    pathfinder=pathfinder,
-                    layout_manager=layout_manager,
-                    simulador=simulador
-                )
-                operarios.append(operator)
-                operator.spawn_index = len(operarios) - 1  # Iniciativa #2 / Fase 2
-                proceso = env.process(operator.agent_process())
-                procesos_operarios.append(proceso)
+        if constructor is None:
+            logger.warning(f"[OPERATORS WARNING] Tipo de agente desconocido: {agent_type}")
+            continue
 
-            elif agent_type == "Forklift":
-                # Count existing forklifts
-                forklift_count = sum(1 for op in operarios if op.type == "Forklift")
-                agent_id = f"Forklift-{forklift_count+1:02d}"
+        existentes = sum(1 for op in operarios if op.type == agent_type)
+        agent_id = f"{prefijos[agent_type]}-{existentes+1:02d}"
 
-                forklift = Forklift(
-                    agent_id=agent_id,
-                    env=env,
-                    almacen=almacen,
-                    configuracion=configuracion,
-                    capacity=capacity,
-                    discharge_time=discharge_time,
-                    work_area_priorities=work_area_priorities,
-                    pathfinder=pathfinder,
-                    layout_manager=layout_manager,
-                    simulador=simulador
-                )
-                operarios.append(forklift)
-                forklift.spawn_index = len(operarios) - 1  # Iniciativa #2 / Fase 2
-                proceso = env.process(forklift.agent_process())
-                procesos_operarios.append(proceso)
-
-            else:
-                logger.warning(f"[OPERATORS WARNING] Tipo de agente desconocido: {agent_type}")
+        operator = constructor(
+            agent_id=agent_id,
+            env=env,
+            almacen=almacen,
+            configuracion=configuracion,
+            capacity=spec['capacity'],
+            discharge_time=spec['discharge_time'],
+            work_area_priorities=spec['work_area_priorities'],
+            pathfinder=pathfinder,
+            layout_manager=layout_manager,
+            simulador=simulador
+        )
+        operarios.append(operator)
+        operator.spawn_index = len(operarios) - 1  # Iniciativa #2 / Fase 2
+        procesos_operarios.append(env.process(operator.agent_process()))
 
     logger.info(f"[OPERATORS] Creados {len(operarios)} operarios:")
     for operario in operarios:

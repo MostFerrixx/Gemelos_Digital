@@ -1,9 +1,19 @@
 # PLAN BK-06 — Capacidad por area vs. flota heterogenea
 
-**Estado:** PROPUESTO — pendiente de aprobacion del Director. NO se ha tocado
-codigo de motor.
+**Estado:** F0-F3 IMPLEMENTADAS Y VALIDADAS (2026-07-25). Falta F4 (regenerar
+baseline) — requiere OK explicito del Director. Resultados en la seccion 9.
 **Rama:** `fix/bk06-capacidad-area`
 **Fecha:** 2026-07-25
+
+> **SUPUESTO DE TRABAJO A CONFIRMAR CON EL CLIENTE (2026-07-25).** Todo este
+> trabajo asume que el mapa `work_area_equipment` del canonico refleja la
+> realidad: `Area_High` y `Area_Special` son atendidas **exclusivamente por
+> montacargas**, y `Area_Ground` exclusivamente por operarios terrestres. El
+> Director no tiene todavia la lectura del almacen real. Si resultara que esas
+> areas son MIXTAS (ambos tipos pueden operar), el mapa esta mal y se corrige
+> **en configuracion, sin tocar codigo** (tab Flota) — salvo que se necesite
+> expresar varios tipos por area, que hoy el modelo no soporta (ver BK-07 en el
+> BACKLOG). Los numeros de la seccion 9 dependen de este supuesto.
 **Origen:** hallazgo colateral al intentar BK-05 opcion (b) (migrar el canonico
 a `agent_types` explicito). La migracion resulto NO ser cosmetica: destapo un
 bug de fondo. Este plan trata el bug; BK-05 queda desacoplado y pendiente.
@@ -276,3 +286,86 @@ procedimiento a usar en F4. Los outputs van al scratchpad, no al repo.
 - **INIT-3 v3** (capacidades por agente en el optimizador): depende de BK-06.
   Meter capacidades en el espacio de busqueda sobre la semantica actual
   generaria trials con flotas heterogeneas y el bucle de WOs huerfanas.
+
+---
+
+## 9. RESULTADOS (F0-F3 ejecutadas, 2026-07-25)
+
+### 9.1 Que se implemento
+
+| Fase | Cambio | Archivos |
+|---|---|---|
+| F0 | Instrumentacion (sin tocar el motor) | `scripts/bk06_f0_instrumentacion.py` |
+| F1 | El mapa manda en el motor + `[WARN]` de config incoherente | `src/core/work_areas.py` (nuevo), `operators.py`, `event_generator.py` |
+| F2 | Capacidad por area derivada de la flota real (minimo) + flota configurable | `src/core/fleet.py` (nuevo), `warehouse.py`, `operators.py`, `config_schema.py` |
+| F3 | Contrato unico en el dispatcher (no devolver WOs oversized) | `dispatcher.py` |
+| -- | 14 tests nuevos | `tests/unit/test_bk06_capacidad_area.py` |
+
+Dos deudas estructurales saldadas de paso:
+
+* **Fuente unica de flota.** `crear_operarios` tenia dos ramas duplicadas
+  (agent_types / contadores legacy) con las capacidades **hardcodeadas**
+  (150/1000) que `warehouse` no podia ver. Ahora ambos leen
+  `core.fleet.resolver_flota`.
+* **Capacidades configurables** (principio rector #2): nuevo bloque opt-in
+  `fleet_defaults` en config.json (registrado en `config_schema.py`). Ausente =
+  defaults historicos, comportamiento intacto.
+
+### 9.2 Numeros (canonico, WAREHOUSE_SEED=42)
+
+| KPI | Canonico (pre-fix) | F1 | F1+F2+F3 |
+|---|---|---|---|
+| WorkOrders | 666 | 666 | **626** |
+| Volumen movido | 21.150 | 21.150 | **21.150** |
+| Ordenes | 300 | 300 | **300** |
+| Makespan | 7440 s | 9685 s | **8783 s** |
+| `[DISPATCHER ERROR]` | 0 | 0 | **0** |
+
+**Las 626 WOs mueven exactamente el mismo volumen (21.150) que las 666
+anteriores: son 40 viajes menos, no trabajo perdido.**
+
+### 9.3 El trade-off del makespan (y por que se acepta)
+
+El makespan sube 18,1% respecto al baseline historico. La causa NO es el fix:
+es que el baseline **se lograba en parte con asignaciones fisicamente
+imposibles** (operarios terrestres bajando mercaderia de racks altos). Al
+prohibirlas, los montacargas quedan como cuello de botella real y los
+terrestres subutilizados. Decision del Director (2026-07-25): **el realismo
+gana**; un KPI logrado con fisica imposible no es una meta legitima
+(principio rector #1, `CLAUDE.md` 1.5).
+
+### 9.4 Validacion del diagnostico: dimensionado de flota
+
+Si el cuello de botella son los montacargas, sumar montacargas debe recuperar
+el makespan. Se corrio variando SOLO `num_montacargas`:
+
+| Flota (ground+forklift) | WOs | Makespan | vs 7440 s |
+|---|---|---|---|
+| 2+2 (canonico) | 626 | 8783 s | +18,1% |
+| 2+3 | 626 | 6042 s | **-18,8%** |
+| 2+4 | 626 | 4844 s | **-34,9%** |
+| 2+5 | 626 | 4966 s | -33,3% |
+
+Diagnostico confirmado. Con **un solo montacargas mas**, el modelo realista ya
+**supera** el baseline historico. El optimo esta en 2+4; con 2+5 empeora
+(congestion), un comportamiento fisicamente sensato que valida de paso la capa
+de congestion. **Hallazgo de negocio accionable: la flota 2+2 esta
+sub-dimensionada para esta carga.**
+
+### 9.5 Criterios de exito del plan (seccion 6)
+
+| Criterio | Resultado |
+|---|---|
+| `[DISPATCHER ERROR]` = 0 en canonico | **CUMPLE** (0) |
+| `[DISPATCHER ERROR]` = 0 con agent_types explicito | **CUMPLE** (0, antes 9.341) |
+| Canonico == agent_types explicito | **CUMPLE** (626 / 8783 s ambos, identico) |
+| WOs completadas >= 666 | **NO CUMPLE literalmente** (626) — pero el volumen y las ordenes son identicos: son menos viajes, no menos trabajo. El criterio estaba mal formulado (contaba viajes, no trabajo). |
+| Makespan <= 7440 s | **NO CUMPLE** (8783 s) — aceptado explicitamente por el Director: el 7440 no era legitimo. Ver 9.3 y 9.4. |
+| Tests que pinneen (a), (b), (c) | **CUMPLE** (14 tests, `test_bk06_capacidad_area.py`) |
+
+### 9.6 Efecto colateral: BK-05 desbloqueado
+
+La prueba de equivalencia (canonico == agent_types explicito) era justamente lo
+que fallaba antes. Ahora pasa, asi que **migrar el canonico a `agent_types`
+explicito ya es un no-op de comportamiento**: BK-05 opcion (b) deja de estar
+bloqueada.

@@ -11,8 +11,11 @@ los 4 hallazgos AUD8-1..4 quedaron APLICADOS el 2026-07-12, ver CHANGELOG.)*
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
-| BK-06 — capacidad por area vs. flota heterogenea (BUG de motor) | PLAN PROPUESTO (2026-07-25) | **Alta** | Medio-Alto | Aprobacion del plan por el Director |
-| BK-05 — guard de flota vacia bloquea guardar el canonico desde la UI | ABIERTO (hallazgo 2026-07-12) | Baja-Media (UX) | ~1 h (opcion a) | Opcion (b) BLOQUEADA por BK-06 |
+| BK-06 — capacidad por area vs. flota heterogenea (BUG de motor) | F0-F3 HECHAS Y VALIDADAS | **Alta** | -- | F4 (baseline) + merge: OK del Director |
+| BK-07 — areas mixtas (varios tipos de equipo por area) | ABIERTO (2026-07-25) | Media | Medio | Confirmar con el cliente si existen areas mixtas |
+| BK-08 — confirmar work_area_equipment con el almacen real | ABIERTO (2026-07-25) | **Alta** (supuesto activo) | Trivial (config) | Lectura del almacen real (Director/cliente) |
+| BK-09 — flota 2+2 sub-dimensionada (hallazgo de negocio) | ABIERTO (2026-07-25) | Media | Trivial (config) | Decision de negocio del Director |
+| BK-05 — guard de flota vacia bloquea guardar el canonico desde la UI | ABIERTO (hallazgo 2026-07-12) | Baja-Media (UX) | ~1 h (opcion a) | DESBLOQUEADO: opcion (b) ya viable tras BK-06 |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
@@ -20,10 +23,66 @@ los 4 hallazgos AUD8-1..4 quedaron APLICADOS el 2026-07-12, ver CHANGELOG.)*
 
 ---
 
+## BK-07 — areas mixtas (varios tipos de equipo por area)
+
+**Hallazgo 2026-07-25 (BK-06 F1).** Hoy `work_area_equipment` es
+`Dict[str, str]`: **un solo tipo de equipo por area**. Si en la operacion real
+un area la atienden AMBOS tipos (p. ej. un rack bajo que puede trabajar tanto
+un terrestre como un montacargas), el modelo actual no lo puede expresar: hay
+que elegir uno y el otro queda excluido.
+
+Propuesta robusta (no implementada): admitir `Dict[str, str | List[str]]` —
+retrocompatible, un string sigue significando "solo ese tipo". La capacidad de
+dimensionado del area ya esta preparada: `core.fleet.capacidades_por_area` toma
+el **minimo** de los tipos compatibles, que es exactamente lo que corresponde
+en un area mixta (toda WO debe caber en el equipo mas chico que pueda tomarla).
+Habria que tocar: `work_areas.effective_work_area_priorities` (aceptar lista),
+el validador web, `fleet-manager.js` y la UI del tab Flota.
+
+Bloqueo: confirmar con el cliente si existen areas mixtas (ver BK-08). No
+meterlo en BK-06 (decision del Director).
+
+---
+
+## BK-08 — confirmar `work_area_equipment` con el almacen real
+
+**Supuesto activo, no verificado (2026-07-25).** Todo BK-06 asume que
+`Area_High` y `Area_Special` son 100% de montacargas y `Area_Ground` 100%
+terrestre, tal como dice el canonico. El Director no tiene todavia la lectura
+del almacen real.
+
+Impacto si el supuesto es falso: los numeros de BK-06 (makespan, reparto de
+carga) cambian. **No requiere codigo**: se corrige editando el mapa en el tab
+Flota — salvo que existan areas mixtas, que necesitan BK-07.
+
+Accion: confirmar con el cliente que equipo atiende cada area fisicamente.
+
+---
+
+## BK-09 — la flota 2+2 esta sub-dimensionada (hallazgo de negocio)
+
+**Medido en BK-06 F4 (2026-07-25), con seed 42 y el resto de la config igual.**
+Variando SOLO `num_montacargas` sobre el modelo ya corregido:
+
+| Flota | Makespan | vs baseline historico (7440 s) |
+|---|---|---|
+| 2+2 (canonico) | 8783 s | +18,1% |
+| 2+3 | 6042 s | **-18,8%** |
+| 2+4 | 4844 s | **-34,9%** |
+| 2+5 | 4966 s | -33,3% (peor que 2+4: congestion) |
+
+Con un solo montacargas mas, el modelo realista ya supera el baseline
+historico; el optimo esta en 2+4. Es una decision de negocio del Director
+(comprar/asignar equipos), no un bug. Cambiar el canonico rompe el baseline
+intencionalmente. Insumo natural para el optimizador (INIT-3).
+
+---
+
 ## BK-06 — capacidad por area vs. flota heterogenea (BUG de motor)
 
-**Hallazgo 2026-07-25, al intentar BK-05 opcion (b).** Plan completo con RCA,
-alternativas de semantica y validacion: `docs/PLAN_BK06_CAPACIDAD_AREA.md`.
+**Hallazgo 2026-07-25, al intentar BK-05 opcion (b). F0-F3 HECHAS Y VALIDADAS;
+falta F4 (regenerar baseline) + merge, ambos con OK del Director.** Plan
+completo con RCA, resultados y validacion: `docs/PLAN_BK06_CAPACIDAD_AREA.md`.
 
 La clave `capacity` de `agent_types` alimenta dos cosas distintas: la capacidad
 fisica del operario y el divisor que dimensiona WOs por area
@@ -67,11 +126,17 @@ Opciones: (a) el validador acepta flota vacia si los contadores legacy > 0;
 canonico migra a agent_types explicito = cambio de baseline); (c) dejarlo y
 documentar. Decision de diseno del Director.
 
-**ACTUALIZACION 2026-07-25: la opcion (b) esta BLOQUEADA por BK-06.** Se
+**ACTUALIZACION 2026-07-25 (a): la opcion (b) estaba BLOQUEADA por BK-06.** Se
 intento y se midio: migrar el canonico a `agent_types` explicito sobre la
-semantica actual degrada la simulacion (-40 WOs, +6,9% de makespan, 9.341
-errores de dispatcher). No es una migracion cosmetica. La opcion (a) sigue
-disponible y NO depende de BK-06.
+semantica de entonces degradaba la simulacion (-40 WOs, +6,9% de makespan,
+9.341 errores de dispatcher). No era una migracion cosmetica.
+
+**ACTUALIZACION 2026-07-25 (b): DESBLOQUEADO.** Con BK-06 F1-F3 aplicado, el
+canonico y su equivalente con `agent_types` explicito dan resultados
+IDENTICOS (626 WOs / 8783 s / 0 errores en ambos) — es la prueba de
+equivalencia de `PLAN_BK06_CAPACIDAD_AREA.md` seccion 9.6. La opcion (b) ya es
+un no-op de comportamiento. La (a) sigue siendo la mas barata si solo se
+quiere destrabar la UX.
 
 ---
 

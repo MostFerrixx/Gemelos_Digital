@@ -90,6 +90,10 @@ class DispatcherV11:
         self.tour_type = configuracion.get('tour_type', 'Tour Mixto (Multi-Destino)')
         # print(f"[DISPATCHER DEBUG] Tour type: '{self.tour_type}'")
 
+        # BK-06 F3: WOs ya avisadas como irrecogibles (evita inundar el log con
+        # el mismo aviso en cada barrido; antes esto era un bucle de 9.341 lineas).
+        self._wos_irrecogibles_avisadas = set()
+
         # Statistics
         self.total_asignaciones = 0
         self.total_tours_creados = 0
@@ -705,13 +709,32 @@ class DispatcherV11:
                       f"(costo: {cost_result.total_cost:.0f}, volumen: {wo_volume})")
                 return wo
         
-        # Si ninguna WO cabe sola, retornar la mejor (será marcada como oversized)
+        # BK-06 F3: si ninguna WO cabe, NO devolver una oversized.
+        #
+        # Antes se devolvia "la mejor" igual, y _construir_tour_por_secuencia la
+        # rechazaba con return [] sin consumirla: el operario se quedaba sin
+        # tour, reintentaba, y volvia a recibir la misma WO -> bucle infinito
+        # (9.341 [DISPATCHER ERROR] en una sola corrida). Las dos funciones se
+        # contradecian. Ahora el contrato es unico: esta funcion SOLO devuelve
+        # WOs que caben, asi que el rechazo de alla es inalcanzable.
+        #
+        # Con F1+F2 este caso no deberia ocurrir (la capacidad del area se deriva
+        # del equipo que la atiende, tomando el minimo). Si ocurre, es una
+        # configuracion invalida: se avisa UNA vez por WO -- visible, no un
+        # bucle mudo -- y se deja la WO para un agente de mas capacidad.
         if costos:
-            best_wo = costos[0][0]
-            logger.warning(f"[DISPATCHER] WARNING: Mejor WO {best_wo.id} excede capacidad "
-                  f"({best_wo.calcular_volumen_restante()} > {operator.capacity})")
-            return best_wo
-        
+            peor = costos[0][0]
+            if peor.id not in self._wos_irrecogibles_avisadas:
+                self._wos_irrecogibles_avisadas.add(peor.id)
+                logger.warning(
+                    "[WARN][DISPATCHER] La WO %s (volumen %s, area %s) no cabe en "
+                    "%s (capacidad %s) ni en ninguna otra WO candidata. Se omite "
+                    "para este agente. Revisa work_area_equipment y las "
+                    "capacidades de la flota: puede haber un area cuyo equipo "
+                    "asignado no pueda con el volumen que se le esta generando.",
+                    peor.id, peor.calcular_volumen_restante(), peor.work_area,
+                    operator.id, operator.capacity)
+
         return None
 
     def _construir_tour_por_secuencia(self, operator: Any, primera_wo: Any, candidatos: List[Any]) -> List[Any]:
