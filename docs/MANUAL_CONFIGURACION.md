@@ -1,0 +1,494 @@
+# MANUAL DE CONFIGURACIÓN — Gemelo Digital de Almacén
+
+Manual completo del configurador web: qué es cada control, qué valores admite
+y **qué efecto real tiene en la simulación**.
+
+**Última actualización:** 2026-09-07 (verificado contra la UI en ejecución y
+contra el código del motor).
+
+---
+
+## 0. Cómo empezar
+
+**Abrir el configurador:** levantar el servidor (`start_server.bat`) y entrar a
+`http://localhost:8000/web_configurator/index.html`.
+
+**Concepto clave — dónde vive la configuración.** El archivo `config.json` de
+la raíz del proyecto es **la única fuente de verdad**: el motor solo lo lee, y
+la UI solo lo edita. Por eso importa la diferencia entre estos dos botones:
+
+- **Aplicar Configuración** — escribe lo que ves en pantalla al `config.json`
+  real. Es lo que va a usar la próxima simulación. Hace backup automático y
+  escritura atómica.
+- **Guardar** — guarda un *preset* con nombre en la biblioteca interna. **No**
+  toca `config.json`. Sirve para tener escenarios ("Alta demanda", "Flota
+  chica") y compararlos después en Experimentos A/B.
+
+Si configurás algo y no apretás **Aplicar**, la simulación seguirá usando la
+configuración anterior.
+
+### La barra superior
+
+| Botón | Qué hace |
+|---|---|
+| **Restart** | Reinicia el servidor web. Útil si la UI queda en un estado raro. |
+| **Default** | Restaura todos los campos del formulario a los valores por defecto. No aplica nada hasta que confirmes. |
+| **Importar** | Carga un `.json` de configuración desde tu disco al formulario. |
+| **Gestionar** | Administra los presets guardados (renombrar, borrar, marcar predeterminado). |
+| **Cargar** | Trae un preset guardado al formulario. |
+| **Guardar** | Guarda el formulario actual como preset con nombre y descripción. |
+| **Abrir Visor** | Abre el visor de replay en otra pestaña (para ver una simulación ya corrida). |
+| **Run Simulation** | Lanza la simulación con la configuración vigente. |
+| **Aplicar Configuración** | Escribe el `config.json` canónico. **Este es el que "manda".** |
+
+### Las 8 pestañas
+
+Se agrupan en dos bloques. **Configuración** (1-3) es el uso cotidiano;
+**Avanzado** (4-8) son archivos, subsistemas opcionales y herramientas de
+análisis.
+
+---
+
+# PESTAÑA 1 — Carga de Trabajo
+
+Define **cuánto trabajo** hay que hacer y **de qué tipo**.
+
+## Modo de Generación de Órdenes
+
+Es la decisión más importante de esta pantalla: de dónde salen los pedidos.
+
+| Opción | Para qué sirve |
+|---|---|
+| **Estocástico (Aleatorio)** | El simulador **inventa** los pedidos según una mezcla de tipos de producto que vos definís. Ideal para pruebas de capacidad, estrés y comparar estrategias sin depender de datos reales. |
+| **Determinista (Archivo)** | Los pedidos salen de un archivo `.json`/`.csv` **real**. Ideal para reproducir un día concreto de la operación, o para validar el modelo contra lo que pasó de verdad. |
+
+Al elegir **Determinista** aparecen estos controles:
+
+- **Zona de carga de archivo** — arrastrás el `.json`/`.csv` con los pedidos.
+- **Política de Cumplimiento** — qué hacer cuando un pedido tiene un ítem
+  inválido (por ejemplo, un SKU que no existe en el catálogo):
+  - **Envío Parcial (Ship Partial):** procesa los ítems válidos y descarta solo
+    los inválidos. El pedido sale incompleto pero sale.
+  - **Todo o Nada (Fill or Kill):** si un solo ítem falla, se descarta el pedido
+    entero. Más estricto; refleja clientes que no aceptan envíos parciales.
+- **Vista Previa de Validación** — antes de correr te muestra cuántas órdenes,
+  ítems y SKUs se leyeron, y cuántos SKUs faltan en el catálogo, con el detalle
+  de exclusiones. **Conviene mirarlo siempre**: si aparecen muchos SKUs
+  faltantes, el archivo o el catálogo Excel están desalineados.
+
+## Volumen General (solo en modo Estocástico)
+
+- **Total de Órdenes** — cuántos pedidos se generan en la corrida. Es la palanca
+  directa de carga de trabajo. Subirlo satura la flota; bajarlo la deja ociosa.
+
+## Distribución por Clase de Manejo (solo en modo Estocástico)
+
+Cinco porcentajes — **Pequeño, Mediano, Voluminoso, Pesado, Extra grande** — que
+**deben sumar 100%** (la insignia arriba a la derecha lo valida en vivo y
+bloquea el guardado si no cierra).
+
+Definen qué proporción de los pedidos generados cae en cada clase de producto.
+**Importante:** acá solo se controla *la mezcla*. La física real de cada clase
+(volumen en m³, peso en kg) vive en la hoja `SkuCatalog` del Excel, no acá.
+
+Por qué importa: una operación con 40% de "Extra grande" se comporta de forma
+completamente distinta a una con 40% de "Pequeño" — cambian los tiempos de pick,
+cuántas unidades entran por viaje y qué equipo hace falta.
+
+---
+
+# PESTAÑA 2 — Estrategias
+
+El **cerebro** de la operación: cómo se decide qué hace cada operario y cuánto
+tarda en hacerlo.
+
+## Lógica de Despacho
+
+### Estrategia de Asignación
+
+Define cómo se elige la **primera** tarea de cada recorrido (el resto del
+recorrido se arma siguiendo la secuencia de picking del Excel en los tres casos).
+
+| Opción | Cómo decide | Cuándo conviene |
+|---|---|---|
+| **Optimización Global** (recomendado) | Evalúa **todas** las tareas compatibles y elige la primera por **costo** (minimiza el desplazamiento desde donde está parado el operario). | Es el default sensato: minimiza caminata muerta. |
+| **Ejecución de Plan (Filtro por Prioridad)** | Ignora el costo: toma la tarea con el **número de secuencia más bajo** del área prioritaria. Sigue el plan del Excel al pie de la letra. | Cuando querés que el almacén respete un orden de recorrido planificado, aunque implique caminar más. |
+| **Cercanía (Asignación por Proximidad)** | Solo considera tareas dentro de un **radio** alrededor del operario. | Para simular operaciones zonificadas, donde cada operario atiende su sector. |
+
+Con **Cercanía** se despliegan tres campos adicionales:
+
+- **Radio de cercanía (celdas)** — el operario prioriza tareas dentro de este
+  radio. Default: 100. Es una *preferencia*, no una pared: si no encuentra nada,
+  amplía.
+- **Paso (celdas)** — cuánto se amplía el radio en cada intento fallido.
+  Default: 50.
+- **Máx. expansiones** — cuántas veces puede ampliar antes de rendirse y mirar
+  todo el almacén. Default: 5. Con **0** no expande nunca.
+
+## Configuración de Tours
+
+### Tipo de Tour
+
+| Opción | Qué hace |
+|---|---|
+| **Tour Mixto (Multi-Destino)** | Un mismo viaje puede juntar pedidos que van a **distintas zonas de salida**. Más eficiente en recorrido. |
+| **Tour Simple (Un Destino)** | Cada viaje agrupa solo pedidos de **una misma zona de salida**. Menos eficiente al caminar, pero deja la mercadería ya separada por destino. |
+
+Es un intercambio clásico: eficiencia de picking contra orden en el muelle.
+
+## Motor Avanzado
+
+- **Ruteo anti-colisión (time-window)** — los agentes **reservan espacio y
+  tiempo** en su ruta y se esquivan entre sí, en vez de atravesarse como
+  fantasmas. Apagado = ruteo clásico. Encendido es más realista y revela
+  congestión en pasillos angostos (**activo en la configuración canónica**).
+- **Subsistema outbound (carriles de carga)** — modela el muelle de salida en
+  serio: pallets persistentes, un operario por columna, llenado de atrás hacia
+  adelante. Apagado, la descarga es instantánea en el punto de entrega.
+
+Al activar outbound aparecen:
+
+- **Intervalo de camión (s)** — cada cuántos segundos llega un camión a retirar
+  pallets. Más bajo = más camiones = el muelle se vacía más rápido. Default: 90.
+- **Capacidad del camión (pallets)** — cuántos pallets carga un camión por
+  viaje, siempre de **una sola zona de staging**. Default: 8.
+
+## Tiempos de Operación
+
+### Perfil de velocidad
+
+| Opción | Qué significa |
+|---|---|
+| **Demo — rápido** | ~10× más rápido que la realidad. Para presentaciones: la simulación "se ve" avanzar. Valores: 0.1 s/celda, factor montacargas 0.8, horquilla 2 s. |
+| **Real — calibrado** | Escala real, 1 celda = 1 metro, con benchmarks de industria (operario 1 m/s, montacargas 2 m/s). Valores: 1.0 s/celda, factor 0.5, picking 15 s/línea, horquilla 8 s. |
+| **Personalizado** | Se selecciona solo cuando tus valores no coinciden con ninguno de los dos anteriores. |
+
+**Para tomar decisiones de negocio usá "Real".** "Demo" sirve para mostrar.
+
+Campos individuales (el perfil los completa, pero podés editarlos a mano):
+
+- **Tiempo por celda — Operario (s/celda)** — cuánto tarda un operario a pie en
+  cruzar una celda del mapa.
+- **Factor velocidad Montacargas** — multiplica el tiempo del operario. **Menor
+  = más rápido.** 0.5 significa el doble de velocidad que una persona.
+- **Tiempo de picking por línea (s)** *(opcional)* — tiempo fijo por línea de
+  pedido. Si se deja vacío, usa el tiempo de descarga de cada agente.
+- **Tiempo de horquilla — Montacargas (s)** — subir/bajar la horquilla en cada
+  operación. Es el costo de trabajar en altura.
+
+## Tiempo de Pick por Producto
+
+Modelo fino de cuánto tarda **cada pick**, según la fórmula:
+
+```
+(base + s/unidad × cantidad + s/kg × peso) × multiplicador de clase + recargo de clase
+```
+
+- **Base por pick (s)** — acercarse, escanear, posicionarse. Si se deja
+  **vacío**, el motor usa el tiempo histórico (comportamiento viejo). Calibrado:
+  10 s.
+- **Por unidad (s/u)** — cada unidad extra del mismo SKU. Calibrado: 2 s.
+- **Por volumen** — término opcional; normalmente 0, porque el efecto del tamaño
+  ya lo captura la clase de manejo.
+- **Por peso (s/kg)** — el "factor fatiga": un artículo de 85 kg agrega ~13 s.
+  Calibrado: 0.15 s/kg.
+- **Mínimo (s)** — piso absoluto: ningún pick puede tardar menos.
+
+## Clases de Manejo
+
+Una grilla con seis filas — las cinco clases más **GENERAL (sin clase)**, que
+aplica a los SKU que no tienen clase asignada. Cada una con tres campos:
+
+- **Mult. de tiempo** — multiplica el tiempo de pick. Un "Extra grande" con 2.2
+  tarda más del doble que un artículo estándar.
+- **Recargo (s)** — segundos fijos que se suman (maniobra, ayuda de un segundo
+  operario).
+- **Pack (s)** — tiempo extra de **empaque en la descarga**. 0 = sin empaque.
+
+Valores por defecto: Pequeño 0.8 / Mediano 1.0 / Voluminoso 1.3 (+3 s) / Pesado
+1.5 (+5 s) / Extra grande 2.2 (+15 s).
+
+## Velocidad según Carga *(opcional, apagado por defecto)*
+
+Modela que **una persona cargada camina más lento** (dato biomecánico real:
+1.35 m/s vacío → 1.10 m/s con 22 kg).
+
+- **Reducción por kg** — cuánta velocidad se pierde por kilo. Calibrado: 0.0084.
+- **Reducción máxima (0–0.9)** — piso de velocidad. Con 0.5, ni el operario más
+  cargado baja del 50% de su paso normal.
+- **Aplicar también a montacargas** — por defecto **NO**, porque el peso lo
+  carga la máquina, no el cuerpo del operario.
+
+## Variabilidad Humana *(opcional, apagado por defecto)*
+
+Los tiempos dejan de ser un promedio fijo y pasan a seguir una distribución
+Log-Normal (nunca negativa, con cola hacia la derecha).
+
+- **Coeficiente de variación (CV)** — dispersión relativa. 0.25 = variación
+  humana típica; 0.5 = operación muy irregular.
+
+**Por qué encenderlo:** los promedios deterministas **sobreestiman la capacidad**
+y esconden cuellos de botella. La corrida sigue siendo reproducible bajo la
+misma semilla, así que los experimentos A/B siguen funcionando.
+
+---
+
+# PESTAÑA 3 — Flota de Agentes
+
+Quiénes trabajan, con qué capacidad y **dónde puede trabajar cada uno**.
+
+## Generar Flota por Defecto
+
+Crea de un saque una flota estándar. Útil para arrancar. **Reemplaza la flota
+actual**, así que pide confirmación.
+
+## Tipo de equipo requerido por área
+
+Un desplegable por cada área del almacén, con dos valores posibles:
+**GroundOperator** (operario a pie) o **Forklift** (montacargas).
+
+**Este es el control más importante de la pantalla, y conviene entender por qué.**
+Es la fuente de verdad de qué equipo puede operar en cada área. Desde la
+corrección BK-06 (septiembre 2026), **el mapa manda sobre todo lo demás**:
+
+- Un operario a pie **no puede** recibir trabajo de un área asignada a
+  montacargas, aunque en su lista de prioridades figure esa área. Antes sí podía,
+  y eso permitía algo físicamente imposible: bajar mercadería de racks altos sin
+  montacargas.
+- El **tamaño de las tareas** de cada área se calcula con la capacidad del equipo
+  que la atiende. Si un área es de montacargas, sus tareas se dimensionan para
+  montacargas.
+
+Si configurás un agente con prioridad en un área que no le corresponde, el motor
+**avisa por consola** (`[WARN][CONFIG]`) y la ignora, en vez de degradar en
+silencio.
+
+> **Supuesto vigente a confirmar:** hoy el mapa asume que `Area_High` y
+> `Area_Special` son 100% de montacargas y `Area_Ground` 100% de operarios a pie.
+> Si en tu almacén real no es así, se corrige **acá mismo**, sin tocar código.
+> Hoy el modelo admite **un solo tipo de equipo por área**; las áreas mixtas
+> están pendientes (BK-07 en el backlog).
+
+## Cobertura de áreas
+
+Indicador en vivo, no editable. Marca en rojo las áreas del layout que quedaron
+**sin ningún agente capaz**. Si hay áreas descubiertas o la flota está vacía,
+**no se puede guardar ni correr** — es una protección para no lanzar una
+simulación que se colgaría esperando a alguien que no existe.
+
+## Grupos de agentes (Operarios Terrestres / Montacargas)
+
+Se agregan con **+ Añadir Grupo**. Un "grupo" es un conjunto de agentes
+idénticos. Cada grupo tiene:
+
+- **Cantidad** — cuántos agentes de este tipo. La palanca más directa sobre la
+  capacidad total del almacén.
+- **Capacidad (L)** — cuánto volumen carga cada agente por viaje. Determina
+  cuántas unidades entran antes de tener que volver a descargar, y también
+  **cómo se dimensionan las tareas** de las áreas que atiende este tipo.
+- **Tiempo Descarga (s)** — cuánto tarda en dejar la mercadería en el punto de
+  entrega.
+- **Prioridades de Work Area** — filas de **Work Area** (desplegable con las
+  áreas del layout) + **Prioridad** (número; **menor = más urgente**). Definen el
+  orden en que el agente busca trabajo: primero agota su área de prioridad 1,
+  después la 2, etc.
+
+> Si el desplegable de Work Area aparece vacío, andá a la pestaña **Layout y
+> Datos** y usá **Cargar Work Areas** para leerlas del Excel.
+
+---
+
+# PESTAÑA 4 — Layout y Datos
+
+De dónde salen el mapa y los datos maestros.
+
+- **Archivo Layout (.tmx)** — el mapa físico del almacén (hecho con Tiled).
+  Define pasillos, racks, muelles y zonas. Default: `layouts/WH1.tmx`.
+- **Archivo de Secuencia (.xlsx)** — el Excel maestro: ubicaciones, secuencia de
+  picking, catálogo de SKU (hoja `SkuCatalog`), muelles de recepción. Default:
+  `layouts/Warehouse_Logic.xlsx`.
+- **Cargar Work Areas** — lee las áreas de trabajo del Excel y las pone
+  disponibles en los desplegables de la pestaña Flota. **Ejecutalo después de
+  cambiar el Excel.**
+
+---
+
+# PESTAÑA 5 — Outbound Staging
+
+Por qué puerta sale cada pedido. Un camión se lleva pallets de **una sola zona
+por viaje** (nunca mezcla rutas).
+
+**Orden de precedencia** — un pedido elige su zona así, y el primero que aplica
+gana:
+
+1. Zona explícita en el archivo de órdenes.
+2. Destino mapeado en **Destino → Zona** (abajo).
+3. Reparto aleatorio por porcentaje.
+
+## Reparto Aleatorio por Zona
+
+Siete porcentajes (**Staging 1 a 7**) que **deben sumar 100%**. Es el último
+recurso: se usa solo si el pedido no trae zona ni destino mapeado. Útil en modo
+Estocástico, donde no hay destinos reales.
+
+> Hoy la configuración canónica manda **100% a la zona 1**. Repartir el tráfico
+> entre las 7 zonas reales es una decisión de negocio pendiente.
+
+## Destino → Zona (por pedido)
+
+Filas de **nombre de destino** (ej. `TIENDA_NORTE`) → **zona de staging (1-7)**.
+
+Solo tiene efecto en modo **Determinista**, cuando el pedido trae el campo
+`destino`. Los pedidos de un mismo destino **siempre salen agrupados**, sin
+importar el reparto aleatorio. Es la forma de modelar rutas de reparto reales.
+
+---
+
+# PESTAÑA 6 — Inbound (Recepción)
+
+Todo lo anterior es **sacar** mercadería. Esta pestaña agrega **meterla**:
+camiones que llegan a los muelles, descargan pallets y operarios que los guardan
+(*putaway*).
+
+**Con el inbound apagado, la simulación es solo de picking.**
+
+- **Activar inbound (recepción + putaway)** — interruptor principal.
+
+### Modo de llegadas
+
+| Opción | Qué hace |
+|---|---|
+| **Determinista (archivo ASN)** | Cada camión, su hora y su contenido salen de un archivo. Escenario real y reproducible. |
+| **Estocástico (intervalo fijo)** | Camiones sintéticos con SKUs muestreados del catálogo. Para prueba de estrés. |
+
+- **Archivo ASN** *(modo determinista)* — JSON con la agenda de camiones
+  (`truck_id`, `arrival_time` en segundos, líneas de SKU + cantidad, `dock_id`
+  opcional). Ejemplo: `layouts/Inbound Test.json`.
+- **Modo estocástico** — cuatro campos: **Intervalo entre camiones (s)**,
+  **Cantidad de camiones**, **Pallets por camión**, **Unidades por pallet**. La
+  agenda es finita: la simulación termina cuando todo lo recibido quedó guardado.
+- **Descarga por pallet (s)** — cuánto tarda el camión en bajar cada pallet al
+  muelle.
+- **Carga del pallet por el operario (s)** — cuánto tarda el operario en tomar el
+  pallet del muelle antes de llevarlo a su ubicación.
+
+### Prioridad de la flota compartida
+
+Los mismos operarios hacen picking y putaway. Esto decide quién gana:
+
+| Opción | Consecuencia |
+|---|---|
+| **Picking primero** | El putaway usa capacidad ociosa. Los pallets pueden esperar **horas** en el muelle si la flota está despachando. |
+| **Recepción primero** | Los pallets se guardan apenas aterrizan, a costa del ritmo de picking. |
+
+Compará ambos en Experimentos A/B con el KPI "espera pallet→agente".
+
+### Cross-docking
+
+**El stock del día rescata pedidos sin stock.** Solo en modo de pedidos
+**Determinista**: si un pedido quedó sin stock al abrir y durante el día llega un
+camión con ese SKU, se genera automáticamente el pick para cumplirlo en la misma
+corrida. El KPI "fill-rate efectivo" muestra la mejora contra el fill-rate de
+apertura.
+
+> Si el modo de pedidos es Estocástico, la UI avisa que se desactivará solo: no
+> hay pedidos reales que rescatar.
+
+### Estrategia de Slotting
+
+**Dónde se guarda cada pallet que llega.** Cada SKU vive en varias ubicaciones
+posibles; la estrategia elige entre ellas. Es la palanca principal a comparar en
+A/B.
+
+| Opción | Lógica | Intercambio |
+|---|---|---|
+| **Fija por SKU** | Siempre el mismo slot (reposición clásica). | Predecible, pero puede implicar viajes largos. |
+| **Más cercana al muelle** | Minimiza el viaje de guardado. | Guardás rápido hoy; podés pagarlo mañana al pickear. |
+| **ABC por rotación** | Lo que más rota queda cerca del despacho. | Guarda más lento hoy, **pickea más rápido mañana**. |
+
+---
+
+# PESTAÑA 7 — Optimización
+
+Búsqueda automática de la mejor configuración con Optuna. Corre N simulaciones
+variando **flota, estrategia de despacho, tareas por tour y radio de cercanía**
+(si aplica), buscando maximizar throughput contra costo.
+
+- **Trials** — cuántas configuraciones distintas probar. Más = mejor resultado,
+  más tiempo.
+- **Jobs paralelos** — cuántas simulaciones a la vez. Limitado por tu CPU.
+- **Costo Ground ($/h)** / **Costo Forklift ($/h)** — cuánto cuesta cada tipo de
+  agente por hora. **Definen el intercambio**: si el montacargas es muy caro, el
+  optimizador preferirá operarios a pie.
+- **Penalización WO fallida ($)** — castigo por tarea no completada.
+- **Penalización SLA vencido ($)** — castigo por pedido entregado después de su
+  plazo. **Sin plazos (`due_time`) en los pedidos, no tiene efecto.**
+
+El estudio corre en segundo plano; no hace falta dejar la pestaña abierta.
+Muestra progreso, mejor score y los parámetros ganadores.
+
+---
+
+# PESTAÑA 8 — Experimentos A/B
+
+Compara **dos configuraciones** con rigor estadístico y dice si la diferencia es
+**real** o **ruido aleatorio**.
+
+**Por qué existe:** la simulación es estocástica. Dos corridas de la misma
+configuración dan números distintos. Una sola corrida **no alcanza** para decidir.
+
+- **Config A (referencia)** / **Config B (variante)** — "Actual" es el
+  `config.json` vigente; el resto son los presets guardados con el botón
+  **Guardar**.
+- **Réplicas por config** — cuántas corridas de cada una. Más réplicas =
+  veredicto más confiable pero más lento (~10-15 s por réplica). **Mínimo útil: 5.**
+- **Semilla base** — ambas configuraciones usan **las mismas semillas**
+  (pareadas), de modo que la diferencia observada sea de la configuración y no
+  del azar.
+
+Ejemplos de uso: comparar dos estrategias de slotting, "picking primero" contra
+"recepción primero", o dos tamaños de flota.
+
+---
+
+# Apéndice A — Validaciones que bloquean
+
+La UI impide guardar o correr si:
+
+1. La **distribución por clase de manejo** no suma 100%.
+2. El **reparto de staging** no suma 100%.
+3. La **flota está vacía** o hay áreas del layout **sin ningún agente capaz**.
+
+Son protecciones deliberadas contra simulaciones que se colgarían o darían
+resultados sin sentido.
+
+# Apéndice B — Flujo recomendado
+
+1. **Layout y Datos** → cargá el mapa y el Excel; ejecutá **Cargar Work Areas**.
+2. **Flota** → revisá el mapa de equipo por área, creá los grupos y verificá que
+   la cobertura esté toda en verde.
+3. **Carga de Trabajo** → elegí modo y volumen.
+4. **Estrategias** → elegí perfil de velocidad (**Real** para decidir) y la
+   lógica de despacho.
+5. *(Opcional)* **Outbound Staging** / **Inbound** según lo que quieras modelar.
+6. **Aplicar Configuración** → **Run Simulation** → **Abrir Visor**.
+7. Para decidir entre dos opciones: guardá ambas como presets y usá
+   **Experimentos A/B**. No decidas con una sola corrida.
+
+# Apéndice C — Qué cambia el "comportamiento de referencia"
+
+El proyecto tiene una prueba automática que verifica que el motor produzca
+resultados **idénticos** ante la configuración canónica. Cualquier cambio que
+apliques al `config.json` y que altere el comportamiento hará que esa prueba
+falle — **lo cual es correcto y esperado** si el cambio fue intencional. En ese
+caso hay que regenerar la referencia (tarea de desarrollo, no de configuración).
+
+Los cambios más habituales que la alteran: total de órdenes, distribución de
+clases, flota, estrategia de despacho, perfil de velocidad y reparto de staging.
+
+---
+
+*Referencias técnicas: `CLAUDE.md` (arquitectura y flags), `docs/STATE.md`
+(estado vigente), `docs/PLAN_BK06_CAPACIDAD_AREA.md` (por qué el mapa de equipo
+por área manda), `docs/antiguos/PLAN_INIT7_INBOUND.md` (contrato del inbound),
+`docs/antiguos/PLAN_INIT8_TIEMPOS.md` (calibración de tiempos y fuentes).*

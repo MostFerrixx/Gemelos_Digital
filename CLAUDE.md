@@ -137,6 +137,7 @@ para el razonamiento completo detras de esta estructura.
 | `docs/CHANGELOG.md` | Historial de iniciativas cerradas, terso, con sha de commit | Solo se AGREGA arriba, nunca se edita lo viejo |
 | `docs/BACKLOG.md` | Solo lo pendiente/abierto, con lo minimo para retomarlo | Se recorta cuando algo pasa a CHANGELOG |
 | `docs/antiguos/` | Planes ya ejecutados + docs de referencia puntual (no vigentes) | Solo se agrega (git mv), no se edita |
+| `docs/MANUAL_CONFIGURACION.md` | Manual de USUARIO del configurador web: que hace cada control de cada pestana y su efecto real en el motor | Cuando se agrega/cambia/elimina un control de la UI |
 | `README.md` (raiz) | Onboarding para un humano nuevo: vision, instalacion, uso | Cuando cambia el flujo de instalacion/uso real |
 | `AUDITORIA.md` | Snapshot puntual (mayo 2026) del diagnostico estructural | Nunca (es historico a proposito) |
 
