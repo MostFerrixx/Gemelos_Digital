@@ -10,6 +10,56 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-07
+
+- **BK-06 — capacidad por area vs. flota heterogenea (BUG de motor).**
+  `5f1a5b0` (plan+RCA), `cc8f58f` (F0), `3db8012` (F1), `d53767a` (F2/F3),
+  `98bc419` (F4 baseline). Plan, RCA y resultados:
+  `docs/PLAN_BK06_CAPACIDAD_AREA.md`.
+  **El bug:** la clave `capacity` alimentaba dos cosas desacopladas -- la
+  capacidad fisica del operario y el divisor que dimensiona WOs por area. Con
+  el canonico (`agent_types: []`) la segunda quedaba CIEGA
+  (`operator_capacities = {}`) y dimensionaba TODAS las areas a 150, aunque
+  las atendieran montacargas de 1000 (factor 6,7x). **Causa raiz:**
+  `work_area_equipment` ya era la fuente de verdad de que equipo sirve cada
+  area (MEJ-3 QA-3) y la consultaban 3 capas, pero **ninguna era el hot-path
+  de simulacion**: el motor decidia compatibilidad solo por
+  `work_area_priorities`, que la contradecia (el ground se declaraba apto para
+  Area_High). **El fix:** el mapa manda en el motor (`src/core/work_areas.py`
+  nuevo), la capacidad por area se deriva de la flota real tomando el MINIMO
+  como red de seguridad (`src/core/fleet.py` nuevo), y el dispatcher ya no
+  devuelve WOs que no caben (antes: 9.341 `[DISPATCHER ERROR]` en bucle por la
+  contradiccion entre `_seleccionar_primera_wo` y `_construir_tour_por_secuencia`).
+  Deudas saldadas: fuente unica de flota (`crear_operarios` tenia dos ramas
+  duplicadas con las capacidades HARDCODEADAS 150/1000 que `warehouse` no
+  veia) y capacidades configurables (bloque opt-in `fleet_defaults`,
+  principio rector #2). +14 tests (`test_bk06_capacidad_area.py`), 207 passed.
+  **Trade-off aceptado por el Director:** makespan 7440 -> 8783 s (+18,1%) y
+  baseline regenerado (`2233b3c6` -> `95b59db0`, 15.925.714 bytes). El 7440
+  no era legitimo: se lograba en parte con asignaciones fisicamente
+  imposibles (terrestres bajando mercaderia de racks altos). Las 626 WOs (vs
+  666) mueven el MISMO volumen (21.150) y las mismas 300 ordenes: 40 viajes
+  menos, no menos trabajo. Realismo > KPI historico (`CLAUDE.md` 1.5).
+  **Validacion del diagnostico:** variando solo `num_montacargas`, 2+3 da
+  6042 s (-18,8% vs el baseline viejo) y 2+4 da 4844 s (-34,9%); 2+5 empeora
+  (congestion). **Prueba de equivalencia:** canonico == `agent_types`
+  explicito (626/8783 ambos), lo que desbloquea BK-05 opcion (b).
+  Abiertos derivados: BK-07 (areas mixtas), BK-08 (confirmar el mapa con el
+  almacen real -- SUPUESTO activo), BK-09 (flota 2+2 sub-dimensionada).
+
+- **Principio rector del producto** fijado por el Director y registrado en
+  `CLAUDE.md` seccion 1.5: realismo > configurabilidad > usabilidad. Un KPI
+  logrado con fisica imposible es un bug, no una meta. Nacio del hallazgo de
+  BK-06.
+
+- **Limpieza de ramas muertas de 2025:** borradas
+  `feat/realtime-workorder-dashboard` y `fix/configurator-tool` (GUI de
+  escritorio archivadas, sin relacion con la cadena viva). Reversible por tag:
+  `archive/feat-realtime-workorder-dashboard`, `archive/fix-configurator-tool`
+  (pusheados a origin).
+
+---
+
 ## 2026-07-12 (cont. 3)
 
 - **Actualizacion documental completa + triage a docs/antiguos/.** A pedido

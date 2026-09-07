@@ -1,17 +1,17 @@
 # BACKLOG — Gemelo Digital de Almacen
 # Solo lo PENDIENTE. Lo cerrado vive en docs/CHANGELOG.md (no se repite aca).
 
-Actualizado: 2026-07-12 · Responsable: Cerebellum
+Actualizado: 2026-09-07 · Responsable: Cerebellum
 
-*(INIT-7 INBOUND completa F0-F5 el 2026-07-10; INIT-8 TIEMPOS completa F1-F4
-el 2026-07-11 -> ambas en CHANGELOG. Auditoria de INIT-8 el 2026-07-11:
-los 4 hallazgos AUD8-1..4 quedaron APLICADOS el 2026-07-12, ver CHANGELOG.)*
+*(BK-06 CERRADA el 2026-09-07 -> CHANGELOG. De ella salieron BK-07, BK-08 y
+BK-09, abiertos abajo. INIT-7 INBOUND completa F0-F5 el 2026-07-10; INIT-8
+TIEMPOS completa F1-F4 el 2026-07-11 con los 4 hallazgos AUD8-1..4 aplicados
+el 2026-07-12 -> todo en CHANGELOG.)*
 
 ## Indice (de un vistazo)
 
 | Item | Estado | Prioridad | Esfuerzo | Bloqueo |
 |------|--------|-----------|----------|---------|
-| BK-06 — capacidad por area vs. flota heterogenea (BUG de motor) | F0-F3 HECHAS Y VALIDADAS | **Alta** | -- | F4 (baseline) + merge: OK del Director |
 | BK-07 — areas mixtas (varios tipos de equipo por area) | ABIERTO (2026-07-25) | Media | Medio | Confirmar con el cliente si existen areas mixtas |
 | BK-08 — confirmar work_area_equipment con el almacen real | ABIERTO (2026-07-25) | **Alta** (supuesto activo) | Trivial (config) | Lectura del almacen real (Director/cliente) |
 | BK-09 — flota 2+2 sub-dimensionada (hallazgo de negocio) | ABIERTO (2026-07-25) | Media | Trivial (config) | Decision de negocio del Director |
@@ -75,40 +75,6 @@ Con un solo montacargas mas, el modelo realista ya supera el baseline
 historico; el optimo esta en 2+4. Es una decision de negocio del Director
 (comprar/asignar equipos), no un bug. Cambiar el canonico rompe el baseline
 intencionalmente. Insumo natural para el optimizador (INIT-3).
-
----
-
-## BK-06 — capacidad por area vs. flota heterogenea (BUG de motor)
-
-**Hallazgo 2026-07-25, al intentar BK-05 opcion (b). F0-F3 HECHAS Y VALIDADAS;
-falta F4 (regenerar baseline) + merge, ambos con OK del Director.** Plan
-completo con RCA, resultados y validacion: `docs/PLAN_BK06_CAPACIDAD_AREA.md`.
-
-La clave `capacity` de `agent_types` alimenta dos cosas distintas: la capacidad
-fisica del operario y el divisor que dimensiona WOs por area
-(`warehouse._validar_y_ajustar_cantidad`). Con el canonico (`agent_types: []`)
-la segunda via queda ciega: `operator_capacities = {}` y todo se dimensiona a
-150, aunque los montacargas se instancien con capacidad 1000 (verificado en la
-corrida canonica). Las WOs de `Area_High`/`Area_Special` se dimensionan a 1/6,6
-de la capacidad real del equipo que las mueve; 40 WOs divididas en el canonico.
-
-Poblar `agent_types` de forma ingenua NO lo arregla: rompe la simulacion. El
-`work_area_priorities` del ground incluye `Area_High`/`Area_Special`, asi que
-recibe WOs dimensionadas para montacargas (1000) que nunca puede levantar (150)
--> `_seleccionar_primera_wo` devuelve la WO oversized y
-`_construir_tour_por_secuencia` la rechaza, en bucle.
-
-**Medicion (2 corridas, seed 42):** canonico 666 WOs / 7440 s / 0 errores vs.
-`agent_types` ingenuo 626 WOs (-40) / 7955 s (+6,9%) / **9.341**
-`[DISPATCHER ERROR]` sobre 5 WOs huerfanas.
-
-**Causa raiz:** `work_area_equipment` ya declara que equipo sirve cada area
-(MEJ-3 QA-3) y lo consultan 3 capas (event_generator, config_manager,
-fleet-manager.js), pero **el hot-path de simulacion no lo mira**: el motor
-decide compatibilidad solo por `work_area_priorities`, que puede contradecirlo.
-
-Rompe el baseline byte-identico de forma intencional (no hay version que lo
-preserve). Bloquea BK-05 opcion (b) e INIT-3 v3.
 
 ---
 
@@ -180,9 +146,18 @@ Unica pieza diferida que queda de INIT-3 (la UI web se completo en v2, ver
 CHANGELOG 2026-07-05): **capacidades por tipo de agente en el espacio de
 busqueda**. Requiere que el optimizador arme un `agent_types` explicito por
 trial en vez de usar el fallback legacy (`num_operarios_terrestres`/
-`num_montacargas`), ya que la capacidad esta hardcodeada en el fallback de
-`operators.py` (150 ground / 1000 forklift, no leida de config). Cambio de
-representacion mas grande, no un fix.
+`num_montacargas`).
+
+**ACTUALIZACION 2026-09-07: MUCHO MAS BARATO tras BK-06.** El bloqueo de fondo
+era que la capacidad estaba HARDCODEADA en el fallback de `operators.py` (150 /
+1000, no leida de config). Ya no: la flota se resuelve en
+`core.fleet.resolver_flota` y las capacidades salen del bloque configurable
+`fleet_defaults`. Ademas quedo probado que el canonico y su equivalente con
+`agent_types` explicito dan resultados IDENTICOS, asi que el optimizador puede
+generar flotas explicitas sin cambiar el comportamiento base. Sigue siendo un
+cambio de representacion en `src/tools/optimizer.py`, pero ya no arrastra un
+fix de motor. Insumo natural: BK-09 (la flota 2+2 esta sub-dimensionada; el
+optimizador deberia encontrarlo solo).
 
 ---
 
