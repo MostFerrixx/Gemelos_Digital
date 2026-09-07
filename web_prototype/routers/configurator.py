@@ -2,6 +2,7 @@
 """Endpoints del CONFIGURADOR web (config.json, presets, upload de ordenes).
 REFACTOR 2026-07-07: extraido verbatim del monolito server.py."""
 import os
+import sys
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
@@ -45,6 +46,56 @@ def save_config(data: ConfigData):
             return {"success": True, "message": "Configuration saved successfully"}
         else:
             return {"success": False, "errors": errors}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/configurator/resolve-fleet")
+def resolve_fleet(data: ConfigData):
+    """Devuelve la flota REAL que usaria el motor para esta configuracion.  (BK-05)
+
+    Un config puede definir la flota de dos formas: explicita (`agent_types`) o
+    por los contadores legacy (`num_operarios_terrestres`/`num_montacargas`),
+    que es como esta el config.json canonico. La UI solo sabe representar la
+    forma explicita, asi que con la legacy mostraba la pestana Flota VACIA y
+    bloqueaba el guardado, aunque el motor corriera perfecto.
+
+    Este endpoint resuelve la flota con la MISMA funcion que usa el motor
+    (`core.fleet.resolver_flota`, fuente unica de verdad desde BK-06) para que
+    la UI materialice los grupos en vez de duplicar la logica.
+
+    Devuelve una entrada por AGENTE; el frontend (`fleetManager.loadFleet`) las
+    agrupa por configuracion identica.
+    """
+    try:
+        # El motor importa como `core.x` (con src/ en el path). El server web
+        # solo tiene la raiz, asi que se agrega src/ aca, acotado a este import,
+        # en vez de tocar el sys.path global de un servidor que ya funciona.
+        src_dir = os.path.join(PROJECT_ROOT, "src")
+        if src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
+        from core.fleet import resolver_flota
+        from core.work_areas import effective_work_area_priorities
+
+        config = data.config or {}
+        flota = resolver_flota(config)
+
+        # Se devuelven las areas EFECTIVAS, no las declaradas. Desde BK-06 el
+        # mapa `work_area_equipment` manda: un operario terrestre declarado en
+        # un area de montacargas NO va a recibir ese trabajo. Mostrar la lista
+        # declarada haria que la UI prometa algo que el motor no hace (y que el
+        # panel de cobertura marque "tipo incorrecto" en una flota sana).
+        for agente in flota:
+            agente["work_area_priorities"] = effective_work_area_priorities(
+                config, agente.get("type"), agente.get("work_area_priorities"))
+
+        return {
+            "success": True,
+            "agent_types": flota,
+            # `derived` = la flota NO estaba explicita en el config: la UI debe
+            # avisar que la materializo (y que al guardar quedara explicita).
+            "derived": not (data.config or {}).get("agent_types"),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

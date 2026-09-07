@@ -41,6 +41,19 @@ sube 18,1% respecto al viejo 7440 s, que no era legitimo: se lograba en parte
 con asignaciones fisicamente imposibles. Trade-off aceptado por el Director
 (principio rector #1, `CLAUDE.md` 1.5).
 
+## Trabajo en curso (rama `docs/manual-configuracion`, sin mergear)
+
+1. **Manual de configuracion** (`docs/MANUAL_CONFIGURACION.md`): manual de
+   usuario completo del configurador web (8 pestanas, todos los controles).
+2. **BK-05 RESUELTO**: la pestana Flota ya materializa la flota legacy y se
+   puede guardar. Endpoint nuevo `POST /api/configurator/resolve-fleet` +
+   `_materializeLegacyFleet` en `app.js`. 216 passed, GATE PASS (no toca motor).
+
+**Pendiente de decision del Director:** si se aplica el config desde la UI, el
+`config.json` pasara a tener `agent_types` explicito. Los EVENTOS son
+identicos (probado en BK-06 seccion 9.6), pero la metadata del .jsonl cambia
+=> el baseline habria que regenerarlo. Hoy el canonico NO fue modificado.
+
 ## Decisiones del Director pendientes
 
 1. **BK-08 (ALTA) — confirmar `work_area_equipment` con el almacen real.** Todo
@@ -53,9 +66,7 @@ con asignaciones fisicamente imposibles. Trade-off aceptado por el Director
    almacen real del cliente y mostrarle el costo, no maquillar el KPI.
 3. **BK-07 — areas mixtas** (varios tipos de equipo por area). Hoy el mapa
    admite uno solo. Depende de la respuesta a BK-08.
-4. **BK-05 — guard de flota vacia en la UI.** DESBLOQUEADO por BK-06 (la
-   opcion (b) ya es un no-op de comportamiento). Elegir entre (a), (b) o (c).
-5. **BK-02 — FIFO Estricto en UI:** redefinir que deberia hacer antes de
+4. **BK-02 — FIFO Estricto en UI:** redefinir que deberia hacer antes de
    exponerlo.
 6. **`outbound_staging_distribution` real** en el canonico (hoy 100% zona 1).
 7. **INIT-6 Opcion C (clustering geografico):** solo con datos reales de
@@ -64,8 +75,8 @@ con asignaciones fisicamente imposibles. Trade-off aceptado por el Director
 ## Siguiente prioridad (sin decidir aun)
 
 Candidatos: **INIT-3 v3** (capacidades por agente en el optimizador -- quedo
-MUCHO mas barato tras BK-06 y encontraria BK-09 solo), BK-05 (~1 h la opcion a),
-las decisiones de arriba, o iniciativa nueva del Director.
+MUCHO mas barato tras BK-06 y encontraria BK-09 solo), BK-10 (~30 min, el boton
+Restart no reinicia), las decisiones de arriba, o iniciativa nueva del Director.
 
 ## Que esta VIVO y ACTIVO ahora mismo (ademas de CLAUDE.md §3/§5)
 
@@ -90,8 +101,9 @@ las decisiones de arriba, o iniciativa nueva del Director.
 
 - `warehouse.db-shm` / `warehouse.db-wal`: WAL de SQLite, untracked pero ya en
   `.gitignore`.
-- BK-05 (UX): guardar el canonico desde la UI lo bloquea el guard de flota
-  vacia. Ver BACKLOG.
+- BK-10 (UX): el boton "Restart" del configurador responde `success` pero NO
+  reinicia el proceso (verificado por PID). Para aplicar cambios del backend hay
+  que relanzar el servidor a mano. Ver BACKLOG.
 - Deuda menor: la copia de `_expected_equipment_for_area` en
   `web_prototype/config_manager.py` y en `fleet-manager.js` sigue duplicada. El
   motor ya usa la fuente unica `src/core/work_areas.py`; consolidar la web

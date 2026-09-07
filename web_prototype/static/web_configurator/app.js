@@ -385,6 +385,62 @@ class WebConfigurator {
             </div>`).join('');
     }
 
+    // BK-05: materializa la flota legacy (contadores) como grupos visibles.
+    // La resolucion la hace el BACKEND con la misma funcion que usa el motor
+    // (core.fleet.resolver_flota); aca no se duplica la logica ni las
+    // capacidades por defecto.
+    async _materializeLegacyFleet(config) {
+        const nGround = parseInt(config.num_operarios_terrestres, 10) || 0;
+        const nFork = parseInt(config.num_montacargas, 10) || 0;
+
+        if (nGround + nFork <= 0) {
+            // Flota realmente vacia: no hay nada que materializar. El panel de
+            // cobertura ya avisa que hay que crear agentes.
+            this.fleetManager.clearAllGroups();
+            this._setFleetDerivedNotice(false);
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/configurator/resolve-fleet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: config })
+            });
+            const result = await response.json();
+
+            if (result.success && Array.isArray(result.agent_types) && result.agent_types.length) {
+                this.fleetManager.loadFleet(result.agent_types);
+                this._setFleetDerivedNotice(true, nGround, nFork);
+                return;
+            }
+            console.warn('[BK-05] resolve-fleet no devolvio agentes:', result);
+        } catch (e) {
+            console.error('[BK-05] No se pudo resolver la flota legacy:', e);
+        }
+        this._setFleetDerivedNotice(false);
+    }
+
+    // BK-05: aviso visible de que la flota se derivo de los contadores legacy.
+    _setFleetDerivedNotice(derived, nGround, nFork) {
+        const panel = document.getElementById('fleet-derived-notice');
+        if (!panel) return;
+        if (!derived) {
+            panel.style.display = 'none';
+            panel.innerHTML = '';
+            return;
+        }
+        panel.style.display = '';
+        panel.innerHTML =
+            '<strong>Flota derivada de la configuracion legacy.</strong> '
+            + 'Esta configuracion no listaba los agentes uno por uno: los grupos '
+            + 'de abajo se reconstruyeron desde los contadores '
+            + '(<code>' + nGround + '</code> operarios terrestres, <code>'
+            + nFork + '</code> montacargas) usando las mismas capacidades que '
+            + 'aplica el motor. Podes editarlos normalmente; al guardar quedaran '
+            + 'escritos de forma explicita.';
+    }
+
     // INIT-8 UI: visibilidad de los bloques opt-in (F3/F4).
     _updateTiemposInit8Visibility() {
         const vc = document.getElementById('vc-enabled');
@@ -1036,8 +1092,16 @@ class WebConfigurator {
         this._updateRadioCercaniaVisibility();
 
         // Tab 3: Flota de Agentes
+        // BK-05: si la flota viene explicita, se carga tal cual. Si viene en la
+        // forma LEGACY (agent_types vacio + contadores num_operarios_*, que es
+        // como esta el config.json canonico), se materializa preguntandole al
+        // backend cual es la flota REAL que usaria el motor. Antes esta pestana
+        // quedaba vacia y bloqueaba el guardado, aunque el motor corriera bien.
         if (config.agent_types && config.agent_types.length > 0) {
             this.fleetManager.loadFleet(config.agent_types);
+            this._setFleetDerivedNotice(false);
+        } else {
+            this._materializeLegacyFleet(config);
         }
         // QA-3 Opcion B: mapa area->equipo (siembra desde convencion lo que falte).
         this.fleetManager.setWorkAreaEquipment(config.work_area_equipment || {});

@@ -10,6 +10,36 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-07 (cont.)
+
+- **BK-05 — la pestana Flota quedaba vacia y bloqueaba el guardado.** El
+  `config.json` canonico define la flota con los contadores legacy
+  (`num_operarios_terrestres`/`num_montacargas`) y `agent_types: []`. La UI solo
+  sabia representar `agent_types`, asi que `loadConfiguration` no cargaba nada
+  (`if (config.agent_types.length > 0)`) y el panel de cobertura mostraba
+  "Flota vacia: no se podra guardar/correr". **El bloqueo era del FRONTEND: el
+  validador del backend ya aceptaba la forma legacy** (opcion (a) del plan, ya
+  implementada; verificado con un test). Fix (opcion (b)): endpoint
+  `POST /api/configurator/resolve-fleet` que resuelve la flota con la MISMA
+  funcion del motor (`core.fleet.resolver_flota`, fuente unica desde BK-06) y
+  devuelve las areas **EFECTIVAS** (filtradas por `work_area_equipment`, para no
+  prometer areas que el motor ignora tras BK-06); la UI materializa los grupos y
+  muestra un aviso de que los derivo. Verificado en el navegador: cobertura pasa
+  de "Flota vacia" a "Todas las areas cubiertas", con 2 terrestres (cap 150,
+  Area_Ground) y 2 montacargas (cap 1000, Area_High/Special); `serializeConfig()`
+  emite 4 agentes y contadores 2/2/4, y ese config **valida OK** contra el
+  backend (antes fallaba con "La flota esta vacia"). +9 tests
+  (`test_bk05_flota_legacy_ui.py`), 216 passed, GATE PASS (no toca el motor).
+  Abierto derivado: BK-10.
+
+- **Manual de configuracion** (`docs/MANUAL_CONFIGURACION.md`): manual de
+  usuario completo del configurador web — las 8 pestanas, cada control y cada
+  opcion de los desplegables, con el efecto real en el motor (verificado contra
+  la UI en ejecucion y contra el codigo, no solo contra las etiquetas).
+  Registrado en el mapa de documentacion de `CLAUDE.md` 4.5.
+
+---
+
 ## 2026-09-07
 
 - **BK-06 — capacidad por area vs. flota heterogenea (BUG de motor).**

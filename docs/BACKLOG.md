@@ -15,7 +15,7 @@ el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-07 — areas mixtas (varios tipos de equipo por area) | ABIERTO (2026-07-25) | Media | Medio | Confirmar con el cliente si existen areas mixtas |
 | BK-08 — confirmar work_area_equipment con el almacen real | ABIERTO (2026-07-25) | **Alta** (supuesto activo) | Trivial (config) | Lectura del almacen real (Director/cliente) |
 | BK-09 — flota 2+2 sub-dimensionada (hallazgo de negocio) | ABIERTO (2026-07-25) | Media | Trivial (config) | Decision de negocio del Director |
-| BK-05 — guard de flota vacia bloquea guardar el canonico desde la UI | ABIERTO (hallazgo 2026-07-12) | Baja-Media (UX) | ~1 h (opcion a) | DESBLOQUEADO: opcion (b) ya viable tras BK-06 |
+| BK-10 — el boton "Restart" responde success pero NO reinicia el servidor | ABIERTO (2026-09-07) | Baja | ~30 min | Ninguno |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
@@ -78,31 +78,22 @@ intencionalmente. Insumo natural para el optimizador (INIT-3).
 
 ---
 
-## BK-05 — guard de flota vacia al guardar el canonico desde la UI
+## BK-10 — el boton "Restart" responde success pero NO reinicia el servidor
 
-**Hallazgo colateral de la tarea de UI de tiempos (2026-07-12), PRE-EXISTENTE.**
-El config canonico usa `agent_types: []` + los contadores legacy
-(`num_operarios_terrestres`/`num_montacargas`) como fallback de flota. La UI
-de Flota solo representa GRUPOS (`agent_types`), asi que al serializar el
-canonico produce `agent_types: []` y el validador web lo rechaza ("flota
-vacia") aunque el motor correria perfectamente con el fallback. Consecuencia:
-NO se puede guardar el canonico desde el configurador sin antes crear grupos.
-Opciones: (a) el validador acepta flota vacia si los contadores legacy > 0;
-(b) la UI materializa los contadores como grupos visibles al cargar (y el
-canonico migra a agent_types explicito = cambio de baseline); (c) dejarlo y
-documentar. Decision de diseno del Director.
+**Hallazgo colateral al arreglar BK-05 (2026-09-07).** `POST /api/system/restart`
+devuelve `{"success": true, "message": "Server restart triggered. Reloading..."}`
+pero el proceso sigue siendo el mismo (verificado por PID antes y despues: el
+puerto 8000 lo seguia sirviendo el mismo `python.exe`, con el mismo
+`StartTime`). Consecuencia practica: un cambio en el codigo del backend NO se
+aplica aunque el usuario apriete "Restart"; hay que matar el proceso y volver a
+levantarlo a mano.
 
-**ACTUALIZACION 2026-07-25 (a): la opcion (b) estaba BLOQUEADA por BK-06.** Se
-intento y se midio: migrar el canonico a `agent_types` explicito sobre la
-semantica de entonces degradaba la simulacion (-40 WOs, +6,9% de makespan,
-9.341 errores de dispatcher). No era una migracion cosmetica.
+Es engañoso justamente por el `success`: promete algo que no ocurrio (contra el
+principio rector #3, hacer visible lo invisible). Arreglar el reinicio real, o
+—si el reinicio en caliente no es viable— que la respuesta diga la verdad y la
+UI indique que hay que relanzar el servidor manualmente.
 
-**ACTUALIZACION 2026-07-25 (b): DESBLOQUEADO.** Con BK-06 F1-F3 aplicado, el
-canonico y su equivalente con `agent_types` explicito dan resultados
-IDENTICOS (626 WOs / 8783 s / 0 errores en ambos) — es la prueba de
-equivalencia de `PLAN_BK06_CAPACIDAD_AREA.md` seccion 9.6. La opcion (b) ya es
-un no-op de comportamiento. La (a) sigue siendo la mas barata si solo se
-quiere destrabar la UX.
+Ver `web_prototype/routers/system.py`.
 
 ---
 

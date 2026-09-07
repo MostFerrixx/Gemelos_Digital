@@ -276,6 +276,24 @@ Indicador en vivo, no editable. Marca en rojo las áreas del layout que quedaron
 **no se puede guardar ni correr** — es una protección para no lanzar una
 simulación que se colgaría esperando a alguien que no existe.
 
+## Aviso "Flota derivada de la configuración legacy"
+
+Una configuración puede definir la flota de dos formas: **explícita** (lista los
+grupos de agentes) o **por contadores** (solo dice "2 operarios y 2
+montacargas"). La segunda es la forma histórica, y es como viene el
+`config.json` canónico.
+
+Cuando abrís una configuración de esa segunda forma, la pantalla reconstruye los
+grupos automáticamente — consultándole al motor cuál sería la flota real — y te
+muestra un aviso azul explicando de dónde salieron. Los grupos son **editables
+como cualquier otro**, y al guardar quedan escritos de forma explícita.
+
+> Antes de esta corrección, esa pantalla aparecía **vacía** con una
+> configuración legacy y bloqueaba el guardado, aunque el motor corriera
+> perfectamente. Si ves la pestaña vacía teniendo agentes configurados,
+> es un síntoma de que algo falló al consultar el motor (mirá la consola del
+> navegador).
+
 ## Grupos de agentes (Operarios Terrestres / Montacargas)
 
 Se agregan con **+ Añadir Grupo**. Un "grupo" es un conjunto de agentes

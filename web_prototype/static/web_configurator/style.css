@@ -1381,6 +1381,23 @@ select:disabled {
 .coverage-panel:empty {
     display: none;
 }
+/* BK-05: aviso de flota derivada de los contadores legacy. Informativo (no es
+   un error): la flota se reconstruyo y es editable como cualquier otra. */
+.fleet-derived-notice {
+    margin: 8px 0 4px 0;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border-left: 3px solid var(--color-accent-blue, #3b82f6);
+    background: var(--color-surface, rgba(59, 130, 246, 0.08));
+    font-size: 13px;
+    line-height: 1.5;
+}
+.fleet-derived-notice code {
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(127, 127, 127, 0.18);
+    font-weight: 600;
+}
 .coverage-label {
     font-weight: 600;
     margin-right: 4px;
