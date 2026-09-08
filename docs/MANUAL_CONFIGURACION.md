@@ -247,11 +247,14 @@ misma semilla, así que los experimentos A/B siguen funcionando.
 # PESTAÑA 3 — Flota de Agentes
 
 Quiénes trabajan, con qué capacidad y **dónde puede trabajar cada uno**.
+Está organizada en tres tarjetas: **Equipo por Área**, **Operarios Terrestres**
+y **Montacargas**.
 
 ## Generar Flota por Defecto
 
-Crea de un saque una flota estándar. Útil para arrancar. **Reemplaza la flota
-actual**, así que pide confirmación.
+Botón en la cabecera de la tarjeta *Equipo por Área*. Crea de un saque una flota
+estándar. Útil para arrancar. **Reemplaza la flota actual**, así que pide
+confirmación.
 
 ## Tipo de equipo requerido por área
 
@@ -315,8 +318,9 @@ idénticos. Cada grupo tiene:
 - **Capacidad (L)** — cuánto volumen carga cada agente por viaje. Determina
   cuántas unidades entran antes de tener que volver a descargar, y también
   **cómo se dimensionan las tareas** de las áreas que atiende este tipo.
-- **Tiempo Descarga (s)** — cuánto tarda en dejar la mercadería en el punto de
-  entrega.
+- **Tiempo de descarga (s)** — cuánto tarda en dejar la mercadería en la zona de
+  staging. Es el tiempo de *entregar*, no el de *levantar del rack* (ese se
+  configura en Estrategias).
 - **Prioridades de Work Area** — filas de **Work Area** (desplegable con las
   áreas del layout) + **Prioridad** (número; **menor = más urgente**). Definen el
   orden en que el agente busca trabajo: primero agota su área de prioridad 1,

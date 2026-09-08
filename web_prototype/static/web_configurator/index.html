@@ -529,40 +529,65 @@
 
                 <!-- Tab 3: Flota de Agentes -->
                 <div id="tab-flota" class="tab-content">
-                    <div class="fleet-actions-bar">
-                        <button id="btn-generate-default-fleet" class="btn-text">Generar Flota por Defecto</button>
-                    </div>
+                    <p class="tab-intro">
+                        Quiénes trabajan y <strong>dónde puede trabajar cada uno</strong>.
+                        Un <em>grupo</em> es un conjunto de agentes idénticos: definís cuántos
+                        son y sus características una sola vez. El mapa de equipo por área
+                        manda sobre las prioridades: un operario a pie no recibe trabajo de
+                        un área asignada a montacargas.
+                    </p>
 
                     <!-- QA-3 Opcion B: editor del tipo de equipo requerido por cada area
                          (fuente de verdad work_area_equipment, en vez de adivinar por nombre). -->
-                    <div id="area-equipment-editor" class="area-equipment-editor"></div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Equipo por Área</h3>
+                            <button id="btn-generate-default-fleet" class="btn-text">Generar Flota por Defecto</button>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Qué tipo de equipo atiende cada área del
+                                almacén. Es la fuente de verdad: define tanto quién puede trabajar
+                                ahí como el tamaño de las tareas que se generan para esa área.</p>
+                            <div id="area-equipment-editor" class="area-equipment-editor"></div>
 
-                    <!-- C (BK-04): cobertura de areas en vivo. Marca en rojo las areas
-                         del layout sin ningun agente; se recalcula al cambiar la flota. -->
-                    <div id="area-coverage-panel" class="coverage-panel"></div>
+                            <!-- C (BK-04): cobertura de areas en vivo. Marca en rojo las areas
+                                 del layout sin ningun agente; se recalcula al cambiar la flota. -->
+                            <div id="area-coverage-panel" class="coverage-panel"></div>
 
-                    <!-- BK-05: aviso cuando la flota se materializo desde los
-                         contadores legacy (config sin agent_types explicito). -->
-                    <div id="fleet-derived-notice" class="fleet-derived-notice" style="display:none;"></div>
+                            <!-- BK-05: aviso cuando la flota se materializo desde los
+                                 contadores legacy (config sin agent_types explicito). -->
+                            <div id="fleet-derived-notice" class="fleet-derived-notice" style="display:none;"></div>
+                        </div>
+                    </div>
 
-                    <div class="fleet-section">
-                        <div class="section-header">
+                    <div class="card">
+                        <div class="card-header">
                             <h3>Operarios Terrestres</h3>
                             <button class="btn-small btn-add-group" data-agent-type="GroundOperator">+ Añadir
                                 Grupo</button>
                         </div>
-                        <div id="ground-operators-container" class="fleet-container">
-                            <!-- Groups added dynamically -->
+                        <div class="card-body">
+                            <div id="ground-operators-container" class="fleet-container">
+                                <!-- Groups added dynamically -->
+                            </div>
+                            <p class="empty-hint" data-empty-for="ground-operators-container">
+                                No hay grupos de operarios terrestres. Usá <strong>+ Añadir Grupo</strong>
+                                o <strong>Generar Flota por Defecto</strong>.</p>
                         </div>
                     </div>
 
-                    <div class="fleet-section">
-                        <div class="section-header">
+                    <div class="card">
+                        <div class="card-header">
                             <h3>Montacargas</h3>
                             <button class="btn-small btn-add-group" data-agent-type="Forklift">+ Añadir Grupo</button>
                         </div>
-                        <div id="forklifts-container" class="fleet-container">
-                            <!-- Groups added dynamically -->
+                        <div class="card-body">
+                            <div id="forklifts-container" class="fleet-container">
+                                <!-- Groups added dynamically -->
+                            </div>
+                            <p class="empty-hint" data-empty-for="forklifts-container">
+                                No hay grupos de montacargas. Usá <strong>+ Añadir Grupo</strong>
+                                o <strong>Generar Flota por Defecto</strong>.</p>
                         </div>
                     </div>
                 </div>

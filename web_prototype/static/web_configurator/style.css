@@ -522,30 +522,34 @@ body {
 }
 
 /* Fleet Management */
-.fleet-section {
-    margin-bottom: 2rem;
-}
-
-.section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.section-header h3 {
-    font-size: 1.125rem;
-    font-weight: 600;
-}
+/* La pestana Flota usa el mismo patron .card que el resto del configurador
+   (antes era la unica de las 8 sin tarjetas). `.fleet-section`,
+   `.section-header` y `.fleet-actions-bar` quedaron sin uso y se eliminaron. */
 
 .fleet-group {
-    background-color: var(--color-bg-card);
+    /* Dentro de una .card el fondo de tarjeta no contrasta: se usa el fondo de
+       la app para que cada grupo se lea como un bloque propio. */
+    background-color: var(--color-bg-app);
     border: 1px solid var(--color-border);
     border-radius: 0.5rem;
     padding: 1.25rem;
     margin-bottom: 1rem;
     position: relative;
     transition: transform 0.2s;
+}
+
+.fleet-container:last-child .fleet-group:last-child {
+    margin-bottom: 0;
+}
+
+/* Aviso cuando una seccion de flota no tiene ningun grupo. El JS lo muestra
+   u oculta segun haya grupos (ver FleetManager._updateEmptyHints). */
+.empty-hint {
+    margin: 0;
+    padding: 0.75rem 0;
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    text-align: center;
 }
 
 .fleet-group:hover {
@@ -571,6 +575,12 @@ body {
     grid-template-columns: repeat(3, 1fr);
     gap: 1rem;
     margin-bottom: 1rem;
+}
+
+/* Los parametros del grupo usan .form-group (label arriba + help-text), igual
+   que el resto del configurador; dentro del grid el margen inferior sobra. */
+.fleet-group-params .form-group {
+    margin-bottom: 0;
 }
 
 .work-area-priorities-section {
@@ -1440,10 +1450,9 @@ select:disabled {
 
 /* QA-3 Opcion B: editor del tipo de equipo requerido por area */
 .area-equipment-editor {
-    margin: 8px 0;
-    padding: 8px 10px;
-    border-radius: 6px;
-    background: var(--color-surface, rgba(127, 127, 127, 0.06));
+    /* Vive dentro de una .card: sin fondo propio, solo separacion. El titulo
+       lo pone el card-header ("Equipo por Area"). */
+    margin: 0 0 12px 0;
 }
 .area-equipment-editor:empty {
     display: none;

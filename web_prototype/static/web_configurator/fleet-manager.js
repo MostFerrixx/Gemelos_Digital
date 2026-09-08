@@ -112,8 +112,8 @@ class FleetManager {
                 + '<select class="area-eq-select" data-area="' + a + '">'
                 + opt('GroundOperator') + opt('Forklift') + '</select></div>';
         }).join('');
-        cont.innerHTML = '<div class="area-eq-title">Tipo de equipo requerido por area</div>'
-            + rows;
+        // Sin titulo propio: lo pone el encabezado de la tarjeta ("Equipo por Area").
+        cont.innerHTML = rows;
         cont.querySelectorAll('.area-eq-select').forEach((s) => {
             s.addEventListener('change', () => {
                 this.workAreaEquipment[s.getAttribute('data-area')] = s.value;
@@ -180,7 +180,19 @@ class FleetManager {
             html = '<span class="coverage-label">Cobertura de areas:</span> ' + chips + ' ' + summary;
         }
         if (panel) panel.innerHTML = html;
+        this._updateEmptyHints();
         return problems;
+    }
+
+    // Muestra el aviso de "no hay grupos" solo cuando la seccion esta vacia.
+    // Se llama desde updateAreaCoverage, que ya corre ante cualquier cambio de
+    // la flota (alta/baja de grupos, carga de config, MutationObserver).
+    _updateEmptyHints() {
+        document.querySelectorAll('.empty-hint[data-empty-for]').forEach((hint) => {
+            const cont = document.getElementById(hint.getAttribute('data-empty-for'));
+            const vacio = !cont || cont.querySelectorAll('.fleet-group').length === 0;
+            hint.style.display = vacio ? '' : 'none';
+        });
     }
 
     updateAllWorkAreaDropdowns() {
@@ -253,17 +265,20 @@ class FleetManager {
             </div>
             
             <div class="fleet-group-params">
-                <div class="fleet-param">
-                    <label>Cantidad:</label>
+                <div class="fleet-param form-group">
+                    <label>Cantidad</label>
                     <input type="number" class="input-cantidad" value="${groupData.cantidad}" min="1" max="50">
+                    <span class="help-text">Cuántos agentes de este tipo.</span>
                 </div>
-                <div class="fleet-param">
-                    <label>Capacidad (L):</label>
+                <div class="fleet-param form-group">
+                    <label>Capacidad (L)</label>
                     <input type="number" class="input-capacidad" value="${groupData.capacidad}" min="50" max="2000">
+                    <span class="help-text">Volumen que carga cada uno por viaje.</span>
                 </div>
-                <div class="fleet-param">
-                    <label>Tiempo Descarga (s):</label>
+                <div class="fleet-param form-group">
+                    <label>Tiempo de descarga (s)</label>
                     <input type="number" class="input-tiempo-descarga" value="${groupData.tiempoDescarga}" min="1" max="60">
+                    <span class="help-text">Dejar la mercadería en staging.</span>
                 </div>
             </div>
 
