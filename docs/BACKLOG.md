@@ -15,7 +15,6 @@ el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-07 — areas mixtas (varios tipos de equipo por area) | ABIERTO (2026-07-25) | Media | Medio | Confirmar con el cliente si existen areas mixtas |
 | BK-08 — confirmar work_area_equipment con el almacen real | ABIERTO (2026-07-25) | **Alta** (supuesto activo) | Trivial (config) | Lectura del almacen real (Director/cliente) |
 | BK-09 — flota 2+2 sub-dimensionada (hallazgo de negocio) | ABIERTO (2026-07-25) | Media | Trivial (config) | Decision de negocio del Director |
-| BK-11 — "Run Simulation" pisa el config.json canonico | ABIERTO (2026-09-07) | **Alta** (riesgo de corrupcion) | ~1-2 h | Decision del Director (opcion a/b/c) |
 | BK-10 — el boton "Restart" responde success pero NO reinicia el servidor | ABIERTO (2026-09-07) | Baja | ~30 min | Ninguno |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
@@ -76,35 +75,6 @@ Con un solo montacargas mas, el modelo realista ya supera el baseline
 historico; el optimo esta en 2+4. Es una decision de negocio del Director
 (comprar/asignar equipos), no un bug. Cambiar el canonico rompe el baseline
 intencionalmente. Insumo natural para el optimizador (INIT-3).
-
----
-
-## BK-11 — "Run Simulation" pisa el config.json canonico (RIESGO ALTO)
-
-**Hallazgo 2026-09-07, verificado en vivo.** `startSimulation()`
-(`web_prototype/static/index.html`, paso 1) hace `serializeConfig()` + POST a
-`/api/configurator/config` ANTES de correr: **no simula sobre una copia, escribe
-el `config.json` real** con lo que tenga el formulario en pantalla.
-
-**Incidente real de esta sesion:** una corrida lanzada desde una pestana cuyo
-formulario tenia la congestion desmarcada dejo el canonico con
-`congestion.enabled: false` / `mode: "off"`, cuando el canonico versionado la
-tiene ACTIVA. Efecto medido: 626 -> 614 WorkOrders y 35.019 -> 25.500 eventos.
-Se detecto porque el gate empezo a fallar; se restauro con `git checkout`.
-
-Es especialmente traicionero porque **el usuario no pidio guardar**: aprieta
-"correr" y se le modifica la configuracion del proyecto en silencio. Cualquier
-pestana vieja abierta se vuelve una bomba de relojeria.
-
-Opciones: (a) correr sobre un config TEMPORAL y no tocar el canonico (lo mas
-seguro; el canonico solo cambia con "Aplicar Configuracion"); (b) mantener el
-auto-guardado pero MOSTRAR un diff de lo que va a cambiar y pedir confirmacion;
-(c) refrescar el formulario desde disco antes de serializar, para no pisar con
-un estado viejo. Recomendacion de Cerebellum: **(a)**, y dejar el guardado
-explicito donde ya esta.
-
-Relacionado: mientras esto siga asi, migrar el canonico a `agent_types`
-explicito es riesgoso, porque cada corrida puede volver a alterarlo.
 
 ---
 

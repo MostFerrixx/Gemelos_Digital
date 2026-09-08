@@ -4,7 +4,8 @@ experimentos A/B). REFACTOR 2026-07-07: extraido verbatim del monolito
 server.py."""
 import json
 import os
-from typing import Optional
+import tempfile as _tempfile
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
@@ -60,8 +61,10 @@ async def websocket_simulation_runner(websocket: WebSocket):
             })
             return
         
-        # Run simulation and stream events
-        async for event in runner.run_simulation_async():
+        # Run simulation and stream events.
+        # BK-11: el cliente manda el config temporal preparado con
+        # /api/simulation/stage-config; sin el se usa el canonico.
+        async for event in runner.run_simulation_async(config_path=data.get("config_path")):
             await websocket.send_json(event)
             
     except WebSocketDisconnect:
@@ -81,6 +84,45 @@ async def websocket_simulation_runner(websocket: WebSocket):
             await websocket.close()
         except:
             pass
+
+
+class StageConfigRequest(BaseModel):
+    """Config a usar en una corrida, SIN escribir el canonico. (BK-11)"""
+    config: Dict[str, Any]
+
+
+@router.post("/api/simulation/stage-config")
+def stage_simulation_config(request: StageConfigRequest):
+    """Prepara un config TEMPORAL para correr, sin tocar el config.json.  (BK-11)
+
+    Antes, "Run Simulation" hacia POST /api/configurator/config: escribia el
+    canonico con lo que tuviera el formulario y recien despues corria. Nadie
+    pedia guardar, asi que una pestana con un estado viejo podia alterar en
+    silencio la configuracion del proyecto (incidente real: dejo la congestion
+    apagada en el canonico, 626 -> 614 WorkOrders).
+
+    Ahora la corrida usa una copia temporal en `temp_web/` y el canonico solo
+    cambia con "Aplicar Configuracion", que es explicito.
+
+    El config se VALIDA igual (mismas reglas que al guardar): si no es valido se
+    devuelve el error y no se corre, que es el comportamiento util de antes.
+    """
+    try:
+        valido, errores = config_manager.validate_config(request.config)
+        if not valido:
+            return {"success": False, "errors": errores}
+
+        temp_dir = os.path.join(PROJECT_ROOT, "temp_web")
+        os.makedirs(temp_dir, exist_ok=True)
+        fd, path = _tempfile.mkstemp(prefix="run_config_", suffix=".json", dir=temp_dir)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(request.config, f, indent=2, ensure_ascii=False)
+
+        # Se devuelve relativo al proyecto: el runner lo resuelve y asi no se
+        # expone una ruta absoluta del servidor al navegador.
+        return {"success": True, "config_path": os.path.relpath(path, PROJECT_ROOT)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/api/simulation-status")

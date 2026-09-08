@@ -1120,7 +1120,7 @@
                     this.ws.onopen = () => {
                         this.appendLog('Connected to server.', 'success');
                         // WebSocket is open, now we can send START
-                        this.ws.send(JSON.stringify({ command: 'START' }));
+                        this.ws.send(JSON.stringify({ command: 'START', config_path: this.stagedConfigPath || null }));
                         this.setStatus('Simulation starting...', 'info');
                     };
 
@@ -1160,34 +1160,42 @@
             }
 
             async startSimulation() {
-                // STEP 1: Save current configuration
-                this.setStatus('Auto-saving configuration...', 'info');
-                this.appendLog('[INFO] Auto-saving configuration...', 'info');
+                // PASO 1 (BK-11): preparar la config de ESTA corrida en un archivo
+                // TEMPORAL. Antes se hacia POST a /api/configurator/config, o sea
+                // se PISABA el config.json del proyecto con lo que hubiera en
+                // pantalla, sin que nadie pidiera guardar: una pestana con estado
+                // viejo podia alterar el canonico en silencio (incidente real: dejo
+                // la congestion apagada). El canonico ahora solo cambia con
+                // "Aplicar Configuracion", que es explicito.
+                this.stagedConfigPath = null;
+                this.setStatus('Preparando configuracion de la corrida...', 'info');
+                this.appendLog('[INFO] Preparando configuracion de la corrida (no se modifica config.json)...', 'info');
 
                 try {
                     if (window.configurator) {
                         const config = window.configurator.serializeConfig();
-                        const saveResponse = await fetch('/api/configurator/config', {
+                        const stageResponse = await fetch('/api/simulation/stage-config', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ config: config })
                         });
 
-                        const saveResult = await saveResponse.json().catch(() => ({}));
-                        if (!saveResponse.ok || saveResult.success === false) {
-                            const msg = (saveResult && Array.isArray(saveResult.errors) && saveResult.errors.length)
-                                ? saveResult.errors.join('; ')
-                                : 'No se pudo guardar la configuracion';
+                        const stageResult = await stageResponse.json().catch(() => ({}));
+                        if (!stageResponse.ok || stageResult.success === false) {
+                            const msg = (stageResult && Array.isArray(stageResult.errors) && stageResult.errors.length)
+                                ? stageResult.errors.join('; ')
+                                : 'No se pudo preparar la configuracion';
                             throw new Error(msg);
                         }
 
-                        this.appendLog('[INFO] Configuration saved successfully', 'success');
+                        this.stagedConfigPath = stageResult.config_path || null;
+                        this.appendLog('[INFO] Configuracion lista (config.json intacto)', 'success');
                     } else {
-                        console.warn('Configurator instance not found, skipping auto-save');
+                        console.warn('Configurator instance not found; se usara config.json');
                     }
                 } catch (error) {
-                    this.setStatus('Error saving configuration', 'error');
-                    this.appendLog(`[ERROR] Could not save config: ${error.message}`, 'error');
+                    this.setStatus('Error preparando la configuracion', 'error');
+                    this.appendLog(`[ERROR] Configuracion invalida: ${error.message}`, 'error');
                     return;  // Abort simulation
                 }
 

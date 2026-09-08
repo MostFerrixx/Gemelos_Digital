@@ -10,6 +10,43 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-08
+
+- **BK-11 — "Run Simulation" ya no pisa el `config.json` canonico.** El paso 1
+  de `startSimulation()` hacia POST a `/api/configurator/config`: escribia el
+  canonico con lo que tuviera el formulario y recien despues corria. Nadie pedia
+  guardar, asi que **una pestana con estado viejo alteraba la configuracion del
+  proyecto en silencio**. Incidente real que lo destapo: una corrida dejo el
+  canonico con `congestion.enabled: false` cuando el versionado la tiene ACTIVA
+  (626 -> 614 WorkOrders, 35.019 -> 25.500 eventos); lo detecto el gate y se
+  restauro con `git checkout`. Fix (opcion (a) del plan): endpoint
+  `POST /api/simulation/stage-config` que VALIDA el config y lo escribe en
+  `temp_web/` (mismo patron que el runner A/B), y `run_simulation_async(config_path)`
+  que lanza `run_generate_replay.py --config <temporal>` (path validado contra
+  PROJECT_ROOT). El canonico ahora solo cambia con "Aplicar Configuracion".
+  Verificado en el navegador con el peor caso: formulario con la congestion
+  desmarcada mientras el disco la tiene activa -> el temporal salio con
+  `false`/`off`, el canonico quedo en `true`/`timewindow` y el **hash del
+  config.json fue identico antes y despues** (`AFB87F16...`). +5 tests
+  (`test_bk11_stage_config.py`). 228 passed, GATE PASS.
+
+- **Visor: "Saltar tiempos muertos"** (idea del Director). En una corrida tipica
+  el **94,1% del tiempo simulado no se mueve ningun agente** (picking, descarga,
+  esperas): a 1x son ~145 min de los cuales solo ~8,5 tienen movimiento, y el
+  visor parecia congelado. Nuevo `GET /api/motion-times` (instantes en que ALGUN
+  agente cambia de celda + los que siguen a un hueco > `min_gap`) y casilla en la
+  barra del visor que adelanta el reloj al proximo instante con movimiento
+  (busqueda binaria; nunca retrocede; huecos < 1 s no se saltan). NO altera la
+  simulacion. Medido en el navegador: 3,4 s simulados -> 12,5 s en el mismo
+  tiempo real, y 299,6 s en 1,5 s dentro de un tramo muerto. +7 tests
+  (`test_motion_times.py`). Diagnostico previo descartado con datos: el patron de
+  movimiento es identico con y sin congestion (0,1% de saltos > 1 celda).
+
+- **`config_manager.save_config` con `indent=2`** (era 4): guardar desde la UI ya
+  no reescribe el `config.json` entero (144+/108- lineas solo por formato).
+
+---
+
 ## 2026-09-07 (cont.)
 
 - **BK-05 — la pestana Flota quedaba vacia y bloqueaba el guardado.** El

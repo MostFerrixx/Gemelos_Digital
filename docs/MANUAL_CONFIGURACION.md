@@ -38,20 +38,19 @@ configuración anterior.
 | **Cargar** | Trae un preset guardado al formulario. |
 | **Guardar** | Guarda el formulario actual como preset con nombre y descripción. |
 | **Abrir Visor** | Abre el visor de replay en otra pestaña (para ver una simulación ya corrida). |
-| **Run Simulation** | Lanza la simulación. **Ojo: antes de correr guarda la configuración en `config.json`** (ver aviso abajo). |
+| **Run Simulation** | Lanza la simulación con lo que ves en pantalla, **sin modificar el `config.json`** (usa una copia temporal). |
 | **Aplicar Configuración** | Escribe el `config.json` canónico. **Este es el que "manda".** |
 
-> ### ⚠ "Run Simulation" guarda tu configuración antes de correr
+> ### Sobre "Run Simulation" y tu configuración
 >
-> No simula sobre una copia: **escribe el `config.json` real** con lo que haya
-> en pantalla, y recién entonces corre. Dos consecuencias prácticas:
+> **Corre lo que ves en pantalla, sin modificar el `config.json`.** Al apretar
+> Run, la configuración del formulario se copia a un archivo temporal y la
+> simulación usa esa copia. Así podés probar variantes libremente: el archivo
+> del proyecto solo cambia cuando apretás **Aplicar Configuración**.
 >
-> 1. Si dejaste una pestaña abierta y mientras tanto cambió la configuración,
->    al apretar Run se guarda **lo que muestra esa pestaña**, pisando lo demás.
->    Ante la duda, recargá la página antes de correr.
-> 2. Si el guardado falla (por ejemplo, porque algún porcentaje no suma 100),
->    **la simulación no arranca**: el error que ves es del guardado, no del
->    motor.
+> Eso sí: la configuración **se valida igual** antes de correr. Si algo está
+> mal (un porcentaje que no suma 100, la flota vacía), la simulación no
+> arranca y el error te dice qué corregir.
 
 ### Las 8 pestañas
 

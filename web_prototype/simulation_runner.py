@@ -38,10 +38,14 @@ class SimulationRunner:
         """Check if a simulation is currently running"""
         return self._is_running
 
-    async def run_simulation_async(self) -> AsyncGenerator[Dict, None]:
+    async def run_simulation_async(self, config_path: Optional[str] = None) -> AsyncGenerator[Dict, None]:
         """
         Execute simulation asynchronously and yield log events.
         Enforces singleton execution (only one simulation at a time).
+
+        BK-11: `config_path` (relativo al proyecto) permite correr con un config
+        TEMPORAL sin tocar el config.json canonico. Sin el, se usa el canonico
+        como siempre.
         """
         async with self._process_lock:
             if self._is_running:
@@ -65,6 +69,21 @@ class SimulationRunner:
             # Prepare command
             script_path = os.path.join(self.PROJECT_ROOT, "entry_points", "run_generate_replay.py")
             cmd = [self.PYTHON_EXECUTABLE, script_path]
+
+            # BK-11: correr con el config temporal si la UI preparo uno. El path
+            # se valida contra PROJECT_ROOT (viene del cliente por el WebSocket).
+            if config_path:
+                resuelto = os.path.realpath(os.path.join(self.PROJECT_ROOT, config_path))
+                raiz = os.path.realpath(self.PROJECT_ROOT)
+                if not resuelto.startswith(raiz + os.sep) or not os.path.exists(resuelto):
+                    yield {
+                        "type": "error",
+                        "message": "Config de corrida invalido o fuera del proyecto.",
+                        "timestamp": time.time()
+                    }
+                    self._is_running = False
+                    return
+                cmd += ["--config", resuelto]
             
             # Prepare environment
             env = os.environ.copy()
