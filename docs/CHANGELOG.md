@@ -12,6 +12,22 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ## 2026-09-08
 
+- **Canonico migrado a `agent_types` explicito + baseline regenerado**
+  (`95b59db0` -> **`4bcac137`**, 15.930.231 bytes). Cierra
+  la deuda que venia desde BK-05/BK-06: el `config.json` definia la flota con
+  los contadores legacy y `agent_types: []`, una forma que la UI no sabia
+  representar y que dejaba `warehouse.operator_capacities` ciego. Se migro con
+  un script controlado que toca UNA sola clave (`agent_types`), preservando
+  orden, indentacion, contadores y el bloque `congestion` (con asserts que
+  abortan si algo mas cambia). Se hizo DESPUES de BK-11 a proposito: antes,
+  cada corrida podia volver a alterar el archivo.
+  **Verificacion:** los 35.020 eventos del replay son identicos salvo UN campo
+  -- `capacidad` en 4.055 eventos, `150 -> 1000` en los montacargas. O sea la
+  simulacion no cambia en nada; lo que cambia es que el visor **deja de mostrar
+  mal la capacidad de los montacargas** (leia `agent_types`, que estaba vacio, y
+  caia al default 150 aunque cargan 1000). El baseline nuevo pesa +4.517 bytes:
+  el `agent_types` en la metadata. 228 passed, GATE PASS.
+
 - **BK-11 — "Run Simulation" ya no pisa el `config.json` canonico.** El paso 1
   de `startSimulation()` hacia POST a `/api/configurator/config`: escribia el
   canonico con lo que tuviera el formulario y recien despues corria. Nadie pedia

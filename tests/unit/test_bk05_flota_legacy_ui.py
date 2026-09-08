@@ -34,8 +34,20 @@ def manager():
 
 @pytest.fixture(scope="module")
 def canonico():
+    """Config con flota LEGACY (agent_types vacio + contadores).
+
+    Se parte del config.json real para no inventar un layout/areas que no
+    existan, pero se fuerza la forma legacy: desde 2026-09-08 el canonico esta
+    migrado a `agent_types` explicito, y lo que estos tests deben cubrir es el
+    escenario legacy en si -- que sigue siendo valido para configs viejas,
+    presets guardados y archivos que el cliente traiga a mano.
+    """
     with open(os.path.join(PROJECT_ROOT, "config.json"), "r", encoding="utf-8") as f:
-        return json.load(f)
+        cfg = json.load(f)
+    cfg["agent_types"] = []
+    cfg.setdefault("num_operarios_terrestres", 2)
+    cfg.setdefault("num_montacargas", 2)
+    return cfg
 
 
 def _materializar(config):
@@ -59,8 +71,8 @@ def _config_como_lo_guarda_la_ui(config):
     return salida
 
 
-def test_bk05_01_canonico_usa_flota_legacy(canonico):
-    """Premisa del bug: el canonico NO lista agentes, solo contadores."""
+def test_bk05_01_premisa_del_bug_flota_solo_por_contadores(canonico):
+    """Premisa del bug: un config que NO lista agentes, solo contadores."""
     assert canonico.get("agent_types") == []
     assert canonico.get("num_operarios_terrestres", 0) > 0
     assert canonico.get("num_montacargas", 0) > 0
