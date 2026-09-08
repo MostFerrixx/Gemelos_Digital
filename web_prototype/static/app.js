@@ -719,12 +719,31 @@ const ControlsModule = {
     lastServerUpdateTime: 0,
     serverUpdateInterval: 250, // Request server update every 250ms during playback (4 req/s)
 
+    // --- Saltar tiempos muertos ---
+    // En una corrida tipica ~94% del tiempo simulado no se mueve NINGUN agente
+    // (picking, descarga, esperas): a 1x son ~145 min de los cuales solo ~8
+    // tienen movimiento. Con el toggle activo la reproduccion salta al proximo
+    // instante con movimiento. NO altera la simulacion: solo se omite el tiempo
+    // muerto al reproducir (el reloj salta hacia adelante, nunca hacia atras).
+    skipIdle: false,
+    jumpTargets: null,      // instantes a los que vale la pena saltar
+    idleMinGap: 1.0,        // seg. de simulacion: huecos menores no se saltan
+
     init() {
         console.log('[ControlsModule] Initializing...');
 
         const playPauseBtn = document.getElementById('play-pause-btn');
         const timeSlider = document.getElementById('time-slider');
         const speedSelect = document.getElementById('speed-select');
+        const skipIdleToggle = document.getElementById('skip-idle-toggle');
+
+        if (skipIdleToggle) {
+            skipIdleToggle.addEventListener('change', (e) => {
+                this.skipIdle = e.target.checked;
+                console.log('[ControlsModule] Saltar tiempos muertos:', this.skipIdle);
+                if (this.skipIdle && !this.jumpTargets) this.loadMotionTimes();
+            });
+        }
 
         if (playPauseBtn) {
             playPauseBtn.addEventListener('click', () => this.togglePlay());
@@ -755,6 +774,63 @@ const ControlsModule = {
         }
     },
 
+    // Carga los instantes con movimiento del replay actual (una sola vez).
+    async loadMotionTimes() {
+        try {
+            const r = await fetch(`/api/motion-times?min_gap=${this.idleMinGap}`);
+            const data = await r.json();
+            this.jumpTargets = Array.isArray(data.jump_targets) ? data.jump_targets : [];
+            this.motionTimes = Array.isArray(data.motion_times) ? data.motion_times : [];
+
+            // Cuanto tiempo muerto tiene este replay (para mostrarlo en la UI).
+            let muerto = 0;
+            for (let i = 1; i < this.motionTimes.length; i++) {
+                const gap = this.motionTimes[i] - this.motionTimes[i - 1];
+                if (gap > this.idleMinGap) muerto += gap;
+            }
+            const total = data.max_time || AppState.maxTime || 0;
+            const stat = document.getElementById('skip-idle-stat');
+            if (stat && total > 0) {
+                this._idleStatBase = `(${(100 * muerto / total).toFixed(0)}% sin movimiento)`;
+                stat.textContent = this._idleStatBase;
+            }
+            console.log(`[ControlsModule] Instantes con movimiento: ${this.motionTimes.length}, `
+                + `saltos posibles: ${this.jumpTargets.length}`);
+        } catch (e) {
+            console.error('[ControlsModule] No se pudieron cargar los instantes de movimiento:', e);
+            this.jumpTargets = [];
+        }
+    },
+
+    // Avisa que se salto un tramo sin movimiento. Deliberadamente discreto:
+    // un replay tipico tiene ~400 saltos, asi que un toast por cada uno seria
+    // insoportable. Se muestra inline y se apaga solo.
+    notifySkip(segundos, destino) {
+        const stat = document.getElementById('skip-idle-stat');
+        if (!stat) return;
+        stat.textContent = `saltando ${Math.round(segundos)}s sin movimiento`;
+        stat.classList.add('skipping');
+        clearTimeout(this._skipNotifyTimer);
+        this._skipNotifyTimer = setTimeout(() => {
+            stat.classList.remove('skipping');
+            stat.textContent = this._idleStatBase || '';
+        }, 900);
+    },
+
+    // Proximo instante con movimiento estrictamente posterior a `t`.
+    // Devuelve null si no queda ninguno (fin del replay).
+    nextMotionTime(t) {
+        const arr = this.motionTimes;
+        if (!arr || !arr.length) return null;
+        let lo = 0, hi = arr.length - 1, res = null;
+        while (lo <= hi) {                       // busqueda binaria
+            const mid = (lo + hi) >> 1;
+            if (arr[mid] > t) { res = arr[mid]; hi = mid - 1; }
+            else { lo = mid + 1; }
+        }
+        return res;
+    },
+
     play() {
         AppState.isPlaying = true;
         const playPauseBtn = document.getElementById('play-pause-btn');
@@ -774,6 +850,20 @@ const ControlsModule = {
 
             const deltaTime = (deltaMs / 1000) * AppState.playbackSpeed;
             let newTime = AppState.currentTime + deltaTime;
+
+            // Saltar tiempos muertos: si nadie se mueve entre `newTime` y el
+            // proximo instante con movimiento, avanzar el reloj hasta ahi.
+            if (this.skipIdle && this.motionTimes && this.motionTimes.length) {
+                const next = this.nextMotionTime(newTime);
+                if (next === null) {
+                    newTime = AppState.maxTime;           // no queda movimiento
+                } else if (next - newTime > this.idleMinGap) {
+                    const saltado = next - newTime;
+                    newTime = next;
+                    this.lastServerUpdateTime = 0;        // forzar refresco al aterrizar
+                    this.notifySkip(saltado, next);
+                }
+            }
 
             if (newTime >= AppState.maxTime) {
                 newTime = AppState.maxTime;

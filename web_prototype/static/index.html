@@ -213,6 +213,15 @@
                 <option value="30">30x</option>
                 <option value="60">60x</option>
             </select>
+            <!-- Saltar tiempos muertos: en una corrida tipica el ~94% del tiempo
+                 no se mueve ningun agente (picking, descarga, esperas). Con esto
+                 la reproduccion salta al proximo instante con movimiento. -->
+            <label id="skip-idle-label" class="skip-idle"
+                   title="Salta los tramos en los que ningun operario se mueve (picking, descarga, esperas). La simulacion no cambia: solo se omite el tiempo muerto al reproducir.">
+                <input type="checkbox" id="skip-idle-toggle">
+                <span>Saltar tiempos muertos</span>
+                <span id="skip-idle-stat" class="skip-idle-stat"></span>
+            </label>
         </footer>
     </div>
 

@@ -38,8 +38,20 @@ configuración anterior.
 | **Cargar** | Trae un preset guardado al formulario. |
 | **Guardar** | Guarda el formulario actual como preset con nombre y descripción. |
 | **Abrir Visor** | Abre el visor de replay en otra pestaña (para ver una simulación ya corrida). |
-| **Run Simulation** | Lanza la simulación con la configuración vigente. |
+| **Run Simulation** | Lanza la simulación. **Ojo: antes de correr guarda la configuración en `config.json`** (ver aviso abajo). |
 | **Aplicar Configuración** | Escribe el `config.json` canónico. **Este es el que "manda".** |
+
+> ### ⚠ "Run Simulation" guarda tu configuración antes de correr
+>
+> No simula sobre una copia: **escribe el `config.json` real** con lo que haya
+> en pantalla, y recién entonces corre. Dos consecuencias prácticas:
+>
+> 1. Si dejaste una pestaña abierta y mientras tanto cambió la configuración,
+>    al apretar Run se guarda **lo que muestra esa pestaña**, pisando lo demás.
+>    Ante la duda, recargá la página antes de correr.
+> 2. Si el guardado falla (por ejemplo, porque algún porcentaje no suma 100),
+>    **la simulación no arranca**: el error que ves es del guardado, no del
+>    motor.
 
 ### Las 8 pestañas
 
@@ -466,6 +478,36 @@ configuración dan números distintos. Una sola corrida **no alcanza** para deci
 
 Ejemplos de uso: comparar dos estrategias de slotting, "picking primero" contra
 "recepción primero", o dos tamaños de flota.
+
+---
+
+# El Visor de Replay — "Saltar tiempos muertos"
+
+El visor (botón **Abrir Visor**) reproduce una simulación ya corrida. En su
+barra inferior, junto al selector de velocidad, hay una casilla:
+
+**☐ Saltar tiempos muertos**  *(NN% sin movimiento)*
+
+**El problema que resuelve.** En una corrida típica, **el ~94% del tiempo
+simulado no se mueve ningún operario**: están haciendo picking, descargando o
+esperando. Reproducida a 1x, esa corrida son ~145 minutos de los cuales solo
+~8 tienen movimiento. Por eso el visor parece congelarse: no está trabado,
+es que realmente no pasa nada durante minutos enteros.
+
+**Qué hace.** Con la casilla activada, cuando la reproducción entra en un tramo
+donde nadie se mueve, el reloj **salta directo al próximo instante con
+movimiento**. El indicador al lado muestra el porcentaje de tiempo muerto del
+replay, y avisa brevemente cada vez que salta ("saltando 227s sin movimiento").
+
+**Qué NO hace.** No cambia la simulación ni los resultados: los KPIs, los
+tiempos y los eventos son exactamente los mismos. Es solo la reproducción la
+que omite las esperas — como adelantar los silencios de una grabación.
+
+**Cuándo usarla.** Prendida para revisar una corrida completa rápido y ver
+dónde hay actividad. Apagada cuando quieras medir el ritmo real de la
+operación, porque justamente esas esperas son parte de lo que estás midiendo.
+
+> Los saltos menores a 1 segundo no se omiten, para no perder continuidad.
 
 ---
 

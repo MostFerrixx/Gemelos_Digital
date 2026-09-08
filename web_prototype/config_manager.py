@@ -119,7 +119,11 @@ class WebConfigurationManager:
             # Solucion: producir el string con json.dumps, codificar a bytes
             # explicitamente, y escribir en modo binario para garantizar
             # truncado exacto al tamano del contenido.
-            json_str = json.dumps(merged, indent=4, ensure_ascii=False)
+            # indent=2: la MISMA indentacion que tiene el config.json versionado.
+            # Con indent=4 cada guardado desde la UI reescribia el archivo entero
+            # (144 lineas +/- 108 solo por formato), volviendo ilegible cualquier
+            # diff de git aunque el contenido casi no cambiara.
+            json_str = json.dumps(merged, indent=2, ensure_ascii=False)
             json_bytes = json_str.encode('utf-8')
             tmp_path = f"{self.config_path}.tmp"
             with open(tmp_path, 'wb') as f:

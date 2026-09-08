@@ -497,6 +497,62 @@ def load_replay_file(file: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/motion-times")
+def get_motion_times(min_gap: float = 1.0):
+    """Instantes en los que ALGUN agente cambia de celda. (Saltar tiempos muertos)
+
+    En una corrida tipica el 94% del tiempo simulado no se mueve nadie: los
+    agentes estan haciendo picking, descargando o esperando. Reproducido a 1x
+    eso son ~145 min de los cuales solo ~8 min tienen movimiento, y se percibe
+    como que el visor se congela.
+
+    El visor usa esta lista para, con "Saltar tiempos muertos" activo, avanzar
+    al proximo instante con movimiento en vez de reproducir la espera.
+
+    `min_gap` (segundos) filtra los huecos irrelevantes: solo se reportan los
+    saltos que valen la pena. Con min_gap=0 devuelve todos los instantes.
+    """
+    try:
+        ultima_pos = {}
+        instantes = []
+
+        for e in replay_data.events:
+            if (e.get('type') or e.get('event_type')) != 'estado_agente':
+                continue
+            datos = e.get('data') or e.get('datos') or {}
+            agente = e.get('agent_id') or datos.get('id')
+            pos = datos.get('position') or datos.get('posicion')
+            t = e.get('timestamp')
+            if not agente or not pos or t is None:
+                continue
+            actual = (pos[0], pos[1]) if isinstance(pos, (list, tuple)) else pos
+            if ultima_pos.get(agente) != actual:
+                ultima_pos[agente] = actual
+                instantes.append(float(t))
+
+        instantes.sort()
+
+        # Solo interesan los INICIOS de hueco: el instante al que hay que saltar
+        # es el primer movimiento despues de cada pausa larga.
+        saltos = []
+        if instantes:
+            saltos.append(instantes[0])
+            for i in range(1, len(instantes)):
+                if instantes[i] - instantes[i - 1] > float(min_gap):
+                    saltos.append(instantes[i])
+
+        return {
+            "motion_times": instantes,
+            "jump_targets": saltos,
+            "max_time": replay_data.max_time,
+            "min_gap": min_gap,
+        }
+    except Exception as ex:
+        print(f"[MOTION-TIMES] WARN: {ex}")
+        return {"motion_times": [], "jump_targets": [], "max_time": replay_data.max_time,
+                "min_gap": min_gap}
+
+
 @router.get("/api/event-markers")
 def get_event_markers():
     """D-15: tiempos de eventos notables del replay para marcar en la barra de tiempo.

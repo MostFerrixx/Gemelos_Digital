@@ -652,6 +652,35 @@ canvas {
     flex-shrink: 0;
 }
 
+/* Saltar tiempos muertos: omite en la reproduccion los tramos donde ningun
+   agente se mueve (~94% del tiempo en una corrida tipica). */
+.skip-idle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+    opacity: 0.9;
+}
+.skip-idle input {
+    width: auto;
+    margin: 0;
+    cursor: pointer;
+}
+.skip-idle-stat {
+    font-size: 11px;
+    opacity: 0.65;
+    min-width: 132px;
+    font-variant-numeric: tabular-nums;
+}
+.skip-idle-stat.skipping {
+    opacity: 1;
+    font-weight: 600;
+    color: var(--color-accent-blue, #3b82f6);
+}
+
 button {
     background: linear-gradient(135deg, var(--color-accent-blue) 0%, #4a8fd5 100%);
     color: white;
