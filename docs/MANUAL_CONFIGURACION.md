@@ -176,28 +176,43 @@ Al activar outbound aparecen:
 
 **Para tomar decisiones de negocio usá "Real".** "Demo" sirve para mostrar.
 
+Este bloque afecta al **desplazamiento** por el almacén, no al tiempo de
+levantar productos (eso es la sección siguiente).
+
 Campos individuales (el perfil los completa, pero podés editarlos a mano):
 
 - **Tiempo por celda — Operario (s/celda)** — cuánto tarda un operario a pie en
   cruzar una celda del mapa.
 - **Factor velocidad Montacargas** — multiplica el tiempo del operario. **Menor
   = más rápido.** 0.5 significa el doble de velocidad que una persona.
-- **Tiempo de picking por línea (s)** *(opcional)* — tiempo fijo por línea de
-  pedido. Si se deja vacío, usa el tiempo de descarga de cada agente.
 - **Tiempo de horquilla — Montacargas (s)** — subir/bajar la horquilla en cada
   operación. Es el costo de trabajar en altura.
 
 ## Tiempo de Pick por Producto
 
-Modelo fino de cuánto tarda **cada pick**, según la fórmula:
+Cuánto tarda el operario en **levantar un producto del rack**. Ojo con la
+distinción, porque es la confusión más común:
+
+| | Qué mide | Dónde se configura |
+|---|---|---|
+| **Tiempo de pick** | Levantar el producto del rack | Acá |
+| **Tiempo de descarga** | Dejarlo en la zona de salida | Flota de Agentes, por grupo |
+
+Son dos momentos distintos del recorrido, por eso están separados.
+
+La fórmula:
 
 ```
 (base + s/unidad × cantidad + s/kg × peso) × multiplicador de clase + recargo de clase
 ```
 
-- **Base por pick (s)** — acercarse, escanear, posicionarse. Si se deja
-  **vacío**, el motor usa el tiempo histórico (comportamiento viejo). Calibrado:
-  10 s.
+> **¿Querés un tiempo fijo, igual para todo producto?** Poné ese valor en
+> *Base por pick* y dejá los demás campos en 0. (Hasta septiembre de 2026 había
+> un campo aparte para esto, "Tiempo de picking por línea"; se retiró porque no
+> tenía efecto mientras la fórmula tuviera base, que es el caso normal. Los
+> archivos de configuración viejos que lo usaban siguen funcionando igual.)
+
+- **Base por pick (s)** — acercarse, escanear, posicionarse. Calibrado: 10 s.
 - **Por unidad (s/u)** — cada unidad extra del mismo SKU. Calibrado: 2 s.
 - **Por volumen** — término opcional; normalmente 0, porque el efecto del tamaño
   ya lo captura la clase de manejo.

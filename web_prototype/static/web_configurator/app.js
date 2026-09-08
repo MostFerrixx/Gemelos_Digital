@@ -81,19 +81,20 @@ class WebConfigurator {
                 if (e.target.value === 'demo') {
                     document.getElementById('tiempos-time-per-cell').value = 0.1;
                     document.getElementById('tiempos-speed-forklift').value = 0.8;
-                    document.getElementById('tiempos-picking').value = '';
                     document.getElementById('tiempos-lift').value = 2.0;
                 } else if (e.target.value === 'real') {
                     document.getElementById('tiempos-time-per-cell').value = 1.0;
                     document.getElementById('tiempos-speed-forklift').value = 0.5;
-                    document.getElementById('tiempos-picking').value = 15;
                     document.getElementById('tiempos-lift').value = 8.0;
                 }
                 // 'custom': el usuario edita manualmente, no se sobreescriben los campos
+                // Los presets ya NO tocan tiempo_picking_por_linea: ese campo salio
+                // de la UI y el tiempo de pick lo define la card "Tiempo de Pick por
+                // Producto", que es independiente del perfil de velocidad.
             });
             // Cambio manual de cualquier campo -> muestra "Personalizado"
             ['tiempos-time-per-cell', 'tiempos-speed-forklift',
-             'tiempos-picking', 'tiempos-lift'].forEach(id => {
+             'tiempos-lift'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.addEventListener('input', () => { tiemposPreset.value = 'custom'; });
             });
@@ -227,13 +228,15 @@ class WebConfigurator {
     }
 
     // C5: determina si los valores actuales coinciden con un preset conocido.
-    _updateTiemposPreset(tpc, sfk, pick, lift) {
+    // El perfil se reconoce por los 3 campos VISIBLES (celda, factor montacargas,
+    // horquilla). `tiempo_picking_por_linea` ya no participa: salio de la UI y no
+    // tiene efecto cuando la formula de pick tiene base (el caso normal).
+    _updateTiemposPreset(tpc, sfk, lift) {
         const sel = document.getElementById('tiempos-preset');
         if (!sel) return;
         const isDemo = Math.abs(tpc - 0.1) < 0.001 && Math.abs(sfk - 0.8) < 0.001
-                       && pick == null && Math.abs(lift - 2.0) < 0.001;
+                       && Math.abs(lift - 2.0) < 0.001;
         const isReal = Math.abs(tpc - 1.0) < 0.001 && Math.abs(sfk - 0.5) < 0.001
-                       && pick != null && Math.abs(pick - 15.0) < 0.001
                        && Math.abs(lift - 8.0) < 0.001;
         sel.value = isDemo ? 'demo' : (isReal ? 'real' : 'custom');
     }
@@ -1173,17 +1176,14 @@ class WebConfigurator {
         const t = config.tiempos || {};
         const tpc  = (t.time_per_cell != null)          ? t.time_per_cell          : 0.1;
         const sfk  = (t.speed_factor_forklift != null)  ? t.speed_factor_forklift  : 0.8;
-        const pick = (t.tiempo_picking_por_linea != null) ? t.tiempo_picking_por_linea : null;
         const lift = (t.tiempo_horquilla != null)        ? t.tiempo_horquilla       : 2.0;
         const tpcEl  = document.getElementById('tiempos-time-per-cell');
         const sfkEl  = document.getElementById('tiempos-speed-forklift');
-        const pickEl = document.getElementById('tiempos-picking');
         const liftEl = document.getElementById('tiempos-lift');
         if (tpcEl)  tpcEl.value  = tpc;
         if (sfkEl)  sfkEl.value  = sfk;
-        if (pickEl) pickEl.value = (pick != null) ? pick : '';
         if (liftEl) liftEl.value = lift;
-        this._updateTiemposPreset(tpc, sfk, pick, lift);
+        this._updateTiemposPreset(tpc, sfk, lift);
 
         // INIT-8 UI: modelo de tiempo de pick (base null = usar historico).
         const ptm = t.pick_time_model || {};
@@ -1420,14 +1420,17 @@ class WebConfigurator {
             (this.currentConfig && this.currentConfig.tiempos) || defaultsTiempos));
         const tpcVal  = parseFloat(document.getElementById('tiempos-time-per-cell')?.value);
         const sfkVal  = parseFloat(document.getElementById('tiempos-speed-forklift')?.value);
-        const pickRaw = document.getElementById('tiempos-picking')?.value;
         const liftVal = parseFloat(document.getElementById('tiempos-lift')?.value);
         if (!isNaN(tpcVal)  && tpcVal  > 0) baseTiempos.time_per_cell          = tpcVal;
         if (!isNaN(sfkVal)  && sfkVal  > 0) baseTiempos.speed_factor_forklift  = sfkVal;
-        baseTiempos.tiempo_picking_por_linea =
-            (pickRaw !== '' && pickRaw != null && !isNaN(parseFloat(pickRaw)))
-            ? parseFloat(pickRaw) : null;
         if (!isNaN(liftVal) && liftVal >= 0) baseTiempos.tiempo_horquilla       = liftVal;
+        // `tiempo_picking_por_linea` ya no se edita desde la UI (ver index.html).
+        // NO se toca: se conserva el valor que traiga el config. Si se pusiera
+        // null aca, abrir y guardar un archivo viejo que si lo use le cambiaria
+        // el comportamiento sin que nadie lo haya pedido.
+        if (!('tiempo_picking_por_linea' in baseTiempos)) {
+            baseTiempos.tiempo_picking_por_linea = null;
+        }
 
         // INIT-8 UI: modelo de tiempo de pick (base-preserve + overrides;
         // base vacia = null = usar tiempo historico del agente).

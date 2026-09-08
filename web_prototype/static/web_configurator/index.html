@@ -385,7 +385,11 @@
                                     <option value="real">Real — calibrado (1 celda = 1 m)</option>
                                     <option value="custom">Personalizado</option>
                                 </select>
-                                <span class="help-text">Demo es ~10× más rápido que la realidad, ideal para demos. Real usa benchmarks de industria (operario 1 m/s, montacargas 2 m/s).</span>
+                                <span class="help-text">Afecta a cuánto tarda en <strong>desplazarse</strong>
+                                    por el almacén (no al tiempo de levantar productos, que se configura
+                                    más abajo). Demo es ~10× más rápido que la realidad, ideal para
+                                    presentaciones. Real usa benchmarks de industria (operario 1 m/s,
+                                    montacargas 2 m/s).</span>
                             </div>
                             <div class="form-group">
                                 <label>Tiempo por celda — Operario (s/celda)</label>
@@ -397,11 +401,13 @@
                                 <input type="number" id="tiempos-speed-forklift" min="0.1" max="2.0" step="0.05" value="0.8">
                                 <span class="help-text">Multiplica el tiempo por celda del operario. 0.5 = 2× más rápido que el operario (real). 0.8 = demo.</span>
                             </div>
-                            <div class="form-group">
-                                <label>Tiempo de picking por línea (s) <em style="font-weight:normal;color:#888;">(opcional)</em></label>
-                                <input type="number" id="tiempos-picking" min="0" step="1" value="" placeholder="Usa tiempo de descarga si está vacío">
-                                <span class="help-text">Tiempo fijo de picking por línea. Si está vacío, usa el tiempo de descarga de cada agente. Real: 15 s/línea.</span>
-                            </div>
+                            <!-- El campo "Tiempo de picking por linea" se retiro de la UI:
+                                 era una herencia del modelo viejo (un tiempo fijo, igual para
+                                 todo producto) y quedaba SIN EFECTO cuando la card "Tiempo de
+                                 Pick por Producto" tiene base (el caso normal). Lo que hacia se
+                                 logra con esa formula: base = el tiempo fijo y el resto en 0.
+                                 La clave sigue leyendose del config para no romper archivos
+                                 viejos; simplemente ya no se ofrece como decision del usuario. -->
                             <div class="form-group">
                                 <label>Tiempo de horquilla — Montacargas (s)</label>
                                 <input type="number" id="tiempos-lift" min="0" step="0.5" value="2.0">
@@ -416,12 +422,17 @@
                             <h3>Tiempo de Pick por Producto</h3>
                         </div>
                         <div class="card-body">
-                            <p class="description-text">Fórmula del tiempo de cada pick:
+                            <p class="description-text">Cuánto tarda el operario en
+                                <strong>levantar un producto del rack</strong> (distinto del tiempo
+                                de descarga, que es dejarlo en la zona de salida y se configura en
+                                Flota de Agentes). Fórmula:
                                 <code>(base + s/unidad·cant + s/kg·peso) × mult. clase + recargo clase</code>.
+                                <br><strong>¿Querés un tiempo fijo, igual para todo producto?</strong>
+                                Poné ese valor en <em>Base por pick</em> y dejá los demás campos en 0.
                                 Calibración con fuentes en <code>docs/PLAN_INIT8_TIEMPOS.md</code>
                                 (MTM-Logistics, regresión POMS, Blue Yonder).</p>
                             <div class="form-group">
-                                <label>Base por pick (s) <em style="font-weight:normal;color:#888;">(vacío = usar tiempo histórico)</em></label>
+                                <label>Base por pick (s)</label>
                                 <input type="number" id="ptm-base" min="0" step="0.5" value="" placeholder="10">
                                 <span class="help-text">Acercarse, escanear, posicionar. Calibrado: 10 s (POMS: ~14 s/caja con 2 unidades).</span>
                             </div>
