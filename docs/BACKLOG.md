@@ -1,12 +1,13 @@
 # BACKLOG — Gemelo Digital de Almacen
 # Solo lo PENDIENTE. Lo cerrado vive en docs/CHANGELOG.md (no se repite aca).
 
-Actualizado: 2026-09-07 · Responsable: Cerebellum
+Actualizado: 2026-09-08 · Responsable: Cerebellum
 
-*(BK-06 CERRADA el 2026-09-07 -> CHANGELOG. De ella salieron BK-07, BK-08 y
-BK-09, abiertos abajo. INIT-7 INBOUND completa F0-F5 el 2026-07-10; INIT-8
-TIEMPOS completa F1-F4 el 2026-07-11 con los 4 hallazgos AUD8-1..4 aplicados
-el 2026-07-12 -> todo en CHANGELOG.)*
+*(BK-05, BK-11 y el canonico migrado a `agent_types` explicito: CERRADOS el
+2026-09-08 -> CHANGELOG. BK-06 CERRADA el 2026-09-07; de ella salieron BK-07,
+BK-08 y BK-09, abiertos abajo. INIT-7 INBOUND completa F0-F5 el 2026-07-10;
+INIT-8 TIEMPOS completa F1-F4 el 2026-07-11 con los 4 hallazgos AUD8-1..4
+aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 
 ## Indice (de un vistazo)
 
