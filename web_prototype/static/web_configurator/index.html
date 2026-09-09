@@ -605,6 +605,13 @@
 
                 <!-- Tab 4: Layout y Datos -->
                 <div id="tab-layout-datos" class="tab-content">
+                    <p class="tab-intro">
+                        El <strong>mapa</strong> define el almacén físico y el <strong>Excel
+                        maestro</strong> los datos del negocio: ubicaciones, productos, zonas de
+                        salida y muelles. El simulador no lee el Excel directamente: primero hay
+                        que <strong>aplicarlo</strong>, y eso se hace desde acá.
+                    </p>
+
                     <div class="card">
                         <div class="card-header">
                             <h3>Archivos de Configuración</h3>
@@ -616,6 +623,9 @@
                                     <input type="text" id="layout-file" value="layouts/WH1.tmx">
                                     <button class="btn-secondary" id="btn-browse-tmx">Examinar</button>
                                 </div>
+                                <input type="file" id="tmx-file-input" accept=".tmx" hidden>
+                                <span class="help-text">Mapa del almacén (hecho con Tiled).</span>
+                                <div id="tmx-upload-result" class="upload-result" style="display:none;"></div>
                             </div>
                             <div class="form-group">
                                 <label>Archivo de Secuencia (.xlsx)</label>
@@ -623,9 +633,43 @@
                                     <input type="text" id="sequence-file" value="layouts/Warehouse_Logic.xlsx">
                                     <button class="btn-secondary" id="btn-browse-seq">Examinar</button>
                                 </div>
+                                <input type="file" id="excel-file-input" accept=".xlsx,.xlsm" hidden>
+                                <span class="help-text">Excel maestro: ubicaciones, catálogo de
+                                    productos, zonas de salida y muelles.</span>
+                                <div id="excel-upload-result" class="upload-result" style="display:none;"></div>
                             </div>
                             <!-- MEJ-3: campo "Escala del Mapa" eliminado. map_scale no tiene
                                  lector desde que se archivo el viewer Pygame. -->
+                        </div>
+                    </div>
+
+                    <!-- Datos maestros: que esta usando REALMENTE el simulador -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Datos Maestros en Uso</h3>
+                            <button id="btn-apply-master-data" class="btn-small">Aplicar Excel</button>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Lo que el simulador está usando ahora mismo.
+                                Si editás el Excel, los cambios <strong>no tienen efecto</strong>
+                                hasta que los apliques con el botón de arriba.</p>
+                            <div id="master-data-stale" class="master-stale" style="display:none;"></div>
+                            <div id="master-data-summary" class="master-summary"></div>
+                            <div id="master-data-apply-result" class="upload-result" style="display:none;"></div>
+
+                            <div class="master-table-controls">
+                                <select id="master-table-select">
+                                    <option value="locations">Ubicaciones de picking</option>
+                                    <option value="sku_catalog">Catálogo de productos</option>
+                                    <option value="staging_areas">Zonas de salida</option>
+                                    <option value="inbound_docks">Muelles de recepción</option>
+                                </select>
+                                <input type="text" id="master-table-search" placeholder="Buscar...">
+                                <span id="master-table-info" class="master-table-info"></span>
+                                <button id="master-page-prev" class="btn-small" disabled>‹</button>
+                                <button id="master-page-next" class="btn-small" disabled>›</button>
+                            </div>
+                            <div id="master-table-container" class="master-table-container"></div>
                         </div>
                     </div>
 
@@ -691,6 +735,23 @@
                                     <input type="number" id="staging-7" class="staging-input" value="0">
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Coordenadas de las zonas: dato maestro, editable aca porque
+                         son pocas. Se guardan en warehouse.db (ver master-data.js). -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Ubicación de las Zonas</h3>
+                            <button id="btn-save-staging-coords" class="btn-small">Guardar ubicaciones</button>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Dónde está físicamente cada zona de salida
+                                en el mapa. Viene del Excel maestro; se puede ajustar acá porque son
+                                pocas. <strong>Ojo:</strong> volver a aplicar el Excel reemplaza
+                                estos valores por los del archivo.</p>
+                            <div id="staging-coords-editor" class="coords-editor"></div>
+                            <div id="staging-coords-result" class="upload-result" style="display:none;"></div>
                         </div>
                     </div>
 
@@ -820,6 +881,22 @@
                                         rescatar). Cambiá a Determinista para usarlo.</p>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Coordenadas de los muelles: mismo criterio que las zonas de salida. -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Ubicación de los Muelles</h3>
+                            <button id="btn-save-docks-coords" class="btn-small">Guardar ubicaciones</button>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Dónde está físicamente cada muelle de
+                                recepción. Viene del Excel maestro; se puede ajustar acá porque son
+                                pocos. <strong>Ojo:</strong> volver a aplicar el Excel reemplaza
+                                estos valores por los del archivo.</p>
+                            <div id="docks-coords-editor" class="coords-editor"></div>
+                            <div id="docks-coords-result" class="upload-result" style="display:none;"></div>
                         </div>
                     </div>
 
@@ -1053,6 +1130,7 @@
     <script src="theme-manager.js"></script>
     <script src="config-storage.js"></script>
     <script src="fleet-manager.js"></script>
+    <script src="master-data.js"></script>
     <script src="app.js"></script>
     <script src="../server_control.js"></script>
 

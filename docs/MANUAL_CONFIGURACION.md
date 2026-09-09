@@ -348,16 +348,56 @@ idénticos. Cada grupo tiene:
 
 # PESTAÑA 4 — Layout y Datos
 
-De dónde salen el mapa y los datos maestros.
+De dónde salen el mapa y los datos maestros del negocio.
+
+> ### Lo más importante de esta pantalla
+>
+> **El simulador no lee el Excel directamente.** Trabaja con una base de datos
+> interna que se arma *a partir* del Excel. Por eso, si editás el Excel, los
+> cambios **no tienen ningún efecto** hasta que apretás **Aplicar Excel**.
+>
+> La pantalla te avisa cuando esto pasa: si el Excel es más nuevo que los datos
+> en uso, aparece una advertencia naranja.
+
+## Archivos de Configuración
 
 - **Archivo Layout (.tmx)** — el mapa físico del almacén (hecho con Tiled).
-  Define pasillos, racks, muelles y zonas. Default: `layouts/WH1.tmx`.
+  Define pasillos, racks, muelles y zonas. Con **Examinar** podés subir uno
+  nuevo: se valida (que se abra bien, tamaño y capas) y se actualiza la ruta.
 - **Archivo de Secuencia (.xlsx)** — el Excel maestro: ubicaciones, secuencia de
-  picking, catálogo de SKU (hoja `SkuCatalog`), muelles de recepción. Default:
-  `layouts/Warehouse_Logic.xlsx`.
+  picking, catálogo de productos, zonas de salida y muelles. Con **Examinar**
+  subís uno nuevo. **Subirlo no lo aplica**: primero te muestra qué contiene y
+  si hay errores; recién con **Aplicar Excel** pasa a usarse.
+
+## Datos Maestros en Uso
+
+Muestra lo que el simulador está usando **ahora mismo**: cuántas ubicaciones,
+productos, zonas de salida y muelles. Debajo hay una tabla para revisarlos, con
+selector, buscador y paginado (son de solo lectura: las tablas grandes se editan
+en el Excel, que es mejor herramienta para eso).
+
+**Aplicar Excel** toma el archivo (el que subiste o el configurado arriba) y
+reconstruye los datos del simulador. Antes de hacerlo te avisa, porque:
+
+- **reinicia el stock inicial** al que diga el Excel, y
+- **reemplaza las ubicaciones de zonas y muelles** que hayas ajustado a mano
+  (ver más abajo).
+
+Se hace una copia de seguridad automática de los datos anteriores antes de tocar
+nada, y si la importación falla se restaura sola.
+
+## Acciones de Datos
+
 - **Cargar Work Areas** — lee las áreas de trabajo del Excel y las pone
   disponibles en los desplegables de la pestaña Flota. **Ejecutalo después de
   cambiar el Excel.**
+
+## ¿Y las zonas y los muelles?
+
+Sus **ubicaciones** (coordenadas) se pueden ajustar directamente, porque son
+pocas: las zonas de salida en la pestaña *Outbound Staging* y los muelles en
+*Inbound*, con el botón "Guardar ubicaciones". Recordá que aplicar el Excel de
+nuevo las vuelve a los valores del archivo.
 
 ---
 

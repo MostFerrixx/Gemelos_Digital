@@ -28,7 +28,7 @@ from fastapi.staticfiles import StaticFiles
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from web_prototype.app_state import PROJECT_ROOT
-from web_prototype.routers import configurator, replay, runners, system
+from web_prototype.routers import configurator, master_data, replay, runners, system
 
 app = FastAPI()
 
@@ -72,6 +72,7 @@ async def startup_event():
 
 
 app.include_router(configurator.router)
+app.include_router(master_data.router)
 app.include_router(replay.router)
 app.include_router(runners.router)
 app.include_router(system.router)

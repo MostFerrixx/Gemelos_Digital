@@ -606,6 +606,8 @@ data/config_presets/
 # === Higiene post-auditoria (2026-05) ===
 # Datos y binarios de runtime que no deben versionarse
 warehouse.db
+# Backup automatico que crea /api/master-data/apply antes de reimportar
+warehouse.db.bak
 *.db
 uploads/
 ordenes_prueba_real.json

@@ -25,6 +25,9 @@ class WebConfigurator {
         // Initialize modules
         this.fleetManager = new FleetManager(this);
         configStorage = new ConfigurationStorage(this);
+        // Datos maestros (Excel/mapa -> warehouse.db). Ver master-data.js.
+        this.masterData = (typeof MasterDataManager !== 'undefined')
+            ? new MasterDataManager(this) : null;
 
         // Setup event listeners
         this.setupEventListeners();
@@ -36,6 +39,10 @@ class WebConfigurator {
 
         // Load initial configuration
         await this.loadConfiguration();
+
+        // Datos maestros: despues de cargar el config, porque el resumen usa
+        // `sequence_file` para saber que Excel comparar contra la base.
+        this.masterData?.init();
 
         // Re-enable Run Simulation button after configuration is loaded
         if (btnRunSim) {

@@ -120,6 +120,15 @@ poda en limpieza:
 Fuente de datos canónica = **la RAÍZ** (`config.json`, `layouts/WH1.tmx`,
 `layouts/Warehouse_Logic.xlsx`). El árbol `data/` es una migración abandonada que
 solo lee código muerto/roto.
+
+**OJO con los datos maestros (verificado 2026-09-09):** `data_manager` carga de
+`warehouse.db` **si existe**, y solo cae al Excel si no existe. Como la base
+existe, **el motor NO lee el Excel**: la cadena real es
+`Excel → run_migration.py → warehouse.db → motor`. Editar el Excel no tiene
+efecto hasta reimportarlo. Eso ya se puede hacer desde la web (pestaña Layout y
+Datos: subir → validar → **Aplicar Excel**), con aviso cuando el Excel quedó más
+nuevo que la base. Endpoints en `web_prototype/routers/master_data.py`; plan en
+`docs/PLAN_DATOS_MAESTROS_WEB.md`.
 NOTA: la simulación y `run_migration.py` leen ambos desde `layouts/`. El migrador
 usa `find_excel_file()` (busca `layouts/Warehouse_Logic_v2.xlsx`, luego
 `layouts/Warehouse_Logic.xlsx`); no existe copia en `data/layouts/`. Sin divergencia.
