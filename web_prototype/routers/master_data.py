@@ -296,6 +296,29 @@ EDITABLES = {
 }
 
 
+def _mapa_para_validar():
+    """(ancho, alto, es_transitable) del mapa TMX vigente, o (None, None, None).
+
+    Se usa el LayoutManager REAL del motor en vez de reinterpretar el TMX aca:
+    es la misma fuente de verdad que valida las coordenadas al correr. Si no se
+    puede cargar (falta el archivo, falta una dependencia), se degrada a no
+    validar geometria en vez de bloquear el guardado.
+    """
+    try:
+        src_dir = os.path.join(PROJECT_ROOT, "src")
+        if src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
+        from web_prototype.app_state import config_manager
+        from subsystems.simulation.layout_manager import LayoutManager
+
+        tmx = config_manager.load_config().get("layout_file", "layouts/WH1.tmx")
+        lm = LayoutManager(_ruta_segura(tmx), headless=True)
+        return lm.grid_width, lm.grid_height, lm.is_walkable
+    except Exception as e:
+        print("[MASTER-DATA][WARN] No se pudo cargar el mapa para validar: %s" % e)
+        return None, None, None
+
+
 def _guardar_coordenadas(tabla: str, filas: List[Coordenada]) -> Dict[str, Any]:
     col_id, col_x, col_y = EDITABLES[tabla]
 
@@ -306,6 +329,36 @@ def _guardar_coordenadas(tabla: str, filas: List[Coordenada]) -> Dict[str, Any]:
         if f.x < 0 or f.y < 0:
             raise HTTPException(status_code=400,
                                 detail="Coordenadas negativas en el id %s." % f.id)
+
+    # Contra el MAPA: el motor exige que estas coordenadas caigan dentro de la
+    # grilla del TMX y aborta la corrida si no (DataManagerError). Sin este
+    # chequeo, la web aceptaba un valor invalido y el error recien aparecia al
+    # simular, lejos de donde se cometio.
+    ancho, alto, transitable = _mapa_para_validar()
+    if ancho is not None:
+        fuera = [f for f in filas if not (0 <= f.x < ancho and 0 <= f.y < alto)]
+        if fuera:
+            raise HTTPException(
+                status_code=400,
+                detail=("Fuera del mapa (%d x %d): %s. Corregi las coordenadas."
+                        % (ancho, alto,
+                           ", ".join("id %s -> (%s, %s)" % (f.id, f.x, f.y) for f in fuera))))
+
+        if transitable is not None:
+            bloqueadas = []
+            for f in filas:
+                try:
+                    if not transitable(f.x, f.y):
+                        bloqueadas.append(f)
+                except Exception:
+                    pass  # ante la duda, no bloquear el guardado
+            if bloqueadas:
+                raise HTTPException(
+                    status_code=400,
+                    detail=("Estas celdas no son transitables en el mapa (hay un rack o "
+                            "una pared): %s. Los agentes no podrian llegar."
+                            % ", ".join("id %s -> (%s, %s)" % (f.id, f.x, f.y)
+                                        for f in bloqueadas)))
 
     conn = _conn()
     try:

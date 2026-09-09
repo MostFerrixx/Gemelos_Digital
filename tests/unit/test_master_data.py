@@ -160,6 +160,44 @@ def test_md13_rechaza_ids_inexistentes():
     assert "no existen" in str(e.value.detail).lower()
 
 
+def test_md15_rechaza_coordenadas_fuera_del_mapa():
+    """El motor ABORTA la corrida si una zona/muelle cae fuera de la grilla del
+    TMX. Sin este chequeo, la web aceptaba el valor y el error aparecia recien
+    al simular, lejos de donde se cometio."""
+    from fastapi import HTTPException
+    if not os.path.exists(md.DB_PATH):
+        pytest.skip("no hay warehouse.db en este entorno")
+    ancho, alto, _ = md._mapa_para_validar()
+    if ancho is None:
+        pytest.skip("no se pudo cargar el mapa en este entorno")
+
+    with pytest.raises(HTTPException) as e:
+        md._guardar_coordenadas("inbound_docks",
+                                [md.Coordenada(id=1, x=ancho + 50, y=alto + 50)])
+    assert "fuera del mapa" in str(e.value.detail).lower()
+
+
+def test_md16_rechaza_celdas_no_transitables():
+    """Una celda puede estar dentro de la grilla y aun asi ser un rack: si se
+    pone ahi un muelle, ningun agente puede llegar."""
+    from fastapi import HTTPException
+    if not os.path.exists(md.DB_PATH):
+        pytest.skip("no hay warehouse.db en este entorno")
+    ancho, alto, transitable = md._mapa_para_validar()
+    if transitable is None:
+        pytest.skip("no se pudo cargar el mapa en este entorno")
+
+    bloqueada = next(((x, y) for y in range(alto) for x in range(ancho)
+                      if not transitable(x, y)), None)
+    if bloqueada is None:
+        pytest.skip("el mapa no tiene celdas bloqueadas")
+
+    with pytest.raises(HTTPException) as e:
+        md._guardar_coordenadas("inbound_docks",
+                                [md.Coordenada(id=1, x=bloqueada[0], y=bloqueada[1])])
+    assert "transitable" in str(e.value.detail).lower()
+
+
 def test_md14_guardar_y_restaurar_coordenadas():
     """Round-trip real contra la base, dejandola como estaba."""
     if not os.path.exists(md.DB_PATH):
@@ -175,15 +213,29 @@ def test_md14_guardar_y_restaurar_coordenadas():
         pytest.skip("no hay muelles cargados")
 
     did, ox, oy = originales[0]
+
+    # El destino tiene que ser una celda VALIDA (dentro del mapa y transitable),
+    # porque el guardado ahora lo exige. Se busca una distinta de la actual.
+    ancho, alto, transitable = md._mapa_para_validar()
+    if ancho is None:
+        destino = (ox + 1, oy)
+    else:
+        destino = next(((x, y) for y in range(alto) for x in range(ancho)
+                        if (x, y) != (ox, oy)
+                        and (transitable is None or transitable(x, y))), None)
+        if destino is None:
+            pytest.skip("no hay otra celda valida en el mapa")
+
     try:
-        md._guardar_coordenadas("inbound_docks", [md.Coordenada(id=did, x=ox + 5, y=oy + 5)])
+        md._guardar_coordenadas("inbound_docks",
+                                [md.Coordenada(id=did, x=destino[0], y=destino[1])])
         conn = md._conn()
         try:
             fila = conn.execute(
                 "SELECT x, y FROM inbound_docks WHERE dock_id = ?", (did,)).fetchone()
         finally:
             conn.close()
-        assert (fila["x"], fila["y"]) == (ox + 5, oy + 5)
+        assert (fila["x"], fila["y"]) == destino
     finally:
         md._guardar_coordenadas("inbound_docks", [md.Coordenada(id=did, x=ox, y=oy)])
 
