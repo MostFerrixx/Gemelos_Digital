@@ -93,7 +93,10 @@ class TiemposConfig(BaseModel):
     time_per_cell: Optional[float] = None
     speed_factor_ground: Optional[float] = None
     speed_factor_forklift: Optional[float] = None
-    tiempo_picking_por_linea: Optional[float] = None
+    # `tiempo_picking_por_linea` ELIMINADA el 2026-09-09: modelo previo a INIT-8
+    # (tiempo fijo de pick, igual para todo producto) que quedaba sin efecto en
+    # cuanto pick_time_model tenia base. Un config viejo que aun la traiga NO
+    # falla: el modelo acepta claves extra (extra="allow"); simplemente se ignora.
     tiempo_horquilla: Optional[float] = None
     pick_time_model: Optional[PickTimeModel] = None
     # INIT-8 F2: {clase_manejo: {mult, recargo}} (hoja SkuCatalog)

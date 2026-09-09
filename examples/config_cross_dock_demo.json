@@ -73,7 +73,6 @@
     "time_per_cell": 0.1,
     "speed_factor_ground": 1,
     "speed_factor_forklift": 0.8,
-    "tiempo_picking_por_linea": null,
     "tiempo_horquilla": 2
   },
   "inbound": {

@@ -120,14 +120,18 @@ class BaseOperator:
         self.time_per_cell = float(_tiempos.get("time_per_cell", 0.1))
         self.speed_factor_ground = float(_tiempos.get("speed_factor_ground", 1.0))
         self.speed_factor_forklift = float(_tiempos.get("speed_factor_forklift", 0.8))
-        _pick = _tiempos.get("tiempo_picking_por_linea", None)
-        self.picking_time = float(_pick) if _pick is not None else None
+        # `tiempo_picking_por_linea` (un tiempo fijo de pick, igual para todo
+        # producto) fue ELIMINADO el 2026-09-09. Era el modelo previo a INIT-8 y
+        # quedaba sin efecto en cuanto pick_time_model tenia base -- el caso
+        # normal. Lo que hacia se expresa con la propia formula: base = ese
+        # valor y el resto de los factores en 0. Se quito de la UI, del motor y
+        # del esquema para no dejar una pieza que nadie puede configurar.
         self.lift_time = float(_tiempos.get("tiempo_horquilla", 2.0))
 
         # INIT-4 (C1): modelo de tiempo de pick que escala con cantidad/volumen.
         # Bloque OPCIONAL config["tiempos"]["pick_time_model"]. Defaults NEUTROS:
         # con base=None y por_unidad=0 y por_volumen=0, _compute_pick_time()
-        # devuelve EXACTAMENTE el valor historico (picking_time o discharge_time),
+        # devuelve EXACTAMENTE el valor historico (el discharge_time del agente),
         # garantizando byte-identico con configs que NO traen el bloque.
         _ptm = _tiempos.get("pick_time_model", {})
         if not isinstance(_ptm, dict):
@@ -306,8 +310,8 @@ class BaseOperator:
         volumen, PESO y CLASE DE MANEJO del producto.
 
         Rama de COMPATIBILIDAD (neutra): sin 'base', factores en 0 y clase
-        neutra, devuelve EXACTAMENTE el valor historico (picking_time o
-        discharge_time) -- gate byte-identico con configs sin los bloques.
+        neutra, devuelve EXACTAMENTE el valor historico (el discharge_time del
+        agente) -- gate byte-identico con configs sin los bloques.
 
         Rama ESCALADA (calibracion en docs/antiguos/PLAN_INIT8_TIEMPOS.md):
             t = (base + por_unidad*qty + por_volumen*vol + por_kg*peso_total)
@@ -315,7 +319,7 @@ class BaseOperator:
         'base' en None reutiliza el tiempo historico como base. Cantidades
         sobre cantidad_inicial (estable, independiente del estado de picking).
         """
-        historico = self.picking_time if self.picking_time is not None else self.discharge_time
+        historico = self.discharge_time
         mult, recargo = self._clase_params(wo)
         # Compat exacta: sin parametros activos -> comportamiento de hoy.
         if (self.pick_time_base is None
