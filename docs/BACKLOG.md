@@ -17,6 +17,8 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-08 — confirmar work_area_equipment con el almacen real | ABIERTO (2026-07-25) | **Alta** (supuesto activo) | Trivial (config) | Lectura del almacen real (Director/cliente) |
 | BK-09 — flota 2+2 sub-dimensionada (hallazgo de negocio) | ABIERTO (2026-07-25) | Media | Trivial (config) | Decision de negocio del Director |
 | BK-10 — el boton "Restart" responde success pero NO reinicia el servidor | ABIERTO (2026-09-07) | Baja | ~30 min | Ninguno |
+| INIT-10 — modelo de almacen propio (reemplaza a Tiled como herramienta principal) | ANALIZADO (2026-09-16) | Alta (cimiento de automatismos y mezaninas) | Alto, por etapas | Plan detallado de la etapa 2 + OK del Director |
+| **INIT-11 — Task Path: outbound en varios pasos** | **PLAN PROPUESTO (2026-09-16)** | **Alta (prioridad actual del Director)** | 1,5-2 semanas | OK del plan + decisiones D1-D5 (`docs/PLAN_INIT11_TASK_PATH.md`) |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
@@ -76,6 +78,50 @@ Con un solo montacargas mas, el modelo realista ya supera el baseline
 historico; el optimo esta en 2+4. Es una decision de negocio del Director
 (comprar/asignar equipos), no un bug. Cambiar el canonico rompe el baseline
 intencionalmente. Insumo natural para el optimizador (INIT-3).
+
+---
+
+## INIT-10 — Modelo de almacen propio (Tiled deja de ser la herramienta principal)
+
+**Analizado el 2026-09-16. Analisis completo, con fuentes: `docs/ANALISIS_LAYOUTS.md`.**
+Anotado para implementar mas adelante (decision del Director).
+
+**Por que.** El `.tmx` de Tiled (editor de videojuegos) aporta grilla,
+transitabilidad y el dibujo del visor, pero:
+- el almacen se describe DOS veces (las 360 ubicaciones estan en el mapa Y en el
+  Excel; las del mapa solo se imprimen). Hoy coinciden 360/360, pero nada lo
+  garantiza;
+- crear un almacen es pintar celda por celda y despues cuadrar el Excel a mano;
+- no tiene escala real ni conceptos de almacen;
+- `docs/INSTRUCCIONES_LAYOUT_PERSONALIZADO.md` esta desactualizada (dice
+  `picking`, el motor busca `picking_location`).
+
+**Horizonte que lo vuelve necesario.** El Director quiere modelar a mediano
+plazo mezaninas, cintas transportadoras, sorters, OSR y GTP. Nada de eso entra
+en una grilla de baldosas (direccion, conexiones, varias salidas, pisos). Los
+simuladores profesionales (AnyLogic, FlexSim) y el estandar LIF (VDMA, JSON en
+metros, grafo de nodos/aristas/estaciones, multinivel) usan un modelo POR CAPAS.
+
+**Decision de fondo:** disenar primero el MODELO DE DATOS del almacen (niveles,
+almacenamiento, zonas, equipos, conexiones, enlaces entre niveles), aunque hoy
+solo se implementen racks y pasillos. Alinear la parte de vehiculos con LIF.
+No hace falta cambiar de lenguaje ni de motor (SimPy alcanza; 3D seria JS).
+
+**Etapas:**
+1. Validar mapa contra Excel al aplicar + corregir la guia (medio dia).
+2. Disenar el modelo de datos y que el motor lo lea; Tiled pasa a importador de
+   los 8 layouts existentes. **Es el cimiento.**
+3. Editor web: generador de pasillos por parametros + pintura + colocar objetos.
+4. Cintas transportadoras (base de sorters, GTP y OSR).
+5. Sorters; despues OSR y GTP, cada uno como iniciativa propia.
+6. Mezaninas: el ruteo hoy es de UN solo plano (celdas `(x, y)` en pathfinder y
+   reservation_table); hay que extenderlo a `(nivel, x, y)` con conectores.
+- A futuro: importar planos DXF (`ezdxf`).
+
+**Advertencia:** GTP y OSR invierten el modelo actual (el producto va hacia la
+persona). Tratarlos como cambio de paradigma, no como una funcionalidad mas.
+
+**Siguiente paso cuando se retome:** plan detallado de la etapa 2 para aprobar.
 
 ---
 
