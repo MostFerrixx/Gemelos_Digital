@@ -320,8 +320,10 @@ class WebConfigurator {
             'carga': { title: 'Carga de Trabajo', subtitle: 'Configure el volumen y distribución de órdenes' },
             'estrategias': { title: 'Estrategias', subtitle: 'Defina la lógica de despacho y tipos de tours' },
             'flota': { title: 'Flota de Agentes', subtitle: 'Gestione grupos de operarios y montacargas' },
-            'layout-datos': { title: 'Layout y Datos', subtitle: 'Archivos de mapa, secuencia y escala' },
+            'layout-datos': { title: 'Layout y Datos', subtitle: 'Mapa, Excel maestro y datos en uso' },
             'staging': { title: 'Outbound Staging', subtitle: 'Distribución de salida por zonas' },
+            // Faltaba: al entrar a Inbound quedaba el titulo de la pestana anterior.
+            'inbound': { title: 'Inbound', subtitle: 'Recepción de camiones, putaway y slotting' },
             'optimizacion': { title: 'Optimización', subtitle: 'Estudio Optuna: ajuste automático de flota y estrategia' },
             'experimentos': { title: 'Experimentos A/B', subtitle: 'Compara dos configuraciones con rigor estadístico' }
         };
@@ -1269,7 +1271,6 @@ class WebConfigurator {
                 time_per_cell: 0.1,
                 speed_factor_ground: 1.0,
                 speed_factor_forklift: 0.8,
-                tiempo_picking_por_linea: null,
                 tiempo_horquilla: 2.0
             }
         };
@@ -1380,8 +1381,17 @@ class WebConfigurator {
 
         config.congestion = baseCong;
         config.outbound = baseOb;
-        // INIT-6 Opcion B: destino -> staging_id
-        config.destino_staging_map = this._serializeDestinoStagingRows();
+        // INIT-6 Opcion B: destino -> staging_id.
+        // Solo se emite si tiene contenido o si ya existia en el config (mismo
+        // criterio que el bloque inbound de abajo). Antes se emitia SIEMPRE,
+        // aunque fuera {}: guardar el canonico sin tocar nada le agregaba
+        // `destino_staging_map: {}` y cambiaba la metadata del replay.
+        const destinoMap = this._serializeDestinoStagingRows();
+        const destinoExistia = !!(this.currentConfig
+            && Object.prototype.hasOwnProperty.call(this.currentConfig, 'destino_staging_map'));
+        if (Object.keys(destinoMap).length > 0 || destinoExistia) {
+            config.destino_staging_map = destinoMap;
+        }
 
         // INIT-7 F3: bloque inbound completo (mismo patron base+overrides).
         // Solo se emite si el usuario lo activo alguna vez o ya existia en el
@@ -1431,13 +1441,9 @@ class WebConfigurator {
         if (!isNaN(tpcVal)  && tpcVal  > 0) baseTiempos.time_per_cell          = tpcVal;
         if (!isNaN(sfkVal)  && sfkVal  > 0) baseTiempos.speed_factor_forklift  = sfkVal;
         if (!isNaN(liftVal) && liftVal >= 0) baseTiempos.tiempo_horquilla       = liftVal;
-        // `tiempo_picking_por_linea` ya no se edita desde la UI (ver index.html).
-        // NO se toca: se conserva el valor que traiga el config. Si se pusiera
-        // null aca, abrir y guardar un archivo viejo que si lo use le cambiaria
-        // el comportamiento sin que nadie lo haya pedido.
-        if (!('tiempo_picking_por_linea' in baseTiempos)) {
-            baseTiempos.tiempo_picking_por_linea = null;
-        }
+        // `tiempo_picking_por_linea` se ELIMINO del motor (2026-09-09): la UI no
+        // la escribe ni la inventa. Si un archivo viejo la trae, `baseTiempos`
+        // (base-preserve) la conserva tal cual y el motor simplemente la ignora.
 
         // INIT-8 UI: modelo de tiempo de pick (base-preserve + overrides;
         // base vacia = null = usar tiempo historico del agente).

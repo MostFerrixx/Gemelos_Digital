@@ -203,6 +203,26 @@ body {
     z-index: 5;
 }
 
+/* El titulo no tenia regla propia: los botones de la derecha lo aplastaban a
+   ~78 px y el texto se partia en 4-5 lineas desbordando la barra de 64 px
+   ("Carga de Trabajo" se veia como "Trabajo"). Ahora ocupa el espacio libre y,
+   si no alcanza, se recorta con "..." en una sola linea. */
+.top-bar-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-right: 1.25rem;
+}
+.top-bar-title h2,
+.top-bar-title p {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.config-actions {
+    flex-shrink: 0;
+}
+
+
 .top-bar-title h2 {
     font-size: 1.25rem;
     font-weight: 600;
@@ -519,6 +539,42 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 1rem;
+}
+
+/* Reparto por zona: mismo aspecto que "Distribucion por Clase de Manejo"
+   (.dist-item), que es el mismo concepto (porcentajes que suman 100%). Antes
+   .staging-item y .staging-input no tenian estilo: inputs nativos pegados. */
+.staging-item {
+    background-color: var(--color-bg-app);
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-border);
+}
+.staging-item label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.staging-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-input-bg);
+    color: var(--color-text-main);
+    font-family: inherit;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.staging-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 /* Fleet Management */
@@ -1472,9 +1528,93 @@ select:disabled {
     min-width: 140px;
     font-size: 13px;
 }
-.area-eq-select {
-    padding: 3px 8px;
-    border-radius: 4px;
+/* ============================================================
+   CONTROLES DE FILA (revision de diseno 2026-09-16)
+   El estilo de campos del configurador solo aplicaba a los que estan dentro
+   de un .form-group. Los de las filas densas (equipo por area, prioridades de
+   work area, destino -> zona, coordenadas) quedaban con el estilo NATIVO del
+   navegador: bordes en relieve, sin esquinas, 19 px de alto. Se les da el mismo
+   lenguaje visual que al resto (borde, radio, fondo, foco), en version compacta
+   porque viven en filas.
+   ============================================================ */
+.area-eq-select,
+.work-area-select,
+.input-priority,
+.destino-staging-row input,
+.coord-row input,
+.master-table-controls select,
+.master-table-controls input {
+    padding: 0.4rem 0.65rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-input-bg);
+    color: var(--color-text-main);
+    font-family: inherit;
+    font-size: 0.875rem;
+    /* Altura fija: select e input miden distinto por defecto y quedaban
+       desalineados en la misma fila. */
+    height: 2.125rem;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.area-eq-select:focus,
+.destino-staging-row input:focus,
+.coord-row input:focus,
+.master-table-controls select:focus,
+.master-table-controls input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+.area-eq-select { min-width: 12rem; }
+
+/* Fila de prioridad de work area: el select se estira, la prioridad es corta. */
+.work-area-priority-row .work-area-select { flex: 1; min-width: 0; }
+.work-area-priority-row .input-priority   { width: 5rem; }
+.work-area-priority-row label {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+
+/* Botones de fila: antes sin estilo (boton nativo de Windows). */
+.btn-add-priority,
+.btn-remove-group,
+.btn-remove-priority {
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+}
+/* Agregar: mismo aspecto que .btn-small ("+ Anadir Grupo", "Aplicar Excel"). */
+.btn-add-priority {
+    padding: 0.25rem 0.75rem;
+    background-color: rgba(37, 99, 235, 0.1);
+    color: var(--color-primary);
+    border: none;
+}
+.btn-add-priority:hover { background-color: rgba(37, 99, 235, 0.2); }
+/* Quitar: discreto en reposo, rojo al pasar el mouse (accion destructiva). */
+.btn-remove-group,
+.btn-remove-priority {
+    padding: 0.25rem 0.6rem;
+    background: transparent;
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+}
+.btn-remove-priority { min-width: 2rem; }
+.btn-remove-group:hover,
+.btn-remove-priority:hover {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+    background-color: rgba(239, 68, 68, 0.08);
 }
 
 /* D-14: stepper numerado de pestañas (paso 1..5) en el sidebar del configurador */
@@ -1670,8 +1810,30 @@ select:disabled {
     margin: 0;
 }
 .coord-row input {
-    width: 4rem;
+    /* borde, radio, padding y foco: regla compartida "CONTROLES DE FILA" */
+    width: 4.5rem;
     margin: 0;
-    padding: 0.25rem 0.4rem;
-    font-size: 0.85rem;
+}
+
+/* "Restart" lo inserta server_control.js (compartido con el visor), con el
+   texto como nodo suelto: se compacta solo en el configurador, a icono. */
+@media (max-width: 1760px) {
+    #restartServerBtn { font-size: 0; padding-left: 0.6rem; padding-right: 0.6rem; }
+    #restartServerBtn .restart-icon { font-size: 1rem; }
+}
+
+/* --- Barra superior responsiva: AL FINAL a proposito, para ganarle a las
+   reglas base de .config-actions y de los botones (mismo nivel de
+   especificidad: gana la ultima). --- */
+/* Barra superior responsiva: los 10 botones median ~1300 px y la barra ~1180
+   en una pantalla de 1440, asi que no entraban ni sin titulo ("Aplicar
+   Configuracion" quedaba cortado). Las acciones SECUNDARIAS (Default y las
+   cuatro de configuraciones guardadas) muestran solo su icono cuando falta
+   espacio; el nombre queda en el tooltip. Las principales conservan su texto. */
+.btn-compactable .btn-label { margin-left: 0.35rem; }
+@media (max-width: 1760px) {
+    .config-actions { gap: 0.5rem; }
+    .btn-compactable { padding-left: 0.6rem; padding-right: 0.6rem; }
+    .btn-compactable .btn-label { display: none; }
+    .btn-compactable .icon { margin: 0; }
 }

@@ -84,26 +84,26 @@
                     <p id="current-tab-subtitle">Configure el volumen y distribución de órdenes</p>
                 </div>
                 <div class="config-actions">
-                    <button id="btn-default" class="btn-text" title="Restaurar valores por defecto">
-                        <span class="icon">↺</span> Default
+                    <button id="btn-default" class="btn-text btn-compactable" title="Restaurar valores por defecto">
+                        <span class="icon">↺</span><span class="btn-label">Default</span>
                     </button>
                     <div class="divider"></div>
                     <input type="file" id="file-import-input" accept=".json" style="display: none;">
-                    <button id="btn-import" class="btn-secondary" title="Importar desde archivo local">
-                        <span class="icon">📂</span> Importar
+                    <button id="btn-import" class="btn-secondary btn-compactable" title="Importar desde archivo local">
+                        <span class="icon">📂</span><span class="btn-label">Importar</span>
                     </button>
-                    <button id="btn-manage" class="btn-secondary">
-                        <span class="icon">📋</span> Gestionar
+                    <button id="btn-manage" class="btn-secondary btn-compactable" title="Gestionar configuraciones guardadas">
+                        <span class="icon">📋</span><span class="btn-label">Gestionar</span>
                     </button>
-                    <button id="btn-load" class="btn-secondary">
-                        <span class="icon">📥</span> Cargar
+                    <button id="btn-load" class="btn-secondary btn-compactable" title="Cargar una configuración guardada">
+                        <span class="icon">📥</span><span class="btn-label">Cargar</span>
                     </button>
-                    <button id="btn-save" class="btn-secondary">
-                        <span class="icon">💾</span> Guardar
+                    <button id="btn-save" class="btn-secondary btn-compactable" title="Guardar la configuración actual con un nombre">
+                        <span class="icon">💾</span><span class="btn-label">Guardar</span>
                     </button>
                     <!-- D-06: Enlace directo al Visor de Replay -->
-                    <a href="/" target="_blank" id="btn-open-viewer" class="btn-secondary" title="Abrir Visor de Replay en nueva pestana" style="text-decoration:none; display:inline-flex; align-items:center; gap:0.4rem;">
-                        <span class="icon">▶</span> Abrir Visor
+                    <a href="/" target="_blank" id="btn-open-viewer" class="btn-secondary btn-compactable" title="Abrir el visor de replay en una pestaña nueva" style="text-decoration:none;">
+                        <span class="icon">▶</span><span class="btn-label">Abrir Visor</span>
                     </a>
 
                     <button id="btn-run-simulation" class="btn-highlight">
@@ -553,7 +553,7 @@
                     <div class="card">
                         <div class="card-header">
                             <h3>Equipo por Área</h3>
-                            <button id="btn-generate-default-fleet" class="btn-text">Generar Flota por Defecto</button>
+                            <button id="btn-generate-default-fleet" class="btn-small">Generar Flota por Defecto</button>
                         </div>
                         <div class="card-body">
                             <p class="description-text">Qué tipo de equipo atiende cada área del

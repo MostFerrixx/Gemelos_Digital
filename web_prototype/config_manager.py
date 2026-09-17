@@ -123,7 +123,9 @@ class WebConfigurationManager:
             # Con indent=4 cada guardado desde la UI reescribia el archivo entero
             # (144 lineas +/- 108 solo por formato), volviendo ilegible cualquier
             # diff de git aunque el contenido casi no cambiara.
-            json_str = json.dumps(merged, indent=2, ensure_ascii=False)
+            # "\n" final: mismo formato que el archivo versionado; sin el, cada
+            # guardado desde la UI dejaba un diff de "No newline at end of file".
+            json_str = json.dumps(merged, indent=2, ensure_ascii=False) + "\n"
             json_bytes = json_str.encode('utf-8')
             tmp_path = f"{self.config_path}.tmp"
             with open(tmp_path, 'wb') as f:
@@ -373,13 +375,9 @@ class WebConfigurationManager:
                                     errors.append(f"tiempos.{key} must be > 0")
                             except (TypeError, ValueError):
                                 errors.append(f"tiempos.{key} must be a positive number")
-                    pick = t.get('tiempo_picking_por_linea')
-                    if pick is not None:
-                        try:
-                            if float(pick) < 0:
-                                errors.append("tiempos.tiempo_picking_por_linea must be >= 0")
-                        except (TypeError, ValueError):
-                            errors.append("tiempos.tiempo_picking_por_linea must be a number or null")
+                    # `tiempo_picking_por_linea` ya no se valida: se elimino del
+                    # motor (2026-09-09) y nadie la lee. Validarla seria rechazar
+                    # un archivo viejo por un dato que no tiene ningun efecto.
 
                     # INIT-4 C1: bloque OPCIONAL pick_time_model (escala de tiempo de pick).
                     # Defaults neutros en el motor; aqui solo validamos si la UI lo envia.

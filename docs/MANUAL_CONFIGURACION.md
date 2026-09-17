@@ -29,6 +29,12 @@ configuración anterior.
 
 ### La barra superior
 
+En pantallas de menos de ~1760 px de ancho, las acciones secundarias
+(**Restart, Default, Importar, Gestionar, Cargar, Guardar y Abrir Visor**) se
+muestran **solo con su ícono**; al pasar el mouse aparece su nombre. Las dos
+acciones principales (**Run Simulation** y **Aplicar Configuración**) siempre
+muestran su texto.
+
 | Botón | Qué hace |
 |---|---|
 | **Restart** | Reinicia el servidor web. Útil si la UI queda en un estado raro. |
