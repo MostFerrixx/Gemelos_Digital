@@ -1,7 +1,7 @@
 # BACKLOG — Gemelo Digital de Almacen
 # Solo lo PENDIENTE. Lo cerrado vive en docs/CHANGELOG.md (no se repite aca).
 
-Actualizado: 2026-09-08 · Responsable: Cerebellum
+Actualizado: 2026-09-16 · Responsable: Cerebellum
 
 *(BK-05, BK-11 y el canonico migrado a `agent_types` explicito: CERRADOS el
 2026-09-08 -> CHANGELOG. BK-06 CERRADA el 2026-09-07; de ella salieron BK-07,

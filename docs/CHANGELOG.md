@@ -10,6 +10,48 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-16
+
+- **Revision de diseno del configurador + guardado sin efectos colaterales**
+  (`dabfc97`). Recorrido de las 8 pestanas en claro/oscuro y a 1280/1440 px, con
+  estilos medidos en el navegador. Controles de fila y botones de fila con
+  estilo NATIVO (fuera de `.form-group`) -> regla compartida; "Reparto
+  Aleatorio por Zona" alineado con su equivalente de Carga; barra superior
+  responsiva (los 10 botones median 1293 px en 1180: las acciones secundarias
+  pasan a icono con tooltip; los 8 titulos ahora completos); Inbound mostraba
+  el titulo de otra pestana. **Bug real:** guardar el canonico sin cambios le
+  reinsertaba `tiempo_picking_por_linea: null` y `destino_staging_map: {}` (y
+  quitaba el salto final) -> habria roto el gate en cada guardado. Verificado
+  extremo a extremo: guardar sin cambios deja `config.json` intacto y el gate
+  en PASS. +4 tests. 248 passed.
+
+- **Datos maestros gestionables desde la web** (`16e25e3`, `5661dbe`). Hallazgo:
+  el motor lee `warehouse.db`, no el Excel -> editar el Excel no tenia efecto
+  sin correr la migracion por consola, y los botones "Examinar" no hacian nada.
+  Endpoints en `web_prototype/routers/master_data.py`: subir y validar el Excel
+  y el TMX (sin aplicar), aplicar a la BD con backup y restauracion ante fallo,
+  resumen con aviso de "Excel mas nuevo que la base", tablas paginadas, y
+  edicion de coordenadas de zonas y muelles **validada contra el mapa real**
+  (fuera de grilla y celdas no transitables se rechazan; lo segundo el motor ni
+  lo valida). Prueba clave: reconstruir la base desde el Excel deja el gate en
+  PASS. +16 tests. Plan: `docs/PLAN_DATOS_MAESTROS_WEB.md`.
+
+- **`tiempo_picking_por_linea` eliminado** de la UI (`a8ca57e`) y luego del
+  motor, el esquema y los configs (`8dfed51`), a instancia del Director: sacarlo
+  solo de la UI lo dejaba como componente fantasma. No tenia efecto con
+  `pick_time_model.base` cargada; la propia formula cubre el tiempo fijo.
+  Eventos identicos; baseline `4bcac137` -> **`adcac936`** (-34 bytes de metadata).
+
+- **Pestana Flota con el patron de tarjetas** (`3d1c537`): era la unica de 8 sin
+  ninguna `.card`.
+
+- **Analisis de layouts** (`docs/ANALISIS_LAYOUTS.md`, INIT-10 al backlog) y
+  **plan v2 de INIT-11 Task Path** (`docs/PLAN_INIT11_TASK_PATH.md`): 6 pilares,
+  11 fases. Hallazgo anotado como BK-12: `WorkOrder.work_group` esta
+  hardcodeado e ignora el Excel (216 de 360 ubicaciones con WG equivocado).
+
+---
+
 ## 2026-09-08
 
 - **Canonico migrado a `agent_types` explicito + baseline regenerado**
