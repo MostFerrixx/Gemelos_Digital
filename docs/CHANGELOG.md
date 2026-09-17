@@ -10,6 +10,17 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-17
+
+- **INIT-11 F1 -- personas y equipos separados** (`277a9af`, rama
+  `feat/init11-f1-persona-equipo`, sin mergear: punto de control). La flota
+  puede definirse como `personas` + `equipos` (opt-in); el mapa de areas
+  acepta un equipo concreto. Reglas de realismo: equipo existente,
+  habilitacion y unidades suficientes. **Bug corregido:** la capacidad del
+  visor salia del primer grupo del mismo tipo (150 fijo sin agent_types).
+  Gate PASS (sin cambio de baseline); flota canonica como personas -> 35.019
+  eventos identicos (`scripts/check_equivalencia_personas.py`). +17 tests.
+
 ## 2026-09-16
 
 - **INIT-11 F0 / BK-12 -- el Work Group de cada orden sale del dato real**
