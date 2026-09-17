@@ -10,9 +10,11 @@
 
 - `main` = todo integrado por fast-forward desde `feat/datos-maestros-web`
   (que incluye `feat/ui-flota-cards`), pusheado a origin.
-- Baseline byte-identico vigente: **`sha256=adcac936...`, 15.930.197 bytes**,
-  seed 42 (`tests/baseline.json`). Ultimo cambio: 2026-09-09, al eliminar la
-  clave muerta `tiempo_picking_por_linea` (eventos identicos, -34 bytes).
+- Rama en curso: `feat/init11-f0-work-group` (INIT-11 F0 hecha, sin mergear).
+- Baseline byte-identico vigente en la rama: **`sha256=3a87a1c0...`,
+  15.930.197 bytes**, seed 42 (`tests/baseline.json`). Ultimo cambio:
+  2026-09-16, F0 (solo cambia el campo `work_group` de los eventos). En `main`
+  sigue `adcac936`.
 - REGLA pinneada por tests BN-05 e IN-43: la metadata del .jsonl NO puede
   contener valores wall-clock.
 - En Windows `core.autocrlf=true`: `config.json` puede figurar como modificado
@@ -22,8 +24,8 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 248 passed, 1 deselected (~10s)
-python scripts/regression_gate.py  # GATE PASS esperado (baseline adcac936)
+python -m pytest -q                # 255 passed, 1 deselected (~10s)
+python scripts/regression_gate.py  # GATE PASS esperado (baseline 3a87a1c0)
 ```
 
 ## Estado del configurador web (revisado el 2026-09-16)
@@ -44,11 +46,9 @@ Novedades vigentes:
 
 ## PROXIMO PASO: INIT-11 Task Path
 
-Plan v2 aprobado para arrancar cuando el Director de la senal:
-**`docs/PLAN_INIT11_TASK_PATH.md`** (6 pilares, 11 fases, 2,5-3,5 semanas).
-- **F0 = BK-12**: `WorkOrder.work_group` hardcodeado ignora el Excel (216 de 360
-  ubicaciones con WG equivocado). Cambia el baseline: hacerlo aislado y
-  verificar que el unico campo de evento que cambia es `work_group`.
+Plan v2 en ejecucion: **`docs/PLAN_INIT11_TASK_PATH.md`** (6 pilares, 11 fases).
+- **F0 = BK-12: HECHA** (`081e2a0`). El Work Group de cada orden sale del dato
+  real; unico cambio en eventos = campo `work_group`.
 - **F1** (la mas delicada): separar persona de equipo, con equivalencia exacta
   con la flota actual.
 - Puntos de control con el Director: al cerrar F1, F3, F6 y F8.

@@ -12,6 +12,14 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ## 2026-09-16
 
+- **INIT-11 F0 / BK-12 -- el Work Group de cada orden sale del dato real**
+  (`081e2a0`). Se derivaba del nombre del area e ignoraba el Excel: Area_High
+  y Area_Special (216 de 360 ubicaciones) quedaban en WG_A. Ahora se busca en
+  el plan maestro (por location_id o por coordenada+area) en los 4 lugares
+  donde nacen ordenes; la derivacion por nombre queda de respaldo. Comparado
+  evento por evento: el UNICO campo que cambia es `work_group` (2.539 eventos);
+  tiempos y rutas identicos. Baseline `adcac936` -> `3a87a1c0`. +7 tests.
+
 - **Revision de diseno del configurador + guardado sin efectos colaterales**
   (`dabfc97`). Recorrido de las 8 pestanas en claro/oscuro y a 1280/1440 px, con
   estilos medidos en el navegador. Controles de fila y botones de fila con
