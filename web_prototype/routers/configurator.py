@@ -87,7 +87,8 @@ def resolve_fleet(data: ConfigData):
         # panel de cobertura marque "tipo incorrecto" en una flota sana).
         for agente in flota:
             agente["work_area_priorities"] = effective_work_area_priorities(
-                config, agente.get("type"), agente.get("work_area_priorities"))
+                config, agente.get("type"), agente.get("work_area_priorities"),
+                equipo_id=(agente.get("equipo") or {}).get("id"))
 
         return {
             "success": True,

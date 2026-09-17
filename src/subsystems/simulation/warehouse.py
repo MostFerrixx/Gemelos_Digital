@@ -11,7 +11,7 @@ from typing import Optional, List, Dict, Any
 from .order_strategies import create_order_strategy, OrderGenerationStrategy
 
 # BK-06 F2: capacidad por area derivada de la flota real + el mapa de equipos.
-from core.fleet import capacidades_por_area
+from core.fleet import capacidad_por_agente, capacidades_por_area
 
 
 class SKU:
@@ -1260,16 +1260,15 @@ class AlmacenMejorado:
                         print(f"[WARNING] Error calculating pixel coordinates from {position}: {e}")
                         pixel_x, pixel_y = position[0] * 32, position[1] * 32  # Fallback
                 
-                # Obtener capacidad real del operario desde configuracion
-                agent_type = datos.get('agent_type', 'Unknown')
-                capacidad_real = 150  # Default
-                
-                # Buscar capacidad en configuracion por tipo de agente
-                agent_types_config = self.configuracion.get('agent_types', [])
-                for agent_config in agent_types_config:
-                    if agent_config.get('type') == agent_type:
-                        capacidad_real = agent_config.get('capacity', 150)
-                        break
+                # Capacidad real DE ESTE agente (INIT-11 F1). Antes se tomaba la
+                # del primer grupo de agent_types del mismo tipo, con 150 fijo
+                # de respaldo: sin agent_types (contadores o personas) los
+                # montacargas figuraban en el visor con 150 en vez de 1000.
+                capacidades = getattr(self, '_capacidad_por_agente', None)
+                if capacidades is None:
+                    capacidades = capacidad_por_agente(self.configuracion)
+                    self._capacidad_por_agente = capacidades
+                capacidad_real = capacidades.get(agent_id, 150)
                 
                 replay_evento = {
                     'type': tipo,

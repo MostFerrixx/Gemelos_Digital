@@ -412,6 +412,31 @@ Despues de F3 ya hay un flujo de varios pasos funcionando y medible.
 
 ---
 
+## 11. BITACORA DE EJECUCION
+
+**F0 (2026-09-16, `081e2a0`).** Work Group real por ubicacion. Unico cambio en
+eventos: el campo `work_group` (2.539 eventos). Baseline `3a87a1c0`.
+
+**F1 (2026-09-17).** Personas y equipos separados. Decisiones tomadas:
+- Personas **por grupos** con nombres opcionales (decision menor 1 de la seccion 10).
+- `tipo_base` (GroundOperator / Forklift) define COMO se comporta el equipo en
+  el motor; el nombre del equipo es libre. `agent.type` sigue siendo el tipo
+  base (lo leen eventos, visor y KPIs).
+- Lo que un equipo no declara sale de `fleet_defaults` y `tiempos`.
+- En F1 cada persona maneja un equipo FIJO; tomar/dejar en estacionamientos
+  es F2. La habilitacion ya se valida (una persona no habilitada no se crea).
+- `work_area_equipment` acepta tipo base o equipo concreto.
+- No se agrego `velocidad_a_pie` a la persona: todavia no tiene efecto (llega
+  con F2, al caminar hasta el estacionamiento). Regla: ninguna clave sin lector.
+- Bug encontrado y corregido: la `capacidad` de los eventos del visor se tomaba
+  del primer grupo de `agent_types` del mismo tipo (150 fijo sin agent_types).
+  Ahora es la del agente real. Los ids historicos pasaron a asignarse en
+  `resolver_flota`.
+- Verificacion: gate PASS byte-identico; flota canonica escrita como personas
+  -> 35.019 eventos identicos (`scripts/check_equivalencia_personas.py`).
+- La UI solo MUESTRA la flota de personas (aviso azul) y ofrece los equipos
+  declarados en "Equipo por area"; el editor completo es F10.
+
 ## Fuentes
 
 - Task interleaving (definicion): https://sgsystemsglobal.com/glossary/task-interleaving/

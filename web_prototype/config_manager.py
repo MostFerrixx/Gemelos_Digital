@@ -324,10 +324,15 @@ class WebConfigurationManager:
                 errors.append("work_area_equipment debe ser un objeto area->tipo de equipo.")
                 wae = {}
             else:
+                # INIT-11 F1: el mapa tambien acepta un equipo declarado en `equipos`.
+                equipos_declarados = config.get('equipos') or {}
+                if not isinstance(equipos_declarados, dict):
+                    equipos_declarados = {}
                 for k, v in wae.items():
-                    if v not in VALID_EQUIPMENT:
+                    if v not in VALID_EQUIPMENT and v not in equipos_declarados:
                         errors.append("work_area_equipment['" + str(k) + "'] = '" + str(v)
-                                      + "' no es un tipo valido (GroundOperator o Forklift).")
+                                      + "' no es un tipo valido (GroundOperator, Forklift "
+                                      "o un equipo definido en 'equipos').")
                 # Completitud: si el mapa esta definido, toda area del layout debe estar en el.
                 if wae and required_areas:
                     for area in required_areas:
@@ -335,7 +340,11 @@ class WebConfigurationManager:
                             errors.append(
                                 "El area '" + str(area) + "' no tiene tipo de equipo definido "
                                 "en 'work_area_equipment'. Definelo (GroundOperator o Forklift).")
-            if isinstance(agent_types, list) and agent_types:
+            if config.get('personas'):
+                # INIT-11 F1: la flota sale de personas + equipos (se valida
+                # abajo, con la misma resolucion que usa el motor).
+                pass
+            elif isinstance(agent_types, list) and agent_types:
                 if required_areas:
                     for area in required_areas:
                         cubridores = [a for a in agent_types
@@ -446,6 +455,8 @@ class WebConfigurationManager:
                 for w in schema_warnings:
                     print(f"[CONFIG_MANAGER][SCHEMA][WARN] {w}")
                 errors.extend(schema_errors)
+                if config.get('personas') and not schema_errors:
+                    errors.extend(self._validar_personas(config, required_areas))
             except ImportError as _e:
                 print(f"[CONFIG_MANAGER][SCHEMA][WARN] esquema no disponible: {_e}")
 
@@ -465,6 +476,35 @@ class WebConfigurationManager:
             print(f"[CONFIG_MANAGER ERROR] {error_msg}")
             return False, [error_msg]
     
+    def _validar_personas(self, config: Dict, required_areas: List[str]) -> List[str]:
+        """INIT-11 F1: flota definida como personas + equipos.
+
+        Usa la MISMA resolucion que el motor (core.fleet): todo lo que el motor
+        descartaria con un aviso (equipo inexistente, persona no habilitada,
+        faltan unidades) aca bloquea el guardado, y ademas cada area del layout
+        debe tener al menos una persona con el equipo que el area exige.
+        """
+        from core.fleet import resolver_personas
+        from core.work_areas import (effective_work_area_priorities,
+                                     expected_equipment_for_area)
+        errores = []
+        flota, avisos = resolver_personas(config)
+        errores.extend("Personas y equipos: " + a for a in avisos)
+        if not flota:
+            errores.append("La flota esta vacia: 'personas' no genera ninguna "
+                           "persona valida.")
+            return errores
+        for area in required_areas or []:
+            exigido = expected_equipment_for_area(config, area)
+            cubre = [a for a in flota if area in effective_work_area_priorities(
+                config, a['type'], a['work_area_priorities'],
+                equipo_id=a['equipo']['id'])]
+            if not cubre:
+                errores.append(
+                    "El area '" + str(area) + "' no tiene ninguna persona con el "
+                    "equipo que exige (" + str(exigido) + ") y prioridad en esa area.")
+        return errores
+
     def extract_work_areas(self, sequence_file: str) -> List[str]:
         """
         Extract work areas from sequence file (Excel/CSV)

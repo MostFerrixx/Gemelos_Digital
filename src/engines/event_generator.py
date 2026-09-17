@@ -283,7 +283,8 @@ class EventGenerator:
             wa = getattr(wo, 'work_area', None)
             if wa:
                 areas.add(str(wa))
-        was_fallback = not (self.configuracion or {}).get('agent_types')
+        was_fallback = not ((self.configuracion or {}).get('agent_types')
+                            or (self.configuracion or {}).get('personas'))
         for area in sorted(areas):
             cubridores = [op for op in operarios if op.can_handle_work_area(area)]
             if not cubridores:
@@ -291,7 +292,7 @@ class EventGenerator:
                                "asignado. Simulacion cancelada (evita cuelgue).")
             if not was_fallback:
                 exp = self._expected_equipment_for_area(area)
-                if not any(getattr(op, 'type', None) == exp for op in cubridores):
+                if not any(op.sirve_equipo(exp) for op in cubridores):
                     return False, ("El area '" + area + "' la cubre un tipo de agente "
                                    "incorrecto; requiere un " + exp + ". Simulacion cancelada.")
         return True, ''

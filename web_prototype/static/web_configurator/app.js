@@ -433,10 +433,41 @@ class WebConfigurator {
         this._setFleetDerivedNotice(false);
     }
 
+    // INIT-11 F1: flota definida por personas + equipos (resuelta en el backend).
+    async _materializePersonasFleet(config) {
+        try {
+            const response = await fetch('/api/configurator/resolve-fleet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: config })
+            });
+            const result = await response.json();
+            if (result.success && Array.isArray(result.agent_types)) {
+                this.fleetManager.loadFleet(result.agent_types);
+            }
+        } catch (e) {
+            console.error('[INIT-11] No se pudo resolver la flota de personas:', e);
+        }
+        this._setFleetDerivedNotice('personas', config.personas.length,
+            Object.keys(config.equipos || {}).length);
+    }
+
     // BK-05: aviso visible de que la flota se derivo de los contadores legacy.
+    // INIT-11 F1: derived === 'personas' -> la flota sale de personas + equipos.
     _setFleetDerivedNotice(derived, nGround, nFork) {
         const panel = document.getElementById('fleet-derived-notice');
         if (!panel) return;
+        if (derived === 'personas') {
+            panel.style.display = '';
+            panel.innerHTML =
+                '<strong>Flota definida por personas y equipos.</strong> '
+                + 'Esta configuracion define <code>' + nGround + '</code> grupos de '
+                + 'personas y <code>' + nFork + '</code> equipos, y esa definicion '
+                + 'es la que usa el motor. Los grupos de abajo la muestran, pero '
+                + '<strong>editarlos aqui no tiene efecto</strong>: la edicion de '
+                + 'personas y equipos se agrega en una proxima version.';
+            return;
+        }
         if (!derived) {
             panel.style.display = 'none';
             panel.innerHTML = '';
@@ -1109,13 +1140,20 @@ class WebConfigurator {
         // como esta el config.json canonico), se materializa preguntandole al
         // backend cual es la flota REAL que usaria el motor. Antes esta pestana
         // quedaba vacia y bloqueaba el guardado, aunque el motor corriera bien.
-        if (config.agent_types && config.agent_types.length > 0) {
+        // INIT-11 F1: si la flota se define con personas + equipos, esa
+        // definicion MANDA en el motor. Se muestra la flota resultante y se
+        // avisa que editar los grupos de esta pestana no tiene efecto.
+        if (Array.isArray(config.personas) && config.personas.length > 0) {
+            this._materializePersonasFleet(config);
+        } else if (config.agent_types && config.agent_types.length > 0) {
             this.fleetManager.loadFleet(config.agent_types);
             this._setFleetDerivedNotice(false);
         } else {
             this._materializeLegacyFleet(config);
         }
         // QA-3 Opcion B: mapa area->equipo (siembra desde convencion lo que falte).
+        // INIT-11 F1: los equipos declarados tambien son opciones del mapa.
+        this.fleetManager.setEquipos(config.equipos || {});
         this.fleetManager.setWorkAreaEquipment(config.work_area_equipment || {});
 
         // Tab 4: Layout y Datos

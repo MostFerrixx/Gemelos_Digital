@@ -73,7 +73,13 @@ def get_fleet_defaults(configuracion: Optional[Dict[str, Any]],
 def resolver_flota(configuracion: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Devuelve la especificacion de la flota: una entrada por AGENTE.
 
-    Cada entrada: {type, capacity, discharge_time, work_area_priorities}.
+    Cada entrada: {type, capacity, discharge_time, work_area_priorities,
+    id, equipo, persona}. `type` es el TIPO BASE del equipo (como se comporta:
+    GroundOperator o Forklift); `equipo` trae sus parametros fisicos
+    (INIT-11 F1). `persona` es None en los modos historicos.
+
+    Si el config trae `personas` (INIT-11 F1), la flota sale de ahi y de
+    `equipos` (ver `resolver_personas`). Si no, de los modos historicos:
 
     Fuente: `agent_types` si tiene contenido; si esta vacio, el fallback legacy
     por contadores (`num_operarios_terrestres` / `num_montacargas`), que es lo
@@ -84,6 +90,17 @@ def resolver_flota(configuracion: Optional[Dict[str, Any]]) -> List[Dict[str, An
     comportamiento historico.
     """
     configuracion = configuracion or {}
+
+    if configuracion.get('personas'):
+        if configuracion.get('agent_types'):
+            logger.warning(
+                "[WARN][CONFIG] El config define 'personas' y 'agent_types'. "
+                "Manda 'personas' (modelo persona + equipo); agent_types se ignora.")
+        flota, avisos = resolver_personas(configuracion)
+        for aviso in avisos:
+            logger.warning("[WARN][CONFIG] %s", aviso)
+        return flota
+
     agent_types = configuracion.get('agent_types', [])
 
     flota: List[Dict[str, Any]] = []
@@ -101,7 +118,8 @@ def resolver_flota(configuracion: Optional[Dict[str, Any]]) -> List[Dict[str, An
                     'work_area_priorities',
                     defaults.get('work_area_priorities', {})),
             })
-        return flota
+        return _con_ids_historicos(
+            [_con_equipo_implicito(configuracion, a) for a in flota])
 
     # --- Fallback legacy por contadores (el caso del config.json canonico) ---
     n_ground = configuracion.get('num_operarios_terrestres',
@@ -120,7 +138,192 @@ def resolver_flota(configuracion: Optional[Dict[str, Any]]) -> List[Dict[str, An
                     defaults.get('work_area_priorities', {})),
             })
 
+    return _con_ids_historicos(
+        [_con_equipo_implicito(configuracion, a) for a in flota])
+
+
+# ---------------------------------------------------------------------------
+# INIT-11 F1: personas y equipos separados
+# ---------------------------------------------------------------------------
+# Tipo base = COMO se comporta un equipo en el motor (secuencia de pick):
+# GroundOperator trabaja a nivel de piso; Forklift sube y baja la horquilla.
+TIPOS_BASE = ('GroundOperator', 'Forklift')
+
+
+def _parametros_tiempo(configuracion: Dict[str, Any], tipo_base: str) -> Dict[str, float]:
+    """Velocidad y horquilla por defecto de un tipo base: los mismos valores
+    que el motor usaba antes de separar persona y equipo (bloque `tiempos`)."""
+    tiempos = (configuracion or {}).get('tiempos', {}) or {}
+    if tipo_base == 'Forklift':
+        velocidad = tiempos.get('speed_factor_forklift', 0.8)
+    else:
+        velocidad = tiempos.get('speed_factor_ground', 1.0)
+    return {
+        'velocidad': float(velocidad),
+        'horquilla_s': float(tiempos.get('tiempo_horquilla', 2.0)),
+    }
+
+
+# Prefijo de los ids historicos por tipo (GroundOp-01, Forklift-01...).
+PREFIJOS_HISTORICOS = {"GroundOperator": "GroundOp", "Forklift": "Forklift"}
+
+
+def _con_ids_historicos(flota: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Ids de los modos historicos: numerados por tipo en orden de aparicion.
+    Antes los ponia `crear_operarios`; vivir aca permite que el resto del
+    motor sepa que agente es cual sin tener la lista de operarios."""
+    contador: Dict[str, int] = {}
+    for agente in flota:
+        tipo = agente['type']
+        if tipo not in PREFIJOS_HISTORICOS:
+            continue  # tipo desconocido: crear_operarios lo descarta con aviso
+        contador[tipo] = contador.get(tipo, 0) + 1
+        agente['id'] = "%s-%02d" % (PREFIJOS_HISTORICOS[tipo], contador[tipo])
     return flota
+
+
+def capacidad_por_agente(configuracion: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """{id de agente: capacidad} de la flota resuelta."""
+    return {a['id']: a['capacity'] for a in resolver_flota(configuracion) if a.get('id')}
+
+
+def _con_equipo_implicito(configuracion: Dict[str, Any],
+                          agente: Dict[str, Any]) -> Dict[str, Any]:
+    """Modo historico: cada agente lleva un equipo implicito cuyo nombre es su
+    tipo. Los numeros son exactamente los de antes (equivalencia de F1)."""
+    tipo = agente['type']
+    agente['id'] = None
+    agente['persona'] = None
+    agente['equipo'] = dict(_parametros_tiempo(configuracion, tipo),
+                            id=tipo, tipo_base=tipo, capacidad=agente['capacity'],
+                            cantidad=None)
+    return agente
+
+
+def resolver_equipos(configuracion: Optional[Dict[str, Any]]):
+    """Catalogo de equipos declarado en `equipos`, con defaults completos.
+
+    Devuelve `(equipos, avisos)`. Cada equipo:
+    {id, tipo_base, capacidad, velocidad, horquilla_s, cantidad}.
+    Lo que no se declara sale de `fleet_defaults` y del bloque `tiempos`.
+    `cantidad` None = sin limite de unidades.
+    """
+    configuracion = configuracion or {}
+    bloque = configuracion.get('equipos') or {}
+    equipos: Dict[str, Dict[str, Any]] = {}
+    avisos: List[str] = []
+    if not isinstance(bloque, dict):
+        return equipos, ["'equipos' debe ser un objeto {nombre: definicion}."]
+
+    for nombre, definicion in bloque.items():
+        definicion = definicion if isinstance(definicion, dict) else {}
+        tipo_base = definicion.get('tipo_base')
+        if tipo_base not in TIPOS_BASE:
+            avisos.append(
+                "El equipo '%s' tiene tipo_base '%s'; debe ser uno de %s. "
+                "Equipo descartado." % (nombre, tipo_base, ", ".join(TIPOS_BASE)))
+            continue
+        defaults = get_fleet_defaults(configuracion, tipo_base)
+        tiempos = _parametros_tiempo(configuracion, tipo_base)
+        cantidad = definicion.get('cantidad')
+        equipos[nombre] = {
+            'id': nombre,
+            'tipo_base': tipo_base,
+            'capacidad': definicion.get('capacidad', defaults.get('capacity')),
+            'velocidad': float(definicion.get('velocidad', tiempos['velocidad'])),
+            'horquilla_s': float(definicion.get('horquilla_s', tiempos['horquilla_s'])),
+            'cantidad': int(cantidad) if cantidad is not None else None,
+        }
+    return equipos, avisos
+
+
+def resolver_personas(configuracion: Optional[Dict[str, Any]]):
+    """Flota a partir de `personas` + `equipos`.  (INIT-11 F1)
+
+    `personas` es una lista de GRUPOS:
+      {grupo, cantidad=1, nombres=[], equipo, habilitaciones=[equipo],
+       discharge_time, work_area_priorities}
+    En F1 cada persona trabaja con UN equipo fijo (el de su grupo). Tomar y
+    dejar equipos en estacionamientos llega en F2.
+
+    Reglas de realismo (cada incumplimiento deja un aviso visible y la
+    persona NO se crea: sin maquina o sin habilitacion no puede trabajar):
+      * el equipo debe existir en `equipos`;
+      * la persona debe estar habilitada para ese equipo;
+      * no puede haber mas personas con un equipo que unidades del equipo.
+
+    Devuelve `(flota, avisos)`; el orden de la lista fija el spawn.
+    """
+    configuracion = configuracion or {}
+    equipos, avisos = resolver_equipos(configuracion)
+    grupos = configuracion.get('personas') or []
+    flota: List[Dict[str, Any]] = []
+    usados: Dict[str, int] = {}
+    ids_vistos = set()
+
+    for indice, grupo in enumerate(grupos):
+        if not isinstance(grupo, dict):
+            avisos.append("personas[%d] no es un objeto; se ignora." % indice)
+            continue
+        nombre_grupo = str(grupo.get('grupo') or ('Grupo%d' % (indice + 1)))
+        equipo_id = grupo.get('equipo')
+        equipo = equipos.get(equipo_id)
+        if equipo is None:
+            avisos.append(
+                "El grupo '%s' usa el equipo '%s', que no esta definido en "
+                "'equipos'. El grupo no se crea." % (nombre_grupo, equipo_id))
+            continue
+        habilitaciones = grupo.get('habilitaciones')
+        if habilitaciones is None:
+            habilitaciones = [equipo_id]
+        if equipo_id not in habilitaciones:
+            avisos.append(
+                "El grupo '%s' no esta habilitado para manejar '%s' "
+                "(habilitaciones: %s). El grupo no se crea."
+                % (nombre_grupo, equipo_id,
+                   ", ".join(map(str, habilitaciones)) or "ninguna"))
+            continue
+
+        defaults = get_fleet_defaults(configuracion, equipo['tipo_base'])
+        nombres = list(grupo.get('nombres') or [])
+        cantidad = int(grupo.get('cantidad', max(1, len(nombres))) or 0)
+        if len(nombres) > cantidad:
+            avisos.append(
+                "El grupo '%s' tiene %d nombres para %d personas; se usan los "
+                "primeros %d." % (nombre_grupo, len(nombres), cantidad, cantidad))
+
+        for n in range(cantidad):
+            if n < len(nombres):
+                persona_id = str(nombres[n])
+            else:
+                persona_id = "%s-%02d" % (nombre_grupo, n + 1)
+            if persona_id in ids_vistos:
+                avisos.append("La persona '%s' esta repetida; se crea una sola vez."
+                              % persona_id)
+                continue
+            if equipo['cantidad'] is not None and                     usados.get(equipo_id, 0) >= equipo['cantidad']:
+                avisos.append(
+                    "No hay unidades de '%s' para '%s' (hay %d y ya estan "
+                    "asignadas). La persona no se crea."
+                    % (equipo_id, persona_id, equipo['cantidad']))
+                continue
+            usados[equipo_id] = usados.get(equipo_id, 0) + 1
+            ids_vistos.add(persona_id)
+            flota.append({
+                'type': equipo['tipo_base'],
+                'capacity': equipo['capacidad'],
+                'discharge_time': grupo.get('discharge_time',
+                                            defaults.get('discharge_time', 5)),
+                'work_area_priorities': copy.deepcopy(
+                    grupo.get('work_area_priorities',
+                              defaults.get('work_area_priorities', {}))),
+                'id': persona_id,
+                'equipo': dict(equipo),
+                'persona': {'id': persona_id, 'grupo': nombre_grupo,
+                            'habilitaciones': list(habilitaciones)},
+            })
+
+    return flota, avisos
 
 
 def capacidades_por_tipo(configuracion: Optional[Dict[str, Any]]) -> Dict[str, List[Any]]:
@@ -146,13 +349,10 @@ def capacidades_por_area(configuracion: Optional[Dict[str, Any]]):
 
     Sin flota, se cae al historico 150 para no alterar configs degeneradas.
     """
-    from core.work_areas import expected_equipment_for_area, get_work_area_equipment
+    from core.work_areas import (equipo_sirve, expected_equipment_for_area,
+                                 get_work_area_equipment)
 
     flota = resolver_flota(configuracion)
-
-    caps_por_tipo: Dict[str, List[Any]] = {}
-    for agente in flota:
-        caps_por_tipo.setdefault(agente['type'], []).append(agente['capacity'])
 
     # Areas a considerar: las del mapa explicito + las declaradas por la flota.
     areas = set(get_work_area_equipment(configuracion).keys())
@@ -162,7 +362,9 @@ def capacidades_por_area(configuracion: Optional[Dict[str, Any]]):
     capacidades: Dict[str, Any] = {}
     for area in areas:
         tipo_requerido = expected_equipment_for_area(configuracion, area)
-        disponibles = caps_por_tipo.get(tipo_requerido, [])
+        disponibles = [a['capacity'] for a in flota
+                       if equipo_sirve(tipo_requerido, a['type'],
+                                       (a.get('equipo') or {}).get('id'))]
         if disponibles:
             capacidades[area] = min(disponibles)
 

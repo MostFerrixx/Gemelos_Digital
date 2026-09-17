@@ -186,6 +186,28 @@ class AgentTypeConfig(BaseModel):
     work_area_priorities: Optional[Dict[str, int]] = None
 
 
+class EquipoConfig(BaseModel):
+    """INIT-11 F1: un equipo del catalogo `equipos` (lector: core.fleet)."""
+    model_config = ConfigDict(extra="allow")
+    tipo_base: Optional[str] = None          # GroundOperator | Forklift
+    capacidad: Optional[float] = None        # default fleet_defaults[tipo_base]
+    velocidad: Optional[float] = None        # default tiempos.speed_factor_*
+    horquilla_s: Optional[float] = None      # default tiempos.tiempo_horquilla
+    cantidad: Optional[int] = None           # None = sin limite
+
+
+class PersonaGrupoConfig(BaseModel):
+    """INIT-11 F1: un grupo de personas (`personas[]`, lector: core.fleet)."""
+    model_config = ConfigDict(extra="allow")
+    grupo: Optional[str] = None
+    cantidad: Optional[int] = None
+    nombres: Optional[List[str]] = None
+    equipo: Optional[str] = None             # clave de `equipos`
+    habilitaciones: Optional[List[str]] = None
+    discharge_time: Optional[float] = None
+    work_area_priorities: Optional[Dict[str, int]] = None
+
+
 class DistribucionTipo(BaseModel):
     """AUD8-2 (2026-07-11): las claves de distribucion_tipos son CLASES DE
     MANEJO reales (SKU.clase de la hoja SkuCatalog); la mezcla estocastica
@@ -232,6 +254,10 @@ class WarehouseConfig(BaseModel):
     # operators.crear_operarios; ahora son configurables. Ausente -> defaults
     # historicos de core.fleet.HISTORIC_FLEET_DEFAULTS (comportamiento intacto).
     fleet_defaults: Optional[Dict[str, AgentTypeConfig]] = None
+    # INIT-11 F1: personas y equipos separados (opt-in). Si `personas` tiene
+    # contenido, MANDA sobre agent_types y los contadores (core.fleet).
+    equipos: Optional[Dict[str, EquipoConfig]] = None
+    personas: Optional[List[PersonaGrupoConfig]] = None
     # Fallback historico cuando agent_types esta vacio (core.fleet.resolver_flota):
     num_operarios_terrestres: Optional[int] = None
     num_montacargas: Optional[int] = None
@@ -311,6 +337,12 @@ def validate_config_schema(config: Dict[str, Any]) -> Tuple[List[str], List[str]
         if block is not None:
             for key in _extras_of(block):
                 warnings.append("clave DESCONOCIDA: '%s.%s'" % (block_name, key))
+    for nombre, equipo in (model.equipos or {}).items():
+        for key in _extras_of(equipo):
+            warnings.append("clave DESCONOCIDA: 'equipos.%s.%s'" % (nombre, key))
+    for i, grupo in enumerate(model.personas or []):
+        for key in _extras_of(grupo):
+            warnings.append("clave DESCONOCIDA: 'personas[%d].%s'" % (i, key))
     if model.tiempos is not None and model.tiempos.pick_time_model is not None:
         for key in _extras_of(model.tiempos.pick_time_model):
             warnings.append("clave DESCONOCIDA: 'tiempos.pick_time_model.%s'" % key)

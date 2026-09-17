@@ -220,6 +220,13 @@ defaults que reproducen el comportamiento histórico. Por eso una corrida sin el
     .jsonl => los valores canonicos se mantienen JS-estables (enteros donde
     JS los produciria); claves opcionales solo se emiten si != neutro.
 - **`cercania_tour_mode`** ("cost" default / "greedy_nn"): BK-03; greedy descartado.
+- **`personas` + `equipos`** (INIT-11 F1, opt-in): persona y equipo separados.
+  Si `personas` tiene contenido MANDA sobre `agent_types`/contadores. Resolucion
+  unica en `core/fleet.py` (`resolver_flota`/`resolver_personas`); el mapa
+  `work_area_equipment` acepta un tipo base o un equipo concreto
+  (`core.work_areas.equipo_sirve`). Equivalencia exacta con la flota historica:
+  `python scripts/check_equivalencia_personas.py`. Plan en
+  `docs/PLAN_INIT11_TASK_PATH.md`.
 - Refactor **Template Method** en `operators.py`: `BaseOperator.agent_process()` +
   hook `_do_picking_at()` por subclase (Ground/Forklift). Logging por nivel en todo
   el hot-path (DEBUG silenciado en producción).

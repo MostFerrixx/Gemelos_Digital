@@ -57,10 +57,19 @@ def expected_equipment_for_area(configuracion: Optional[Dict[str, Any]], area: A
     return tipo if tipo else equipment_by_naming(area)
 
 
+def equipo_sirve(requerido: Any, tipo_base: str, equipo_id: Optional[str] = None) -> bool:
+    """El mapa puede pedir un TIPO BASE ('Forklift') o un EQUIPO concreto
+    ('grua_trilateral', INIT-11 F1). Un agente sirve si coincide con cualquiera
+    de los dos: el mapa historico sigue valiendo y el cliente puede afinarlo
+    por equipo cuando declara `equipos`."""
+    return requerido == tipo_base or (equipo_id is not None and requerido == equipo_id)
+
+
 def effective_work_area_priorities(configuracion: Optional[Dict[str, Any]],
                                    agent_type: str,
                                    declared_priorities: Optional[Dict[str, int]],
-                                   agent_id: str = None) -> Dict[str, int]:
+                                   agent_id: str = None,
+                                   equipo_id: str = None) -> Dict[str, int]:
     """Filtra las prioridades declaradas de un agente dejando SOLO las areas
     que el mapa le asigna a su tipo.
 
@@ -77,7 +86,7 @@ def effective_work_area_priorities(configuracion: Optional[Dict[str, Any]],
 
     for area, prioridad in declaradas.items():
         esperado = expected_equipment_for_area(configuracion, area)
-        if esperado == agent_type:
+        if equipo_sirve(esperado, agent_type, equipo_id):
             efectivas[area] = prioridad
         else:
             descartadas.append((area, esperado))

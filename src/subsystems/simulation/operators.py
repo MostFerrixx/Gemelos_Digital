@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 from typing import List, Dict, Any, Optional, Tuple
 
 # BK-06 F1/F2: fuentes unicas de verdad de areas y flota.
-from core.work_areas import effective_work_area_priorities
+from core.work_areas import effective_work_area_priorities, equipo_sirve
 from core.fleet import resolver_flota
 
 
@@ -58,7 +58,8 @@ class BaseOperator:
                  capacity: int, discharge_time: int,
                  work_area_priorities: Dict[str, int],
                  pathfinder: Any = None, layout_manager: Any = None,
-                 simulador: Any = None):
+                 simulador: Any = None, equipo: Dict[str, Any] = None,
+                 persona: Dict[str, Any] = None):
         """
         Initialize base operator
 
@@ -74,9 +75,20 @@ class BaseOperator:
             pathfinder: Pathfinder instance for navigation
             layout_manager: LayoutManager for TMX maps
             simulador: Main simulator reference
+            equipo: INIT-11 F1 -- equipo que maneja (id, tipo_base, capacidad,
+                velocidad, horquilla_s). None = equipo implicito del tipo.
+            persona: INIT-11 F1 -- identidad (id, grupo, habilitaciones).
+                None en los modos historicos (agent_types / contadores).
         """
         self.id = agent_id
+        # `type` es el TIPO BASE del equipo (como se comporta). Se conserva el
+        # nombre porque lo leen los eventos, el visor y los KPIs.
         self.type = agent_type
+        # INIT-11 F1: la persona y el equipo son conceptos separados. En F1 la
+        # persona maneja siempre el mismo equipo; F2 agrega tomar/dejar.
+        self.persona = persona
+        self.equipo = equipo
+        self.equipo_id = (equipo or {}).get('id', agent_type)
         self.env = env
         self.almacen = almacen
         self.configuracion = configuracion
@@ -89,7 +101,8 @@ class BaseOperator:
         # Las declaradas se conservan aparte para diagnostico/UI.
         self.work_area_priorities_declaradas = dict(work_area_priorities or {})
         self.work_area_priorities = effective_work_area_priorities(
-            configuracion, agent_type, work_area_priorities, agent_id=agent_id)
+            configuracion, agent_type, work_area_priorities, agent_id=agent_id,
+            equipo_id=self.equipo_id)
         self.pathfinder = pathfinder
         self.layout_manager = layout_manager
         self.simulador = simulador
@@ -127,6 +140,10 @@ class BaseOperator:
         # valor y el resto de los factores en 0. Se quito de la UI, del motor y
         # del esquema para no dejar una pieza que nadie puede configurar.
         self.lift_time = float(_tiempos.get("tiempo_horquilla", 2.0))
+        # INIT-11 F1: velocidad y horquilla son del EQUIPO. Sin equipo
+        # declarado valen lo mismo que el bloque tiempos (equivalencia exacta).
+        if equipo:
+            self.lift_time = float(equipo.get('horquilla_s', self.lift_time))
 
         # INIT-4 (C1): modelo de tiempo de pick que escala con cantidad/volumen.
         # Bloque OPCIONAL config["tiempos"]["pick_time_model"]. Defaults NEUTROS:
@@ -349,6 +366,17 @@ class BaseOperator:
             Priority level (lower is higher priority), 999 if not in priorities
         """
         return self.work_area_priorities.get(work_area, 999)
+
+    def _velocidad_equipo(self, por_defecto: float) -> float:
+        """Multiplicador de tiempo por celda del equipo (INIT-11 F1)."""
+        if self.equipo and self.equipo.get('velocidad') is not None:
+            return float(self.equipo['velocidad'])
+        return por_defecto
+
+    def sirve_equipo(self, requerido: str) -> bool:
+        """True si el agente cumple lo que pide un area: su tipo base o su
+        equipo concreto (INIT-11 F1)."""
+        return equipo_sirve(requerido, self.type, self.equipo_id)
 
     def can_handle_work_area(self, work_area: str) -> bool:
         """
@@ -1626,7 +1654,8 @@ class GroundOperator(BaseOperator):
                  configuracion: Dict[str, Any], capacity: int, discharge_time: int,
                  work_area_priorities: Dict[str, int],
                  pathfinder: Any = None, layout_manager: Any = None,
-                 simulador: Any = None):
+                 simulador: Any = None, equipo: Dict[str, Any] = None,
+                 persona: Dict[str, Any] = None):
         """
         Initialize Ground Operator
 
@@ -1644,12 +1673,14 @@ class GroundOperator(BaseOperator):
             work_area_priorities=work_area_priorities,
             pathfinder=pathfinder,
             layout_manager=layout_manager,
-            simulador=simulador
+            simulador=simulador,
+            equipo=equipo,
+            persona=persona
         )
 
         # Ground operator specific attributes
         # C1: default_speed leido de config (speed_factor_ground); default 1.0
-        self.default_speed = self.speed_factor_ground
+        self.default_speed = self._velocidad_equipo(self.speed_factor_ground)
         self.preferred_areas = ["Area_Ground", "Area_Piso_L1"]
 
     def _do_picking_at(self, wo):
@@ -1748,7 +1779,8 @@ class Forklift(BaseOperator):
                  configuracion: Dict[str, Any], capacity: int, discharge_time: int,
                  work_area_priorities: Dict[str, int],
                  pathfinder: Any = None, layout_manager: Any = None,
-                 simulador: Any = None):
+                 simulador: Any = None, equipo: Dict[str, Any] = None,
+                 persona: Dict[str, Any] = None):
         """
         Initialize Forklift
 
@@ -1766,14 +1798,16 @@ class Forklift(BaseOperator):
             work_area_priorities=work_area_priorities,
             pathfinder=pathfinder,
             layout_manager=layout_manager,
-            simulador=simulador
+            simulador=simulador,
+            equipo=equipo,
+            persona=persona
         )
 
         # Forklift specific attributes
         # C1: default_speed leido de config (speed_factor_forklift); default 0.8.
         # NOTA: default_speed es multiplicador de TIEMPO (0.8 => 20% mas rapido
         # que Ground, no mas lento). El comentario anterior era incorrecto.
-        self.default_speed = self.speed_factor_forklift
+        self.default_speed = self._velocidad_equipo(self.speed_factor_forklift)
         self.preferred_areas = ["Area_Rack"]
         self.lift_height = 0  # Current lift height
 
@@ -1928,16 +1962,18 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
     # (ver docs/PLAN_BK06_CAPACIDAD_AREA.md). Ahora ambos leen la misma flota.
     flota = resolver_flota(configuracion)
 
-    if configuracion.get('agent_types'):
+    if configuracion.get('personas'):
+        logger.info(f"[OPERATORS] Creando {len(flota)} personas desde 'personas' "
+                    f"+ 'equipos' (INIT-11)...")
+    elif configuracion.get('agent_types'):
         logger.info(f"[OPERATORS] Creando {len(flota)} agentes desde agent_types...")
     else:
         logger.info(f"[OPERATORS] Sin agent_types: {len(flota)} agentes derivados "
                     f"de los contadores legacy...")
 
-    # Constructor por tipo. Los IDs se numeran por tipo y el orden de `flota`
-    # fija el spawn_index (Iniciativa #2 / Fase 2).
+    # Constructor por tipo. El orden de `flota` fija el spawn_index
+    # (Iniciativa #2 / Fase 2).
     constructores = {"GroundOperator": GroundOperator, "Forklift": Forklift}
-    prefijos = {"GroundOperator": "GroundOp", "Forklift": "Forklift"}
 
     for spec in flota:
         agent_type = spec.get('type', 'GroundOperator')
@@ -1947,8 +1983,9 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
             logger.warning(f"[OPERATORS WARNING] Tipo de agente desconocido: {agent_type}")
             continue
 
-        existentes = sum(1 for op in operarios if op.type == agent_type)
-        agent_id = f"{prefijos[agent_type]}-{existentes+1:02d}"
+        # INIT-11 F1: el id lo fija resolver_flota (la persona, o en los modos
+        # historicos la numeracion por tipo de siempre).
+        agent_id = spec['id']
 
         operator = constructor(
             agent_id=agent_id,
@@ -1960,7 +1997,9 @@ def crear_operarios(env: simpy.Environment, almacen: Any,
             work_area_priorities=spec['work_area_priorities'],
             pathfinder=pathfinder,
             layout_manager=layout_manager,
-            simulador=simulador
+            simulador=simulador,
+            equipo=spec.get('equipo'),
+            persona=spec.get('persona')
         )
         operarios.append(operator)
         operator.spawn_index = len(operarios) - 1  # Iniciativa #2 / Fase 2

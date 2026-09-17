@@ -279,8 +279,12 @@ confirmación.
 
 ## Tipo de equipo requerido por área
 
-Un desplegable por cada área del almacén, con dos valores posibles:
-**GroundOperator** (operario a pie) o **Forklift** (montacargas).
+Un desplegable por cada área del almacén, con dos valores básicos:
+**GroundOperator** (operario a pie) o **Forklift** (montacargas). Si la
+configuración define **equipos** propios (ver más abajo), también aparecen
+como opción, con su tipo entre paréntesis — por ejemplo
+`trilateral (Forklift)`: así un área puede exigir un equipo concreto y no solo
+"cualquier montacargas".
 
 **Este es el control más importante de la pantalla, y conviene entender por qué.**
 Es la fuente de verdad de qué equipo puede operar en cada área. Desde la
@@ -310,6 +314,27 @@ Indicador en vivo, no editable. Marca en rojo las áreas del layout que quedaron
 **sin ningún agente capaz**. Si hay áreas descubiertas o la flota está vacía,
 **no se puede guardar ni correr** — es una protección para no lanzar una
 simulación que se colgaría esperando a alguien que no existe.
+
+## Aviso "Flota definida por personas y equipos"
+
+Desde INIT-11 (septiembre 2026) el motor distingue a la **persona** del
+**equipo** que maneja. Una configuración puede describir la flota así:
+
+- **Equipos**: cada uno con su tipo base (GroundOperator o Forklift), su
+  capacidad, su velocidad, el tiempo de horquilla y cuántas unidades hay.
+- **Personas**: grupos con cantidad, nombres opcionales, el equipo que manejan,
+  para qué equipos están habilitadas y sus prioridades por área.
+
+El motor respeta tres reglas de realismo: la persona necesita un equipo
+existente, tiene que estar habilitada para manejarlo y no puede haber más
+personas con un equipo que unidades de ese equipo. Si algo no se cumple, no se
+puede guardar y el mensaje dice qué corregir.
+
+Cuando la configuración trae personas, **esa definición es la que usa el
+motor**. La pestaña muestra la flota resultante con un aviso azul, pero
+**editar los grupos aquí no tiene efecto**. La pantalla para editar personas y
+equipos llega en una fase posterior del plan (F10); mientras tanto se definen
+en el archivo de configuración.
 
 ## Aviso "Flota derivada de la configuración legacy"
 

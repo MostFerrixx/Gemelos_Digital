@@ -81,6 +81,20 @@ class FleetManager {
         });
     }
 
+    // INIT-11 F1: equipos declarados en config.equipos ({id: tipo_base}). El
+    // mapa de areas puede pedir un equipo concreto ademas de un tipo base.
+    setEquipos(equipos) {
+        this.equiposTipoBase = {};
+        Object.entries(equipos || {}).forEach(([id, def]) => {
+            if (def && def.tipo_base) this.equiposTipoBase[id] = def.tipo_base;
+        });
+    }
+
+    // Tipo base que exige un valor del mapa (un equipo se traduce a su tipo).
+    _tipoBaseDe(valor) {
+        return (this.equiposTipoBase || {})[valor] || valor;
+    }
+
     // Carga el mapa desde config (siembra lo que falte) y renderiza el editor.
     setWorkAreaEquipment(map) {
         this.workAreaEquipment = Object.assign({}, map || {});
@@ -106,11 +120,21 @@ class FleetManager {
         if (!areas.length) { cont.innerHTML = ''; return; }
         const rows = areas.map((a) => {
             const cur = this.workAreaEquipment[a] || this._expectedEquipmentForArea(a);
-            const opt = (v) => '<option value="' + v + '"' + (cur === v ? ' selected' : '')
-                + '>' + v + '</option>';
+            const opt = (v, label) => '<option value="' + v + '"' + (cur === v ? ' selected' : '')
+                + '>' + (label || v) + '</option>';
+            // INIT-11 F1: ademas de los tipos base, los equipos declarados. Un
+            // valor desconocido se muestra tal cual (nunca se reemplaza en silencio).
+            const equipos = this.equiposTipoBase || {};
+            let opciones = opt('GroundOperator') + opt('Forklift');
+            Object.keys(equipos).forEach((id) => {
+                opciones += opt(id, id + ' (' + equipos[id] + ')');
+            });
+            if (cur !== 'GroundOperator' && cur !== 'Forklift' && !(cur in equipos)) {
+                opciones += opt(cur, cur + ' (no definido)');
+            }
             return '<div class="area-eq-row"><span class="area-eq-name">' + a + '</span>'
                 + '<select class="area-eq-select" data-area="' + a + '">'
-                + opt('GroundOperator') + opt('Forklift') + '</select></div>';
+                + opciones + '</select></div>';
         }).join('');
         // Sin titulo propio: lo pone el encabezado de la tarjeta ("Equipo por Area").
         cont.innerHTML = rows;
@@ -155,7 +179,7 @@ class FleetManager {
             let nUnc = 0, nWrong = 0;
             const chips = areas.map((a) => {
                 const types = coveringTypes[a];
-                const exp = this._expectedEquipmentForArea(a);
+                const exp = this._tipoBaseDe(this._expectedEquipmentForArea(a));
                 if (!types || types.size === 0) {
                     problems.push(a); nUnc++;
                     return '<span class="coverage-chip uncovered">✗ ' + a + '</span>';
