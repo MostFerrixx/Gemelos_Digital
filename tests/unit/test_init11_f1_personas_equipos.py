@@ -54,7 +54,8 @@ def test_pe01_modo_historico_lleva_equipo_implicito_con_los_mismos_numeros():
     assert ground["persona"] is None
     assert ground["equipo"] == {"id": "GroundOperator", "tipo_base": "GroundOperator",
                                 "capacidad": 150, "velocidad": 1.0,
-                                "horquilla_s": 2.0, "cantidad": None}
+                                "horquilla_s": 2.0, "tiempo_cambio_s": 30.0,
+                                "cantidad": None}
     assert fork["equipo"]["velocidad"] == 0.8 and fork["equipo"]["capacidad"] == 1000
 
 
@@ -71,7 +72,8 @@ def test_pe03_equipo_completa_lo_no_declarado_con_defaults():
     assert avisos == []
     assert equipos["transpaleta"] == {"id": "transpaleta", "tipo_base": "GroundOperator",
                                       "capacidad": 150, "velocidad": 1.0,
-                                      "horquilla_s": 2.0, "cantidad": None}
+                                      "horquilla_s": 2.0, "tiempo_cambio_s": 30.0,
+                                      "cantidad": None}
     assert equipos["grua"]["horquilla_s"] == 6.0
 
 
@@ -92,7 +94,8 @@ def test_pe05_grupo_con_nombres_y_numeracion_automatica():
     assert avisos == []
     assert [a["id"] for a in flota] == ["Ana", "Pickers-02", "Pickers-03"]
     assert flota[0]["persona"] == {"id": "Ana", "grupo": "Pickers",
-                                   "habilitaciones": ["transpaleta"]}
+                                   "habilitaciones": ["transpaleta"],
+                                   "perfiles": []}  # sin perfiles: F1 puro
     assert flota[0]["type"] == "GroundOperator"
 
 

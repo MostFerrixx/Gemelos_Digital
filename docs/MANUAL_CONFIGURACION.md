@@ -336,6 +336,37 @@ motor**. La pestaña muestra la flota resultante con un aviso azul, pero
 equipos llega en una fase posterior del plan (F10); mientras tanto se definen
 en el archivo de configuración.
 
+## Perfiles de trabajo y estacionamientos de equipos
+
+Una persona puede tener varios **perfiles**, en orden de prioridad. Cada perfil
+dice qué tipo de tarea toma (hoy: *picking* y *guardado*) y con qué equipo. Al
+terminar una tarea, la persona busca trabajo recorriendo sus perfiles en ese
+orden.
+
+Como cambiar de equipo cuesta tiempo real, hay una **regla de cambio**
+configurable:
+
+| Modo | Qué hace |
+|---|---|
+| `inmediato` | Vuelve a su perfil principal apenas hay trabajo ahí |
+| `agotar` | Sigue en el perfil actual mientras le quede trabajo |
+| `umbral` (por defecto, 3) | Sube a un perfil más prioritario solo si se acumularon N tareas |
+
+En los tres modos, una persona sin nada que hacer termina tomando lo que haya:
+quedarse parada no sería realista.
+
+Los **estacionamientos** son puntos del mapa con capacidad y una lista de qué
+equipos admiten. Para cambiar de equipo, la persona va hasta uno, deja el que
+lleva y toma el otro, pagando el tiempo configurado en cada equipo
+(`tiempo_cambio_s`, 30 s por defecto). Si no hay unidad libre de ese equipo o no
+hay lugar donde dejar el suyo, ese perfil no se le asigna. Las coordenadas se
+validan contra el mapa, igual que las zonas de salida y los muelles.
+
+**Medido (17/09/2026)**, con 4 personas y la misma carga: con los pickers
+atados a su equipo, la corrida terminó en 8.783 s y hubo 9.380 s de espera
+acumulada; dándoles un segundo perfil y dejando una grúa libre en el
+estacionamiento, terminó en 7.310 s (**17% menos**) con 3.346 s de espera.
+
 ## Aviso "Flota derivada de la configuración legacy"
 
 Una configuración puede definir la flota de dos formas: **explícita** (lista los

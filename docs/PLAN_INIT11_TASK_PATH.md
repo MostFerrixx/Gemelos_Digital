@@ -437,6 +437,32 @@ eventos: el campo `work_group` (2.539 eventos). Baseline `3a87a1c0`.
 - La UI solo MUESTRA la flota de personas (aviso azul) y ofrece los equipos
   declarados en "Equipo por area"; el editor completo es F10.
 
+**F2 (2026-09-17).** Perfiles con prioridad, regla de cambio y
+estacionamientos. Decisiones tomadas:
+- Modo por defecto de la regla de cambio: **`umbral` con 3** (decision menor 2
+  de la seccion 10). Agregado: los perfiles que no llegan al umbral quedan al
+  FINAL de la lista, no afuera -- una persona sin trabajo hace lo que haya.
+- Tipos de tarea de un perfil hoy: `pick` y `putaway`. `traslado`/`actividad`
+  se avisan como todavia no repartibles (llegan en F3/F4).
+- Un perfil sin equipo declarado NO obliga a cambiar: la persona sigue con el
+  suyo. "Trabajar a pie" como equipo propio se define en F3, cuando el
+  traslado le da sentido.
+- El cambio de equipo se RESERVA al asignar (la unidad se saca del
+  estacionamiento) y se PAGA al ejecutar (viaje + `tiempo_cambio_s` de cada
+  equipo): asi dos personas no pueden tomar la misma unidad.
+- El costo del viaje al estacionamiento NO entra en el costo del tour al
+  elegirlo (el dispatcher decide antes); es una aproximacion aceptable
+  mientras el cambio sea poco frecuente. Anotado para F9 (KPIs).
+- Refactor necesario: las dos secuencias de picking (con y sin horquilla)
+  pasaron de las subclases a `BaseOperator`, porque ahora dependen del equipo
+  que la persona lleva, no de la clase del objeto. Gate PASS.
+- Verificacion: gate PASS byte-identico y equivalencia de F1 intacta. Prueba
+  de comportamiento: con 4 personas y la misma carga, atar cada picker a su
+  equipo termina en 8.783 s (9.380 s de espera); con un segundo perfil y una
+  grua libre, 7.310 s (-16,8%) y 3.346 s de espera, con 1 cambio de equipo.
+- Pendiente para F9/F10: el visor todavia pinta el estado `cambiando_equipo`
+  con el color por defecto y no dibuja los estacionamientos.
+
 ## Fuentes
 
 - Task interleaving (definicion): https://sgsystemsglobal.com/glossary/task-interleaving/

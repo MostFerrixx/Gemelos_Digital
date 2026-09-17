@@ -193,6 +193,7 @@ class EquipoConfig(BaseModel):
     capacidad: Optional[float] = None        # default fleet_defaults[tipo_base]
     velocidad: Optional[float] = None        # default tiempos.speed_factor_*
     horquilla_s: Optional[float] = None      # default tiempos.tiempo_horquilla
+    tiempo_cambio_s: Optional[float] = None  # INIT-11 F2: tomarlo/dejarlo (30 s)
     cantidad: Optional[int] = None           # None = sin limite
 
 
@@ -204,8 +205,32 @@ class PersonaGrupoConfig(BaseModel):
     nombres: Optional[List[str]] = None
     equipo: Optional[str] = None             # clave de `equipos`
     habilitaciones: Optional[List[str]] = None
+    perfiles: Optional[List[str]] = None     # INIT-11 F2, en orden de prioridad
     discharge_time: Optional[float] = None
     work_area_priorities: Optional[Dict[str, int]] = None
+
+
+class PerfilConfig(BaseModel):
+    """INIT-11 F2: un perfil de trabajo (`perfiles`, lector: core.fleet)."""
+    model_config = ConfigDict(extra="allow")
+    tareas: Optional[List[str]] = None       # pick | putaway (F3/F4 agregan mas)
+    equipo: Optional[str] = None             # clave de `equipos`; None = el suyo
+
+
+class CambioDePerfilConfig(BaseModel):
+    """INIT-11 F2: cuando conviene cambiar de perfil (core.fleet)."""
+    model_config = ConfigDict(extra="allow")
+    modo: Optional[str] = None               # inmediato | agotar | umbral
+    umbral: Optional[int] = None             # tareas acumuladas (modo umbral)
+
+
+class EstacionamientoConfig(BaseModel):
+    """INIT-11 F2: donde se dejan los equipos (subsystems.simulation.parking)."""
+    model_config = ConfigDict(extra="allow")
+    x: Optional[int] = None
+    y: Optional[int] = None
+    capacidad: Optional[int] = None
+    admite: Optional[List[str]] = None       # ausente = cualquier equipo
 
 
 class DistribucionTipo(BaseModel):
@@ -258,6 +283,10 @@ class WarehouseConfig(BaseModel):
     # contenido, MANDA sobre agent_types y los contadores (core.fleet).
     equipos: Optional[Dict[str, EquipoConfig]] = None
     personas: Optional[List[PersonaGrupoConfig]] = None
+    # INIT-11 F2: perfiles con prioridad, regla de cambio y estacionamientos.
+    perfiles: Optional[Dict[str, PerfilConfig]] = None
+    cambio_de_perfil: Optional[CambioDePerfilConfig] = None
+    estacionamientos: Optional[Dict[str, EstacionamientoConfig]] = None
     # Fallback historico cuando agent_types esta vacio (core.fleet.resolver_flota):
     num_operarios_terrestres: Optional[int] = None
     num_montacargas: Optional[int] = None
@@ -343,6 +372,15 @@ def validate_config_schema(config: Dict[str, Any]) -> Tuple[List[str], List[str]
     for i, grupo in enumerate(model.personas or []):
         for key in _extras_of(grupo):
             warnings.append("clave DESCONOCIDA: 'personas[%d].%s'" % (i, key))
+    for nombre, perfil in (model.perfiles or {}).items():
+        for key in _extras_of(perfil):
+            warnings.append("clave DESCONOCIDA: 'perfiles.%s.%s'" % (nombre, key))
+    for nombre, punto in (model.estacionamientos or {}).items():
+        for key in _extras_of(punto):
+            warnings.append("clave DESCONOCIDA: 'estacionamientos.%s.%s'" % (nombre, key))
+    if model.cambio_de_perfil is not None:
+        for key in _extras_of(model.cambio_de_perfil):
+            warnings.append("clave DESCONOCIDA: 'cambio_de_perfil.%s'" % key)
     if model.tiempos is not None and model.tiempos.pick_time_model is not None:
         for key in _extras_of(model.tiempos.pick_time_model):
             warnings.append("clave DESCONOCIDA: 'tiempos.pick_time_model.%s'" % key)

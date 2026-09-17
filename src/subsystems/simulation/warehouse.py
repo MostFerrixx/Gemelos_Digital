@@ -11,7 +11,10 @@ from typing import Optional, List, Dict, Any
 from .order_strategies import create_order_strategy, OrderGenerationStrategy
 
 # BK-06 F2: capacidad por area derivada de la flota real + el mapa de equipos.
-from core.fleet import capacidad_por_agente, capacidades_por_area
+from core.fleet import (capacidad_por_agente, capacidades_por_area,
+                        resolver_equipos, resolver_flota)
+# INIT-11 F2: donde viven los equipos que nadie esta usando.
+from .parking import GestorEstacionamientos
 
 
 class SKU:
@@ -505,6 +508,20 @@ class AlmacenMejorado:
         # construccion, no por suerte.
         self.operator_capacities, self.max_operator_capacity = \
             capacidades_por_area(configuracion)
+
+        # INIT-11 F2: estacionamientos de equipos. Solo existen si el config
+        # los declara; sin ellos nadie puede cambiar de equipo (y sin perfiles
+        # nadie lo necesita).
+        self.estacionamientos = None
+        if configuracion.get('estacionamientos'):
+            equipos, _ = resolver_equipos(configuracion)
+            en_uso = {}
+            for agente in resolver_flota(configuracion):
+                eid = (agente.get('equipo') or {}).get('id')
+                if eid in equipos:
+                    en_uso[eid] = en_uso.get(eid, 0) + 1
+            self.estacionamientos = GestorEstacionamientos(
+                configuracion, equipos, en_uso, layout_manager)
 
         if not self.operator_capacities:
             print("[ALMACEN][WARN] No se pudo derivar capacidad por area de la "

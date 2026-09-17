@@ -18,7 +18,7 @@ from typing import List, Dict, Any, Optional, Tuple
 
 # BK-06 F1/F2: fuentes unicas de verdad de areas y flota.
 from core.work_areas import effective_work_area_priorities, equipo_sirve
-from core.fleet import resolver_flota
+from core.fleet import resolver_equipos, resolver_flota
 
 
 def determinar_staging_destino(work_orders: List[Any], data_manager: Any) -> Tuple[int, Tuple[int, int]]:
@@ -89,6 +89,15 @@ class BaseOperator:
         self.persona = persona
         self.equipo = equipo
         self.equipo_id = (equipo or {}).get('id', agent_type)
+        # INIT-11 F2: perfiles en orden de prioridad y equipo que lleva EN LA
+        # MANO (puede diferir del que pide la proxima tarea: ahi va al
+        # estacionamiento a cambiarlo).
+        self.perfiles = list((persona or {}).get('perfiles') or [])
+        self.perfil_actual = None
+        self.equipo_fisico = equipo
+        self._cambio_pendiente = None
+        self._catalogo_equipos = None
+        self._prioridades_por_equipo = {}
         self.env = env
         self.almacen = almacen
         self.configuracion = configuracion
@@ -108,6 +117,7 @@ class BaseOperator:
         self.simulador = simulador
 
         # Agent state
+        self.lift_height = 0  # altura de horquilla (solo con equipo de elevacion)
         self.current_position = None  # (grid_x, grid_y)
         self.current_task = None
         self.status = "idle"  # idle, moving, working
@@ -372,6 +382,96 @@ class BaseOperator:
         if self.equipo and self.equipo.get('velocidad') is not None:
             return float(self.equipo['velocidad'])
         return por_defecto
+
+    # ------------------------------------------------ INIT-11 F2: perfiles
+
+    def _equipos_declarados(self) -> Dict[str, Any]:
+        if self._catalogo_equipos is None:
+            catalogo, _ = resolver_equipos(self.configuracion)
+            self._catalogo_equipos = catalogo
+        return self._catalogo_equipos
+
+    def equipo_de_perfil(self, perfil: Dict[str, Any]) -> Dict[str, Any]:
+        """Equipo que pide un perfil. Sin equipo declarado, sigue con el suyo."""
+        if not perfil or not perfil.get('equipo'):
+            return self.equipo_fisico
+        return self._equipos_declarados().get(perfil['equipo'], self.equipo_fisico)
+
+    def prioridades_de_equipo(self, equipo_id: str) -> Dict[str, int]:
+        """Areas que puede servir con ESE equipo (el mapa manda, BK-06)."""
+        if equipo_id not in self._prioridades_por_equipo:
+            equipo = self._equipos_declarados().get(equipo_id) or {}
+            tipo_base = equipo.get('tipo_base', self.type)
+            self._prioridades_por_equipo[equipo_id] = effective_work_area_priorities(
+                self.configuracion, tipo_base, self.work_area_priorities_declaradas,
+                agent_id=self.id, equipo_id=equipo_id)
+        return self._prioridades_por_equipo[equipo_id]
+
+    def usar_equipo(self, equipo: Dict[str, Any]) -> None:
+        """Pasa a trabajar CON ese equipo (no mueve a la persona todavia)."""
+        if not equipo:
+            return
+        self.equipo = equipo
+        self.equipo_id = equipo['id']
+        self.type = equipo.get('tipo_base', self.type)
+        self.capacity = equipo.get('capacidad', self.capacity)
+        self.lift_time = float(equipo.get('horquilla_s', self.lift_time))
+        self.default_speed = float(equipo.get('velocidad', self.default_speed))
+        self.work_area_priorities = self.prioridades_de_equipo(self.equipo_id)
+
+    def punto_para_perfil(self, perfil: Dict[str, Any]):
+        """Donde deberia ir a cambiar de equipo para trabajar en este perfil.
+
+        Devuelve None si no necesita cambiar, el estacionamiento si puede
+        hacerlo, y False si no hay forma (sin unidad libre o sin lugar donde
+        dejar la suya): ese perfil no se le puede asignar.
+        """
+        equipo = self.equipo_de_perfil(perfil)
+        if not equipo or equipo.get('id') == (self.equipo_fisico or {}).get('id'):
+            return None
+        gestor = getattr(self.almacen, 'estacionamientos', None)
+        if gestor is None:
+            return False
+        punto = gestor.punto_para_cambio((self.equipo_fisico or {}).get('id'),
+                                         equipo.get('id'))
+        return punto if punto is not None else False
+
+    def reservar_cambio_de_equipo(self, punto) -> None:
+        """Toma la unidad ya (evita que dos personas reserven la misma) y deja
+        el cambio anotado; el viaje y el tiempo se pagan al ejecutar el tour."""
+        if punto is None:
+            return
+        gestor = self.almacen.estacionamientos
+        actual = (self.equipo_fisico or {}).get('id')
+        nuevo = self.equipo_id
+        gestor.ejecutar_cambio(punto, actual, nuevo)
+        self._cambio_pendiente = (punto, actual, nuevo,
+                                  gestor.tiempo_de_cambio(actual, nuevo))
+
+    def _aplicar_cambio_de_equipo(self):
+        """Va al estacionamiento, deja un equipo y toma el otro (INIT-11 F2)."""
+        if not self._cambio_pendiente:
+            return
+        punto, actual, nuevo, duracion = self._cambio_pendiente
+        self._cambio_pendiente = None
+        yield from self._outbound_nav_to(punto.celda)
+        self.status = "cambiando_equipo"
+        self.almacen.registrar_evento('estado_agente', {
+            'agent_id': self.id, 'agent_type': self.type,
+            'position': self.current_position, 'status': self.status,
+            'current_task': None, 'cargo_volume': self.cargo_volume,
+        })
+        yield self.env.timeout(duracion)
+        self.equipo_fisico = self.equipo
+        self.lift_height = 0
+        self.almacen.registrar_evento('cambio_de_equipo', {
+            'agent_id': self.id, 'agent_type': self.type,
+            'estacionamiento': punto.id, 'equipo_dejado': actual,
+            'equipo_tomado': nuevo, 'duracion': duracion,
+            'perfil': (self.perfil_actual or {}).get('nombre'),
+        })
+        logger.info("[%s] t=%.1f cambio de equipo en %s: %s -> %s (%.0fs)",
+                    self.id, self.env.now, punto.id, actual, nuevo, duracion)
 
     def sirve_equipo(self, requerido: str) -> bool:
         """True si el agente cumple lo que pide un area: su tipo base o su
@@ -1099,14 +1199,220 @@ class BaseOperator:
         zone.release_lane(lane)
 
     def _do_picking_at(self, wo):
-        """
-        Hook de picking en la ubicacion de la WorkOrder.
-        GroundOperator: timeout simple. Forklift: lift + pick + lower.
+        """Secuencia de picking, segun el EQUIPO que la persona lleva ahora.
+
+        Antes la elegia la subclase (Template Method). Desde INIT-11 F2 una
+        persona puede cambiar de equipo dentro del turno (deja la grua en un
+        estacionamiento y sigue a pie), y la secuencia tiene que cambiar con
+        el equipo, no con la clase del objeto. Sin cambios de equipo el
+        resultado es exactamente el mismo de siempre.
         Generador SimPy; usar con `yield from self._do_picking_at(wo)`.
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} debe implementar _do_picking_at")
-        yield  # hace que Python trate esto como generador
+        if self.type == 'Forklift':
+            yield from self._picking_con_horquilla(wo)
+        else:
+            yield from self._picking_terrestre(wo)
+
+    def _pick_dwell_estimate_equipo(self, wo) -> float:
+        """MEJ-4: con horquilla, la permanencia incluye subirla y bajarla."""
+        base = self._pick_dwell_estimate(wo)
+        if self.type == 'Forklift':
+            return base + 2.0 * float(self.lift_time)
+        return base
+
+    def _picking_terrestre(self, wo):
+        """Secuencia de picking Ground: status -> timeout -> cargo."""
+        self.almacen.registrar_evento('estado_agente', {
+            'agent_id': self.id,
+            'agent_type': self.type,
+            'position': self.current_position,
+            'status': self.status,
+            'current_task': wo.id if wo else None,
+            'current_work_area': wo.work_area if wo else None,
+            'cargo_volume': self.cargo_volume
+        })
+        self.status = "picking"
+        # Registrar evento con estado de picking
+        self.almacen.registrar_evento('estado_agente', {
+            'agent_id': self.id,
+            'agent_type': self.type,
+            'position': self.current_position,
+            'status': self.status,
+            'current_task': wo.id if wo else None,
+            'current_work_area': wo.work_area if wo else None,
+            'cargo_volume': self.cargo_volume
+        })
+        # INIT-4 C1 + INIT-8 F4: tiempo de pick final (escala por clase/peso
+        # y, con variabilidad on, muestreado UNA vez -- misma muestra que la
+        # reserva del planner via _pick_dwell_estimate).
+        picking_duration = self._tiempo_pick_final(wo)
+        # MEJ-4 (F1): la permanencia del picking se reserva en la tabla.
+        self._tw_reserve_dwell(picking_duration)
+        yield self.env.timeout(picking_duration)
+        self.almacen.registrar_evento('operation_completed', {
+            'agent_id': self.id,
+            'data': {
+                'duration': picking_duration,
+                'work_order_id': wo.id
+            }
+        })
+        self.almacen.registrar_evento('task_completed', {
+            'agent_id': self.id,
+            'task_id': wo.id,
+            'data': {
+                'task_ubicacion': wo.ubicacion,
+                'tiempo_picking': picking_duration
+            }
+        })
+        # ACTUALIZAR CARGO_VOLUME ANTES de poner cantidad_restante = 0
+        if wo:
+            # Sumar el volumen ANTES de modificar cantidad_restante
+            self.cargo_volume += wo.calcular_volumen_restante()
+            self.cargo_peso += wo.cantidad_restante * getattr(wo.sku, 'peso', 0.0)
+            wo.status = 'picked'
+            wo.cantidad_restante = 0
+            # AUD8-3: la muestra de pick cierra su ciclo con el pick.
+            self._invalidar_pick_muestreado(wo)
+            # Fase 2: consume real stock at the picked location
+            self.almacen.consumir_stock_picking(wo, self.env.now)
+            progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
+            self.almacen.registrar_evento('work_order_update', {
+                'id': wo.id,
+                'order_id': wo.order_id,
+                'tour_id': getattr(wo, 'tour_id', None),
+                'sku_id': wo.sku_id,
+                'product': wo.sku_name,
+                'status': 'picked',
+                'assigned_agent_id': wo.assigned_agent_id,
+                'priority': getattr(wo, 'priority', 99),
+                'items': getattr(wo, 'items', 1),
+                'total_qty': wo.cantidad_total,
+                'qty_requested': wo.cantidad_inicial,
+                'qty_picked': wo.cantidad_inicial - wo.cantidad_restante,
+                'volume': getattr(wo, 'volume', wo.volumen_restante),
+                'location': wo.ubicacion,
+                'staging': wo.staging_id,
+                'work_group': wo.work_group,
+                'work_area': wo.work_area,
+                'executions': getattr(wo, 'picking_executions', 0) + 1,
+                'start_time': wo.tiempo_inicio,
+                'progress': progress,
+                'tiempo_fin': getattr(wo, 'tiempo_fin', None)
+            })
+
+    def set_lift_height(self, height: int):
+        """Set forklift lift height"""
+        self.lift_height = height
+
+
+    def _picking_con_horquilla(self, wo):
+        """Secuencia de picking Forklift: lift + timeout + lower."""
+        LIFT_TIME = self.lift_time
+        # MEJ-4 (F1): reservar la permanencia COMPLETA (lift + pick + lower)
+        # de una vez. F4/AUD8-4: _tiempo_pick_final muestrea UNA vez por WO y
+        # cachea la muestra, asi el timeout del pick de abajo usa EL MISMO
+        # valor que esta reserva (con variabilidad off es determinista, sin
+        # cache ni RNG: identico al comportamiento historico).
+        _pick_est = self._tiempo_pick_final(wo)
+        self._tw_reserve_dwell(LIFT_TIME + _pick_est + LIFT_TIME)
+        self.status = "lifting"
+        logger.debug(f"[{self.id}] t={self.env.now:.1f} Elevando horquilla")
+
+        # Registrar evento con estado de lifting
+        self.almacen.registrar_evento('estado_agente', {
+            'agent_id': self.id,
+            'agent_type': self.type,
+            'position': self.current_position,
+            'status': self.status,
+            'current_task': wo.id if wo else None,
+            'current_work_area': wo.work_area if wo else None,
+            'cargo_volume': self.cargo_volume
+        })
+
+        yield self.env.timeout(LIFT_TIME)
+        self.set_lift_height(1)
+
+        self.status = "picking"
+        logger.debug(f"[{self.id}] t={self.env.now:.1f} Picking en {wo.ubicacion}")
+
+        # Registrar evento con estado de picking
+        self.almacen.registrar_evento('estado_agente', {
+            'agent_id': self.id,
+            'agent_type': self.type,
+            'position': self.current_position,
+            'status': self.status,
+            'current_task': wo.id if wo else None,
+            'current_work_area': wo.work_area if wo else None,
+            'cargo_volume': self.cargo_volume
+        })
+
+        # INIT-4 C1 + INIT-8 F4: tiempo de pick final (misma muestra cacheada
+        # que la reserva de arriba).
+        picking_duration = self._tiempo_pick_final(wo)
+        yield self.env.timeout(picking_duration)
+
+        logger.debug(f"[{self.id}] t={self.env.now:.1f} Bajando horquilla")
+        yield self.env.timeout(LIFT_TIME)
+        self.set_lift_height(0)
+
+        total_operation_duration = LIFT_TIME + picking_duration + LIFT_TIME
+        self.almacen.registrar_evento('operation_completed', {
+            'agent_id': self.id,
+            'data': {
+                'duration': total_operation_duration,
+                'work_order_id': wo.id
+            }
+        })
+        self.almacen.registrar_evento('task_completed', {
+            'agent_id': self.id,
+            'task_id': wo.id,
+            'data': {
+                'task_ubicacion': wo.ubicacion,
+                'tiempo_picking': total_operation_duration
+            }
+        })
+
+        # ACTUALIZAR CARGO_VOLUME ANTES de poner cantidad_restante = 0
+        if wo:
+            # Sumar el volumen ANTES de modificar cantidad_restante
+            self.cargo_volume += wo.calcular_volumen_restante()
+            self.cargo_peso += wo.cantidad_restante * getattr(wo.sku, 'peso', 0.0)
+            wo.cantidad_restante = 0
+            if hasattr(wo, 'picking_executions'):
+                wo.picking_executions += 1
+            else:
+                wo.picking_executions = 1
+
+        if wo:
+            wo.status = 'picked'
+            # AUD8-3: la muestra de pick cierra su ciclo con el pick.
+            self._invalidar_pick_muestreado(wo)
+            # Fase 2: consume real stock at the picked location
+            self.almacen.consumir_stock_picking(wo, self.env.now)
+            progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
+            self.almacen.registrar_evento('work_order_update', {
+                'id': wo.id,
+                'order_id': wo.order_id,
+                'tour_id': getattr(wo, 'tour_id', None),
+                'sku_id': wo.sku_id,
+                'product': wo.sku_name,
+                'status': 'picked',
+                'assigned_agent_id': wo.assigned_agent_id,
+                'priority': getattr(wo, 'priority', 99),
+                'items': getattr(wo, 'items', 1),
+                'total_qty': wo.cantidad_total,
+                'qty_requested': wo.cantidad_inicial,
+                'qty_picked': wo.cantidad_inicial - wo.cantidad_restante,
+                'volume': getattr(wo, 'volume', wo.volumen_restante),
+                'location': wo.ubicacion,
+                'staging': wo.staging_id,
+                'work_group': wo.work_group,
+                'work_area': wo.work_area,
+                'executions': getattr(wo, 'picking_executions', 0) + 1,
+                'start_time': wo.tiempo_inicio,
+                'progress': progress,
+                'tiempo_fin': getattr(wo, 'tiempo_fin', None)
+            })
 
     def agent_process(self):
         """
@@ -1153,6 +1459,13 @@ class BaseOperator:
 
                 yield self.env.timeout(0.5)  # V12: Reduced for fast termination detection
                 continue
+
+            # INIT-11 F2: si la tarea pide otro equipo, primero va a buscarlo.
+            if self._cambio_pendiente:
+                try:
+                    yield from self._aplicar_cambio_de_equipo()
+                except Exception as e:
+                    logger.error("[%s] fallo el cambio de equipo: %s", self.id, e)
 
             # INIT-7 F2: tour de putaway (muelle -> ubicacion), flujo propio.
             if tour.get('tour_type') == 'putaway':
@@ -1261,7 +1574,7 @@ class BaseOperator:
                     segment_path, self.default_speed,
                     on_before=_on_before, on_after=_on_after,
                     time_per_cell=TIME_PER_CELL,
-                    goal_dwell=self._pick_dwell_estimate(wo)
+                    goal_dwell=self._pick_dwell_estimate_equipo(wo)
                 )
             else:
                 self._jump_to(wo.ubicacion)
@@ -1683,91 +1996,6 @@ class GroundOperator(BaseOperator):
         self.default_speed = self._velocidad_equipo(self.speed_factor_ground)
         self.preferred_areas = ["Area_Ground", "Area_Piso_L1"]
 
-    def _do_picking_at(self, wo):
-        """Secuencia de picking Ground: status -> timeout -> cargo."""
-        self.almacen.registrar_evento('estado_agente', {
-            'agent_id': self.id,
-            'agent_type': self.type,
-            'position': self.current_position,
-            'status': self.status,
-            'current_task': wo.id if wo else None,
-            'current_work_area': wo.work_area if wo else None,
-            'cargo_volume': self.cargo_volume
-        })
-
-        self.status = "picking"
-
-        # Registrar evento con estado de picking
-        self.almacen.registrar_evento('estado_agente', {
-            'agent_id': self.id,
-            'agent_type': self.type,
-            'position': self.current_position,
-            'status': self.status,
-            'current_task': wo.id if wo else None,
-            'current_work_area': wo.work_area if wo else None,
-            'cargo_volume': self.cargo_volume
-        })
-
-        # INIT-4 C1 + INIT-8 F4: tiempo de pick final (escala por clase/peso
-        # y, con variabilidad on, muestreado UNA vez -- misma muestra que la
-        # reserva del planner via _pick_dwell_estimate).
-        picking_duration = self._tiempo_pick_final(wo)
-        # MEJ-4 (F1): la permanencia del picking se reserva en la tabla.
-        self._tw_reserve_dwell(picking_duration)
-        yield self.env.timeout(picking_duration)
-
-        self.almacen.registrar_evento('operation_completed', {
-            'agent_id': self.id,
-            'data': {
-                'duration': picking_duration,
-                'work_order_id': wo.id
-            }
-        })
-        self.almacen.registrar_evento('task_completed', {
-            'agent_id': self.id,
-            'task_id': wo.id,
-            'data': {
-                'task_ubicacion': wo.ubicacion,
-                'tiempo_picking': picking_duration
-            }
-        })
-
-        # ACTUALIZAR CARGO_VOLUME ANTES de poner cantidad_restante = 0
-        if wo:
-            # Sumar el volumen ANTES de modificar cantidad_restante
-            self.cargo_volume += wo.calcular_volumen_restante()
-            self.cargo_peso += wo.cantidad_restante * getattr(wo.sku, 'peso', 0.0)
-            wo.status = 'picked'
-            wo.cantidad_restante = 0
-            # AUD8-3: la muestra de pick cierra su ciclo con el pick.
-            self._invalidar_pick_muestreado(wo)
-            # Fase 2: consume real stock at the picked location
-            self.almacen.consumir_stock_picking(wo, self.env.now)
-            progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
-            self.almacen.registrar_evento('work_order_update', {
-                'id': wo.id,
-                'order_id': wo.order_id,
-                'tour_id': getattr(wo, 'tour_id', None),
-                'sku_id': wo.sku_id,
-                'product': wo.sku_name,
-                'status': 'picked',
-                'assigned_agent_id': wo.assigned_agent_id,
-                'priority': getattr(wo, 'priority', 99),
-                'items': getattr(wo, 'items', 1),
-                'total_qty': wo.cantidad_total,
-                'qty_requested': wo.cantidad_inicial,
-                'qty_picked': wo.cantidad_inicial - wo.cantidad_restante,
-                'volume': getattr(wo, 'volume', wo.volumen_restante),
-                'location': wo.ubicacion,
-                'staging': wo.staging_id,
-                'work_group': wo.work_group,
-                'work_area': wo.work_area,
-                'executions': getattr(wo, 'picking_executions', 0) + 1,
-                'start_time': wo.tiempo_inicio,
-                'progress': progress,
-                'tiempo_fin': getattr(wo, 'tiempo_fin', None)
-            })
-
 
 class Forklift(BaseOperator):
     """
@@ -1809,126 +2037,6 @@ class Forklift(BaseOperator):
         # que Ground, no mas lento). El comentario anterior era incorrecto.
         self.default_speed = self._velocidad_equipo(self.speed_factor_forklift)
         self.preferred_areas = ["Area_Rack"]
-        self.lift_height = 0  # Current lift height
-
-    def set_lift_height(self, height: int):
-        """Set forklift lift height"""
-        self.lift_height = height
-
-    def _pick_dwell_estimate(self, wo) -> float:
-        """MEJ-4: la permanencia del Forklift incluye subir y bajar la horquilla."""
-        base = super()._pick_dwell_estimate(wo)
-        return base + 2.0 * float(self.lift_time)
-
-    def _do_picking_at(self, wo):
-        """Secuencia de picking Forklift: lift + timeout + lower."""
-        LIFT_TIME = self.lift_time
-        # MEJ-4 (F1): reservar la permanencia COMPLETA (lift + pick + lower)
-        # de una vez. F4/AUD8-4: _tiempo_pick_final muestrea UNA vez por WO y
-        # cachea la muestra, asi el timeout del pick de abajo usa EL MISMO
-        # valor que esta reserva (con variabilidad off es determinista, sin
-        # cache ni RNG: identico al comportamiento historico).
-        _pick_est = self._tiempo_pick_final(wo)
-        self._tw_reserve_dwell(LIFT_TIME + _pick_est + LIFT_TIME)
-        self.status = "lifting"
-        logger.debug(f"[{self.id}] t={self.env.now:.1f} Elevando horquilla")
-
-        # Registrar evento con estado de lifting
-        self.almacen.registrar_evento('estado_agente', {
-            'agent_id': self.id,
-            'agent_type': self.type,
-            'position': self.current_position,
-            'status': self.status,
-            'current_task': wo.id if wo else None,
-            'current_work_area': wo.work_area if wo else None,
-            'cargo_volume': self.cargo_volume
-        })
-
-        yield self.env.timeout(LIFT_TIME)
-        self.set_lift_height(1)
-
-        self.status = "picking"
-        logger.debug(f"[{self.id}] t={self.env.now:.1f} Picking en {wo.ubicacion}")
-
-        # Registrar evento con estado de picking
-        self.almacen.registrar_evento('estado_agente', {
-            'agent_id': self.id,
-            'agent_type': self.type,
-            'position': self.current_position,
-            'status': self.status,
-            'current_task': wo.id if wo else None,
-            'current_work_area': wo.work_area if wo else None,
-            'cargo_volume': self.cargo_volume
-        })
-
-        # INIT-4 C1 + INIT-8 F4: tiempo de pick final (misma muestra cacheada
-        # que la reserva de arriba).
-        picking_duration = self._tiempo_pick_final(wo)
-        yield self.env.timeout(picking_duration)
-
-        logger.debug(f"[{self.id}] t={self.env.now:.1f} Bajando horquilla")
-        yield self.env.timeout(LIFT_TIME)
-        self.set_lift_height(0)
-
-        total_operation_duration = LIFT_TIME + picking_duration + LIFT_TIME
-        self.almacen.registrar_evento('operation_completed', {
-            'agent_id': self.id,
-            'data': {
-                'duration': total_operation_duration,
-                'work_order_id': wo.id
-            }
-        })
-        self.almacen.registrar_evento('task_completed', {
-            'agent_id': self.id,
-            'task_id': wo.id,
-            'data': {
-                'task_ubicacion': wo.ubicacion,
-                'tiempo_picking': total_operation_duration
-            }
-        })
-
-        # ACTUALIZAR CARGO_VOLUME ANTES de poner cantidad_restante = 0
-        if wo:
-            # Sumar el volumen ANTES de modificar cantidad_restante
-            self.cargo_volume += wo.calcular_volumen_restante()
-            self.cargo_peso += wo.cantidad_restante * getattr(wo.sku, 'peso', 0.0)
-            wo.cantidad_restante = 0
-            if hasattr(wo, 'picking_executions'):
-                wo.picking_executions += 1
-            else:
-                wo.picking_executions = 1
-
-        if wo:
-            wo.status = 'picked'
-            # AUD8-3: la muestra de pick cierra su ciclo con el pick.
-            self._invalidar_pick_muestreado(wo)
-            # Fase 2: consume real stock at the picked location
-            self.almacen.consumir_stock_picking(wo, self.env.now)
-            progress = round(((wo.cantidad_total - wo.cantidad_restante) / wo.cantidad_total) * 100, 2) if wo.cantidad_total > 0 else 0
-            self.almacen.registrar_evento('work_order_update', {
-                'id': wo.id,
-                'order_id': wo.order_id,
-                'tour_id': getattr(wo, 'tour_id', None),
-                'sku_id': wo.sku_id,
-                'product': wo.sku_name,
-                'status': 'picked',
-                'assigned_agent_id': wo.assigned_agent_id,
-                'priority': getattr(wo, 'priority', 99),
-                'items': getattr(wo, 'items', 1),
-                'total_qty': wo.cantidad_total,
-                'qty_requested': wo.cantidad_inicial,
-                'qty_picked': wo.cantidad_inicial - wo.cantidad_restante,
-                'volume': getattr(wo, 'volume', wo.volumen_restante),
-                'location': wo.ubicacion,
-                'staging': wo.staging_id,
-                'work_group': wo.work_group,
-                'work_area': wo.work_area,
-                'executions': getattr(wo, 'picking_executions', 0) + 1,
-                'start_time': wo.tiempo_inicio,
-                'progress': progress,
-                'tiempo_fin': getattr(wo, 'tiempo_fin', None)
-            })
-
 
 def crear_operarios(env: simpy.Environment, almacen: Any,
                     configuracion: Dict[str, Any],

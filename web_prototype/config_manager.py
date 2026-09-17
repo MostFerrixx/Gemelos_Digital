@@ -490,6 +490,7 @@ class WebConfigurationManager:
         errores = []
         flota, avisos = resolver_personas(config)
         errores.extend("Personas y equipos: " + a for a in avisos)
+        errores.extend(self._validar_estacionamientos(config, flota))
         if not flota:
             errores.append("La flota esta vacia: 'personas' no genera ninguna "
                            "persona valida.")
@@ -504,6 +505,57 @@ class WebConfigurationManager:
                     "El area '" + str(area) + "' no tiene ninguna persona con el "
                     "equipo que exige (" + str(exigido) + ") y prioridad en esa area.")
         return errores
+
+    def _validar_estacionamientos(self, config: Dict, flota: List[Dict]) -> List[str]:
+        """INIT-11 F2: estacionamientos y perfiles que obligan a cambiar de equipo.
+
+        Las coordenadas se validan contra el MAPA (igual que las zonas de
+        salida y los muelles) y se avisa si alguien tiene perfiles con equipos
+        distintos pero no hay donde cambiarlos: ese perfil nunca se le daria.
+        """
+        from core.fleet import resolver_equipos
+        from subsystems.simulation.parking import GestorEstacionamientos
+
+        errores = []
+        equipos, _ = resolver_equipos(config)
+        en_uso = {}
+        for agente in flota:
+            eid = (agente.get('equipo') or {}).get('id')
+            if eid:
+                en_uso[eid] = en_uso.get(eid, 0) + 1
+
+        layout = None
+        if config.get('estacionamientos'):
+            layout = self._layout_manager(config.get('layout_file'))
+        gestor = GestorEstacionamientos(config, equipos, en_uso, layout)
+        errores.extend("Estacionamientos: " + a for a in gestor.avisos)
+
+        necesitan_cambio = any(
+            perfil.get('equipo') and perfil['equipo'] != (a.get('equipo') or {}).get('id')
+            for a in flota for perfil in (a.get('persona') or {}).get('perfiles', []))
+        if necesitan_cambio and not gestor.puntos:
+            errores.append(
+                "Hay personas con perfiles que usan otro equipo, pero no hay "
+                "ningun estacionamiento donde cambiarlo: esos perfiles nunca se "
+                "les asignarian. Defini 'estacionamientos'.")
+        return errores
+
+    def _layout_manager(self, layout_file: str):
+        """LayoutManager real del motor (headless), o None si no se puede cargar."""
+        try:
+            import sys as _sys
+            _src = os.path.join(self.project_root, "src")
+            if _src not in _sys.path:
+                _sys.path.insert(0, _src)
+            from subsystems.simulation.layout_manager import LayoutManager
+            ruta = os.path.join(self.project_root, layout_file or "layouts/WH1.tmx")
+            if not os.path.exists(ruta):
+                return None
+            return LayoutManager(ruta, headless=True)
+        except Exception as e:                      # mapa ilegible: no bloquea
+            print("[CONFIG_MANAGER][WARN] no se pudo cargar el mapa para validar "
+                  "estacionamientos: %s" % e)
+            return None
 
     def extract_work_areas(self, sequence_file: str) -> List[str]:
         """

@@ -10,9 +10,8 @@
 
 - `main` = todo integrado por fast-forward desde `feat/datos-maestros-web`
   (que incluye `feat/ui-flota-cards`), pusheado a origin.
-- `main` = `e597f97` (INIT-11 F0 integrada y pusheada el 2026-09-17).
-- Rama en curso: `feat/init11-f1-persona-equipo` (F1 hecha, `277a9af`),
-  **esperando el OK del Director (punto de control de F1)** para mergear.
+- `main` = `6a18e44` (INIT-11 F0 y F1 integradas y pusheadas el 2026-09-17).
+- Rama en curso: `feat/init11-f2-perfiles` (F2 hecha, sin mergear).
 - Baseline byte-identico vigente: **`sha256=3a87a1c0...`, 15.930.197 bytes**,
   seed 42 (`tests/baseline.json`). Ultimo cambio: 2026-09-16, F0 (solo el
   campo `work_group` de los eventos). F1 no lo cambio.
@@ -25,7 +24,7 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 272 passed, 1 deselected (~10s)
+python -m pytest -q                # 292 passed, 1 deselected (~10s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline 3a87a1c0)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
@@ -51,10 +50,11 @@ Novedades vigentes:
 Plan v2 en ejecucion: **`docs/PLAN_INIT11_TASK_PATH.md`** (6 pilares, 11 fases).
 - **F0 = BK-12: HECHA** (`081e2a0`). El Work Group de cada orden sale del dato
   real; unico cambio en eventos = campo `work_group`.
-- **F1: HECHA** (`277a9af`, sin mergear). Personas + equipos, equivalencia
-  exacta verificada. Detalle y decisiones en la seccion 11 del plan.
-- **Siguiente: F2** -- perfiles con prioridad, regla de cambio de perfil y
-  estacionamientos (tomar/dejar equipo).
+- **F1: HECHA** (`277a9af`, en main). Personas + equipos, equivalencia exacta.
+- **F2: HECHA** (sin mergear). Perfiles con prioridad, regla de cambio y
+  estacionamientos. Medido: -16,8% de tiempo total con pickers polivalentes.
+- **Siguiente: F3** -- task path basico (pick -> punto de transferencia ->
+  staging). Es punto de control con el Director.
 - Puntos de control con el Director: al cerrar F1, F3, F6 y F8.
 - 4 decisiones menores en la seccion 10 del plan (con sugerencia).
 

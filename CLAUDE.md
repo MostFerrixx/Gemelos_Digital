@@ -227,6 +227,15 @@ defaults que reproducen el comportamiento histórico. Por eso una corrida sin el
   (`core.work_areas.equipo_sirve`). Equivalencia exacta con la flota historica:
   `python scripts/check_equivalencia_personas.py`. Plan en
   `docs/PLAN_INIT11_TASK_PATH.md`.
+- **`perfiles` + `cambio_de_perfil` + `estacionamientos`** (INIT-11 F2, opt-in):
+  cada persona lleva perfiles en orden de prioridad (que tareas toma y con que
+  equipo); la regla de cambio (`inmediato`/`agotar`/`umbral`) decide cuando
+  cambiar, y el cambio de equipo se hace fisicamente en un estacionamiento
+  (viaje + `tiempo_cambio_s`). Lectores: `core/fleet.py`
+  (`resolver_perfiles`/`resolver_cambio_de_perfil`),
+  `subsystems/simulation/parking.py`, `dispatcher._asignar_por_perfiles`,
+  `operators` (`usar_equipo`, `_aplicar_cambio_de_equipo`). Sin `perfiles`, el
+  despacho es el historico (gate byte-identico).
 - Refactor **Template Method** en `operators.py`: `BaseOperator.agent_process()` +
   hook `_do_picking_at()` por subclase (Ground/Forklift). Logging por nivel en todo
   el hot-path (DEBUG silenciado en producción).

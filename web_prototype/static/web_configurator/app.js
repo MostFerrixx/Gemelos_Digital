@@ -449,12 +449,14 @@ class WebConfigurator {
             console.error('[INIT-11] No se pudo resolver la flota de personas:', e);
         }
         this._setFleetDerivedNotice('personas', config.personas.length,
-            Object.keys(config.equipos || {}).length);
+            Object.keys(config.equipos || {}).length,
+            Object.keys(config.perfiles || {}).length,
+            Object.keys(config.estacionamientos || {}).length);
     }
 
     // BK-05: aviso visible de que la flota se derivo de los contadores legacy.
     // INIT-11 F1: derived === 'personas' -> la flota sale de personas + equipos.
-    _setFleetDerivedNotice(derived, nGround, nFork) {
+    _setFleetDerivedNotice(derived, nGround, nFork, nPerfiles, nEstacionamientos) {
         const panel = document.getElementById('fleet-derived-notice');
         if (!panel) return;
         if (derived === 'personas') {
@@ -465,7 +467,10 @@ class WebConfigurator {
                 + 'personas y <code>' + nFork + '</code> equipos, y esa definicion '
                 + 'es la que usa el motor. Los grupos de abajo la muestran, pero '
                 + '<strong>editarlos aqui no tiene efecto</strong>: la edicion de '
-                + 'personas y equipos se agrega en una proxima version.';
+                + 'personas y equipos se agrega en una proxima version.'
+                + (nPerfiles ? ' Ademas usa <code>' + nPerfiles + '</code> perfiles '
+                    + 'de trabajo y <code>' + nEstacionamientos + '</code> '
+                    + 'estacionamientos de equipos.' : '');
             return;
         }
         if (!derived) {

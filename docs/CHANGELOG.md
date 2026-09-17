@@ -12,6 +12,14 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ## 2026-09-17
 
+- **INIT-11 F2 -- perfiles con prioridad, regla de cambio y estacionamientos**
+  (rama `feat/init11-f2-perfiles`). Una persona puede tomar tareas de varios
+  perfiles (que tarea, con que equipo) y cambia de equipo yendo a un
+  estacionamiento (viaje + tiempo). Reglas `inmediato`/`agotar`/`umbral`.
+  Nuevo modulo `parking.py`; el picking dejo de depender de la subclase y
+  depende del equipo que la persona lleva. Medido: -16,8% de tiempo total al
+  dar un segundo perfil a los pickers. Gate PASS. +20 tests.
+
 - **INIT-11 F1 -- personas y equipos separados** (`277a9af`, rama
   `feat/init11-f1-persona-equipo`, sin mergear: punto de control). La flota
   puede definirse como `personas` + `equipos` (opt-in); el mapa de areas

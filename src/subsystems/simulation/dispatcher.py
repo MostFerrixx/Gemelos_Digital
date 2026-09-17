@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 from typing import List, Dict, Optional, Any, Tuple
 import math
 
+# INIT-11 F2: regla de cambio de perfil (perfiles con prioridad).
+from core.fleet import resolver_cambio_de_perfil
+
 
 class DispatcherV11:
     """
@@ -118,6 +121,9 @@ class DispatcherV11:
             logger.warning(f"[DISPATCHER WARN] putaway_priority desconocida "
                            f"'{self.putaway_priority}', usando picks_first")
             self.putaway_priority = 'picks_first'
+
+        # INIT-11 F2: regla de cambio de perfil (modo + umbral).
+        self.cambio_de_perfil = resolver_cambio_de_perfil(configuracion)
 
         # BK-03 experiment: modo de construccion del tour para Cercania
         # "cost" = orden por AssignmentCostCalculator (actual, default)
@@ -222,6 +228,11 @@ class DispatcherV11:
                 }
                 or None if no work available
         """
+        # INIT-11 F2: con perfiles, la persona elige QUE tipo de tarea toma y
+        # CON QUE equipo, segun el orden de sus perfiles y la regla de cambio.
+        if getattr(operator, 'perfiles', None):
+            return self._asignar_por_perfiles(operator)
+
         # INIT-7 F5a: con putaway_first, el putaway pendiente mas viejo se
         # asigna ANTES de evaluar picks (con picks_first este bloque es no-op:
         # el putaway queda como fallback de los 3 puntos de salida sin tour).
@@ -230,6 +241,15 @@ class DispatcherV11:
             if tour is not None:
                 return tour
 
+        return self._asignar_picks(operator)
+
+    def _asignar_picks(self, operator: Any,
+                       fallback_putaway: bool = True) -> Optional[Dict[str, Any]]:
+        """Flujo de picks: cuerpo historico de `solicitar_asignacion`.
+
+        `fallback_putaway=False` lo usa el reparto por perfiles (INIT-11 F2):
+        ahi el putaway es la tarea de otro perfil, no un fallback silencioso.
+        """
         # Step 1: Check if work is available
         if not self.work_orders_pendientes:
             # BUGFIX: Solo log cada 10 segundos para evitar spam
@@ -245,7 +265,7 @@ class DispatcherV11:
                 self._last_no_work_log[operator_key] = self.env.now
 
             # INIT-7 F2: sin picks pendientes, intentar putaway (None si no hay).
-            return self._asignar_putaway(operator)
+            return self._asignar_putaway(operator) if fallback_putaway else None
 
         # BUGFIX: Evitar spam de logs - solo log cada 5 segundos
         if not hasattr(self, '_last_request_log'):
@@ -275,7 +295,7 @@ class DispatcherV11:
                 self._last_no_candidates_log[operator_key] = self.env.now
 
             # INIT-7 F2: sin candidatos de pick, intentar putaway.
-            return self._asignar_putaway(operator)
+            return self._asignar_putaway(operator) if fallback_putaway else None
 
         logger.debug(f"[DISPATCHER] Estrategia '{self.estrategia}' selecciono {len(candidatos)} candidatos")
 
@@ -297,7 +317,7 @@ class DispatcherV11:
         if not selected_work_orders:
             logger.debug(f"[DISPATCHER] No se pudo seleccionar batch para {operator.type}_{operator.id}")
             # INIT-7 F2: sin batch de pick viable, intentar putaway.
-            return self._asignar_putaway(operator)
+            return self._asignar_putaway(operator) if fallback_putaway else None
 
         # Step 4: Build optimal tour
         tour = self._construir_tour(operator, selected_work_orders)
@@ -383,6 +403,86 @@ class DispatcherV11:
               f"{wo.id} (pallet {getattr(wo, 'pallet_id', '?')}, muelle "
               f"{getattr(wo, 'dock_id', '?')} -> {wo.target_location})")
         return tour_result
+
+    # --------------------------------------------- INIT-11 F2: perfiles
+
+    def _asignar_por_perfiles(self, operator: Any) -> Optional[Dict[str, Any]]:
+        """Recorre los perfiles de la persona en orden y le da la primera
+        tarea que puede hacer. Si el perfil pide otro equipo, reserva el
+        cambio (la persona paga el viaje y el tiempo al ejecutar el tour)."""
+        equipo_fisico = operator.equipo_fisico
+        for perfil in self._orden_de_perfiles(operator):
+            punto = operator.punto_para_perfil(perfil)
+            if punto is False:
+                continue  # sin equipo disponible o sin lugar donde dejar el suyo
+            operator.usar_equipo(operator.equipo_de_perfil(perfil))
+
+            tour = None
+            if 'pick' in perfil['tareas']:
+                tour = self._asignar_picks(operator, fallback_putaway=False)
+            if tour is None and 'putaway' in perfil['tareas']:
+                tour = self._asignar_putaway(operator)
+
+            if tour is not None:
+                operator.perfil_actual = perfil
+                operator.reservar_cambio_de_equipo(punto)
+                tour['perfil'] = perfil['nombre']
+                return tour
+
+        # Nada que hacer en ningun perfil: sigue con el equipo que tiene.
+        operator.usar_equipo(equipo_fisico)
+        return None
+
+    def _orden_de_perfiles(self, operator: Any) -> List[Dict[str, Any]]:
+        """Orden en que la persona prueba sus perfiles, segun la regla de
+        cambio (`cambio_de_perfil`): cambiar de tarea cuesta tiempo real, asi
+        que no siempre conviene volver al perfil principal por una sola tarea.
+
+        * `inmediato`: siempre empieza por el mas prioritario.
+        * `agotar`: sigue en el suyo mientras tenga trabajo.
+        * `umbral`: solo sube a uno mas prioritario si acumulo N tareas.
+        """
+        perfiles = operator.perfiles
+        actual = operator.perfil_actual
+        if actual is None or actual not in perfiles:
+            return list(perfiles)
+        modo = self.cambio_de_perfil['modo']
+        if modo == 'inmediato':
+            return list(perfiles)
+
+        indice = perfiles.index(actual)
+        mas_prioritarios = perfiles[:indice]
+        if modo == 'agotar':
+            if self._pendientes_de_perfil(operator, actual) > 0:
+                return [actual] + mas_prioritarios + perfiles[indice + 1:]
+            return list(perfiles)
+
+        umbral = self.cambio_de_perfil['umbral']
+        suben, esperan = [], []
+        for perfil in mas_prioritarios:
+            if self._pendientes_de_perfil(operator, perfil) >= umbral:
+                suben.append(perfil)
+            else:
+                esperan.append(perfil)
+        # Los que no llegan al umbral quedan AL FINAL, no afuera: no vale la
+        # pena cambiar de equipo por dos tareas, pero si la persona no tiene
+        # nada que hacer, las hace igual (quedarse parada no es realista).
+        return suben + [actual] + perfiles[indice + 1:] + esperan
+
+    def _pendientes_de_perfil(self, operator: Any, perfil: Dict[str, Any]) -> int:
+        """Tareas que ESTA persona podria tomar en ese perfil ahora mismo."""
+        equipo = operator.equipo_de_perfil(perfil)
+        prioridades = operator.prioridades_de_equipo((equipo or {}).get('id'))
+        total = 0
+        if 'pick' in perfil['tareas']:
+            total += sum(1 for wo in self.work_orders_pendientes
+                         if prioridades.get(wo.work_area, 999) < 999
+                         and self._wo_elegible_por_ola(wo))
+        if 'putaway' in perfil['tareas']:
+            total += sum(1 for wo in self.putaway_pendientes
+                         if getattr(wo, 'pallet_ready', False)
+                         and prioridades.get(wo.work_area, 999) < 999)
+        return total
 
     def _seleccionar_work_orders_candidatos(self, operator: Any) -> List[Any]:
         """

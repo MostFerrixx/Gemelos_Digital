@@ -196,7 +196,7 @@ def _con_equipo_implicito(configuracion: Dict[str, Any],
     agente['persona'] = None
     agente['equipo'] = dict(_parametros_tiempo(configuracion, tipo),
                             id=tipo, tipo_base=tipo, capacidad=agente['capacity'],
-                            cantidad=None)
+                            tiempo_cambio_s=30.0, cantidad=None)
     return agente
 
 
@@ -204,7 +204,7 @@ def resolver_equipos(configuracion: Optional[Dict[str, Any]]):
     """Catalogo de equipos declarado en `equipos`, con defaults completos.
 
     Devuelve `(equipos, avisos)`. Cada equipo:
-    {id, tipo_base, capacidad, velocidad, horquilla_s, cantidad}.
+    {id, tipo_base, capacidad, velocidad, horquilla_s, tiempo_cambio_s, cantidad}.
     Lo que no se declara sale de `fleet_defaults` y del bloque `tiempos`.
     `cantidad` None = sin limite de unidades.
     """
@@ -232,9 +232,84 @@ def resolver_equipos(configuracion: Optional[Dict[str, Any]]):
             'capacidad': definicion.get('capacidad', defaults.get('capacity')),
             'velocidad': float(definicion.get('velocidad', tiempos['velocidad'])),
             'horquilla_s': float(definicion.get('horquilla_s', tiempos['horquilla_s'])),
+            # INIT-11 F2: segundos que cuesta tomarlo o dejarlo en el estacionamiento.
+            'tiempo_cambio_s': float(definicion.get('tiempo_cambio_s', 30.0)),
             'cantidad': int(cantidad) if cantidad is not None else None,
         }
     return equipos, avisos
+
+
+# INIT-11 F2: tipos de tarea que un perfil puede tomar HOY. El task path
+# (traslado, actividad) los agrega en F3/F4.
+TAREAS_VALIDAS = ('pick', 'putaway')
+
+# Modos de la regla de cambio de perfil (ver `cambio_de_perfil`).
+MODOS_CAMBIO = ('inmediato', 'agotar', 'umbral')
+
+
+def resolver_perfiles(configuracion: Optional[Dict[str, Any]]):
+    """Catalogo de perfiles declarado en `perfiles`.  (INIT-11 F2)
+
+    Un perfil dice QUE tipos de tarea toma una persona y CON QUE equipo:
+    {nombre: {tareas: [...], equipo: <clave de `equipos`> | None}}.
+    Devuelve `(perfiles, avisos)`.
+    """
+    configuracion = configuracion or {}
+    bloque = configuracion.get('perfiles') or {}
+    perfiles: Dict[str, Dict[str, Any]] = {}
+    avisos: List[str] = []
+    if not isinstance(bloque, dict):
+        return perfiles, ["'perfiles' debe ser un objeto {nombre: definicion}."]
+
+    equipos, avisos_equipos = resolver_equipos(configuracion)
+    avisos.extend(avisos_equipos)
+
+    for nombre, definicion in bloque.items():
+        definicion = definicion if isinstance(definicion, dict) else {}
+        tareas = [str(t) for t in (definicion.get('tareas') or [])]
+        desconocidas = [t for t in tareas if t not in TAREAS_VALIDAS]
+        if desconocidas:
+            avisos.append(
+                "El perfil '%s' declara tareas que el motor todavia no sabe "
+                "repartir (%s). Se ignoran; validas: %s."
+                % (nombre, ", ".join(desconocidas), ", ".join(TAREAS_VALIDAS)))
+            tareas = [t for t in tareas if t in TAREAS_VALIDAS]
+        if not tareas:
+            avisos.append("El perfil '%s' no toma ninguna tarea valida; se "
+                          "descarta." % nombre)
+            continue
+        equipo_id = definicion.get('equipo')
+        if equipo_id is not None and equipo_id not in equipos:
+            avisos.append("El perfil '%s' usa el equipo '%s', que no esta "
+                          "definido en 'equipos'; se descarta."
+                          % (nombre, equipo_id))
+            continue
+        perfiles[nombre] = {'nombre': nombre, 'tareas': tareas,
+                            'equipo': equipo_id}
+    return perfiles, avisos
+
+
+def resolver_cambio_de_perfil(configuracion: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Regla de cambio de perfil: {modo, umbral}.  (INIT-11 F2)
+
+    * `inmediato`: vuelve al perfil de mayor prioridad con trabajo apenas puede.
+    * `agotar`: se queda en el perfil actual mientras tenga trabajo.
+    * `umbral`: cambia a un perfil mas prioritario solo si acumulo N tareas.
+    Default: `umbral` con 3 (cambiar de tarea cuesta tiempo real; ver plan).
+    """
+    bloque = (configuracion or {}).get('cambio_de_perfil') or {}
+    if not isinstance(bloque, dict):
+        bloque = {}
+    modo = str(bloque.get('modo', 'umbral'))
+    if modo not in MODOS_CAMBIO:
+        logger.warning("[WARN][CONFIG] cambio_de_perfil.modo '%s' desconocido; "
+                       "se usa 'umbral'. Validos: %s", modo, ", ".join(MODOS_CAMBIO))
+        modo = 'umbral'
+    try:
+        umbral = int(bloque.get('umbral', 3))
+    except (TypeError, ValueError):
+        umbral = 3
+    return {'modo': modo, 'umbral': max(1, umbral)}
 
 
 def resolver_personas(configuracion: Optional[Dict[str, Any]]):
@@ -256,6 +331,8 @@ def resolver_personas(configuracion: Optional[Dict[str, Any]]):
     """
     configuracion = configuracion or {}
     equipos, avisos = resolver_equipos(configuracion)
+    catalogo_perfiles, avisos_perfiles = resolver_perfiles(configuracion)
+    avisos.extend(a for a in avisos_perfiles if a not in avisos)
     grupos = configuracion.get('personas') or []
     flota: List[Dict[str, Any]] = []
     usados: Dict[str, int] = {}
@@ -266,7 +343,16 @@ def resolver_personas(configuracion: Optional[Dict[str, Any]]):
             avisos.append("personas[%d] no es un objeto; se ignora." % indice)
             continue
         nombre_grupo = str(grupo.get('grupo') or ('Grupo%d' % (indice + 1)))
+        # INIT-11 F2: perfiles del grupo, en orden de prioridad. Sin perfiles,
+        # la persona hace lo de F1: cualquier tarea con su equipo fijo.
+        perfiles_grupo, avisos_grupo = _perfiles_del_grupo(
+            grupo, nombre_grupo, catalogo_perfiles)
+        avisos.extend(avisos_grupo)
         equipo_id = grupo.get('equipo')
+        if equipo_id is None and perfiles_grupo:
+            # El equipo inicial es el del perfil mas prioritario que use uno.
+            equipo_id = next((p['equipo'] for p in perfiles_grupo if p['equipo']),
+                             None)
         equipo = equipos.get(equipo_id)
         if equipo is None:
             avisos.append(
@@ -275,7 +361,20 @@ def resolver_personas(configuracion: Optional[Dict[str, Any]]):
             continue
         habilitaciones = grupo.get('habilitaciones')
         if habilitaciones is None:
-            habilitaciones = [equipo_id]
+            # Por defecto: lo que necesita para su equipo y para sus perfiles.
+            habilitaciones = [equipo_id] + [p['equipo'] for p in perfiles_grupo
+                                            if p['equipo']]
+            habilitaciones = list(dict.fromkeys(habilitaciones))
+        habilitados = []
+        for perfil in perfiles_grupo:
+            if perfil['equipo'] is None or perfil['equipo'] in habilitaciones:
+                habilitados.append(perfil)
+            else:
+                avisos.append(
+                    "El grupo '%s' tiene el perfil '%s', que necesita '%s', pero "
+                    "no esta habilitado para ese equipo. Ese perfil no se le "
+                    "asigna." % (nombre_grupo, perfil['nombre'], perfil['equipo']))
+        perfiles_grupo = habilitados
         if equipo_id not in habilitaciones:
             avisos.append(
                 "El grupo '%s' no esta habilitado para manejar '%s' "
@@ -320,10 +419,26 @@ def resolver_personas(configuracion: Optional[Dict[str, Any]]):
                 'id': persona_id,
                 'equipo': dict(equipo),
                 'persona': {'id': persona_id, 'grupo': nombre_grupo,
-                            'habilitaciones': list(habilitaciones)},
+                            'habilitaciones': list(habilitaciones),
+                            'perfiles': [dict(p) for p in perfiles_grupo]},
             })
 
     return flota, avisos
+
+
+def _perfiles_del_grupo(grupo: Dict[str, Any], nombre_grupo: str,
+                        catalogo: Dict[str, Dict[str, Any]]):
+    """Perfiles de un grupo, en el orden declarado (= orden de prioridad)."""
+    perfiles, avisos = [], []
+    for nombre in (grupo.get('perfiles') or []):
+        perfil = catalogo.get(nombre)
+        if perfil is None:
+            avisos.append("El grupo '%s' usa el perfil '%s', que no esta "
+                          "definido en 'perfiles'; se ignora."
+                          % (nombre_grupo, nombre))
+            continue
+        perfiles.append(perfil)
+    return perfiles, avisos
 
 
 def capacidades_por_tipo(configuracion: Optional[Dict[str, Any]]) -> Dict[str, List[Any]]:
