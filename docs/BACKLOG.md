@@ -18,7 +18,9 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-09 — flota 2+2 sub-dimensionada (hallazgo de negocio) | ABIERTO (2026-07-25) | Media | Trivial (config) | Decision de negocio del Director |
 | BK-10 — el boton "Restart" responde success pero NO reinicia el servidor | ABIERTO (2026-09-07) | Baja | ~30 min | Ninguno |
 | INIT-10 — modelo de almacen propio (reemplaza a Tiled como herramienta principal) | ANALIZADO (2026-09-16) | Alta (cimiento de automatismos y mezaninas) | Alto, por etapas | Plan detallado de la etapa 2 + OK del Director |
-| **INIT-11 — Task Path: outbound en varios pasos** | **PLAN PROPUESTO (2026-09-16)** | **Alta (prioridad actual del Director)** | 1,5-2 semanas | OK del plan + decisiones D1-D5 (`docs/PLAN_INIT11_TASK_PATH.md`) |
+| **INIT-11 — Task Path: outbound en varios pasos (6 pilares)** | **PLAN v2 PROPUESTO (2026-09-16)** | **Alta (prioridad actual del Director)** | 2,5-3,5 semanas, 11 fases | OK del plan v2 (`docs/PLAN_INIT11_TASK_PATH.md`) |
+| BK-12 — `WorkOrder.work_group` hardcodeado ignora el Excel (60% de ubicaciones mal) | ABIERTO (2026-09-16) | Alta (bloquea estrategias por WG) | Medio dia | Es la F0 de INIT-11 |
+| INIT-12 — Reposicion (replenishment) como tipo de tarea | IDEA (2026-09-16) | Media | No estimado | Despues de INIT-11 (usa perfiles y equipos) |
 | BK-02 — FIFO Estricto en UI | EN REPENSAR | Baja | ~15 min | Diseno pendiente del Director |
 | INIT-3 v3 — capacidades por agente en el optimizador | DIFERIDO | Baja | Medio | Ninguno, listo para tomar |
 | INIT-6 Opcion C — clustering geografico de destinos | DIFERIDO | Baja | Alto (no estimado) | Requiere datos reales de geolocalizacion de clientes |
