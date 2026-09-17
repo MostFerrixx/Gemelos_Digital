@@ -287,7 +287,9 @@ class StochasticOrderStrategy(OrderGenerationStrategy):
                         work_area=work_area,
                         pick_sequence=(pick_sequence_real if pick_sequence_real is not None
                                        else almacen._obtener_pick_sequence_real(ubicacion, work_area)),
-                        staging_id=staging_id
+                        staging_id=staging_id,
+                        # INIT-11 F0: WG real de la ubicacion (antes derivado del nombre)
+                        work_group=almacen._obtener_work_group(ubicacion, work_area)
                     )
                     all_work_orders.append(work_order)
 
@@ -607,6 +609,9 @@ class DeterministicOrderStrategy(OrderGenerationStrategy):
                             # INIT-4: prioridad/SLA/ola del pedido (None -> default historico)
                             priority=order.priority,
                             due_time=order.due_time,
+                            # INIT-11 F0: WG real de la ubicacion
+                            work_group=almacen._obtener_work_group(
+                                ubicacion, work_area, location_id),
                         )
                         # INIT-4 (C3): propagar la ola del pedido a la WO (elegibilidad).
                         work_order.wave_id = order.wave

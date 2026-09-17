@@ -38,8 +38,11 @@ class WorkOrder:
                  sku: SKU, cantidad: int, ubicacion: tuple,
                  work_area: str, pick_sequence: int, staging_id: int = 1,
                  qty_requested: int = None, location_id: str = None,
-                 priority: int = 99, due_time: float = None):
+                 priority: int = 99, due_time: float = None,
+                 work_group: str = None):
         self.id = work_order_id
+        # INIT-11 F0: Work Group REAL de la ubicacion (None -> respaldo por nombre).
+        self._work_group = work_group
         self.order_id = order_id
         self.tour_id = tour_id
         self.sku = sku
@@ -104,15 +107,32 @@ class WorkOrder:
     
     @property
     def work_group(self) -> str:
-        """Get work group (derived from work_area)"""
-        # Map work_area to work_group
-        if 'Ground' in self.work_area:
+        """Work Group de la ubicacion (INIT-11 F0 / BK-12).
+
+        Antes se DERIVABA del nombre del area con reglas escritas a mano
+        ('Ground' -> WG_A, 'Piso' -> WG_B, 'Rack' -> WG_C, resto WG_A) e
+        ignoraba el WorkGroup que el Excel trae por ubicacion: con el canonico,
+        216 de 360 ubicaciones quedaban con el grupo equivocado (Area_High y
+        Area_Special caian todas en WG_A). Ahora usa el dato real, que asigna
+        el almacen al crear la orden (`AlmacenMejorado._obtener_work_group`).
+        La derivacion por nombre queda solo como respaldo para ordenes sin
+        ubicacion conocida.
+        """
+        if self._work_group:
+            return self._work_group
+        return self._work_group_por_nombre(self.work_area)
+
+    @staticmethod
+    def _work_group_por_nombre(work_area: str) -> str:
+        """Respaldo historico: derivacion por nombre del area (sin dato real)."""
+        area = work_area or ''
+        if 'Ground' in area:
             return 'WG_A'
-        elif 'Piso' in self.work_area:
+        elif 'Piso' in area:
             return 'WG_B'
-        elif 'Rack' in self.work_area:
+        elif 'Rack' in area:
             return 'WG_C'
-        return 'WG_A'  # Default
+        return 'WG_A'
 
     def calcular_volumen_restante(self) -> int:
         """Calculate remaining volume for this work order"""
@@ -680,6 +700,38 @@ class AlmacenMejorado:
         print(f"[WAREHOUSE WARN] No se encontro pick_sequence para {ubicacion} en {work_area}")
         return 999
 
+    def _obtener_work_group(self, ubicacion: tuple = None, work_area: str = None,
+                            location_id: str = None) -> Optional[str]:
+        """Work Group REAL de una ubicacion, segun el plan maestro (INIT-11 F0).
+
+        Busca primero por `location_id` (unico por ubicacion) y despues por
+        (x, y, WorkArea). Devuelve None si no la encuentra: la WorkOrder usa
+        entonces su respaldo historico por nombre de area.
+
+        El indice se arma una sola vez (antes cada orden recorreria las 360
+        ubicaciones, como hace _obtener_pick_sequence_real).
+        """
+        indice = getattr(self, '_indice_work_group', None)
+        if indice is None:
+            indice = {'por_id': {}, 'por_coord': {}}
+            dm = getattr(self, 'data_manager', None)
+            puntos = getattr(dm, 'puntos_de_picking_ordenados', None) or []
+            for punto in puntos:
+                grupo = punto.get('WorkGroup')
+                if not grupo or grupo == 'WG_Default':
+                    continue
+                if punto.get('location_id'):
+                    indice['por_id'][punto['location_id']] = grupo
+                indice['por_coord'][(punto.get('x'), punto.get('y'),
+                                     punto.get('WorkArea'))] = grupo
+            self._indice_work_group = indice
+
+        if location_id and location_id in indice['por_id']:
+            return indice['por_id'][location_id]
+        if ubicacion is not None:
+            return indice['por_coord'].get((ubicacion[0], ubicacion[1], work_area))
+        return None
+
     def _seleccionar_staging_id(self) -> int:
         """
         Select staging ID based on outbound_staging_distribution configuration
@@ -868,6 +920,9 @@ class AlmacenMejorado:
                     # de rescate cross-dock; estrategias de plan lo ordenan).
                     pick_sequence=target.get('pick_sequence', 0),
                     location_id=target['location_id'],
+                    # INIT-11 F0: WG real del DESTINO del pallet
+                    work_group=self._obtener_work_group(
+                        None, target['work_area'], target['location_id']),
                 )
                 wo.task_type = 'putaway'
                 wo.pallet_id = pallet_id
@@ -973,6 +1028,10 @@ class AlmacenMejorado:
                     priority=(order.priority if order is not None
                               and order.priority is not None else 99),
                     due_time=(order.due_time if order is not None else None),
+                    # INIT-11 F0: WG real de la ubicacion de rescate
+                    work_group=self._obtener_work_group(
+                        wo_putaway.target_location, wo_putaway.work_area,
+                        wo_putaway.location_id),
                 )
                 nuevos.append(pick)
             bo['qty_pending'] -= take
