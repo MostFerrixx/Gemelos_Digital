@@ -42,6 +42,20 @@ def cargar(ruta):
     return meta, eventos
 
 
+def clases_de_sku(raiz=None):
+    """{sku: clase_manejo} desde warehouse.db (lo que usa el motor)."""
+    import sqlite3
+    raiz = raiz or os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    ruta = os.path.join(raiz, 'warehouse.db')
+    if not os.path.exists(ruta):
+        return {}
+    con = sqlite3.connect(ruta)
+    try:
+        return dict(con.execute('select sku_code, category from sku_catalog'))
+    finally:
+        con.close()
+
+
 def tipo_de(evento):
     return evento.get('type') or evento.get('event_type')
 
@@ -141,6 +155,10 @@ def resumir(meta, eventos):
             if n > 1:
                 coocupaciones.append((t, celda, n))
 
+    clases = clases_de_sku()
+    wos_por_clase = collections.Counter(
+        clases.get(w.get('sku_id'), 'SIN_CLASE') for w in wo_info.values())
+
     staging = collections.Counter(
         str(w.get('staging')) for w in wo_info.values() if w.get('staging') is not None)
     duraciones = [p['duracion'] for p in picks if p['duracion'] is not None]
@@ -159,6 +177,7 @@ def resumir(meta, eventos):
         'wos_por_area': dict(collections.Counter(
             w.get('work_area') for w in wo_info.values())),
         'wos_por_staging': dict(staging),
+        'wos_por_clase': dict(wos_por_clase),
         'agentes': dict(agentes),
         'capacidad_por_agente': capacidad,
         'carga_max_por_agente': {a: round(v, 2) for a, v in carga_max.items()},

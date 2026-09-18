@@ -356,6 +356,18 @@ class WebConfigurator {
 
     // AUD8-2: las claves de distribucion_tipos son CLASES DE MANEJO reales
     // (hoja SkuCatalog / INIT-8). [claveConfig, idInput, defaultPct]
+    // H-07 (QA 2026-09-18): lee un numero del formulario y usa el valor por
+    // defecto SOLO si el campo esta vacio o no es un numero. El patron previo
+    // `parseInt(v) || defecto` trataba el 0 como "vacio": un 0% en una clase
+    // se enviaba como el porcentaje por defecto (el formulario decia "Suma
+    // 100%" y el servidor rechazaba "164%"), y "0 expansiones" pasaba a 5.
+    static numero(id, defecto, entero = false) {
+        const raw = document.getElementById(id)?.value;
+        if (raw === undefined || raw === null || String(raw).trim() === '') return defecto;
+        const v = entero ? parseInt(raw, 10) : parseFloat(raw);
+        return isNaN(v) ? defecto : v;
+    }
+
     static CLASES_DISTRIBUCION = [
         ['pequeno', 'pct-pequeno', 36],
         ['mediano', 'pct-mediano', 30],
@@ -704,11 +716,11 @@ class WebConfigurator {
 
         btnStart.addEventListener('click', async () => {
             const body = {
-                n_trials: parseInt(document.getElementById('opt-n-trials').value, 10) || 20,
-                n_jobs: parseInt(document.getElementById('opt-n-jobs').value, 10) || 2,
-                cost_ground: parseFloat(document.getElementById('opt-cost-ground').value) || 15.0,
-                cost_forklift: parseFloat(document.getElementById('opt-cost-forklift').value) || 50.0,
-                penalty_failed: parseFloat(document.getElementById('opt-penalty-failed').value) || 100.0,
+                n_trials: WebConfigurator.numero('opt-n-trials', 20, true),
+                n_jobs: WebConfigurator.numero('opt-n-jobs', 2, true),
+                cost_ground: WebConfigurator.numero('opt-cost-ground', 15.0),
+                cost_forklift: WebConfigurator.numero('opt-cost-forklift', 50.0),
+                penalty_failed: WebConfigurator.numero('opt-penalty-failed', 100.0),
                 // MEJ-SLA-OPT: $ por pedido con SLA vencido. NO usar || como los
                 // demas: 0 es un valor valido (desactiva la penalizacion a proposito).
                 penalty_late: (() => {
@@ -908,8 +920,8 @@ class WebConfigurator {
             const body = {
                 config_a: selectA?.value || 'current',
                 config_b: selectB?.value || 'current',
-                replicas: parseInt(document.getElementById('exp-replicas').value, 10) || 5,
-                base_seed: parseInt(document.getElementById('exp-base-seed').value, 10) || 1000,
+                replicas: WebConfigurator.numero('exp-replicas', 5, true),
+                base_seed: WebConfigurator.numero('exp-base-seed', 1000, true),
             };
             try {
                 const resp = await fetch('/api/experiment/start', {
@@ -1344,14 +1356,14 @@ class WebConfigurator {
             distribucion_tipos: Object.fromEntries(
                 WebConfigurator.CLASES_DISTRIBUCION.map(([clave, id, defPct]) => [
                     clave,
-                    { porcentaje: parseInt(document.getElementById(id)?.value) || defPct }
+                    { porcentaje: WebConfigurator.numero(id, defPct, true) }
                 ])
             ),
             // Tab 2: Estrategias
             dispatch_strategy: document.getElementById('dispatch-strategy').value,
-            radio_cercania: parseInt(document.getElementById('radio-cercania')?.value) || 100,
-            radio_expansion_paso: parseInt(document.getElementById('radio-expansion-paso')?.value) || 50,
-            radio_max_expansiones: parseInt(document.getElementById('radio-max-expansiones')?.value) || 5,
+            radio_cercania: WebConfigurator.numero('radio-cercania', 100, true),
+            radio_expansion_paso: WebConfigurator.numero('radio-expansion-paso', 50, true),
+            radio_max_expansiones: WebConfigurator.numero('radio-max-expansiones', 5, true),
             tour_type: document.getElementById('tour-type').value,
 
             // Tab 3: Flota de Agentes

@@ -541,8 +541,10 @@ class FleetManager {
             const groups = groundContainer.querySelectorAll('.fleet-group');
             groups.forEach(group => {
                 const cantidad = parseInt(group.querySelector('.input-cantidad').value);
-                const capacidad = parseInt(group.querySelector('.input-capacidad').value);
-                const tiempoDescarga = parseInt(group.querySelector('.input-tiempo-descarga').value);
+                // H-07: parseFloat, no parseInt -- parseInt truncaba los
+                // decimales (una descarga de 2.5 s se enviaba como 2).
+                const capacidad = parseFloat(group.querySelector('.input-capacidad').value);
+                const tiempoDescarga = parseFloat(group.querySelector('.input-tiempo-descarga').value);
 
                 // Get work area priorities
                 const workAreaPriorities = {};
@@ -573,8 +575,10 @@ class FleetManager {
             const groups = forkliftContainer.querySelectorAll('.fleet-group');
             groups.forEach(group => {
                 const cantidad = parseInt(group.querySelector('.input-cantidad').value);
-                const capacidad = parseInt(group.querySelector('.input-capacidad').value);
-                const tiempoDescarga = parseInt(group.querySelector('.input-tiempo-descarga').value);
+                // H-07: parseFloat, no parseInt -- parseInt truncaba los
+                // decimales (una descarga de 2.5 s se enviaba como 2).
+                const capacidad = parseFloat(group.querySelector('.input-capacidad').value);
+                const tiempoDescarga = parseFloat(group.querySelector('.input-tiempo-descarga').value);
 
                 // Get work area priorities
                 const workAreaPriorities = {};

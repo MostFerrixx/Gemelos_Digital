@@ -6,9 +6,9 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 1 — Carga de Trabajo.
-**Último cerrado:** H-01 corregido y reprobado (18/09).
-**Hallazgos abiertos:** H-02, H-03, H-05.
+**Objetivo inmediato:** Bloque 1 — Carga de Trabajo (hechos 1.1, 1.2, 1.3; sigue 1.4).
+**Último cerrado:** H-07 corregido y reprobado con QA-1.3 (18/09).
+**Hallazgos abiertos:** H-02, H-03, H-05 (evidencia nueva en QA-1.2), H-06 (decisión del Director).
 
 ### Modo de trabajo (pedido del Director, 18/09)
 
@@ -447,6 +447,10 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-0.1 | 18/09 | Copia temporal = metadata del `.jsonl`; vs `config.json` falta solo `cercania_tour_mode` | 300 órdenes, 603 tareas, todas completadas, todo a zona 1, capacidades 150/1000 respetadas, cada equipo solo en sus áreas | 5 instantes × 4 operarios: **20/20** coinciden en celda y estado; captura OK | **PASA** con hallazgo | H-01, H-02 |
 | QA-0.2 | 18/09 | Igual que QA-0.1 | 3 corridas: estructura idéntica; duración 6.772 / 7.256 / 7.833 s; tareas 603 / 625 / 606 | — | **PASA** (criterio recalibrado) | H-04 |
 | H-01 reprueba 1 | 18/09 | Corrida canónica: copia temporal **idéntica** a `config.json` (antes faltaba `cercania_tour_mode`) y = metadata | — | — | **PASA** | H-01 cerrado |
+| QA-1.1 | 18/09 | `total_ordenes` 50 \| 50 | 50 pedidos, 107 tareas, todas completadas; fin 1.415 s | 20/20 | **PASA** | — |
+| QA-1.2 | 18/09 | 600 \| 600 | 600 pedidos, 1.195 tareas completadas; fin 15.178 s = **2,08×** el control (esperado ~2×) | 20/20 | **PASA** | H-05 (evidencia) |
+| QA-1.3 (1.er intento) | 18/09 | **FALLA**: 0% se envió como el % por defecto (30/16/12/6); el formulario decía "Suma 100%" y el servidor rechazó "164%" | — | — | **FALLA** | H-07 |
+| QA-1.3 (reprueba) | 18/09 | 100/0/0/0/0 \| idéntico | 568 tareas, **100% `pequeno`**; pick medio 15,4 s (control ~30 s); fin 4.272 s | 20/20 | **PASA** | H-07 cerrado |
 | H-01 reprueba 2 | 18/09 | Importar un `.json` con `personas` + `equipos` (clave sin control web) → Run: la metadata trae las personas | Agentes = **Ana, Beto, Carla, Dario**; pickers solo en Area_Ground, grueros en High/Special; 613 tareas completadas; `config.json` intacto | — | **PASA** | H-01 cerrado |
 
 ## 10. Hallazgos
@@ -458,6 +462,9 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | H-03 | OBS | QA-0.2 | Una corrida cancelada deja una carpeta `output/simulation_*` a medias (solo el Excel) | La cancelación no limpia | Marcarla como incompleta o borrarla al cancelar | Abierto |
 | H-04 | OBS (método) | QA-0.2 | La variación natural entre corridas web es ±8% en duración; el criterio inicial de ±10% no discriminaba | Semilla libre | Regla 4 recalibrada | Cerrado |
 | H-05 | A investigar (QA-3.1) | QA-0.1 | Con el anti-colisión activo hay co-ocupaciones: el propio motor reporta 16-23 eventos en 8-9 celdas por corrida (sobre todo la zona de descarga (3, 28)/(3, 29) y cruces) | — | Verificar en QA-3.1 si son las excepciones documentadas (spawn/staging) o fallas | Abierto |
+
+| H-06 | MENOR (decisión) | QA-1.1 | El servidor que usa el cliente (`start_server.bat` → `server.py`) corre con **recarga automática** vigilando todo el proyecto: cualquier cambio en un `.py` (actualizar el programa con git, por ejemplo) reinicia el servidor y **cancela la simulación en curso**. Canceló dos corridas de QA | `uvicorn.run(reload=True, reload_dirs=[PROJECT_ROOT])`; el botón **Restart** depende de esa recarga (toca `server.py`) — ligado a BK-10 | Recarga solo en modo desarrollo y un Restart que no dependa de ella. **Se consulta al Director** (toca BK-10). Mientras tanto QA usa un servidor sin recarga (`web-qa` en `.claude/launch.json`) | Abierto |
+| H-07 | **CRÍTICO** | QA-1.3 | **Un 0 en la web se reemplazaba por el valor por defecto.** Imposible excluir una clase de la mezcla (0% → 30/16/12/6), "0 expansiones" de Cercanía pasaba a 5 (el manual promete lo contrario), y en Optimización/A/B un costo o penalización 0 volvía al default y la semilla 0 a 1000. Además la flota truncaba decimales (descarga 2,5 s → 2) | `parseInt(valor) \|\| defecto`: en JavaScript el 0 cuenta como falso. En la flota, `parseInt` | Función única `WebConfigurator.numero(id, defecto)`: el default solo si el campo está vacío o no es número. Flota con `parseFloat` | **Cerrado** (reprobado QA-1.3; 2.4 y 5.5 lo vuelven a cubrir) |
 
 ## 11. Registro de cambios de este plan
 
@@ -474,3 +481,7 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
   H-01 corregido. Método para Importar sin diálogo del sistema: se asigna un
   `File` al `#file-import-input` y se dispara `change` (mismo código que usa
   el selector).
+- 2026-09-18 — Nivel 3 endurecido: con corridas grandes el visor tarda en
+  responder y leer su estado a tiempo fijo daba lecturas viejas. Ahora cada
+  lectura espera el evento `snapshotReady` del visor (`qaLeerVisor`). QA corre
+  con el servidor `web-qa` (sin recarga automática) por H-06.
