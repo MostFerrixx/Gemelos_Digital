@@ -6,9 +6,12 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 1 — Carga de Trabajo (hechos 1.1, 1.2, 1.3; sigue 1.4).
-**Último cerrado:** H-07 corregido y reprobado con QA-1.3 (18/09).
-**Hallazgos abiertos:** H-02, H-03, H-05 (evidencia nueva en QA-1.2), H-06 (decisión del Director).
+**Objetivo inmediato:** H-05 — dos montacargas en la misma celda a la vez
+(causa raíz en el motor anti-colisión y plan de corrección para el Director).
+Después: Bloque 2 — Despacho y tours.
+**Último cerrado:** Bloque 1 completo (18/09): 11 corridas, todas pasan tras
+corregir H-07; 220/220 posiciones visor = JSON.
+**Hallazgos abiertos:** H-02, H-03, H-05 (confirmado), H-06 (decisión), H-08 a H-12.
 
 ### Modo de trabajo (pedido del Director, 18/09)
 
@@ -255,11 +258,11 @@ Salvo indicación, todo lo demás queda en el canónico.
 | QA-1.2 | Total de órdenes 600 | N2: 600 pedidos; duración ≈ 2× el control (±25%) |
 | QA-1.3 | Distribución 100% Pequeño | N2: 100% de las WOs con SKU de clase `pequeno` |
 | QA-1.4 | Distribución 100% Extra grande | N2: 100% `extra_grande`; picks más largos que en QA-1.3 (mult 2.2 + 15 s) |
-| QA-1.5 | Distribución 20/20/20/20/20 | N2: cada clase 20% ±8 pp |
+| QA-1.5 | Distribución 20/20/20/20/20 | N2: cada clase 20% ±8 pp **por pedido** (la mezcla se sortea por pedido; por tarea cambia porque los productos grandes se dividen en más tareas) |
 | QA-1.6 | Distribución que suma 90% | La UI bloquea Run y Aplicar con un mensaje claro |
 | QA-1.7 | Determinista con archivo válido | N2: `order_id` y SKU = los del archivo; cantidad de pedidos = archivo |
 | QA-1.8 | Determinista + Envío Parcial, archivo con 1 SKU inexistente | N2: el pedido sale sin ese ítem; vista previa lo informa |
-| QA-1.9 | Determinista + Todo o Nada, mismo archivo | N2: ese pedido no aparece |
+| QA-1.9 | Determinista + Todo o Nada, mismo archivo: (a) política elegida antes de subir; (b) cambiada después de subir | N2: ese pedido no aparece en ninguna de las dos variantes |
 | QA-1.10 | Volver a Estocástico tras cargar archivo | N1: `order_generation_mode = stochastic`; el archivo no se usa |
 
 ### Bloque 2 — Despacho y tours
@@ -451,6 +454,13 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-1.2 | 18/09 | 600 \| 600 | 600 pedidos, 1.195 tareas completadas; fin 15.178 s = **2,08×** el control (esperado ~2×) | 20/20 | **PASA** | H-05 (evidencia) |
 | QA-1.3 (1.er intento) | 18/09 | **FALLA**: 0% se envió como el % por defecto (30/16/12/6); el formulario decía "Suma 100%" y el servidor rechazó "164%" | — | — | **FALLA** | H-07 |
 | QA-1.3 (reprueba) | 18/09 | 100/0/0/0/0 \| idéntico | 568 tareas, **100% `pequeno`**; pick medio 15,4 s (control ~30 s); fin 4.272 s | 20/20 | **PASA** | H-07 cerrado |
+| QA-1.4 | 18/09 | 0/0/0/0/100 \| idéntico | 664 tareas **100% `extra_grande`**; pick medio 115 s; mínimo 61,167 s = fórmula exacta para SKU003 (59,9 kg, 1 u): (10+2+0,15·59,9)·2,2+15 | 20/20 | **PASA** | H-05 (373 co-ocupaciones) |
+| QA-1.5 | 18/09 | 20×5 \| idéntico | Por pedido: 17,7 / 20,7 / 19,0 / 20,3 / 22,3 % (±3 pp) | 20/20 | **PASA** | — |
+| QA-1.6 | 18/09 | — | Suma 90%: Run y Aplicar **bloqueados**; aviso en pantalla "ERROR: Suma 90%"; `config.json` intacto | — | **PASA** | H-08 |
+| QA-1.7 | 18/09 | determinista + archivo \| idéntico | 30 pedidos = los del archivo, SKUs y cantidades iguales; cumplimiento 100%; vista previa 30/34/32/0 correcta | 20/20 | **PASA** | H-09, H-10 |
+| QA-1.8 | 18/09 | `ship_partial` | ORD-003 sale con SKU015 y SKU039, sin SKU999; vista previa informa el faltante | 20/20 | **PASA** | H-11 |
+| QA-1.9a/b | 18/09 | `fill_or_kill` (antes y después de subir) | ORD-003 descartado entero en ambas: la política se aplica al correr | 20/20 | **PASA** | H-12 |
+| QA-1.10 | 18/09 | `stochastic`; la ruta del archivo queda pero no se usa | 300 pedidos `ORD-xxxx`, ninguno del archivo | 20/20 | **PASA** | — |
 | H-01 reprueba 2 | 18/09 | Importar un `.json` con `personas` + `equipos` (clave sin control web) → Run: la metadata trae las personas | Agentes = **Ana, Beto, Carla, Dario**; pickers solo en Area_Ground, grueros en High/Special; 613 tareas completadas; `config.json` intacto | — | **PASA** | H-01 cerrado |
 
 ## 10. Hallazgos
@@ -461,10 +471,16 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | H-02 | MENOR | QA-0.1 (N3) | El KPI **"Tareas"** del visor es tareas completadas × 3: un número fijo heredado de la versión de escritorio, no mide nada | `routers/replay.py`: `tareas_completadas = wo_completed * 3` | Reemplazarlo por una métrica real (picks o paradas) o quitarlo | Abierto |
 | H-03 | OBS | QA-0.2 | Una corrida cancelada deja una carpeta `output/simulation_*` a medias (solo el Excel) | La cancelación no limpia | Marcarla como incompleta o borrarla al cancelar | Abierto |
 | H-04 | OBS (método) | QA-0.2 | La variación natural entre corridas web es ±8% en duración; el criterio inicial de ±10% no discriminaba | Semilla libre | Regla 4 recalibrada | Cerrado |
-| H-05 | A investigar (QA-3.1) | QA-0.1 | Con el anti-colisión activo hay co-ocupaciones: el propio motor reporta 16-23 eventos en 8-9 celdas por corrida (sobre todo la zona de descarga (3, 28)/(3, 29) y cruces) | — | Verificar en QA-3.1 si son las excepciones documentadas (spawn/staging) o fallas | Abierto |
+| H-05 | **MAYOR** (realismo) — confirmado | QA-0.1, 1.2, 1.4, 1.5 | **Dos montacargas ocupan la misma celda al mismo tiempo, incluso pickeando juntos la misma ubicación.** Ej. QA-1.4: ambos en (17, 13) con SKU001, terminando con 0,1 s de diferencia; QA-1.2: uno "en movimiento" encima del otro que pickea en (13, 6). El motor reporta 16-23 co-ocupaciones por corrida con la mezcla normal y **373** con 100% extra grande (pocas ubicaciones → choques frecuentes). El visor lo muestra fielmente: el error está en el motor | Por investigar en la capa anti-colisión (reserva de la permanencia de pick / asignación de dos WOs de la misma ubicación a la vez) | Análisis de causa raíz + plan (toca el motor y el baseline) | **Objetivo inmediato** |
 
 | H-06 | MENOR (decisión) | QA-1.1 | El servidor que usa el cliente (`start_server.bat` → `server.py`) corre con **recarga automática** vigilando todo el proyecto: cualquier cambio en un `.py` (actualizar el programa con git, por ejemplo) reinicia el servidor y **cancela la simulación en curso**. Canceló dos corridas de QA | `uvicorn.run(reload=True, reload_dirs=[PROJECT_ROOT])`; el botón **Restart** depende de esa recarga (toca `server.py`) — ligado a BK-10 | Recarga solo en modo desarrollo y un Restart que no dependa de ella. **Se consulta al Director** (toca BK-10). Mientras tanto QA usa un servidor sin recarga (`web-qa` en `.claude/launch.json`) | Abierto |
 | H-07 | **CRÍTICO** | QA-1.3 | **Un 0 en la web se reemplazaba por el valor por defecto.** Imposible excluir una clase de la mezcla (0% → 30/16/12/6), "0 expansiones" de Cercanía pasaba a 5 (el manual promete lo contrario), y en Optimización/A/B un costo o penalización 0 volvía al default y la semilla 0 a 1000. Además la flota truncaba decimales (descarga 2,5 s → 2) | `parseInt(valor) \|\| defecto`: en JavaScript el 0 cuenta como falso. En la flota, `parseInt` | Función única `WebConfigurator.numero(id, defecto)`: el default solo si el campo está vacío o no es número. Flota con `parseFloat` | **Cerrado** (reprobado QA-1.3; 2.4 y 5.5 lo vuelven a cubrir) |
+
+| H-08 | OBS | QA-1.6 | Los mensajes de validación del servidor están en **inglés** ("Distribution percentages must sum to 100%") dentro de una interfaz en español | `config_manager.validate_config` | Traducirlos (y revisar que digan dónde corregir) | Abierto |
+| H-09 | OBS | QA-1.7 | La ruta del archivo de órdenes se guarda **absoluta** (`D:\...\uploads\...`): un preset o `config.json` con archivo no funciona en otra carpeta o máquina | `/api/upload-orders` devuelve la ruta absoluta | Guardarla relativa al proyecto | Abierto |
+| H-10 | OBS (realismo) | QA-1.7, 1.8 | Con pocas tareas (10-34), **un operario de cada tipo se lleva todo el trabajo** en un solo recorrido y el otro queda ocioso toda la corrida | Ejecución de Plan + tope de tareas por tour: el primero que pide arma el tour más grande posible | Evaluar reparto más equilibrado (tope por tour configurable, o repartir cuando hay ociosos). Decisión de diseño | Abierto |
+| H-11 | OBS (realismo) | QA-1.8 | El cumplimiento (fill rate) queda en 100% aunque una línea se rechazó por SKU inexistente: la línea rechazada no cuenta como pedida | `service_level` se calcula sobre lo aceptado | Contar lo rechazado como no servido (el cliente lo pidió) | Abierto |
+| H-12 | MENOR | QA-1.9 | Con "Todo o Nada", la vista previa dice "10 Órdenes" y no avisa que el pedido con el ítem inválido se descarta entero | La vista previa no mira la política | Mostrar "órdenes que se descartarán" según la política | Abierto |
 
 ## 11. Registro de cambios de este plan
 
@@ -485,3 +501,7 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
   responder y leer su estado a tiempo fijo daba lecturas viejas. Ahora cada
   lectura espera el evento `snapshotReady` del visor (`qaLeerVisor`). QA corre
   con el servidor `web-qa` (sin recarga automática) por H-06.
+- 2026-09-18 — Bloque 1 cerrado. QA-1.5 mide la mezcla por pedido. QA-1.9 se
+  desdobla en (a) política antes de subir y (b) después. Método del nivel 3:
+  esperar a que el visor termine el `autoload` (recarga la página) antes de
+  leer. Archivos de órdenes con `DragEvent('drop')` sobre `#orders-dropzone`.
