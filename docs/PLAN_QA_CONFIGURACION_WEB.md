@@ -6,8 +6,8 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** H-05 — dos montacargas en la misma celda a la vez
-(causa raíz en el motor anti-colisión y plan de corrección para el Director).
+**Objetivo inmediato:** H-05 — cerrar la última causa (dónde espera un
+operario ocioso: decisión del Director) y regenerar la referencia con su OK.
 Después: Bloque 2 — Despacho y tours.
 **Último cerrado:** Bloque 1 completo (18/09): 11 corridas, todas pasan tras
 corregir H-07; 220/220 posiciones visor = JSON.
@@ -475,7 +475,7 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21; la sección 4.1 → BK-22.
 | H-02 | MENOR | QA-0.1 (N3) | El KPI **"Tareas"** del visor es tareas completadas × 3: un número fijo heredado de la versión de escritorio, no mide nada | `routers/replay.py`: `tareas_completadas = wo_completed * 3` | Reemplazarlo por una métrica real (picks o paradas) o quitarlo | Abierto |
 | H-03 | OBS | QA-0.2 | Una corrida cancelada deja una carpeta `output/simulation_*` a medias (solo el Excel) | La cancelación no limpia | Marcarla como incompleta o borrarla al cancelar | Abierto |
 | H-04 | OBS (método) | QA-0.2 | La variación natural entre corridas web es ±8% en duración; el criterio inicial de ±10% no discriminaba | Semilla libre | Regla 4 recalibrada | Cerrado |
-| H-05 | **MAYOR** (realismo) — confirmado | QA-0.1, 1.2, 1.4, 1.5 | **Dos montacargas ocupan la misma celda al mismo tiempo, incluso pickeando juntos la misma ubicación.** Ej. QA-1.4: ambos en (17, 13) con SKU001, terminando con 0,1 s de diferencia; QA-1.2: uno "en movimiento" encima del otro que pickea en (13, 6). El motor reporta 16-23 co-ocupaciones por corrida con la mezcla normal y **373** con 100% extra grande (pocas ubicaciones → choques frecuentes). El visor lo muestra fielmente: el error está en el motor | Por investigar en la capa anti-colisión (reserva de la permanencia de pick / asignación de dos WOs de la misma ubicación a la vez) | Análisis de causa raíz + plan (toca el motor y el baseline) | **Objetivo inmediato** |
+| H-05 | **MAYOR** (realismo) — confirmado | QA-0.1, 1.2, 1.4, 1.5 | **Dos montacargas ocupan la misma celda al mismo tiempo, incluso pickeando juntos la misma ubicación.** Ej. QA-1.4: ambos en (17, 13) con SKU001, terminando con 0,1 s de diferencia; QA-1.2: uno "en movimiento" encima del otro que pickea en (13, 6). El motor reporta 16-23 co-ocupaciones por corrida con la mezcla normal y **373** con 100% extra grande (pocas ubicaciones → choques frecuentes). El visor lo muestra fielmente: el error está en el motor | Por investigar en la capa anti-colisión (reserva de la permanencia de pick / asignación de dos WOs de la misma ubicación a la vez) | Causas C1-C3 + reservas omitidas en silencio **corregidas** en `fix/bk15-anticolision` (`119064f`): co-ocupaciones 23 → 3 (canónica) y 373 → 21 (extremo). Detalle en BK-15 del backlog. Falta: dónde espera el ocioso | **En curso** |
 
 | H-06 | MENOR (decisión) | QA-1.1 | El servidor que usa el cliente (`start_server.bat` → `server.py`) corre con **recarga automática** vigilando todo el proyecto: cualquier cambio en un `.py` (actualizar el programa con git, por ejemplo) reinicia el servidor y **cancela la simulación en curso**. Canceló dos corridas de QA | `uvicorn.run(reload=True, reload_dirs=[PROJECT_ROOT])`; el botón **Restart** depende de esa recarga (toca `server.py`) — ligado a BK-10 | Recarga solo en modo desarrollo y un Restart que no dependa de ella. **Se consulta al Director** (toca BK-10). Mientras tanto QA usa un servidor sin recarga (`web-qa` en `.claude/launch.json`) | Abierto |
 | H-07 | **CRÍTICO** | QA-1.3 | **Un 0 en la web se reemplazaba por el valor por defecto.** Imposible excluir una clase de la mezcla (0% → 30/16/12/6), "0 expansiones" de Cercanía pasaba a 5 (el manual promete lo contrario), y en Optimización/A/B un costo o penalización 0 volvía al default y la semilla 0 a 1000. Además la flota truncaba decimales (descarga 2,5 s → 2) | `parseInt(valor) \|\| defecto`: en JavaScript el 0 cuenta como falso. En la flota, `parseInt` | Función única `WebConfigurator.numero(id, defecto)`: el default solo si el campo está vacío o no es número. Flota con `parseFloat` | **Cerrado** (reprobado QA-1.3; 2.4 y 5.5 lo vuelven a cubrir) |
@@ -505,6 +505,11 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21; la sección 4.1 → BK-22.
   responder y leer su estado a tiempo fijo daba lecturas viejas. Ahora cada
   lectura espera el evento `snapshotReady` del visor (`qaLeerVisor`). QA corre
   con el servidor `web-qa` (sin recarga automática) por H-06.
+- 2026-09-18 — H-05: investigación con corridas instrumentadas (semilla 42) y
+  trazas por celda; corrección en rama propia. Aprendizaje de método: al
+  envolver funciones del motor para medir, el envoltorio debe aceptar
+  parámetros nuevos (`**kw`); un envoltorio desactualizado invalidó una
+  medición (las co-ocupaciones "subieron" por el instrumento, no por el motor).
 - 2026-09-18 — Bloque 1 cerrado. QA-1.5 mide la mezcla por pedido. QA-1.9 se
   desdobla en (a) política antes de subir y (b) después. Método del nivel 3:
   esperar a que el visor termine el `autoload` (recarga la página) antes de

@@ -17,7 +17,8 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-08 — confirmar work_area_equipment con el almacen real | ABIERTO (2026-07-25) | **Alta** (supuesto activo) | Trivial (config) | Lectura del almacen real (Director/cliente) |
 | BK-09 — flota 2+2 sub-dimensionada (hallazgo de negocio) | ABIERTO (2026-07-25) | Media | Trivial (config) | Decision de negocio del Director |
 | BK-10 — el boton "Restart" responde success pero NO reinicia el servidor | ABIERTO (2026-09-07) | Baja | ~30 min | Ninguno |
-| **BK-15 — dos montacargas en la misma celda a la vez (anti-colision)** | **EN CURSO (2026-09-18)** | **Alta (realismo)** | A estimar tras causa raiz | Ninguno (QA H-05) |
+| **BK-15 — dos montacargas en la misma celda a la vez (anti-colision)** | **EN CURSO (2026-09-18): causas corregidas en rama, falta decidir donde espera el ocioso** | **Alta (realismo)** | Resto: chico | Decision del Director + OK de baseline (QA H-05) |
+| BK-23 — el despacho manda un segundo equipo a una ubicacion ocupada | ABIERTO (2026-09-18) | Media (realismo/eficiencia) | A definir | Ninguno (sale de BK-15) |
 | BK-13 — KPI "Tareas" del visor es un numero fabricado (x3) | ABIERTO (2026-09-18) | Media | Chico | Ninguno (QA H-02) |
 | BK-14 — una corrida cancelada deja una carpeta a medias | ABIERTO (2026-09-18) | Baja | Chico | Ninguno (QA H-03) |
 | BK-16 — el servidor del cliente se reinicia solo y cancela simulaciones | ABIERTO (2026-09-18) | Media | Chico | Ligado a BK-10 (Restart) (QA H-06) |
@@ -184,6 +185,30 @@ dice el JSON. El error esta en el motor.
 `spacetime_planner.py`, `operators._timewindow_execute_plan`,
 `_tw_reserve_dwell`) y el despacho que puede mandar a dos agentes a la misma
 ubicacion a la vez.
+
+**Avance (2026-09-18, rama `fix/bk15-anticolision`, commit `119064f`).** Causa
+raiz encontrada con trazas del motor: la capa esquivaba bien al que se mueve
+pero no protegia al que esta QUIETO. (C1) la estadia reservada cubria solo la
+primera de varias tareas seguidas en la misma ubicacion; (C2) la permanencia no
+incluia el paso de salida; (C3) el A* verificaba la llegada al destino pero no
+toda la estadia; y toda reserva imposible se omitia EN SILENCIO (el agente
+ejecutaba igual). Corregido, mas una tolerancia numerica en los bordes y la
+caminata de salida de la descarga que no emitia eventos. Resultado con semilla
+42: co-ocupaciones 23 -> 3 (canonica) y 373 -> 21 (100% extra grande).
+**Queda:** el agente ocioso espera sobre la celda de acceso a la descarga
+(3, 28) o a su alrededor, y los que van a descargar tienen que pasar por ahi.
+Falta decidir donde espera un ocioso. Impacto medido en la duracion: +4,3%
+canonica y +53% con 100% extra grande (ver BK-23). Cambia el baseline.
+
+### BK-23 — el despacho manda un segundo equipo a una ubicacion ocupada
+
+Salio al corregir BK-15. Con pocas ubicaciones distintas (ej. 100% extra
+grande: 3 SKUs), el despacho le asigna a un montacargas tareas en el mismo
+hueco del rack donde otro ya esta trabajando. Antes los dos trabajaban a la
+vez en la misma celda (imposible); con BK-15 corregido, el segundo espera a
+que el primero termine: la corrida pasa de 37.354 s a 57.168 s (+53%). En un
+almacen real el segundo equipo recibiria otra tarea. El despacho no mira si la
+ubicacion de la tarea esta ocupada o reservada por otro agente.
 
 ### BK-13 — el KPI "Tareas" del visor es un numero fabricado (QA H-02)
 
