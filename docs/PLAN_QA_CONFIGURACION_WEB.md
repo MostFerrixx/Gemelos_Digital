@@ -4,6 +4,25 @@
 > agregan casos que falten, se quitan los que sobren y se registra cada
 > resultado en la sección 9. Última actualización: 2026-09-18.
 
+## 0. Estado actual (se actualiza en cada interacción)
+
+**Objetivo inmediato:** Bloque 1 — Carga de Trabajo.
+**Último cerrado:** H-01 corregido y reprobado (18/09).
+**Hallazgos abiertos:** H-02, H-03, H-05.
+
+### Modo de trabajo (pedido del Director, 18/09)
+
+Cada interacción tiene **un objetivo inmediato** y este documento marca la
+ruta. Ciclo por hallazgo:
+
+1. Se detecta y se registra (sección 10) con evidencia y causa raíz.
+2. Si es un error, **se corrige cuanto antes** (no se acumula para el final).
+3. **Se reprueba** el caso que lo detectó y se deja la evidencia.
+4. Recién entonces se sigue con lo próximo del plan.
+
+Cada cosa que se descubre alimenta este documento, que es a la vez la ruta y
+el registro de todo lo hecho.
+
 ## 1. Objetivo
 
 Responder con evidencia a la sospecha del Director:
@@ -43,9 +62,9 @@ cualquiera, es un hallazgo.
 5. Todo lo que modifica datos reales (Aplicar Excel, coordenadas de zonas y
    muelles, Aplicar Configuración) se hace con **backup previo y restauración
    posterior**, verificada con el gate de regresión.
-6. **Durante la ejecución no se corrige código.** Los hallazgos se registran;
-   al cerrar cada bloque se le presentan al Director con su causa raíz y una
-   propuesta, y se corrigen por lotes con su OK (Ley #1).
+6. **Los errores se corrigen apenas se confirman** (ver "Modo de trabajo") y
+   se reprueba el caso antes de seguir. Si la corrección no es obvia o cambia
+   el diseño, se le consulta al Director antes.
 7. **No se crean ni editan archivos `.py` del proyecto mientras corre una
    simulación**: el servidor de desarrollo se reinicia solo y cancela la
    corrida (lección del bloque 0).
@@ -427,12 +446,14 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-0.3 | 18/09 | — | Herramienta determinista (dos pasadas idénticas sobre el replay de semilla 42) | — | **PASA** | — |
 | QA-0.1 | 18/09 | Copia temporal = metadata del `.jsonl`; vs `config.json` falta solo `cercania_tour_mode` | 300 órdenes, 603 tareas, todas completadas, todo a zona 1, capacidades 150/1000 respetadas, cada equipo solo en sus áreas | 5 instantes × 4 operarios: **20/20** coinciden en celda y estado; captura OK | **PASA** con hallazgo | H-01, H-02 |
 | QA-0.2 | 18/09 | Igual que QA-0.1 | 3 corridas: estructura idéntica; duración 6.772 / 7.256 / 7.833 s; tareas 603 / 625 / 606 | — | **PASA** (criterio recalibrado) | H-04 |
+| H-01 reprueba 1 | 18/09 | Corrida canónica: copia temporal **idéntica** a `config.json` (antes faltaba `cercania_tour_mode`) y = metadata | — | — | **PASA** | H-01 cerrado |
+| H-01 reprueba 2 | 18/09 | Importar un `.json` con `personas` + `equipos` (clave sin control web) → Run: la metadata trae las personas | Agentes = **Ana, Beto, Carla, Dario**; pickers solo en Area_Ground, grueros en High/Special; 613 tareas completadas; `config.json` intacto | — | **PASA** | H-01 cerrado |
 
 ## 10. Hallazgos
 
 | # | Severidad | Caso | Descripción | Causa raíz | Propuesta | Estado |
 |---|---|---|---|---|---|---|
-| H-01 | **CRÍTICO** | QA-0.1 | **Run Simulation descarta las claves que la web no muestra.** Corre solo con lo que arma el formulario, sin fusionarlo con `config.json` (Aplicar sí fusiona). En la corrida de control faltó `cercania_tour_mode`; por el mismo mecanismo se pierden `waves`, `priority_dispatch_enabled`, `fleet_defaults` y todo INIT-11 (`personas`, `equipos`, `perfiles`, `estacionamientos`, `cambio_de_perfil`). El mismo `config.json` da una simulación distinta desde consola que desde Run | `runners.stage_simulation_config` escribe `request.config` tal cual; `config_manager.save_config` fusiona con el existente | Que la copia temporal use la misma fusión que Aplicar (una sola función para ambos). Confirmar con QA-9 y QA-10.7 | Abierto |
+| H-01 | **CRÍTICO** | QA-0.1 | **Run Simulation descarta las claves que la web no muestra.** Corre solo con lo que arma el formulario, sin fusionarlo con `config.json` (Aplicar sí fusiona). En la corrida de control faltó `cercania_tour_mode`; por el mismo mecanismo se pierden `waves`, `priority_dispatch_enabled`, `fleet_defaults` y todo INIT-11 (`personas`, `equipos`, `perfiles`, `estacionamientos`, `cambio_de_perfil`). El mismo `config.json` da una simulación distinta desde consola que desde Run | `runners.stage_simulation_config` escribe `request.config` tal cual; `config_manager.save_config` fusiona con el existente | **Corregido** en el navegador (`app.js`): (1) el formulario recuerda de qué configuración se cargó — servidor, `.json` importado o preset (antes solo la del servidor, así que al importar también los parámetros internos de congestión/outbound/tiempos salían del `config.json`); (2) al armar la configuración conserva las claves de esa fuente que la web no edita. No se fusiona en el servidor porque una corrida con un archivo importado tomaría las claves del `config.json` y no las del archivo | **Cerrado** (reprobado) |
 | H-02 | MENOR | QA-0.1 (N3) | El KPI **"Tareas"** del visor es tareas completadas × 3: un número fijo heredado de la versión de escritorio, no mide nada | `routers/replay.py`: `tareas_completadas = wo_completed * 3` | Reemplazarlo por una métrica real (picks o paradas) o quitarlo | Abierto |
 | H-03 | OBS | QA-0.2 | Una corrida cancelada deja una carpeta `output/simulation_*` a medias (solo el Excel) | La cancelación no limpia | Marcarla como incompleta o borrarla al cancelar | Abierto |
 | H-04 | OBS (método) | QA-0.2 | La variación natural entre corridas web es ±8% en duración; el criterio inicial de ±10% no discriminaba | Semilla libre | Regla 4 recalibrada | Cerrado |
@@ -448,3 +469,8 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
   Método del nivel 3 validado: el visor se carga con `?autoload=<ruta>`, el
   reloj se mueve con el control de tiempo (`#time-slider`, redondea a 0,1 s)
   y se lee lo dibujado en `AppState.agents`.
+- 2026-09-18 — Modo de trabajo del Director: corregir cada error apenas se
+  confirma, reprobar y recién seguir; sección 0 con el objetivo inmediato.
+  H-01 corregido. Método para Importar sin diálogo del sistema: se asigna un
+  `File` al `#file-import-input` y se dispara `change` (mismo código que usa
+  el selector).

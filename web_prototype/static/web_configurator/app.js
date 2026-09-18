@@ -1101,6 +1101,13 @@ class WebConfigurator {
     }
 
     loadConfigToForm(config) {
+        // H-01 (QA 2026-09-18): el formulario recuerda DE QUE configuracion se
+        // cargo (la del servidor, un .json importado o un preset). Antes solo se
+        // registraba la del servidor: al importar, lo que la web no edita
+        // (y los parametros internos de congestion/outbound/tiempos) seguia
+        // saliendo del config.json en vez del archivo importado.
+        this.currentConfig = config;
+
         // Tab 1: Carga de Trabajo
         document.getElementById('total-ordenes').value = config.total_ordenes || 300;
 
@@ -1544,6 +1551,20 @@ class WebConfigurator {
         }
 
         config.tiempos = baseTiempos;
+
+        // H-01 (QA 2026-09-18): conservar las claves que la web NO edita
+        // (olas, prioridad de pedidos, fleet_defaults, personas, equipos,
+        // perfiles...). Antes "Run Simulation" corria solo con lo que arma el
+        // formulario y las descartaba en silencio: el mismo config daba otra
+        // simulacion desde el boton que desde la consola. Se toman de la
+        // configuracion de la que se cargo el formulario, y lo que el
+        // formulario si edita siempre gana.
+        const origen = this.currentConfig || {};
+        Object.keys(origen).forEach((clave) => {
+            if (!Object.prototype.hasOwnProperty.call(config, clave)) {
+                config[clave] = JSON.parse(JSON.stringify(origen[clave]));
+            }
+        });
 
         return config;
     }
