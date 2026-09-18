@@ -17,7 +17,7 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-08 — confirmar work_area_equipment con el almacen real | ABIERTO (2026-07-25) | **Alta** (supuesto activo) | Trivial (config) | Lectura del almacen real (Director/cliente) |
 | BK-09 — flota 2+2 sub-dimensionada (hallazgo de negocio) | ABIERTO (2026-07-25) | Media | Trivial (config) | Decision de negocio del Director |
 | BK-10 — el boton "Restart" responde success pero NO reinicia el servidor | ABIERTO (2026-09-07) | Baja | ~30 min | Ninguno |
-| **BK-15 — dos montacargas en la misma celda a la vez (anti-colision)** | **EN CURSO (2026-09-18): causas corregidas en rama, falta decidir donde espera el ocioso** | **Alta (realismo)** | Resto: chico | Decision del Director + OK de baseline (QA H-05) |
+| **BK-15 — dos montacargas en la misma celda a la vez (anti-colision)** | **CORREGIDO en rama `fix/bk15-anticolision` (2026-09-18)** | **Alta (realismo)** | Hecho | OK del Director para baseline + merge (QA H-05) |
 | BK-23 — el despacho manda un segundo equipo a una ubicacion ocupada | ABIERTO (2026-09-18) | Media (realismo/eficiencia) | A definir | Ninguno (sale de BK-15) |
 | BK-13 — KPI "Tareas" del visor es un numero fabricado (x3) | ABIERTO (2026-09-18) | Media | Chico | Ninguno (QA H-02) |
 | BK-14 — una corrida cancelada deja una carpeta a medias | ABIERTO (2026-09-18) | Baja | Chico | Ninguno (QA H-03) |
@@ -195,10 +195,16 @@ toda la estadia; y toda reserva imposible se omitia EN SILENCIO (el agente
 ejecutaba igual). Corregido, mas una tolerancia numerica en los bordes y la
 caminata de salida de la descarga que no emitia eventos. Resultado con semilla
 42: co-ocupaciones 23 -> 3 (canonica) y 373 -> 21 (100% extra grande).
-**Queda:** el agente ocioso espera sobre la celda de acceso a la descarga
-(3, 28) o a su alrededor, y los que van a descargar tienen que pasar por ahi.
-Falta decidir donde espera un ocioso. Impacto medido en la duracion: +4,3%
-canonica y +53% con 100% extra grande (ver BK-23). Cambia el baseline.
+**Cierre tecnico (commit `258d9f7`).** Decision del Director: zona de espera
+configurable (`zonas_espera`), validada como los estacionamientos, con
+eleccion automatica si no se define; el ocioso reserva su celda sin fin y
+nunca estorba. Mas una verificacion al EJECUTAR (no se entra a una celda con
+otro agente adentro: se replanifica). Resultado con semilla 42: **0
+co-ocupaciones en operacion** en la canonica y en 100% extra grande (queda 1
+en la ventana de arranque, excepcion documentada). Corrida desde la web: 0 en
+operacion y 20/20 posiciones visor = JSON. Duracion: +3,8% canonica, +53,6%
+extra grande (ver BK-23). **Falta:** OK del Director para regenerar el
+baseline e integrar.
 
 ### BK-23 — el despacho manda un segundo equipo a una ubicacion ocupada
 
@@ -279,6 +285,8 @@ un componente fantasma. Hoy el motor lee estas claves que la web no muestra
 (desde H-01 al menos se conservan al correr y al guardar):
 - `personas`, `equipos`, `perfiles`, `cambio_de_perfil`, `estacionamientos`
   (INIT-11; su editor es la fase F10 del plan).
+- `zonas_espera` y `congestion.timewindow.replan_wait_s` / `replan_max_retries`
+  (BK-15).
 - `priority_dispatch_enabled` y `waves` (prioridad de pedidos y olas, INIT-4).
 - `fleet_defaults` (BK-06).
 - Parametros de la capa anti-colision (`congestion.spawn_offset`,
