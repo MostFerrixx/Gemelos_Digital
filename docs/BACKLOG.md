@@ -1,7 +1,7 @@
 # BACKLOG — Gemelo Digital de Almacen
 # Solo lo PENDIENTE. Lo cerrado vive en docs/CHANGELOG.md (no se repite aca).
 
-Actualizado: 2026-09-16 · Responsable: Cerebellum
+Actualizado: 2026-09-18 · Responsable: Cerebellum
 
 *(BK-05, BK-11 y el canonico migrado a `agent_types` explicito: CERRADOS el
 2026-09-08 -> CHANGELOG. BK-06 CERRADA el 2026-09-07; de ella salieron BK-07,
@@ -17,6 +17,16 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-08 — confirmar work_area_equipment con el almacen real | ABIERTO (2026-07-25) | **Alta** (supuesto activo) | Trivial (config) | Lectura del almacen real (Director/cliente) |
 | BK-09 — flota 2+2 sub-dimensionada (hallazgo de negocio) | ABIERTO (2026-07-25) | Media | Trivial (config) | Decision de negocio del Director |
 | BK-10 — el boton "Restart" responde success pero NO reinicia el servidor | ABIERTO (2026-09-07) | Baja | ~30 min | Ninguno |
+| **BK-15 — dos montacargas en la misma celda a la vez (anti-colision)** | **EN CURSO (2026-09-18)** | **Alta (realismo)** | A estimar tras causa raiz | Ninguno (QA H-05) |
+| BK-13 — KPI "Tareas" del visor es un numero fabricado (x3) | ABIERTO (2026-09-18) | Media | Chico | Ninguno (QA H-02) |
+| BK-14 — una corrida cancelada deja una carpeta a medias | ABIERTO (2026-09-18) | Baja | Chico | Ninguno (QA H-03) |
+| BK-16 — el servidor del cliente se reinicia solo y cancela simulaciones | ABIERTO (2026-09-18) | Media | Chico | Ligado a BK-10 (Restart) (QA H-06) |
+| BK-17 — mensajes de validacion en ingles | ABIERTO (2026-09-18) | Baja | Chico | Ninguno (QA H-08) |
+| BK-18 — ruta absoluta del archivo de ordenes | ABIERTO (2026-09-18) | Baja | Chico | Ninguno (QA H-09) |
+| BK-19 — con pocas tareas un solo operario se lleva todo el trabajo | ABIERTO (2026-09-18) | Media (realismo) | A definir | Decision de diseno del Director (QA H-10) |
+| BK-20 — el fill rate ignora las lineas rechazadas | ABIERTO (2026-09-18) | Media (realismo) | Chico | Ninguno (QA H-11) |
+| BK-21 — la vista previa de ordenes ignora la politica de cumplimiento | ABIERTO (2026-09-18) | Baja | Chico | Ninguno (QA H-12) |
+| BK-22 — configuraciones del motor sin control en la web | ABIERTO (2026-09-18) | Media (configurabilidad) | Variable | Algunas estan planificadas (INIT-11 F10) |
 | INIT-10 — modelo de almacen propio (reemplaza a Tiled como herramienta principal) | ANALIZADO (2026-09-16) | Alta (cimiento de automatismos y mezaninas) | Alto, por etapas | Plan detallado de la etapa 2 + OK del Director |
 | **INIT-11 — Task Path: outbound en varios pasos (6 pilares)** | **PLAN v2 PROPUESTO (2026-09-16)** | **Alta (prioridad actual del Director)** | 2,5-3,5 semanas, 11 fases | OK del plan v2 (`docs/PLAN_INIT11_TASK_PATH.md`) |
 | INIT-12 — Reposicion (replenishment) como tipo de tarea | IDEA (2026-09-16) | Media | No estimado | Despues de INIT-11 (usa perfiles y equipos) |
@@ -142,6 +152,116 @@ principio rector #3, hacer visible lo invisible). Arreglar el reinicio real, o
 UI indique que hay que relanzar el servidor manualmente.
 
 Ver `web_prototype/routers/system.py`.
+
+---
+
+## Hallazgos del plan de QA de la configuracion web (2026-09-18)
+
+Salieron de probar cada control de la web contra el simulador y el visor
+(`docs/PLAN_QA_CONFIGURACION_WEB.md`, donde esta la evidencia completa de cada
+uno; el codigo `H-xx` es el del plan). Los errores que se corrigieron en el
+momento (H-01 y H-07) estan en el plan, no aca.
+
+### BK-15 — dos montacargas en la misma celda al mismo tiempo (QA H-05) — EN CURSO
+
+**Que pasa.** Con la capa anti-colision activa (canonico), dos operarios
+pueden ocupar la misma celda en el mismo instante. El caso mas visible: los
+dos montacargas pickeando juntos la MISMA ubicacion (QA-1.4: ambos en
+(17, 13) con SKU001, terminando con 0,1 s de diferencia). Tambien aparece uno
+"en movimiento" parado encima de otro que pickea (QA-1.2, celda (13, 6)).
+Es fisicamente imposible, asi que viola el principio rector #1.
+
+**Cuanto.** El propio motor lo cuenta en la metadata del replay
+(`bottleneck_summary.congestion.cooccupation_events_total`): 16-23 veces por
+corrida con la mezcla canonica y 373 con 100% extra grande (solo 3 SKUs: todo
+el trabajo cae en pocas ubicaciones y los choques se multiplican). Pasa sobre
+todo entre montacargas en celdas de pick y en la zona de descarga (3, 28)/(3, 29).
+
+**Descartado:** no es un problema del visor; el visor muestra fielmente lo que
+dice el JSON. El error esta en el motor.
+
+**Donde mirar.** Capa anti-colision (`reservation_table.py`,
+`spacetime_planner.py`, `operators._timewindow_execute_plan`,
+`_tw_reserve_dwell`) y el despacho que puede mandar a dos agentes a la misma
+ubicacion a la vez.
+
+### BK-13 — el KPI "Tareas" del visor es un numero fabricado (QA H-02)
+
+El panel del visor muestra "Tareas" = tareas completadas x 3. Es un valor fijo
+heredado de la version de escritorio ("cada WO tiene 3 tareas"), que no mide
+nada real: con 256 tareas completadas muestra 768. Esta en
+`web_prototype/routers/replay.py` (`tareas_completadas = wo_completed * 3`).
+Un usuario lo puede tomar como un dato del simulador.
+
+### BK-14 — una corrida cancelada deja una carpeta a medias (QA H-03)
+
+Si una simulacion se corta (se cierra la conexion, se reinicia el servidor),
+queda una carpeta `output/simulation_*` con solo el Excel, sin el `.jsonl` ni
+el resto de los archivos. No se distingue de una corrida valida a simple vista
+y el visor no la puede abrir.
+
+### BK-16 — el servidor del cliente se reinicia solo y cancela simulaciones (QA H-06)
+
+`start_server.bat` lanza `web_prototype/server.py`, que corre uvicorn con
+recarga automatica (`reload=True`) vigilando TODO el proyecto. Cualquier
+cambio en un archivo `.py` (por ejemplo, actualizar el programa con git
+mientras corre una simulacion) reinicia el servidor y cancela la corrida en
+curso. Paso dos veces durante el QA. El boton **Restart** de la web depende de
+ese mecanismo (toca `server.py` para provocar la recarga), por eso esta ligado
+a BK-10. Para el QA se usa un servidor sin recarga (`web-qa` en
+`.claude/launch.json`).
+
+### BK-17 — mensajes de validacion en ingles (QA H-08)
+
+La interfaz esta en espanol, pero los errores que devuelve el servidor al
+validar salen en ingles (ej. "Distribution percentages must sum to 100%
+(current: 90%)"). Vienen de `web_prototype/config_manager.validate_config`.
+
+### BK-18 — la ruta del archivo de ordenes se guarda absoluta (QA H-09)
+
+Al subir un archivo de ordenes, la configuracion guarda la ruta completa del
+servidor (`D:\...\uploads\orders_x.json`). Un preset o un `config.json` con
+modo determinista deja de funcionar si el proyecto se mueve de carpeta o de
+maquina. La ruta la devuelve `/api/upload-orders`.
+
+### BK-19 — con pocas tareas un solo operario se lleva todo el trabajo (QA H-10)
+
+Con pocas tareas (10 a 34 en las pruebas), el primer operario de cada tipo que
+pide trabajo arma un recorrido con todo lo que puede cargar y el otro queda
+ocioso toda la corrida (QA-1.7: 700 s). Pasa con "Ejecucion de Plan" y el tope
+de tareas por recorrido. En un almacen real el trabajo se repartiria. Es un
+tema de realismo del despacho, no de configuracion.
+
+### BK-20 — el fill rate ignora las lineas rechazadas (QA H-11)
+
+En modo determinista con "Envio Parcial", si una linea de un pedido trae un
+SKU inexistente se descarta, y el nivel de servicio queda en 100% porque esa
+linea no cuenta como pedida. El cliente si la pidio y no la recibio, asi que
+el indicador sobreestima el cumplimiento. Lo calcula `service_level` sobre lo
+aceptado.
+
+### BK-21 — la vista previa de ordenes ignora la politica de cumplimiento (QA H-12)
+
+Con "Todo o Nada" y un item invalido, la vista previa sigue diciendo "10
+Ordenes" y solo lista el SKU faltante: no avisa que el pedido completo se va a
+descartar. La simulacion si lo descarta (correcto); lo que confunde es el
+aviso previo.
+
+### BK-22 — configuraciones del motor sin control en la web
+
+Por el principio rector #2, lo que el cliente no puede ajustar desde la web es
+un componente fantasma. Hoy el motor lee estas claves que la web no muestra
+(desde H-01 al menos se conservan al correr y al guardar):
+- `personas`, `equipos`, `perfiles`, `cambio_de_perfil`, `estacionamientos`
+  (INIT-11; su editor es la fase F10 del plan).
+- `priority_dispatch_enabled` y `waves` (prioridad de pedidos y olas, INIT-4).
+- `fleet_defaults` (BK-06).
+- Parametros de la capa anti-colision (`congestion.spawn_offset`,
+  `staggered_start`, `timewindow.*`) y del muelle de salida
+  (`outbound.loading_time`, `zone_capacity_default`, `slot_wait_alert`,
+  `slot_poll_dt`, `dwell_scaffold`, `dispatch_policy`).
+- `tiempos.cell_size_m`, `tiempos.speed_factor_ground`.
+- `cercania_tour_mode` (estrategia descartada en BK-03: evaluar si se elimina).
 
 ---
 

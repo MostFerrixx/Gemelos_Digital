@@ -465,6 +465,10 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 
 ## 10. Hallazgos
 
+Los hallazgos abiertos están además en `docs/BACKLOG.md` (18/09):
+H-02→BK-13, H-03→BK-14, H-05→BK-15, H-06→BK-16, H-08→BK-17, H-09→BK-18,
+H-10→BK-19, H-11→BK-20, H-12→BK-21; la sección 4.1 → BK-22.
+
 | # | Severidad | Caso | Descripción | Causa raíz | Propuesta | Estado |
 |---|---|---|---|---|---|---|
 | H-01 | **CRÍTICO** | QA-0.1 | **Run Simulation descarta las claves que la web no muestra.** Corre solo con lo que arma el formulario, sin fusionarlo con `config.json` (Aplicar sí fusiona). En la corrida de control faltó `cercania_tour_mode`; por el mismo mecanismo se pierden `waves`, `priority_dispatch_enabled`, `fleet_defaults` y todo INIT-11 (`personas`, `equipos`, `perfiles`, `estacionamientos`, `cambio_de_perfil`). El mismo `config.json` da una simulación distinta desde consola que desde Run | `runners.stage_simulation_config` escribe `request.config` tal cual; `config_manager.save_config` fusiona con el existente | **Corregido** en el navegador (`app.js`): (1) el formulario recuerda de qué configuración se cargó — servidor, `.json` importado o preset (antes solo la del servidor, así que al importar también los parámetros internos de congestión/outbound/tiempos salían del `config.json`); (2) al armar la configuración conserva las claves de esa fuente que la web no edita. No se fusiona en el servidor porque una corrida con un archivo importado tomaría las claves del `config.json` y no las del archivo | **Cerrado** (reprobado) |
