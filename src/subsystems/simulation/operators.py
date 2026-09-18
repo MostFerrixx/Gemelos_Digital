@@ -748,6 +748,20 @@ class BaseOperator:
         except Exception:
             return 0.0
 
+    def _estadia_en_ubicacion(self, visit_sequence, idx) -> float:
+        """BK-15 (C1): permanencia total en la ubicacion de visit_sequence[idx]:
+        la suma de las tareas CONSECUTIVAS en esa misma celda (cada una con su
+        tiempo de pick; con horquilla, subir y bajar en cada una)."""
+        ubicacion = visit_sequence[idx].ubicacion
+        total = 0.0
+        for wo in visit_sequence[idx:]:
+            if wo.ubicacion != ubicacion:
+                break
+            # Con horquilla suma subir y bajar en cada tarea (segun el EQUIPO
+            # que lleva ahora: INIT-11 F2).
+            total += self._pick_dwell_estimate_equipo(wo)
+        return total
+
     def _tw_reserve_dwell(self, duration):
         """
         MEJ-4 (F1): reservar la PERMANENCIA del agente en su celda actual en la
@@ -776,8 +790,15 @@ class BaseOperator:
             logger.warning(f"[TIMEWINDOW][DWELL][WARN] {self.id}: reserva de "
                            f"permanencia fallo: {e}")
 
+    def _tw_replan_params(self):
+        """BK-15: espera entre reintentos de planificacion y cantidad maxima de
+        reintentos (congestion.timewindow.replan_wait_s / replan_max_retries)."""
+        tw = ((self.configuracion or {}).get('congestion') or {}).get('timewindow') or {}
+        return (float(tw.get('replan_wait_s', 0.5)),
+                int(tw.get('replan_max_retries', 40)))
+
     def _timewindow_execute_plan(self, segment_path, speed, on_before, on_after,
-                                 time_per_cell, goal_dwell=0.0):
+                                 time_per_cell, goal_dwell=0.0, fallback=True):
         """
         OPCION C (time-window) - Fase 2: EJECUCION segun el plan espacio-temporal.
         Planifica+reserva la ruta libre de conflicto y la SIGUE celda a celda,
@@ -802,7 +823,14 @@ class BaseOperator:
                 start, goal, t0, self.id, speed, static_steps=len(segment_path),
                 goal_dwell=float(goal_dwell or 0.0))
         except Exception as e:
+            # BK-15: una excepcion del planner ya no pasa inadvertida.
+            try:
+                planner.shadow_metrics["plan_exceptions"] += 1
+            except Exception:
+                pass
             logger.warning(f"[TIMEWINDOW][EXEC][WARN] plan fallo para {self.id}: {e}")
+            plan = None
+        if (not plan or len(plan) < 2) and not fallback:
             return False
         if not plan or len(plan) < 2:
             try:
@@ -895,11 +923,25 @@ class BaseOperator:
                     # Si hay plan, recorre y retorna; si no, cae al estatico (fallback).
                     # MEJ-4: goal_dwell = permanencia esperada en el destino, que se
                     # reserva EN el plan (destino-con-permanencia, 3.2/4.6).
-                    executed = yield from self._timewindow_execute_plan(
-                        segment_path, speed, on_before, on_after, time_per_cell,
-                        goal_dwell=goal_dwell)
-                    if executed:
-                        return
+                    # BK-15: sin plan reservable, ESPERAR en el lugar y volver a
+                    # planificar (la espera se reserva: el agente sigue ahi).
+                    # La ruta estatica sin garantias queda como ultimo recurso,
+                    # visible en exec_fallbacks.
+                    espera, reintentos = self._tw_replan_params()
+                    planner = getattr(self.almacen, 'spacetime_planner', None)
+                    for intento in range(reintentos + 1):
+                        ultimo = intento == reintentos
+                        executed = yield from self._timewindow_execute_plan(
+                            segment_path, speed, on_before, on_after, time_per_cell,
+                            goal_dwell=goal_dwell, fallback=ultimo)
+                        if executed:
+                            return
+                        if ultimo:
+                            break
+                        if planner is not None:
+                            planner.shadow_metrics["replan_waits"] += 1
+                        self._tw_reserve_dwell(espera)
+                        yield self.env.timeout(espera)
             for step_idx, step_position in enumerate(segment_path[1:], 1):
                 self._set_pos(step_position)
                 if on_before is not None:
@@ -1081,9 +1123,21 @@ class BaseOperator:
                 path = None
         if path and len(path) > 1:
             self.status = "moving"
+
+            # BK-15: cada paso se registra. Antes este desplazamiento (salir de
+            # la zona de descarga a esperar) no emitia eventos: el replay y el
+            # visor seguian mostrando al agente en la celda de descarga mientras
+            # ya caminaba, y aparecian co-ocupaciones que en el motor no existian.
+            def _emitir_paso(_step_idx, _cell):
+                self.almacen.registrar_evento('estado_agente', {
+                    'agent_id': self.id, 'agent_type': self.type,
+                    'position': self.current_position, 'status': self.status,
+                    'current_task': None, 'cargo_volume': self.cargo_volume,
+                })
+
             # C1: time_per_cell leido de config (self.time_per_cell); default 0.1
             yield from self._recorrer_tramo(
-                path, self.default_speed, on_before=None, on_after=None,
+                path, self.default_speed, on_before=_emitir_paso, on_after=None,
                 time_per_cell=self.time_per_cell)
         else:
             self._jump_to(tuple(cell))
@@ -1457,6 +1511,9 @@ class BaseOperator:
                     logger.info(f"[{self.id}] Simulacion finalizada, saliendo...")
                     break
 
+                # BK-15 (C4): el agente ocioso OCUPA su celda: se reserva la
+                # espera para que los planes ajenos no lo atraviesen.
+                self._tw_reserve_dwell(0.5)
                 yield self.env.timeout(0.5)  # V12: Reduced for fast termination detection
                 continue
 
@@ -1574,7 +1631,11 @@ class BaseOperator:
                     segment_path, self.default_speed,
                     on_before=_on_before, on_after=_on_after,
                     time_per_cell=TIME_PER_CELL,
-                    goal_dwell=self._pick_dwell_estimate_equipo(wo)
+                    # BK-15 (C1): la estadia cubre TODAS las tareas seguidas en
+                    # esta misma ubicacion, no solo la primera: las siguientes
+                    # no pasan por el planner (no hay que moverse) y antes
+                    # quedaban sin reservar -> otro agente entraba encima.
+                    goal_dwell=self._estadia_en_ubicacion(visit_sequence, idx)
                 )
             else:
                 self._jump_to(wo.ubicacion)

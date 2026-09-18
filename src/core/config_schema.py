@@ -116,6 +116,9 @@ class TimewindowConfig(BaseModel):
     max_expansions: Optional[int] = None
     plan_horizon: Optional[float] = None
     allow_diagonal: Optional[bool] = None
+    # BK-15: sin plan reservable, esperar y replanificar (lector: operators).
+    replan_wait_s: Optional[float] = None
+    replan_max_retries: Optional[int] = None
 
 
 class CongestionConfig(BaseModel):

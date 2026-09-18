@@ -89,6 +89,11 @@ class SpaceTimePlanner:
             # MEJ-4: permanencias (dwell) y fallback visible.
             "dwell_conflicts": 0,
             "exec_fallback_reserved_steps": 0,
+            # BK-15: planes descartados porque no se pudieron reservar enteros,
+            # reintentos de planificacion (esperando en el lugar) y excepciones.
+            "plans_rejected_unreservable": 0,
+            "replan_waits": 0,
+            "plan_exceptions": 0,
         }
 
     # ------------------------------------------------------------------
@@ -124,11 +129,20 @@ class SpaceTimePlanner:
     # A* espacio-temporal
     # ------------------------------------------------------------------
     def find_path_st(self, start: Cell, goal: Cell, t0: float, agent_id: str,
-                     speed: float = 1.0) -> Optional[List[PlanStep]]:
+                     speed: float = 1.0,
+                     goal_hold: float = 0.0) -> Optional[List[PlanStep]]:
         """
         Devuelve un plan [(celda, t_llegada), ...] libre de conflicto desde `start`
         en `t0` hasta `goal`, o None si no se encontro dentro de `max_expansions`.
         Las reservas existentes del PROPIO agente se ignoran (ignore_agent=agent_id).
+
+        BK-15 (C3): `goal_hold` = cuanto se va a quedar en el destino (permanencia
+        + paso de salida). Solo se acepta llegar al destino si la celda queda
+        libre durante TODA la estadia; si no, se espera antes de entrar. Antes se
+        verificaba solo la llegada y la permanencia podia pisar la de otro.
+
+        BK-15 (C2): mientras se mueve de `cell` a `nb`, el agente ocupa las DOS
+        celdas hasta llegar (el origen se libera recien al entrar al destino).
         """
         self.last_expansions = 0
         self.last_capped = False
@@ -205,24 +219,28 @@ class SpaceTimePlanner:
             # reserva cubre la permanencia en la celda de espera).
             t_next = t + dur
             for nb in self._neighbors(cell):
-                free_ok = tbl.is_free(nb, t, t_next, ignore_agent=agent_id)
+                # BK-15 (C3): el destino tiene que quedar libre toda la estadia.
+                hold = goal_hold if nb == goal else 0.0
+                free_ok = tbl.is_free(nb, t, t_next + hold, ignore_agent=agent_id)
+                # BK-15 (C2): el origen sigue ocupado hasta llegar al vecino.
+                here_ok = tbl.is_free(cell, t, t_next, ignore_agent=agent_id)
                 swap_ok = tbl.can_swap(cell, nb, t, t_next, agent_id)
-                if free_ok and swap_ok:
+                if free_ok and swap_ok and here_ok:
                     _relax(nb, t_next, key, t)
                     continue
                 if not free_ok:
                     # vertice ocupado (dwell/transito ajeno): saltar al primer hueco
                     try:
-                        t_free = tbl.earliest_free(nb, t, dur, ignore_agent=agent_id)
+                        t_free = tbl.earliest_free(nb, t, dur + hold, ignore_agent=agent_id)
                     except Exception:
                         t_free = None
                 else:
-                    # solo conflicto de cruce (arista inversa): reintento corto,
+                    # conflicto de cruce o del origen: reintento corto,
                     # los cruces duran <= un paso (dur)
                     t_free = t + self.dt_wait
                 if (t_free is not None and t_free > t
-                        and tbl.is_free(cell, t, t_free, ignore_agent=agent_id)
-                        and tbl.is_free(nb, t_free, t_free + dur, ignore_agent=agent_id)
+                        and tbl.is_free(cell, t, t_free + dur, ignore_agent=agent_id)
+                        and tbl.is_free(nb, t_free, t_free + dur + hold, ignore_agent=agent_id)
                         and tbl.can_swap(cell, nb, t_free, t_free + dur, agent_id)):
                     # movimiento retrasado: esperar en `cell` hasta t_free y entrar
                     _relax(nb, t_free + dur, key, t_free)
@@ -259,7 +277,8 @@ class SpaceTimePlanner:
     # ------------------------------------------------------------------
     def _plan_reserve_core(self, start: Cell, goal: Cell, t0: float,
                            agent_id: str, speed: float,
-                           static_steps: int = 0) -> Optional[List[PlanStep]]:
+                           static_steps: int = 0,
+                           goal_hold: float = 0.0) -> Optional[List[PlanStep]]:
         """
         Para un tramo: libera las reservas previas del agente (re-planificacion),
         planifica una ruta espacio-temporal, la RESERVA en la tabla (vertices+aristas)
@@ -278,7 +297,7 @@ class SpaceTimePlanner:
         self.table.purge_before(t0 - 1.0)
 
         t_start = _time.perf_counter()
-        plan = self.find_path_st(start, goal, t0, agent_id, speed)
+        plan = self.find_path_st(start, goal, t0, agent_id, speed, goal_hold=goal_hold)
         plan_ms = (_time.perf_counter() - t_start) * 1000.0
 
         m["total_expansions"] += self.last_expansions
@@ -312,12 +331,29 @@ class SpaceTimePlanner:
             m["reserve_overlaps"] += 1
             return False
 
+        # BK-15 (C2): mientras se mueve, el agente ocupa origen Y destino hasta
+        # llegar. Antes el origen quedaba libre al instante de salir y otro
+        # podia entrar mientras este todavia no habia terminado de salir
+        # (hotspot de la zona de descarga).
         prev_cell, prev_t = plan[0]
-        _reserve_or_skip(prev_cell, prev_t, prev_t)
+        completo = True
         for (cell, t) in plan[1:]:
-            if _reserve_or_skip(cell, prev_t, t) and cell != prev_cell:
-                self.table.reserve_move(prev_cell, cell, prev_t, t, agent_id)
+            completo = _reserve_or_skip(prev_cell, prev_t, t) and completo
+            if _reserve_or_skip(cell, prev_t, t):
+                if cell != prev_cell:
+                    self.table.reserve_move(prev_cell, cell, prev_t, t, agent_id)
+            else:
+                completo = False
             prev_cell, prev_t = cell, t
+
+        # BK-15: un plan que no se pudo reservar ENTERO no se ejecuta. Antes el
+        # tramo sin reserva se omitia en silencio y el agente lo recorria igual,
+        # invisible para los demas (co-ocupacion). Ahora se descarta: el agente
+        # espera en su lugar y vuelve a planificar.
+        if not completo:
+            self.table.release_agent(agent_id)
+            m["plans_rejected_unreservable"] += 1
+            return None
 
         return plan
 
@@ -410,12 +446,17 @@ class SpaceTimePlanner:
         las llegadas al mismo destino (p.ej. staging) se serializan solas: el A*
         del siguiente inserta esperas hasta que el dwell libere.
         """
-        plan = self._plan_reserve_core(start, goal, t0, agent_id, speed, static_steps)
+        # BK-15 (C2): la estadia incluye el paso de SALIDA de la celda: hasta
+        # que el agente sale, la celda sigue ocupada.
+        salida = self._dur(speed)
+        hold = (float(goal_dwell) + salida) if goal_dwell and goal_dwell > 0.0 else 0.0
+        plan = self._plan_reserve_core(start, goal, t0, agent_id, speed, static_steps,
+                                       goal_hold=hold)
         if plan is not None:
             self.shadow_metrics["exec_segments"] += 1
-            if goal_dwell and goal_dwell > 0.0:
+            if hold > 0.0:
                 g_cell, g_t = plan[-1]
-                self.reserve_dwell(g_cell, float(g_t), float(goal_dwell), agent_id)
+                self.reserve_dwell(g_cell, float(g_t), hold, agent_id)
         return plan
 
     def shadow_report(self) -> Dict[str, Any]:

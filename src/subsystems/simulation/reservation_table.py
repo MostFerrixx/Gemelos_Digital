@@ -26,6 +26,14 @@ Cell = Tuple[int, int]
 Edge = Tuple[Cell, Cell]
 
 
+# BK-15: tolerancia numerica en las comparaciones de intervalos. Los tiempos se
+# construyen por sumas de flotantes (t + dur, e_out + clearance) y dos bordes
+# que deberian tocarse exactamente pueden diferir en 1e-13: sin tolerancia, un
+# plan valido se declaraba en conflicto y el agente quedaba sin plan (antes se
+# "resolvia" omitiendo la reserva en silencio, lo que producia co-ocupaciones).
+EPS = 1e-6
+
+
 class ReservationTable:
     """
     Estructura `reservations: {cell: [Interval, ...]}` con intervalos ORDENADOS por
@@ -66,7 +74,7 @@ class ReservationTable:
             if ignore_agents is not None and e_agent in ignore_agents:
                 continue
             # solapan si t_in < e_out+cl  y  e_in-cl < t_out  (margen a ambos lados)
-            if t_in < (e_out + cl) and (e_in - cl) < t_out:
+            if t_in < (e_out + cl - EPS) and (e_in - cl + EPS) < t_out:
                 return False
             # lista ordenada por t_in: si el existente empieza ya despues de t_out+cl,
             # los siguientes tambien => no puede haber mas solapes.
@@ -92,9 +100,9 @@ class ReservationTable:
         for (e_in, e_out, e_agent) in ivs:
             if e_agent == ignore_agent:
                 continue
-            if e_in - cl >= t + dur:
+            if e_in - cl + EPS >= t + dur:
                 return t  # hueco suficiente antes de este intervalo
-            if t < (e_out + cl) and (e_in - cl) < t + dur:
+            if t < (e_out + cl - EPS) and (e_in - cl + EPS) < t + dur:
                 t = e_out + cl  # saltar al final del bloqueo (con margen)
         return t
 
@@ -112,7 +120,7 @@ class ReservationTable:
         for (e_in, e_out, e_agent) in rev:
             if e_agent == agent_id:
                 continue
-            if t_in < (e_out + cl) and (e_in - cl) < t_out:
+            if t_in < (e_out + cl - EPS) and (e_in - cl + EPS) < t_out:
                 return False
         return True
 
