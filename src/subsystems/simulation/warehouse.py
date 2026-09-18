@@ -288,6 +288,27 @@ class AlmacenMejorado:
             print(f"[TIMEWINDOW] OpcionC activo (shadow={self.timewindow_shadow}). "
                   f"table={self.reservation_table}, planner={self.spacetime_planner}")
 
+        # BK-15 (C4, decision del Director 2026-09-18): el operario sin trabajo
+        # espera en una celda donde no estorba (zonas_espera, o elegidas por el
+        # simulador) y la reserva sin fin: los demas lo rodean. Requiere la
+        # capa anti-colision en ejecucion (es la que hace respetar la reserva).
+        self.zonas_espera = None
+        if (self.spacetime_planner is not None and layout_manager is not None
+                and data_manager is not None):
+            from .idle_zones import GestorZonasEspera
+            from core.fleet import resolver_flota
+            puntos = getattr(data_manager, 'puntos_de_picking_ordenados', None) or []
+            self.zonas_espera = GestorZonasEspera(
+                configuracion,
+                es_transitable=layout_manager.is_walkable,
+                ancho=layout_manager.grid_width, alto=layout_manager.grid_height,
+                picks=[(pt.get('x'), pt.get('y')) for pt in puntos],
+                descargas=list(data_manager.get_outbound_staging_locations().values()),
+                muelles=list(data_manager.get_inbound_dock_locations().values()),
+                n_agentes=len(resolver_flota(configuracion)))
+            print(f"[ZONAS-ESPERA] {'automaticas' if self.zonas_espera.automatica else 'configuradas'}: "
+                  f"{self.zonas_espera.celdas}")
+
         # ============================================================
         # INICIATIVA #3 - OUTBOUND (aforo de staging + despacho) - Fase 0
         # Se LEE el bloque config["outbound"] pero NO se usa con el flag off.

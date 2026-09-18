@@ -159,6 +159,21 @@ Es un intercambio clásico: eficiencia de picking contra orden en el muelle.
   tiempo** en su ruta y se esquivan entre sí, en vez de atravesarse como
   fantasmas. Apagado = ruteo clásico. Encendido es más realista y revela
   congestión en pasillos angostos (**activo en la configuración canónica**).
+  Desde la corrección BK-15 (septiembre 2026) garantiza que **nunca haya dos
+  operarios en la misma celda**: protege también a quien está quieto
+  (pickeando varias tareas en el mismo lugar, descargando o esperando), y si al
+  momento de entrar a una celda hay alguien, el que llega espera y replanifica.
+  El costo es real: donde antes dos máquinas trabajaban a la vez en el mismo
+  hueco del rack (imposible), ahora una espera a la otra.
+
+  **Dónde esperan los operarios sin trabajo.** Quien no tiene tarea camina a
+  una **celda de espera** y queda ahí como un obstáculo fijo: los demás lo
+  rodean, nunca estorba. Por defecto el simulador elige esas celdas solo
+  (bordes de los corredores, cerca de las zonas de descarga, nunca un punto de
+  pick, una descarga, un muelle o sus accesos, ni una celda que corte el paso).
+  Se pueden definir a mano con el bloque `zonas_espera` del archivo de
+  configuración (rectángulos `x, y, ancho, alto`), que se valida contra el mapa
+  con esas mismas reglas. Por ahora no tiene control en esta pantalla.
 - **Subsistema outbound (carriles de carga)** — modela el muelle de salida en
   serio: pallets persistentes, un operario por columna, llenado de atrás hacia
   adelante. Apagado, la descarga es instantánea en el punto de entrega.

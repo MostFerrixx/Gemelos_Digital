@@ -236,6 +236,16 @@ class EstacionamientoConfig(BaseModel):
     admite: Optional[List[str]] = None       # ausente = cualquier equipo
 
 
+class ZonaEsperaConfig(BaseModel):
+    """BK-15: rectangulo donde esperan los operarios sin trabajo
+    (lector: subsystems.simulation.idle_zones)."""
+    model_config = ConfigDict(extra="allow")
+    x: Optional[int] = None
+    y: Optional[int] = None
+    ancho: Optional[int] = None
+    alto: Optional[int] = None
+
+
 class DistribucionTipo(BaseModel):
     """AUD8-2 (2026-07-11): las claves de distribucion_tipos son CLASES DE
     MANEJO reales (SKU.clase de la hoja SkuCatalog); la mezcla estocastica
@@ -295,6 +305,9 @@ class WarehouseConfig(BaseModel):
     num_montacargas: Optional[int] = None
     # LEGACY-INFORMATIVO: solo se imprime (warehouse.py) y lo exige REQUIRED_KEYS.
     num_operarios_total: Optional[int] = None
+
+    # BK-15: donde esperan los operarios sin trabajo (ausente = automaticas).
+    zonas_espera: Optional[Dict[str, ZonaEsperaConfig]] = None
 
     # --- Layout y datos (layout_manager / data_manager) ---
     layout_file: Optional[str] = None
@@ -384,6 +397,9 @@ def validate_config_schema(config: Dict[str, Any]) -> Tuple[List[str], List[str]
     if model.cambio_de_perfil is not None:
         for key in _extras_of(model.cambio_de_perfil):
             warnings.append("clave DESCONOCIDA: 'cambio_de_perfil.%s'" % key)
+    for nombre, zona in (model.zonas_espera or {}).items():
+        for key in _extras_of(zona):
+            warnings.append("clave DESCONOCIDA: 'zonas_espera.%s.%s'" % (nombre, key))
     if model.tiempos is not None and model.tiempos.pick_time_model is not None:
         for key in _extras_of(model.tiempos.pick_time_model):
             warnings.append("clave DESCONOCIDA: 'tiempos.pick_time_model.%s'" % key)

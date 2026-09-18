@@ -762,6 +762,54 @@ class BaseOperator:
             total += self._pick_dwell_estimate_equipo(wo)
         return total
 
+    def _esperar_sin_estorbar(self):
+        """BK-15 (C4): el operario sin trabajo camina a su celda de espera y la
+        reserva SIN FIN, asi los demas planifican alrededor de el. En la
+        operacion real quien no tiene trabajo espera donde no molesta (y si
+        molesta, se corre): aca se garantiza que no moleste nunca."""
+        gestor = getattr(self.almacen, 'zonas_espera', None)
+        planner = getattr(self.almacen, 'spacetime_planner', None)
+        if gestor is None or planner is None or not self._tw_exec_active():
+            return
+        from .idle_zones import ESPERA_ABIERTA_S
+        aqui = tuple(self.current_position)
+        destino = gestor.asignar(self.id, aqui)
+        if destino is None:
+            self._tw_reserve_dwell(0.5)  # sin celda libre: al menos la actual
+            return
+        if aqui == destino:
+            # Ya espera ahi: asegurar que la reserva abierta siga en pie.
+            propia = [iv for iv in planner.table.reservations.get(destino, [])
+                      if iv[2] == self.id and iv[1] >= ESPERA_ABIERTA_S / 2]
+            if not propia:
+                planner.reserve_dwell(destino, float(self.env.now),
+                                      ESPERA_ABIERTA_S, self.id)
+            return
+        rc = getattr(self.almacen, 'route_calculator', None)
+        path = None
+        if rc is not None and getattr(rc, 'pathfinder', None) is not None:
+            try:
+                path = rc.pathfinder.find_path(aqui, destino)
+            except Exception:
+                path = None
+        if not path or len(path) < 2:
+            self._tw_reserve_dwell(0.5)
+            return
+        self.status = "moving"
+
+        def _emitir_paso(_i, _c):
+            self.almacen.registrar_evento('estado_agente', {
+                'agent_id': self.id, 'agent_type': self.type,
+                'position': self.current_position, 'status': self.status,
+                'current_task': None, 'cargo_volume': self.cargo_volume,
+            })
+
+        yield from self._recorrer_tramo(
+            path, self.default_speed, on_before=_emitir_paso, on_after=None,
+            time_per_cell=self.time_per_cell, goal_dwell=ESPERA_ABIERTA_S)
+        self.status = "idle"
+        _emitir_paso(0, None)
+
     def _tw_reserve_dwell(self, duration):
         """
         MEJ-4 (F1): reservar la PERMANENCIA del agente en su celda actual en la
@@ -795,7 +843,7 @@ class BaseOperator:
         reintentos (congestion.timewindow.replan_wait_s / replan_max_retries)."""
         tw = ((self.configuracion or {}).get('congestion') or {}).get('timewindow') or {}
         return (float(tw.get('replan_wait_s', 0.5)),
-                int(tw.get('replan_max_retries', 40)))
+                int(tw.get('replan_max_retries', 1200)))
 
     def _timewindow_execute_plan(self, segment_path, speed, on_before, on_after,
                                  time_per_cell, goal_dwell=0.0, fallback=True):
@@ -853,10 +901,23 @@ class BaseOperator:
             return False
 
         prev_t = float(plan[0][1])  # = t0; plan[0] == start == posicion actual
+        cm = getattr(self.almacen, 'congestion_manager', None)
         for step_idx, (cell, t) in enumerate(plan[1:], 1):
             dt = float(t) - prev_t
             if dt < 0.0:
                 dt = 0.0
+            # BK-15: verificacion al EJECUTAR. El plan se armo con lo que se
+            # sabia al planificar; si al momento de entrar hay otro agente
+            # fisicamente en la celda (p. ej. no pudo salir porque este mismo
+            # le bloqueaba la salida), no se entra: se suelta el plan y el
+            # llamador espera y replanifica desde donde esta.
+            if cm is not None and tuple(cell) != tuple(self.current_position):
+                otros = (cm.occupied.get(tuple(cell)) or set()) - {self.id}
+                if otros:
+                    planner.table.release_agent(self.id)
+                    planner.shadow_metrics["exec_blocked"] = (
+                        planner.shadow_metrics.get("exec_blocked", 0) + 1)
+                    return False
             self._set_pos(cell)  # mover (o re-entrar si es espera: cell == actual)
             if on_before is not None:
                 on_before(step_idx, cell)
@@ -929,6 +990,7 @@ class BaseOperator:
                     # visible en exec_fallbacks.
                     espera, reintentos = self._tw_replan_params()
                     planner = getattr(self.almacen, 'spacetime_planner', None)
+                    destino = tuple(segment_path[-1])
                     for intento in range(reintentos + 1):
                         ultimo = intento == reintentos
                         executed = yield from self._timewindow_execute_plan(
@@ -936,6 +998,20 @@ class BaseOperator:
                             goal_dwell=goal_dwell, fallback=ultimo)
                         if executed:
                             return
+                        # Si se detuvo a mitad de camino, replanificar desde
+                        # donde quedo (no desde el inicio del tramo).
+                        if tuple(self.current_position) != tuple(segment_path[0]):
+                            if tuple(self.current_position) == destino:
+                                return
+                            nuevo = None
+                            rc = getattr(self.almacen, 'route_calculator', None)
+                            try:
+                                nuevo = rc.pathfinder.find_path(
+                                    tuple(self.current_position), destino)
+                            except Exception:
+                                nuevo = None
+                            if nuevo and len(nuevo) > 1:
+                                segment_path = nuevo
                         if ultimo:
                             break
                         if planner is not None:
@@ -1511,11 +1587,16 @@ class BaseOperator:
                     logger.info(f"[{self.id}] Simulacion finalizada, saliendo...")
                     break
 
-                # BK-15 (C4): el agente ocioso OCUPA su celda: se reserva la
-                # espera para que los planes ajenos no lo atraviesen.
-                self._tw_reserve_dwell(0.5)
+                # BK-15 (C4): sin trabajo, esperar donde no se estorba.
+                yield from self._esperar_sin_estorbar()
                 yield self.env.timeout(0.5)  # V12: Reduced for fast termination detection
                 continue
+
+            # BK-15 (C4): deja su celda de espera (la reserva abierta se libera
+            # al planificar el primer tramo del recorrido).
+            gestor_espera = getattr(self.almacen, 'zonas_espera', None)
+            if gestor_espera is not None:
+                gestor_espera.liberar(self.id)
 
             # INIT-11 F2: si la tarea pide otro equipo, primero va a buscarlo.
             if self._cambio_pendiente:
@@ -1793,7 +1874,7 @@ class BaseOperator:
             # con el siguiente que llegaba a descargar. El punto de
             # estacionamiento se DISPERSA por agente (reusa _spawn_lane, BFS
             # determinista) para que los idle no se apilen en la misma celda.
-            if self._tw_exec_active():
+            if self._tw_exec_active() and getattr(self.almacen, 'zonas_espera', None) is None:
                 _exit_cell = (staging_location[0], staging_location[1] - 1)
                 if _exit_cell[1] >= 0:
                     try:

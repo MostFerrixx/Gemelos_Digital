@@ -249,6 +249,15 @@ integración en `warehouse.py` (crea manager/table/planner) y `operators.py`
 (`_timewindow_execute_plan`). El baseline byte-idéntico (`a4ae8d4e…`) se generó
 CON esta capa activa: es parte del comportamiento de referencia, no una
 desviación. Historia en `docs/antiguos/PLAN_INICIATIVA_2_OPCION_C.md`.
+**BK-15 (2026-09-18):** la capa protege al agente QUIETO (estadia = todas las
+tareas seguidas en la misma ubicacion + paso de salida; el A* exige el destino
+libre toda la estadia; origen ocupado hasta llegar al vecino; tolerancia 1e-6
+en bordes), un plan que no se puede reservar entero NO se ejecuta (espera y
+replanifica: `timewindow.replan_wait_s` / `replan_max_retries`), verificacion
+de ocupacion fisica al entrar a cada celda (`exec_blocked`), y el ocioso
+espera en celdas que no estorban con reserva sin fin (`zonas_espera`, o
+automaticas: `subsystems/simulation/idle_zones.py`). Invariante medido: 0
+co-ocupaciones fuera de la ventana de arranque.
 
 Existe `AUDITORIA.md` con el diagnostico estructural completo (mayo 2026, no
 se actualiza — es una foto puntual, ver `docs/STATE.md` para lo vigente).

@@ -457,6 +457,8 @@ class WebConfigurationManager:
                 errors.extend(schema_errors)
                 if config.get('personas') and not schema_errors:
                     errors.extend(self._validar_personas(config, required_areas))
+                if config.get('zonas_espera') and not schema_errors:
+                    errors.extend(self._validar_zonas_espera(config))
             except ImportError as _e:
                 print(f"[CONFIG_MANAGER][SCHEMA][WARN] esquema no disponible: {_e}")
 
@@ -556,6 +558,35 @@ class WebConfigurationManager:
             print("[CONFIG_MANAGER][WARN] no se pudo cargar el mapa para validar "
                   "estacionamientos: %s" % e)
             return None
+
+    def _validar_zonas_espera(self, config: Dict) -> List[str]:
+        """BK-15: las zonas de espera se validan contra el MAPA y los datos
+        maestros en uso (warehouse.db), con las mismas reglas que aplica el
+        motor: transitable, ni pick, ni descarga, ni muelle, ni sus accesos, ni
+        una celda que deje incomunicada parte del almacen."""
+        import sqlite3
+        from subsystems.simulation.idle_zones import GestorZonasEspera
+        layout = self._layout_manager(config.get('layout_file'))
+        if layout is None:
+            return []
+        picks, descargas, muelles = [], [], []
+        db = os.path.join(self.project_root, "warehouse.db")
+        if os.path.exists(db):
+            con = sqlite3.connect(db)
+            try:
+                picks = [tuple(r) for r in con.execute(
+                    "SELECT legacy_x, legacy_y FROM locations")]
+                descargas = [tuple(r) for r in con.execute(
+                    "SELECT legacy_x, legacy_y FROM staging_areas")]
+                try:
+                    muelles = [tuple(r) for r in con.execute("SELECT x, y FROM inbound_docks")]
+                except sqlite3.Error:
+                    muelles = []
+            finally:
+                con.close()
+        gestor = GestorZonasEspera(config, layout.is_walkable, layout.grid_width,
+                                   layout.grid_height, picks, descargas, muelles)
+        return ["Zonas de espera: " + a for a in gestor.avisos]
 
     def extract_work_areas(self, sequence_file: str) -> List[str]:
         """
