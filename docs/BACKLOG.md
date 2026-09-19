@@ -194,6 +194,18 @@ encimadas:
 2. Nadie garantiza la salida del que descarga.
 3. El ultimo recurso del motor es pisar a otro.
 
+**F0 hecho y medido (2026-09-19), rama `fix/bk25-estacion-descarga` (`be65b04`).**
+Semilla fija, antes -> despues:
+- Canonico 2+2 (semillas 1, 2, 3, 4, 42): planes rechazados de miles a 0;
+  rendiciones 3/1/0/0/0 -> 0; co-ocupaciones solo la de arranque; duracion
+  igual o mejor (-7% a -9% en las semillas 1 y 2).
+- Descarga de 60 s: rechazos a 0, co-ocupaciones 18 -> 7, duracion +41%.
+- Flota 4+4: duracion 7.178 -> 20.578 s, maximo 2 agentes juntos (antes 6).
+  Sin la doble reserva, el planificador "se rinde" menos (28 -> 12) y se
+  queda mas tiempo en el atasco real de la descarga.
+F0 no se integra solo: va a `main` junto con F1 (estacion con turno), que es
+lo que resuelve el atasco. El baseline se actualiza una sola vez, con las dos.
+
 Texto original del hallazgo:
 
 Salio en QA-5.2 (4 terrestres + 4 montacargas, todo el trabajo va a la zona

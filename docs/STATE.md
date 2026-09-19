@@ -60,7 +60,10 @@ es punto de control con el Director.
    encargo en `docs/CONSULTA_DISENO_CIRCULACION_Y_LAYOUT.md`). Pasa tambien
    con la flota canonica (3 de 4 corridas con semilla libre). Decisiones
    D1-D10 en su seccion 7; F0 (corregir que el que espera ocupe dos celdas)
-   mueve el baseline.
+   mueve el baseline. **D1 aprobado; F0 hecho en la rama
+   `fix/bk25-estacion-descarga` (`be65b04`)**: mejora el canonico pero sola
+   empeora la flota 4+4 (se queda en el atasco en vez de pisar); se integra
+   junto con F1. Pendientes D2-D10.
    **BK-30 / QA H-25:** el muelle de salida no es realista en WH1 (D3, D10).
 2. **BK-28 / QA H-22:** una config sin bloque `outbound` corre con outbound
    encendido desde la web y apagado desde consola.
