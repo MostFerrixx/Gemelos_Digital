@@ -6,7 +6,12 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 3 — Motor avanzado.
+**Objetivo inmediato:** Bloque 7 — Outbound Staging (despues 8, 10, 11, 12;
+el 6 espera a INIT-10).
+**Ultimo cerrado:** Bloque 3 — Motor avanzado (19/09): 5 de 6 pasan; QA-3.1
+falla por H-15 (tambien con la flota canonica). Corregido **H-26** (quedaban
+pallets sin despachar al terminar). Consulta de diseno de H-15 hecha:
+`docs/PROPUESTA_DISENO_CIRCULACION_Y_LAYOUT.md` (causa nueva confirmada: H-27).
 **Último cerrado:** Bloque 5 — Flota (19/09): 11 de 11 casos pasan; 160/160
 posiciones visor = JSON (desde 5.6 también carga y capacidad). **3 errores
 corregidos: H-17** (el panel mostraba siempre 0 de 100/200), **H-18** ("Generar
@@ -498,6 +503,13 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-5.11 | 19/09 | 2 grupos a pie: 1×150 y 1×60 \| idéntico | GroundOp-01 carga máx. 150, GroundOp-02 **60**; 155 vs 113 tareas | 20/20; el panel muestra 150 y 60 | **PASA** | — |
 | H-19 (detección) | 19/09 | Corrida web con outbound activo (salió de un Importar mal armado, ver §11) | 64.817 avisos "Goal position (1,29)/(5,29) is not walkable"; el navegador se congeló y la corrida murió sin resultados | — | **FALLA** | H-19, H-20 |
 | H-19 reprueba | 19/09 | Canónico + outbound activo desde la pestaña Outbound \| idéntico | Termina en ~1 min sin avisos. Semilla 42 sin la corrección: 64.817 avisos y 24.836 s; con la corrección: 60 avisos (otro origen, H-23) y 19.436 s | — | **PASA** | H-19 cerrado |
+| QA-3.1 | 19/09 | Canonico (anti-colision encendido) \| identico | 4 corridas web 2+2 con semilla libre: **1 / 7 / 3 / 0** episodios de co-ocupacion, todos en la descarga (3,29)/(4,29), hasta 3 agentes juntos; siguen 1 a 1 a las rendiciones del planificador (1/8/2/0). Con semilla 42 da 0 por casualidad | — | **FALLA** | H-15, H-27 |
+| QA-3.2 | 19/09 | Anti-colision apagado \| `congestion.enabled=false, mode=off` | **103** episodios de co-ocupacion (vs 0-7 encendido); los ociosos quedan parados sobre la descarga (3,29) | 28/28; el visor dibuja las superposiciones (3 agentes en (3,29) a t=4.711) | **PASA** | H-24 |
+| QA-3.3 | 19/09 | Outbound encendido \| identico | 165 camiones, 618 pallets, cada ~96 s (90 + 2 s por pallet), max 7 por camion. Duracion **16.091 s** (x2,1): 50% del tiempo en descarga, un pallet por tarea, un operario por carril | contadores del visor = JSON | **PASA** | H-25 |
+| QA-3.4 | 19/09 | Intervalo 30 s \| identico | Camion cada 32 s (30-44); espera en zona 29 s (vs 89 s); duracion 11.033 s | — | **PASA** | — |
+| QA-3.5 | 19/09 | Intervalo 600 s \| identico | Camion cada 604-614 s; espera 593 s; duracion **63.016 s**: los operarios esperan lugar en el carril | — | **PASA** | H-25 |
+| QA-3.6 (1.er intento) | 19/09 | Capacidad 2 \| identico | Max 2 por camion; pero **quedaron 3 pallets sin despachar** (1-3 en las 4 corridas con outbound) | — | **PASA** con hallazgo | H-26 |
+| QA-3.6 (reprueba) | 19/09 | identico | 622 tareas, **622 despachadas**, 0 pendientes | Camiones con carga y pallets del visor = JSON en t=15.000 (157/314) y al final (318/622) | **PASA** | H-26 cerrado |
 | H-01 reprueba 1 | 18/09 | Corrida canónica: copia temporal **idéntica** a `config.json` (antes faltaba `cercania_tour_mode`) y = metadata | — | — | **PASA** | H-01 cerrado |
 | QA-1.1 | 18/09 | `total_ordenes` 50 \| 50 | 50 pedidos, 107 tareas, todas completadas; fin 1.415 s | 20/20 | **PASA** | — |
 | QA-1.2 | 18/09 | 600 \| 600 | 600 pedidos, 1.195 tareas completadas; fin 15.178 s = **2,08×** el control (esperado ~2×) | 20/20 | **PASA** | H-05 (evidencia) |
@@ -516,7 +528,7 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 
 Los hallazgos abiertos están además en `docs/BACKLOG.md` (18/09):
 H-02→BK-13, H-03→BK-14, H-05→BK-15, H-06→BK-16, H-08→BK-17, H-09→BK-18,
-H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24, H-15→BK-25, H-16→BK-22, H-20→BK-26, H-21→BK-27, H-22→BK-28, H-23→BK-29; la sección 4.1 → BK-22.
+H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24, H-15→BK-25, H-16→BK-22, H-20→BK-26, H-21→BK-27, H-22→BK-28, H-23→BK-29, H-25→BK-30, H-27→BK-25; la sección 4.1 → BK-22.
 
 | # | Severidad | Caso | Descripción | Causa raíz | Propuesta | Estado |
 |---|---|---|---|---|---|---|
@@ -545,6 +557,10 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24, H-15→BK-25, H-16→BK-
 | H-21 | OBS (usabilidad) | QA-5.7 | Si el mapa le da un área a otro tipo de equipo, las prioridades de esa área en los grupos del tipo anterior quedan en el formulario sin aviso: no hacen nada y confunden | Sin aviso | → BK-27 | Abierto |
 | H-22 | MENOR (decisión) | QA-5.10 (1.er intento) | Una configuración **sin** bloque `outbound` (o `congestion`) corre desde la web con el outbound **encendido** y desde consola **apagado**: el mismo archivo da dos simulaciones distintas | Decisión explícita en `app.js` ("ausencia de bloque = ON") | → BK-28. **Decisión del Director** | Abierto |
 | H-23 | OBS (realismo) | H-19 reprueba | Con outbound activo algunos operarios arrancan dentro de celdas que el carril después bloquea (60 avisos "Start position … is not walkable") | Posición inicial anterior al bloqueo de carriles | → BK-29 | Abierto |
+| H-24 | OBS | QA-3.2 | Con la anti-colision apagada, los operarios sin trabajo se quedan parados sobre la zona de descarga el resto de la corrida (las zonas de espera dependen de esa capa). Es el modo "sin fisica" de comparacion | Zonas de espera solo con planificador | Documentar en el manual | Abierto |
+| H-25 | **MAYOR** (realismo, decision) | QA-3.3, 3.5 | **El muelle de salida (outbound) no es realista en WH1.** Cada tarea es un pallet; se depositan de a uno y un operario por carril: la corrida dura x2,1 (x8,6 con camion cada 600 s). Las 7 zonas se expanden a manchas de 8 celdas que tapan las filas 28-29 enteras (el pasillo frontal queda en 1 fila); 52 saltos de 2-3 celdas al entrar o salir del carril; los camiones nunca cargaron mas de 7 de 8 | Modelo de carriles de INIT-3 sobre un mapa sin anden | → BK-30. Decisiones D3 y D10 de la propuesta de diseno | Abierto |
+| H-26 | MENOR | QA-3.6 | **Con outbound, la corrida terminaba con 1-3 pallets sin despachar**: cortaba al llegar la ultima tarea a la zona, sin esperar el ultimo camion | `simulacion_ha_terminado` solo miraba las tareas | **Corregido** (`dcf71b3`): con camiones activos termina cuando se despacho todo. +1 test. Gate PASS | **Cerrado** (reprobado) |
+| H-27 | **MAYOR** (causa de H-15) | Consulta de diseno | **El que espera ocupa dos celdas.** Si el plan de un operario incluye una espera, el planificador le reserva tambien la celda de la que salio durante toda la espera, aunque ya no esta ahi. Esa reserva de mas choca con otras y se rechazan planes validos: 92-95% de los planes rechazados en corridas 2+2. Lo introdujo BK-15 (C2) | `spacetime_planner._plan_reserve_core` usa el tiempo de SALIDA de la celda siguiente como fin de la reserva del origen | Hallado por el consultor (Fable 5.1) y **confirmado**: reproduccion de 25 lineas + lectura del ejecutor (se mueve y espera en la celda nueva). → BK-25 F0 | Abierto |
 
 ## 11. Registro de cambios de este plan
 
@@ -604,3 +620,9 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24, H-15→BK-25, H-16→BK-
   H-05) quedó corriendo 10 horas en segundo plano: al cerrar una
   investigación, verificar que no queden procesos vivos. (3) El gate solo
   prueba el canónico (outbound apagado): H-19 se escapó por eso.
+- 2026-09-19 — Bloque 3 cerrado. Herramientas de sesion: conteo propio de
+  co-ocupaciones desde el replay (independiente del reporte del motor) y
+  analisis de camiones/pallets. **Leccion:** un invariante probado con la
+  semilla 42 no esta probado; QA-3.1 lo mide con varias corridas de semilla
+  libre. Primera consulta a un consultor externo (Fable 5.1) con encargo
+  escrito; su hallazgo principal (H-27) se verifico antes de aceptarlo.

@@ -10,7 +10,7 @@
 
 - `main` integra por fast-forward (ramas re-apiladas, sin commits de merge):
   INIT-11 F0-F2, el plan de QA de la configuracion web y sus correcciones
-  (H-01, H-07, H-14, H-17, H-18, H-19) y la capa anti-colision (BK-15).
+  (H-01, H-07, H-14, H-17, H-18, H-19, H-26) y la capa anti-colision (BK-15).
 - Rama de trabajo del QA: `qa/configuracion-web` (se integra a `main` al
   cerrar cada bloque, con gate PASS).
 - Baseline byte-identico vigente: **`sha256=5c7f4c32...`, 16.591.951 bytes**,
@@ -25,7 +25,7 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 311 passed, 1 deselected (~20s)
+python -m pytest -q                # 312 passed, 1 deselected (~40s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline 5c7f4c32)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
@@ -40,11 +40,10 @@ inmediato; seccion 9 = registro de cada prueba; seccion 10 = hallazgos).
 Metodo: cada control se configura SOLO desde la web y se verifica en 3
 niveles (llega a la corrida / cambia el comportamiento / el visor muestra lo
 mismo que el JSON, incluidas carga y capacidad desde el bloque 5).
-- Hecho: bloques 0, 1, 2, 4 y **5 (Flota, 11/11)**. Corregidos H-01, H-07,
-  H-05 (BK-15), H-14, H-17 (panel del visor), H-18 (flota por defecto) y
-  H-19 (ociosos trabados con outbound activo).
-- **Siguiente: bloque 3 (Motor avanzado).** Luego 7, 8, 6, 10, 9, 11, 12 y
-  las pruebas combinadas.
+- Hecho: bloques 0, 1, 2, 3 (5/6), 4 y 5 (11/11). Corregidos H-01, H-07,
+  H-05 (BK-15), H-14, H-17, H-18, H-19 y H-26.
+- **Siguiente: bloque 7 (Outbound Staging).** Luego 8, 10, 9, 11, 12 y las
+  combinadas; el 6 (Layout y Datos) espera a INIT-10.
 - Servidor de QA: `web-qa` de `.claude/launch.json` (sin recarga automatica;
   ver BK-16). Herramientas en `scripts/qa/`.
 
@@ -56,12 +55,13 @@ es punto de control con el Director.
 
 ## Decisiones del Director pendientes
 
-1. **BK-25 / QA H-15 (alta, realismo) -- EN ESPERA de consulta externa:**
-   encargo listo en `docs/CONSULTA_DISENO_CIRCULACION_Y_LAYOUT.md` (salidas
-   de un solo sentido, fila, reglas de circulacion, orden frente a INIT-10).
-   Atasco circular en la zona de
-   descarga con flota grande (los que esperan tapan la salida del que
-   descarga; duplicar la flota casi no rinde).
+1. **BK-25 / QA H-15 + H-27 (alta, realismo) -- PROPUESTA LISTA:**
+   `docs/PROPUESTA_DISENO_CIRCULACION_Y_LAYOUT.md` (consultor Fable 5.1;
+   encargo en `docs/CONSULTA_DISENO_CIRCULACION_Y_LAYOUT.md`). Pasa tambien
+   con la flota canonica (3 de 4 corridas con semilla libre). Decisiones
+   D1-D10 en su seccion 7; F0 (corregir que el que espera ocupe dos celdas)
+   mueve el baseline.
+   **BK-30 / QA H-25:** el muelle de salida no es realista en WH1 (D3, D10).
 2. **BK-28 / QA H-22:** una config sin bloque `outbound` corre con outbound
    encendido desde la web y apagado desde consola.
 3. **BK-16:** el servidor del cliente se reinicia solo al cambiar un `.py` y
@@ -78,8 +78,8 @@ es punto de control con el Director.
 ## Que esta VIVO y ACTIVO ahora mismo (ademas de CLAUDE.md §3/§5)
 
 - Congestion timewindow ACTIVA en el canonico, con las garantias de BK-15:
-  0 co-ocupaciones con la flota canonica fuera de la ventana de arranque (con
-  flota grande reaparecen por BK-25); los ociosos esperan en celdas elegidas
+  con la semilla 42 da 0 co-ocupaciones, pero con semilla libre aparecen
+  en la descarga tambien con la flota canonica (BK-25, H-27); los ociosos esperan en celdas elegidas
   automaticamente o en `zonas_espera`, siempre fuera de los carriles de
   descarga (H-19).
 - BK-06: `work_area_equipment` manda; "Generar Flota por Defecto" lo respeta.
@@ -89,7 +89,7 @@ es punto de control con el Director.
 
 ## Bugs conocidos (no criticos)
 
-- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-29.
+- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-30.
 - Al reiniciar el servidor a mano puede quedar un proceso hijo de
   `multiprocessing` reteniendo el puerto 8000: hay que cerrarlo tambien.
 - El visor no interpola posiciones entre snapshots (mitigado con "Saltar

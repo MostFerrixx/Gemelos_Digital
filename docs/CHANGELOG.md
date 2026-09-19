@@ -12,6 +12,12 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ## 2026-09-19
 
+- **QA H-26 -- con outbound, la corrida esperaba al ultimo camion**
+  (`dcf71b3`). Antes cortaba con 1-3 pallets sin despachar. Gate PASS.
+- **Plan de QA: bloque 3 (Motor avanzado)**: 5/6; QA-3.1 falla por H-15
+  (tambien con la flota canonica). Consulta de diseno con Fable 5.1:
+  `docs/PROPUESTA_DISENO_CIRCULACION_Y_LAYOUT.md`; su causa principal
+  (H-27, el que espera ocupa dos celdas) quedo confirmada.
 - **QA H-19 -- con outbound activo los ociosos quedaban trabados** (`61697d8`).
   Las celdas de espera de BK-15 se elegian antes de que el outbound
   convirtiera cada descarga en un carril bloqueado; quedaban adentro y el

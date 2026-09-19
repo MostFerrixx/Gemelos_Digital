@@ -23,7 +23,8 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-26 — la consola del Simulation Runner no tiene limite de lineas | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-20) |
 | BK-27 — prioridades muertas sin aviso cuando el mapa cambia de equipo | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-21) |
 | BK-29 — con outbound activo hay operarios que arrancan dentro de un carril | ABIERTO (2026-09-19) | Baja | A definir | Ninguno (QA H-23) |
-| **BK-25 — atasco circular en la zona de descarga con flota grande** | **ABIERTO (2026-09-19)** | **Alta (realismo)** | A definir | Decision de diseno del Director (QA H-15) |
+| **BK-25 — operarios que se pisan en la zona de descarga (tambien con la flota canonica)** | **PROPUESTA LISTA (2026-09-19)** | **Alta (realismo)** | F0 1 dia; F1 3-4 dias; F2 2-3 dias | Decisiones D1-D9 de `docs/PROPUESTA_DISENO_CIRCULACION_Y_LAYOUT.md` (QA H-15, H-27) |
+| BK-30 — el muelle de salida (outbound) no es realista en WH1 | ABIERTO (2026-09-19) | Media (realismo, solo con outbound) | F3 de la propuesta, 3-4 dias | Decisiones D3 y D10 de la propuesta (QA H-25) |
 | BK-24 — la estrategia "Cercania" casi no se distingue de "cualquier tarea" | ABIERTO (2026-09-19) | Media (diseno) | A definir | Decision de diseno (QA H-13) |
 | BK-23 — el despacho manda un segundo equipo a una ubicacion ocupada | ABIERTO (2026-09-18) | Media (realismo/eficiencia) | A definir | Ninguno (sale de BK-15) |
 | BK-13 — KPI "Tareas" del visor es un numero fabricado (x3) | ABIERTO (2026-09-18) | Media | Chico | Ninguno (QA H-02) |
@@ -180,7 +181,20 @@ que el primero termine: la corrida pasa de 37.354 s a 57.168 s (+53%). En un
 almacen real el segundo equipo recibiria otra tarea. El despacho no mira si la
 ubicacion de la tarea esta ocupada o reservada por otro agente.
 
-### BK-25 — atasco circular en la zona de descarga con flota grande (QA H-15)
+### BK-25 — operarios que se pisan en la zona de descarga (QA H-15, H-27)
+
+**Actualizacion 2026-09-19.** No es solo con flota grande: con la flota
+canonica 2+2 y semilla libre, 3 de 4 corridas web tuvieron co-ocupaciones en
+la descarga (1/7/3/0). Con la semilla 42 da 0 por casualidad. Consulta de
+diseno hecha con un consultor externo: propuesta completa en
+`docs/PROPUESTA_DISENO_CIRCULACION_Y_LAYOUT.md`. Ahi estan tres causas
+encimadas:
+1. El que espera ocupa dos celdas (H-27): el planificador le reserva
+   tambien la celda de la que salio durante toda la espera. Confirmado.
+2. Nadie garantiza la salida del que descarga.
+3. El ultimo recurso del motor es pisar a otro.
+
+Texto original del hallazgo:
 
 Salio en QA-5.2 (4 terrestres + 4 montacargas, todo el trabajo va a la zona
 de descarga 1, en (3,29)). La zona de descarga admite un solo operario a la
@@ -241,6 +255,20 @@ carril de celdas bloqueadas. Algunos operarios ya estaban parados ahi al
 arrancar: el buscador de rutas avisa "Start position ... is not walkable" (60
 veces con semilla 42) y esos primeros movimientos salen de una celda que ya
 no es transitable.
+
+### BK-30 — el muelle de salida (outbound) no es realista en WH1 (QA H-25)
+
+Con el muelle de salida activo:
+- Cada tarea se convierte en su propio pallet, que se deposita de a uno en
+  el carril, y solo entra un operario por carril. La corrida canonica pasa
+  de ~7.300 s a 16.091 s; con camion cada 600 s, a 63.016 s.
+- Las 7 zonas de descarga se expanden solas a manchas de 8 celdas que tapan
+  enteras las filas 28 y 29: el pasillo frontal de 3 filas queda en 1.
+- Al entrar o salir del carril hay saltos de 2-3 celdas (52 en una corrida).
+- Ningun camion cargo mas de 7 pallets, aunque la capacidad es 8.
+
+WH1 no tiene un anden de muelle donde quepan carriles reales. Analisis y
+opciones en la propuesta de diseno (seccion 2.5, decisiones D3 y D10).
 
 ### BK-24 — la estrategia "Cercania" casi no se distingue de "cualquier tarea" (QA H-13)
 
