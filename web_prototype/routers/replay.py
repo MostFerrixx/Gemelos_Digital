@@ -24,6 +24,11 @@ def get_layout():
     Orden: layout_file del config -> ruta historica -> WH1.tmx.
     """
     candidates = []
+    # QA H-28: primero el mapa de la corrida CARGADA. Correr desde la web no
+    # modifica config.json, asi que con otro layout el visor dibujaba el mapa
+    # equivocado (simulacion 30x42 sobre un dibujo de 30x30).
+    if getattr(replay_data, 'layout_file', None):
+        candidates.append(os.path.join(PROJECT_ROOT, replay_data.layout_file))
     try:
         cfg = config_manager.load_config()
         layout_rel = cfg.get('layout_file')

@@ -33,6 +33,7 @@ class ReplayData:
         self.sla_summary = None  # INIT-4b: resumen de cumplimiento de SLA (due_time)
         self.bottleneck_summary = None  # MEJ-BOTTLENECK: cuellos de botella de la corrida
         self.inbound_summary = None  # INIT-7 F4: KPIs de recepcion/putaway
+        self.layout_file = None  # QA H-28: mapa con el que se corrio este replay
         self.load_data()
         self.precompute_snapshots()
 
@@ -167,6 +168,7 @@ class ReplayData:
             self.sla_summary = None
             self.bottleneck_summary = None
             self.inbound_summary = None
+            self.layout_file = None
             with open(REPLAY_FILE, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
@@ -185,6 +187,9 @@ class ReplayData:
                             self.bottleneck_summary = event.get('bottleneck_summary')
                             # INIT-7 F4: KPIs de recepcion/putaway desde la metadata.
                             self.inbound_summary = event.get('inbound_summary')
+                            # QA H-28: el visor debe dibujar el mapa de ESTA
+                            # corrida, no el de config.json (el boton Run no lo toca).
+                            self.layout_file = (event.get('config') or {}).get('layout_file')
                             # Extract initial WOs directly from event
                             initial_wos = event.get('initial_work_orders', [])
                             print(f"Found {len(initial_wos)} initial WOs in SIMULATION_START")
