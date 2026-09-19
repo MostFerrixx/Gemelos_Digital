@@ -10,6 +10,19 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-19
+
+- **QA H-14 -- el tiempo por celda configurado gobernaba nada** (`c06742d`).
+  Con la capa anti-colision activa (canonico) el movimiento sale del plan, y
+  el planificador se creaba con `time_per_cell=0.1` fijo: el perfil "Real"
+  (1 s/celda) no hacia caminar mas lento a nadie. Ahora se lee de
+  `tiempos.time_per_cell`. Reprobado desde la web (pasos 1,0 / 0,5 s). Gate
+  PASS (el canonico usa 0,1). +3 tests (308 passed).
+- **Plan de QA: bloques 2 (Despacho y tours, 7/7) y 4 (Tiempos, 16/17)**
+  ejecutados desde la web con verificacion en 3 niveles; herramientas nuevas
+  `scripts/qa/analizar_tours.py`, `verificar_radio.py`, `verificar_tiempos.py`.
+  Observacion H-13 (Cercania) -> BK-24.
+
 ## 2026-09-18
 
 - **BK-15 / QA H-05 -- nunca dos operarios en la misma celda.** La capa

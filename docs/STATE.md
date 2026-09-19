@@ -4,7 +4,7 @@
 > presente, nada mas. Historial -> `docs/CHANGELOG.md`. Pendientes ->
 > `docs/BACKLOG.md`. Identidad/reglas/arquitectura -> `CLAUDE.md`.
 
-**Ultima actualizacion:** 2026-09-18
+**Ultima actualizacion:** 2026-09-19
 
 ## Git
 
@@ -23,7 +23,7 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 305 passed, 1 deselected (~15s)
+python -m pytest -q                # 308 passed, 1 deselected (~20s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline 5c7f4c32)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
@@ -36,10 +36,11 @@ Metodo: cada control se configura SOLO desde la web y se verifica en 3
 niveles (llega a la corrida / cambia el comportamiento / el visor muestra lo
 mismo que el JSON). Modo de trabajo del Director: cada error se corrige apenas
 se confirma, se reprueba y recien entonces se sigue.
-- Hecho: bloque 0 (metodo), bloque 1 (Carga de Trabajo). Corregidos H-01
-  (Run descartaba la config sin control web), H-07 (un 0 se reemplazaba por el
-  default) y H-05 (co-ocupaciones, BK-15).
-- **Siguiente: bloque 2 (Despacho y tours).**
+- Hecho: bloques 0 (metodo), 1 (Carga de Trabajo), 2 (Despacho y tours) y
+  4 (Tiempos). Corregidos H-01 (Run descartaba la config sin control web),
+  H-07 (un 0 se reemplazaba por el default), H-05 (co-ocupaciones, BK-15) y
+  H-14 (el tiempo por celda se ignoraba).
+- **Siguiente: bloque 5 (Flota).**
 - Para QA usar el servidor `web-qa` de `.claude/launch.json` (sin recarga
   automatica; ver BK-16). Herramientas: `scripts/qa/analizar_replay.py`,
   `scripts/qa/esperar_corrida.py`.
