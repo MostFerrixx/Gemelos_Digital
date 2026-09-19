@@ -292,6 +292,14 @@ Botón en la cabecera de la tarjeta *Equipo por Área*. Crea de un saque una flo
 estándar. Útil para arrancar. **Reemplaza la flota actual**, así que pide
 confirmación.
 
+- Arma un grupo de operarios a pie y uno de montacargas, de 2 agentes cada uno.
+- Cada área va al grupo del equipo que indica el mapa *Equipo por Área*. Por
+  eso la flota generada siempre cubre todas las áreas.
+- Las prioridades se numeran 1, 2, 3… en el orden de las áreas del layout.
+- Capacidad y tiempo de descarga: los de `fleet_defaults` si la configuración
+  cargada los trae (hoy solo por Importar). Si no: 150 L y 5 s los operarios a
+  pie, 1000 L y 5 s los montacargas.
+
 ## Tipo de equipo requerido por área
 
 Un desplegable por cada área del almacén, con dos valores básicos:
