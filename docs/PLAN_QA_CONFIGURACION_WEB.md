@@ -6,7 +6,9 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 5 — Flota.
+**Objetivo inmediato:** Bloque 5 — Flota (en curso: 5.1 a 5.5 hechos; sigue 5.6).
+**Pendiente de decisión del Director: H-15 / BK-25** (atasco circular en la
+zona de descarga con flota grande).
 **Último cerrado:** Bloque 4 — Tiempos (19/09): 16 de 17 casos pasan en los 3
 niveles (4.13 no aplicable con los datos actuales); 200/200 posiciones visor
 = JSON. **1 error crítico encontrado y corregido: H-14** (el tiempo por celda
@@ -478,6 +480,10 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-4.15 | 19/09 | + aplicar a montacargas \| idéntico | Montacargas cargado **0,16 s** (0,08 / 0,5), vacío 0,08 s | 20/20 | **PASA** | — |
 | QA-4.16 | 19/09 | variabilidad CV 0,25 \| idéntico | σ log medida 0,251 vs 0,246 (+0,7 errores estándar), media real/esperado 0,995 | 20/20 | **PASA** | — |
 | QA-4.17 | 19/09 | CV 0,5 \| idéntico | σ log 0,455 vs 0,472 (−1,3 errores estándar); el generador probado aparte con 200.000 muestras da CV 0,501 | 20/20 | **PASA** | — |
+| QA-5.1 | 19/09 | 1 terrestre + 1 montacargas \| idéntico | 2 agentes; fin **14.541 s** (≈2× el control de ~7.300 s con 2+2) | 10/10 | **PASA** | — |
+| QA-5.2 | 19/09 | 4 + 4 \| idéntico | 8 agentes, todos trabajan; fin 6.756 s (semilla libre) y 7.178 s (semilla fija): **casi no mejora** contra 2+2. Atasco circular en la descarga 1: 28 rendiciones del planificador, 32 co-ocupaciones (hasta 6 agentes en (3,29)) | 40/40 | **PASA** la configuración; **revela H-15** | H-15 |
+| QA-5.3/5.4/5.5 | 19/09 | terrestre cap. 50 + descarga 60 s; montacargas cap. 3000 \| idéntico | Carga máx. terrestre **50**; recorridos: montacargas 19,1 tareas vs terrestres 4,2; descarga terrestre **60,0 s**, montacargas 5 s; 626/626 picks exactos. 21 co-ocupaciones en la descarga (H-15). Montacargas cortado en 20 tareas pese a capacidad 3000 (H-16) | 20/20 posiciones; **capacidad y carga del panel: FALLA** (siempre 0 de 100) | **PASA** tras corregir H-17 | H-15, H-16, H-17 |
+| H-17 reprueba | 19/09 | — | — | Panel del visor en t=11.983: barras 100% (50/50), 20% (10/50), 3,2% (95/3000), 15,0% (451/3000) = JSON | **PASA** | H-17 cerrado |
 | H-01 reprueba 1 | 18/09 | Corrida canónica: copia temporal **idéntica** a `config.json` (antes faltaba `cercania_tour_mode`) y = metadata | — | — | **PASA** | H-01 cerrado |
 | QA-1.1 | 18/09 | `total_ordenes` 50 \| 50 | 50 pedidos, 107 tareas, todas completadas; fin 1.415 s | 20/20 | **PASA** | — |
 | QA-1.2 | 18/09 | 600 \| 600 | 600 pedidos, 1.195 tareas completadas; fin 15.178 s = **2,08×** el control (esperado ~2×) | 20/20 | **PASA** | H-05 (evidencia) |
@@ -496,7 +502,7 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 
 Los hallazgos abiertos están además en `docs/BACKLOG.md` (18/09):
 H-02→BK-13, H-03→BK-14, H-05→BK-15, H-06→BK-16, H-08→BK-17, H-09→BK-18,
-H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24; la sección 4.1 → BK-22.
+H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24, H-15→BK-25, H-16→BK-22; la sección 4.1 → BK-22.
 
 | # | Severidad | Caso | Descripción | Causa raíz | Propuesta | Estado |
 |---|---|---|---|---|---|---|
@@ -516,6 +522,9 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24; la sección 4.1 → BK-2
 | H-14 | **CRÍTICO** | QA-4.2 | **El tiempo por celda configurado se ignoraba.** Con la capa anti-colisión activa (canónico) todo el movimiento sale del plan, y el planificador se creaba con `time_per_cell=0.1` fijo: el perfil "Real" (1,0 s/celda) o cualquier valor de la web no cambiaba la velocidad de nadie (el factor de montacargas y la horquilla sí se aplicaban) | `warehouse.py`: `SpaceTimePlanner(time_per_cell=0.1)` | **Corregido** (`c06742d`): se lee de `tiempos.time_per_cell`. +3 tests. Gate PASS (el canónico usa 0,1) | **Cerrado** (reprobado) |
 | H-13 | OBS (diseño) | QA-2.3, 2.4 | **Cercanía casi no se distingue de "cualquier tarea".** (1) El radio por defecto (100) no filtra nada en este mapa (distancia máxima ~42). (2) Más de fondo: todo recorrido termina en la zona de descarga, así que la cercanía se mide siempre desde ahí; con radio 5, 61 de 64 recorridos no tenían nada cerca y cayeron al almacén completo. Además, por código, Cercanía filtra por equipo compatible pero **no** por prioridad de área (Plan y Global sí): sin verificar su efecto | Diseño de la estrategia | → BK-24 | Abierto |
 | H-12 | MENOR | QA-1.9 | Con "Todo o Nada", la vista previa dice "10 Órdenes" y no avisa que el pedido con el ítem inválido se descarta entero | La vista previa no mira la política | Mostrar "órdenes que se descartarán" según la política | Abierto |
+| H-15 | **MAYOR** (realismo) | QA-5.2, 5.5 | **Atasco circular en la zona de descarga.** La descarga admite un solo operario; los que esperan turno se paran en las celdas vecinas (2,29), (4,29), (3,28), que son la única salida del que descarga. Nadie cede; tras 10 min de reintentos el motor se rinde, avanza por la ruta fija y vuelven las co-ocupaciones (hasta 6 agentes en (3,29)). Duplicar la flota casi no acorta la corrida | Capacidad 1 de la descarga + espera en la boca de salida | → BK-25. **Decisión de diseño del Director** | Abierto |
+| H-16 | MENOR (configurabilidad) | QA-5.4 | El tope de tareas por recorrido (`max_wos_por_tour`, 20) no tiene control en la web: un montacargas de capacidad 3000 sigue cortando sus recorridos en 20 tareas y el cliente no sabe por qué | Clave del motor sin control | → BK-22 | Abierto |
+| H-17 | MENOR (visor) | QA-5.3 (N3) | **El panel del visor mostraba siempre carga 0 de capacidad 100 (terrestre) o 200 (montacargas)**, sin importar la configuración ni lo que llevaba el operario | `app_state._apply_event_to_state` descartaba `cargo_volume` y `capacidad` del evento; `routers/replay.py` completaba con 100/200 fijos | **Corregido** (`63c9c39`): se copian del evento. +1 test | **Cerrado** (reprobado) |
 
 ## 11. Registro de cambios de este plan
 
@@ -563,3 +572,6 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24; la sección 4.1 → BK-2
   (2) al medir la variabilidad, restar los componentes fijos (horquilla) y
   usar la muestra completa, con el error estándar como criterio; (3) reglas 8
   y 9 agregadas.
+- 2026-09-19 — Bloque 5 (en curso). El nivel 3 suma la **carga y capacidad**
+  de cada operario en el panel (no solo celda y estado): así apareció H-17.
+  Lección: comparar cada dato que el visor dibuja, no solo la posición.

@@ -19,6 +19,7 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-08 — confirmar work_area_equipment con el almacen real | ABIERTO (2026-07-25) | **Alta** (supuesto activo) | Trivial (config) | Lectura del almacen real (Director/cliente) |
 | BK-09 — flota 2+2 sub-dimensionada (hallazgo de negocio) | ABIERTO (2026-07-25) | Media | Trivial (config) | Decision de negocio del Director |
 | BK-10 — el boton "Restart" responde success pero NO reinicia el servidor | ABIERTO (2026-09-07) | Baja | ~30 min | Ninguno |
+| **BK-25 — atasco circular en la zona de descarga con flota grande** | **ABIERTO (2026-09-19)** | **Alta (realismo)** | A definir | Decision de diseno del Director (QA H-15) |
 | BK-24 — la estrategia "Cercania" casi no se distingue de "cualquier tarea" | ABIERTO (2026-09-19) | Media (diseno) | A definir | Decision de diseno (QA H-13) |
 | BK-23 — el despacho manda un segundo equipo a una ubicacion ocupada | ABIERTO (2026-09-18) | Media (realismo/eficiencia) | A definir | Ninguno (sale de BK-15) |
 | BK-13 — KPI "Tareas" del visor es un numero fabricado (x3) | ABIERTO (2026-09-18) | Media | Chico | Ninguno (QA H-02) |
@@ -175,6 +176,38 @@ que el primero termine: la corrida pasa de 37.354 s a 57.168 s (+53%). En un
 almacen real el segundo equipo recibiria otra tarea. El despacho no mira si la
 ubicacion de la tarea esta ocupada o reservada por otro agente.
 
+### BK-25 — atasco circular en la zona de descarga con flota grande (QA H-15)
+
+Salio en QA-5.2 (4 terrestres + 4 montacargas, todo el trabajo va a la zona
+de descarga 1, en (3,29)). La zona de descarga admite un solo operario a la
+vez. Los que llegan a descargar mientras esta ocupada esperan en las celdas
+vecinas: (2,29), (4,29) y (3,28). Pero esas son justamente las unicas
+celdas por donde el que esta descargando puede salir. Resultado: el que
+descarga no puede irse, los que esperan no pueden entrar, y nadie cede. Es un
+bloqueo circular.
+
+Tras 10 minutos simulados de reintentos, el motor se rinde y el operario
+avanza por la ruta fija aunque la celda este ocupada. Por eso reaparecen dos
+agentes en la misma celda: justo lo que BK-15 habia eliminado.
+
+Evidencia de la corrida con semilla (4+4, canonico):
+- 28 rendiciones.
+- 32 co-ocupaciones: 26 en (3,29), con hasta 6 agentes juntos.
+- 50.643 esperas de replanificacion y 914 movimientos bloqueados.
+
+El visor lo muestra fielmente (40/40 posiciones = JSON; captura a t=5476 con
+6 agentes apilados). El costo en rendimiento: duplicar la flota casi no
+acorta la corrida (6.756-7.178 s contra ~7.300 s con 2+2), porque todos
+hacen cola en la misma descarga.
+
+Tambien aparece, mas leve, con la flota 2+2 cuando la descarga es lenta.
+QA-5.5 (descarga de 60 s): 21 co-ocupaciones en (3,29) y (3,28), 16
+rendiciones.
+
+En un almacen real, quien espera para descargar deja libre el paso de salida
+(hace cola a un costado o en un pulmon). Ademas, una zona de descarga de
+varios metros suele admitir mas de un operario a la vez.
+
 ### BK-24 — la estrategia "Cercania" casi no se distingue de "cualquier tarea" (QA H-13)
 
 Medido en el bloque 2 del QA. La estrategia funciona como esta programada (0
@@ -267,6 +300,11 @@ un componente fantasma. Hoy el motor lee estas claves que la web no muestra
   `slot_poll_dt`, `dwell_scaffold`, `dispatch_policy`).
 - `tiempos.cell_size_m`, `tiempos.speed_factor_ground`.
 - `cercania_tour_mode` (estrategia descartada en BK-03: evaluar si se elimina).
+- `max_wos_por_tour` (tope de tareas por recorrido, 20 por defecto; QA H-16).
+  Es un limite que el cliente no ve y que puede anular la capacidad que si
+  configura. En QA-5.4, con un montacargas de capacidad 3000, los recorridos
+  se cortaban igual en 20 tareas (media 19,1). El cliente sube la capacidad y
+  no entiende por que no cambia nada.
 
 ---
 
