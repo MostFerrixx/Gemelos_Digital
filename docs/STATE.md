@@ -56,7 +56,10 @@ es punto de control con el Director.
 
 ## Decisiones del Director pendientes
 
-1. **BK-25 / QA H-15 (alta, realismo):** atasco circular en la zona de
+1. **BK-25 / QA H-15 (alta, realismo) -- EN ESPERA de consulta externa:**
+   encargo listo en `docs/CONSULTA_DISENO_CIRCULACION_Y_LAYOUT.md` (salidas
+   de un solo sentido, fila, reglas de circulacion, orden frente a INIT-10).
+   Atasco circular en la zona de
    descarga con flota grande (los que esperan tapan la salida del que
    descarga; duplicar la flota casi no rinde).
 2. **BK-28 / QA H-22:** una config sin bloque `outbound` corre con outbound
