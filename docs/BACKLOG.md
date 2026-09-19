@@ -19,6 +19,7 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-08 — confirmar work_area_equipment con el almacen real | ABIERTO (2026-07-25) | **Alta** (supuesto activo) | Trivial (config) | Lectura del almacen real (Director/cliente) |
 | BK-09 — flota 2+2 sub-dimensionada (hallazgo de negocio) | ABIERTO (2026-07-25) | Media | Trivial (config) | Decision de negocio del Director |
 | BK-10 — el boton "Restart" responde success pero NO reinicia el servidor | ABIERTO (2026-09-07) | Baja | ~30 min | Ninguno |
+| BK-24 — la estrategia "Cercania" casi no se distingue de "cualquier tarea" | ABIERTO (2026-09-19) | Media (diseno) | A definir | Decision de diseno (QA H-13) |
 | BK-23 — el despacho manda un segundo equipo a una ubicacion ocupada | ABIERTO (2026-09-18) | Media (realismo/eficiencia) | A definir | Ninguno (sale de BK-15) |
 | BK-13 — KPI "Tareas" del visor es un numero fabricado (x3) | ABIERTO (2026-09-18) | Media | Chico | Ninguno (QA H-02) |
 | BK-14 — una corrida cancelada deja una carpeta a medias | ABIERTO (2026-09-18) | Baja | Chico | Ninguno (QA H-03) |
@@ -173,6 +174,19 @@ vez en la misma celda (imposible); con BK-15 corregido, el segundo espera a
 que el primero termine: la corrida pasa de 37.354 s a 57.168 s (+53%). En un
 almacen real el segundo equipo recibiria otra tarea. El despacho no mira si la
 ubicacion de la tarea esta ocupada o reservada por otro agente.
+
+### BK-24 — la estrategia "Cercania" casi no se distingue de "cualquier tarea" (QA H-13)
+
+Medido en el bloque 2 del QA. La estrategia funciona como esta programada (0
+violaciones del radio en 128 recorridos), pero en la operacion modelada casi
+no tiene efecto: (1) el radio por defecto (100 celdas) es mayor que cualquier
+distancia de este mapa (~42 como maximo), asi que no filtra nada; (2) cada
+recorrido termina en la zona de descarga, entonces la "cercania" se mide
+siempre desde ahi: con radio 5, 61 de 64 recorridos no encontraron nada cerca
+y cayeron al almacen completo. Ademas, segun el codigo
+(`dispatcher._estrategia_cercania`), filtra por equipo compatible pero NO por
+prioridad de area, a diferencia de Plan y Optimizacion Global (efecto no
+verificado todavia). El radio se mide en linea recta, no por camino.
 
 ### BK-13 — el KPI "Tareas" del visor es un numero fabricado (QA H-02)
 

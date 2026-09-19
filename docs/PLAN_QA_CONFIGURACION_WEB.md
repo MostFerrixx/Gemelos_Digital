@@ -6,9 +6,10 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 2 — Despacho y tours.
-**Último cerrado:** H-05 integrado a `main` con referencia nueva `5c7f4c32`
-(18/09): 0 co-ocupaciones en operación.
+**Objetivo inmediato:** Bloque 4 — Tiempos (sigue el orden de la sección 6).
+**Último cerrado:** Bloque 2 — Despacho y tours (19/09): 7/7 casos pasan en
+los 3 niveles; 140/140 posiciones visor = JSON. Sin errores; 1 observación
+de diseño (H-13).
 Después: Bloque 2 — Despacho y tours.
 **Último cerrado:** Bloque 1 completo (18/09): 11 corridas, todas pasan tras
 corregir H-07; 220/220 posiciones visor = JSON.
@@ -273,8 +274,8 @@ Salvo indicación, todo lo demás queda en el canónico.
 | QA-2.1 | Ejecución de Plan (canónico) | N2: la 1.ª WO de cada tour es la de menor `pick_sequence` pendiente en el área prioritaria del agente |
 | QA-2.2 | Optimización Global | N2: la 1.ª WO es la de menor costo desde la posición; distancia media al 1.er pick < Plan |
 | QA-2.3 | Cercanía, radio 100 | N2: 1.ª WO dentro del radio (o expansión justificada) |
-| QA-2.4 | Cercanía, radio 5, máx. expansiones 0 | N2: ningún primer pick fuera de 5 celdas… salvo el respaldo a todo el almacén; documentar el comportamiento real |
-| QA-2.5 | Cercanía, radio 5, paso 5, 2 expansiones | N2: distancias ≤ 15 o respaldo |
+| QA-2.4 | Cercanía, radio 5, máx. expansiones 0 | N2: si al pedir trabajo había alguna tarea compatible a ≤ 5 celdas (línea recta, como el motor), el recorrido la usa; si no, cae al almacén completo sin escalones intermedios |
+| QA-2.5 | Cercanía, radio 5, paso 5, 2 expansiones | N2: se usa el primer escalón (5, 10, 15) con tareas; 0 recorridos que ignoren una tarea de su escalón |
 | QA-2.6 | Tour Simple + reparto 50/50 entre zonas 1 y 2 | N2: **ningún** tour mezcla zonas |
 | QA-2.7 | Tour Mixto + mismo reparto | N2: existen tours con más de una zona |
 
@@ -450,6 +451,13 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-0.3 | 18/09 | — | Herramienta determinista (dos pasadas idénticas sobre el replay de semilla 42) | — | **PASA** | — |
 | QA-0.1 | 18/09 | Copia temporal = metadata del `.jsonl`; vs `config.json` falta solo `cercania_tour_mode` | 300 órdenes, 603 tareas, todas completadas, todo a zona 1, capacidades 150/1000 respetadas, cada equipo solo en sus áreas | 5 instantes × 4 operarios: **20/20** coinciden en celda y estado; captura OK | **PASA** con hallazgo | H-01, H-02 |
 | QA-0.2 | 18/09 | Igual que QA-0.1 | 3 corridas: estructura idéntica; duración 6.772 / 7.256 / 7.833 s; tareas 603 / 625 / 606 | — | **PASA** (criterio recalibrado) | H-04 |
+| QA-2.1 | 19/09 | `Ejecucion de Plan` \| idéntico | **100%** de los 56 recorridos contiene la tarea pendiente de menor secuencia del área (firma de Plan); 64% contiene la más cercana | 20/20 | **PASA** | — |
+| QA-2.2 | 19/09 | `Optimizacion Global` \| idéntico | **97,7%** contiene la tarea más cercana por camino real (la excepción: el arranque, 1 celda de diferencia); solo 13,6% la de menor secuencia; caminata al 1.er pick 13,8 vs 18,4 celdas de Plan | 20/20 | **PASA** | — |
+| QA-2.3 | 19/09 | `Cercania` 100/50/5 \| idéntico | Radio 100 no filtra nada en este mapa (distancia máxima ~42): tarea más lejana asignada a 33 celdas; 58% contiene la más cercana | 20/20 | **PASA** | H-13 |
+| QA-2.4 | 19/09 | 5/50/**0** \| idéntico (antes de H-07 el 0 llegaba como 5) | 0 violaciones del radio; 3 recorridos a ≤5, 61 al almacén completo | 20/20 | **PASA** | H-13 |
+| QA-2.5 | 19/09 | 5/5/2 \| idéntico | Escalones usados: 3 a 5, 6 a 10, 12 a 15, 39 al almacén; **0 violaciones** | 20/20 | **PASA** | — |
+| QA-2.6 | 19/09 | Tour Simple + 50/50 zonas 1-2 \| idéntico | **0 de 62** recorridos mezclan zonas; 315/303 tareas (51/49); descargas físicas en (3,29) y (7,29) | 20/20 | **PASA** | — |
+| QA-2.7 | 19/09 | Tour Mixto + 50/50 \| idéntico | **53 de 66** recorridos mezclan zonas, y esas 53 rondas de descarga pasan físicamente por las dos zonas | 20/20 | **PASA** | — |
 | H-01 reprueba 1 | 18/09 | Corrida canónica: copia temporal **idéntica** a `config.json` (antes faltaba `cercania_tour_mode`) y = metadata | — | — | **PASA** | H-01 cerrado |
 | QA-1.1 | 18/09 | `total_ordenes` 50 \| 50 | 50 pedidos, 107 tareas, todas completadas; fin 1.415 s | 20/20 | **PASA** | — |
 | QA-1.2 | 18/09 | 600 \| 600 | 600 pedidos, 1.195 tareas completadas; fin 15.178 s = **2,08×** el control (esperado ~2×) | 20/20 | **PASA** | H-05 (evidencia) |
@@ -468,7 +476,7 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 
 Los hallazgos abiertos están además en `docs/BACKLOG.md` (18/09):
 H-02→BK-13, H-03→BK-14, H-05→BK-15, H-06→BK-16, H-08→BK-17, H-09→BK-18,
-H-10→BK-19, H-11→BK-20, H-12→BK-21; la sección 4.1 → BK-22.
+H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24; la sección 4.1 → BK-22.
 
 | # | Severidad | Caso | Descripción | Causa raíz | Propuesta | Estado |
 |---|---|---|---|---|---|---|
@@ -485,6 +493,7 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21; la sección 4.1 → BK-22.
 | H-09 | OBS | QA-1.7 | La ruta del archivo de órdenes se guarda **absoluta** (`D:\...\uploads\...`): un preset o `config.json` con archivo no funciona en otra carpeta o máquina | `/api/upload-orders` devuelve la ruta absoluta | Guardarla relativa al proyecto | Abierto |
 | H-10 | OBS (realismo) | QA-1.7, 1.8 | Con pocas tareas (10-34), **un operario de cada tipo se lleva todo el trabajo** en un solo recorrido y el otro queda ocioso toda la corrida | Ejecución de Plan + tope de tareas por tour: el primero que pide arma el tour más grande posible | Evaluar reparto más equilibrado (tope por tour configurable, o repartir cuando hay ociosos). Decisión de diseño | Abierto |
 | H-11 | OBS (realismo) | QA-1.8 | El cumplimiento (fill rate) queda en 100% aunque una línea se rechazó por SKU inexistente: la línea rechazada no cuenta como pedida | `service_level` se calcula sobre lo aceptado | Contar lo rechazado como no servido (el cliente lo pidió) | Abierto |
+| H-13 | OBS (diseño) | QA-2.3, 2.4 | **Cercanía casi no se distingue de "cualquier tarea".** (1) El radio por defecto (100) no filtra nada en este mapa (distancia máxima ~42). (2) Más de fondo: todo recorrido termina en la zona de descarga, así que la cercanía se mide siempre desde ahí; con radio 5, 61 de 64 recorridos no tenían nada cerca y cayeron al almacén completo. Además, por código, Cercanía filtra por equipo compatible pero **no** por prioridad de área (Plan y Global sí): sin verificar su efecto | Diseño de la estrategia | → BK-24 | Abierto |
 | H-12 | MENOR | QA-1.9 | Con "Todo o Nada", la vista previa dice "10 Órdenes" y no avisa que el pedido con el ítem inválido se descarta entero | La vista previa no mira la política | Mostrar "órdenes que se descartarán" según la política | Abierto |
 
 ## 11. Registro de cambios de este plan
@@ -515,3 +524,11 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21; la sección 4.1 → BK-22.
   desdobla en (a) política antes de subir y (b) después. Método del nivel 3:
   esperar a que el visor termine el `autoload` (recarga la página) antes de
   leer. Archivos de órdenes con `DragEvent('drop')` sobre `#orders-dropzone`.
+- 2026-09-19 — Bloque 2 cerrado. Herramientas nuevas:
+  `scripts/qa/analizar_tours.py` (firma de cada estrategia por recorrido,
+  con el mismo buscador de rutas del motor) y `scripts/qa/verificar_radio.py`
+  (regla de radio y escalones de Cercanía). **Lección de método:** la
+  posición para juzgar un despacho es la del momento en que el operario PIDIÓ
+  trabajo, no la del mismo instante después de su primer paso
+  (`analizar_replay.posicion_al_pedir`); sin eso aparecieron 18 "violaciones"
+  falsas del radio. QA-2.4/2.5 reescritos con el criterio correcto.

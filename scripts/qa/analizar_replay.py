@@ -83,6 +83,23 @@ def posiciones_en(linea, t):
     return estado
 
 
+def posicion_al_pedir(linea, agente, t):
+    """Celda donde estaba `agente` cuando PIDIO trabajo en el instante t.
+
+    En un mismo instante el agente puede pedir trabajo (estado idle) y dar el
+    primer paso del recorrido; la posicion util para verificar el despacho es
+    la del pedido, no la de despues del paso (QA bloque 2)."""
+    celda = None
+    for ts, a, c, s in linea:
+        if ts > t:
+            break
+        if a != agente:
+            continue
+        if ts < t or s == 'idle':
+            celda = c
+    return celda
+
+
 def resumir(meta, eventos):
     config = meta.get('config', {})
     iniciales = meta.get('initial_work_orders', []) or []
