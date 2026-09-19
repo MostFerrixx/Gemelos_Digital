@@ -10,6 +10,31 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-18
+
+- **BK-15 / QA H-05 -- nunca dos operarios en la misma celda.** La capa
+  anti-colision esquivaba al que se mueve pero no protegia al QUIETO: la
+  estadia cubria solo la primera de varias tareas en la misma ubicacion, no
+  incluia el paso de salida, el A* no verificaba toda la estadia en el
+  destino, y las reservas imposibles se omitian en silencio. Corregido, mas
+  tolerancia numerica en bordes, "plan no reservable = esperar y
+  replanificar", verificacion de ocupacion al ejecutar, eventos en la
+  caminata de salida de la descarga, y **zonas de espera** (decision del
+  Director: el ocioso nunca estorba; `zonas_espera` o automaticas, validadas
+  contra el mapa). Semilla 42: co-ocupaciones 23 -> 0 (canonica) y 373 -> 0
+  (100% extra grande), solo queda 1 en la ventana de arranque. Duracion
+  +3,8% canonica / +53,6% extra grande (antes dos montacargas pickeaban a la
+  vez en el mismo hueco: ver BK-23). Baseline `3a87a1c0` -> `5c7f4c32`.
+  +13 tests (305 passed).
+- **Plan de QA de la configuracion web** (`docs/PLAN_QA_CONFIGURACION_WEB.md`,
+  documento vivo). Bloques 0 y 1 ejecutados desde la web con verificacion en 3
+  niveles (config / comportamiento / visor = JSON, 220/220 posiciones).
+  Corregidos en el momento: **H-01** Run Simulation descartaba la
+  configuracion sin control web (y al importar, los parametros internos
+  salian del config.json); **H-07** un 0 en el formulario se reemplazaba por
+  el valor por defecto (mezcla 0%, "0 expansiones", costos 0; la flota ademas
+  truncaba decimales). Resto de hallazgos al backlog como BK-13..BK-23.
+
 ## 2026-09-17
 
 - **INIT-11 F2 -- perfiles con prioridad, regla de cambio y estacionamientos**

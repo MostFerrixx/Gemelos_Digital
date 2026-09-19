@@ -4,17 +4,16 @@
 > presente, nada mas. Historial -> `docs/CHANGELOG.md`. Pendientes ->
 > `docs/BACKLOG.md`. Identidad/reglas/arquitectura -> `CLAUDE.md`.
 
-**Ultima actualizacion:** 2026-09-17
+**Ultima actualizacion:** 2026-09-18
 
 ## Git
 
-- `main` = todo integrado por fast-forward desde `feat/datos-maestros-web`
-  (que incluye `feat/ui-flota-cards`), pusheado a origin.
-- `main` = `6a18e44` (INIT-11 F0 y F1 integradas y pusheadas el 2026-09-17).
-- Rama en curso: `feat/init11-f2-perfiles` (F2 hecha, sin mergear).
-- Baseline byte-identico vigente: **`sha256=3a87a1c0...`, 15.930.197 bytes**,
-  seed 42 (`tests/baseline.json`). Ultimo cambio: 2026-09-16, F0 (solo el
-  campo `work_group` de los eventos). F1 no lo cambio.
+- `main` integra por fast-forward (ramas re-apiladas, sin commits de merge):
+  INIT-11 F0-F2, el plan de QA de la configuracion web con sus correcciones
+  (H-01, H-07) y la correccion de la capa anti-colision (BK-15 / QA H-05).
+- Baseline byte-identico vigente: **`sha256=5c7f4c32...`, 16.591.951 bytes**,
+  seed 42 (`tests/baseline.json`). Cambio intencional del 2026-09-18 (BK-15:
+  nunca dos agentes en la misma celda; los ociosos esperan donde no estorban).
 - REGLA pinneada por tests BN-05 e IN-43: la metadata del .jsonl NO puede
   contener valores wall-clock.
 - En Windows `core.autocrlf=true`: `config.json` puede figurar como modificado
@@ -24,69 +23,59 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 292 passed, 1 deselected (~10s)
-python scripts/regression_gate.py  # GATE PASS esperado (baseline 3a87a1c0)
+python -m pytest -q                # 305 passed, 1 deselected (~15s)
+python scripts/regression_gate.py  # GATE PASS esperado (baseline 5c7f4c32)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
 
-## Estado del configurador web (revisado el 2026-09-16)
+## En curso: plan de QA de la configuracion web
 
-Las 8 pestanas usan el mismo patron de tarjetas y controles; barrido automatico
-sin controles con estilo nativo; claro/oscuro y 1280/1440 px verificados.
-**Guardar sin cambios es un no-op exacto** (verificado extremo a extremo).
+`docs/PLAN_QA_CONFIGURACION_WEB.md` (documento vivo: seccion 0 = objetivo
+inmediato; seccion 9 = registro de cada prueba; seccion 10 = hallazgos).
+Metodo: cada control se configura SOLO desde la web y se verifica en 3
+niveles (llega a la corrida / cambia el comportamiento / el visor muestra lo
+mismo que el JSON). Modo de trabajo del Director: cada error se corrige apenas
+se confirma, se reprueba y recien entonces se sigue.
+- Hecho: bloque 0 (metodo), bloque 1 (Carga de Trabajo). Corregidos H-01
+  (Run descartaba la config sin control web), H-07 (un 0 se reemplazaba por el
+  default) y H-05 (co-ocupaciones, BK-15).
+- **Siguiente: bloque 2 (Despacho y tours).**
+- Para QA usar el servidor `web-qa` de `.claude/launch.json` (sin recarga
+  automatica; ver BK-16). Herramientas: `scripts/qa/analizar_replay.py`,
+  `scripts/qa/esperar_corrida.py`.
 
-Novedades vigentes:
-- **Datos maestros desde la web** (pestana Layout y Datos): subir/validar el
-  Excel y el mapa, "Aplicar Excel" a `warehouse.db` con backup, aviso si el
-  Excel quedo mas nuevo que la base, tablas de consulta, y edicion de las
-  coordenadas de zonas (Outbound Staging) y muelles (Inbound) validadas contra
-  el mapa. **Recordar: el motor lee `warehouse.db`, no el Excel.**
-- "Run Simulation" corre sobre una copia temporal y no toca `config.json`.
-- Visor con "Saltar tiempos muertos".
-- Manual de usuario al dia: `docs/MANUAL_CONFIGURACION.md`.
+## INIT-11 Task Path (en pausa mientras avanza el QA)
 
-## PROXIMO PASO: INIT-11 Task Path
+Plan v2: **`docs/PLAN_INIT11_TASK_PATH.md`**. F0, F1 y F2 hechas e
+integradas. **Siguiente: F3** (pick -> punto de transferencia -> staging), que
+es punto de control con el Director.
 
-Plan v2 en ejecucion: **`docs/PLAN_INIT11_TASK_PATH.md`** (6 pilares, 11 fases).
-- **F0 = BK-12: HECHA** (`081e2a0`). El Work Group de cada orden sale del dato
-  real; unico cambio en eventos = campo `work_group`.
-- **F1: HECHA** (`277a9af`, en main). Personas + equipos, equivalencia exacta.
-- **F2: HECHA** (sin mergear). Perfiles con prioridad, regla de cambio y
-  estacionamientos. Medido: -16,8% de tiempo total con pickers polivalentes.
-- **Siguiente: F3** -- task path basico (pick -> punto de transferencia ->
-  staging). Es punto de control con el Director.
-- Puntos de control con el Director: al cerrar F1, F3, F6 y F8.
-- 4 decisiones menores en la seccion 10 del plan (con sugerencia).
+## Decisiones del Director pendientes
 
-## Decisiones del Director pendientes (no bloquean INIT-11)
-
-1. **BK-08 (alta):** confirmar con el almacen real que Area_High/Area_Special son
-   100% montacargas. Supuesto activo de BK-06.
-2. **BK-09:** flota 2+2 sub-dimensionada (2+4 es el optimo medido).
-3. **Reparto de `outbound_staging_distribution`** entre las 7 zonas (hoy 100% a
-   la zona 1: todo el trafico converge en una esquina).
-4. **BK-07:** areas mixtas. **BK-02:** FIFO en UI.
-5. **INIT-10** (modelo de almacen propio, reemplazo de Tiled): analizado, en
-   backlog para despues.
+1. **BK-16:** el servidor del cliente se reinicia solo al cambiar un `.py` y
+   cancela simulaciones (ligado a BK-10, el boton Restart depende de eso).
+2. **BK-19 / BK-23:** reparto del trabajo (un solo operario se lleva todo con
+   pocas tareas; el despacho manda un segundo equipo a una ubicacion ocupada).
+3. **BK-08 (alta):** confirmar con el almacen real que Area_High/Area_Special son
+   100% montacargas. **BK-09:** flota 2+2 sub-dimensionada.
+4. Reparto de `outbound_staging_distribution` (hoy 100% a la zona 1).
+5. **BK-07** areas mixtas, **BK-02** FIFO en UI, **INIT-10** modelo de almacen propio.
 
 ## Que esta VIVO y ACTIVO ahora mismo (ademas de CLAUDE.md §3/§5)
 
-- Congestion timewindow: ACTIVA en el canonico.
-- BK-06: `work_area_equipment` manda en el motor; capacidad por area derivada de
-  la flota real. Fuentes unicas: `src/core/fleet.py`, `src/core/work_areas.py`.
+- Congestion timewindow ACTIVA en el canonico, con las garantias de BK-15:
+  0 co-ocupaciones fuera de la ventana de arranque; los ociosos esperan en
+  celdas elegidas automaticamente (fila 29 entre zonas de descarga) o en
+  `zonas_espera` si se configuran.
+- BK-06: `work_area_equipment` manda; capacidad por area de la flota real.
 - Canonico con `agent_types` explicito (2 terrestres + 2 montacargas).
-- INIT-8 nucleo ACTIVO; F3/F4 e inbound opt-in.
-- Web: `server.py` + `app_state.py` + `routers/` (configurator, master_data,
-  replay, runners, system).
+- INIT-8 nucleo ACTIVO; F3/F4 e inbound opt-in. INIT-11 personas/equipos/
+  perfiles/estacionamientos: opt-in, sin editor web todavia (BK-22).
 
 ## Bugs conocidos (no criticos)
 
-- **BK-10:** el boton "Restart" responde `success` pero no reinicia el proceso.
+- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-23.
 - Al reiniciar el servidor a mano puede quedar un proceso hijo de
   `multiprocessing` reteniendo el puerto 8000: hay que cerrarlo tambien.
-- Deuda menor: copia de `_expected_equipment_for_area` en
-  `web_prototype/config_manager.py` y `fleet-manager.js`.
 - El visor no interpola posiciones entre snapshots (mitigado con "Saltar
   tiempos muertos").
-- `docs/INSTRUCCIONES_LAYOUT_PERSONALIZADO.md` desactualizada (dice `picking`,
-  el motor busca `picking_location`); se corrige en la etapa 1 de INIT-10.

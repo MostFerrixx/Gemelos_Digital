@@ -3,6 +3,8 @@
 
 Actualizado: 2026-09-18 · Responsable: Cerebellum
 
+*(BK-15 CERRADO el 2026-09-18 -> CHANGELOG.)*
+
 *(BK-05, BK-11 y el canonico migrado a `agent_types` explicito: CERRADOS el
 2026-09-08 -> CHANGELOG. BK-06 CERRADA el 2026-09-07; de ella salieron BK-07,
 BK-08 y BK-09, abiertos abajo. INIT-7 INBOUND completa F0-F5 el 2026-07-10;
@@ -17,7 +19,6 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-08 — confirmar work_area_equipment con el almacen real | ABIERTO (2026-07-25) | **Alta** (supuesto activo) | Trivial (config) | Lectura del almacen real (Director/cliente) |
 | BK-09 — flota 2+2 sub-dimensionada (hallazgo de negocio) | ABIERTO (2026-07-25) | Media | Trivial (config) | Decision de negocio del Director |
 | BK-10 — el boton "Restart" responde success pero NO reinicia el servidor | ABIERTO (2026-09-07) | Baja | ~30 min | Ninguno |
-| **BK-15 — dos montacargas en la misma celda a la vez (anti-colision)** | **CORREGIDO en rama `fix/bk15-anticolision` (2026-09-18)** | **Alta (realismo)** | Hecho | OK del Director para baseline + merge (QA H-05) |
 | BK-23 — el despacho manda un segundo equipo a una ubicacion ocupada | ABIERTO (2026-09-18) | Media (realismo/eficiencia) | A definir | Ninguno (sale de BK-15) |
 | BK-13 — KPI "Tareas" del visor es un numero fabricado (x3) | ABIERTO (2026-09-18) | Media | Chico | Ninguno (QA H-02) |
 | BK-14 — una corrida cancelada deja una carpeta a medias | ABIERTO (2026-09-18) | Baja | Chico | Ninguno (QA H-03) |
@@ -162,49 +163,6 @@ Salieron de probar cada control de la web contra el simulador y el visor
 (`docs/PLAN_QA_CONFIGURACION_WEB.md`, donde esta la evidencia completa de cada
 uno; el codigo `H-xx` es el del plan). Los errores que se corrigieron en el
 momento (H-01 y H-07) estan en el plan, no aca.
-
-### BK-15 — dos montacargas en la misma celda al mismo tiempo (QA H-05) — EN CURSO
-
-**Que pasa.** Con la capa anti-colision activa (canonico), dos operarios
-pueden ocupar la misma celda en el mismo instante. El caso mas visible: los
-dos montacargas pickeando juntos la MISMA ubicacion (QA-1.4: ambos en
-(17, 13) con SKU001, terminando con 0,1 s de diferencia). Tambien aparece uno
-"en movimiento" parado encima de otro que pickea (QA-1.2, celda (13, 6)).
-Es fisicamente imposible, asi que viola el principio rector #1.
-
-**Cuanto.** El propio motor lo cuenta en la metadata del replay
-(`bottleneck_summary.congestion.cooccupation_events_total`): 16-23 veces por
-corrida con la mezcla canonica y 373 con 100% extra grande (solo 3 SKUs: todo
-el trabajo cae en pocas ubicaciones y los choques se multiplican). Pasa sobre
-todo entre montacargas en celdas de pick y en la zona de descarga (3, 28)/(3, 29).
-
-**Descartado:** no es un problema del visor; el visor muestra fielmente lo que
-dice el JSON. El error esta en el motor.
-
-**Donde mirar.** Capa anti-colision (`reservation_table.py`,
-`spacetime_planner.py`, `operators._timewindow_execute_plan`,
-`_tw_reserve_dwell`) y el despacho que puede mandar a dos agentes a la misma
-ubicacion a la vez.
-
-**Avance (2026-09-18, rama `fix/bk15-anticolision`, commit `119064f`).** Causa
-raiz encontrada con trazas del motor: la capa esquivaba bien al que se mueve
-pero no protegia al que esta QUIETO. (C1) la estadia reservada cubria solo la
-primera de varias tareas seguidas en la misma ubicacion; (C2) la permanencia no
-incluia el paso de salida; (C3) el A* verificaba la llegada al destino pero no
-toda la estadia; y toda reserva imposible se omitia EN SILENCIO (el agente
-ejecutaba igual). Corregido, mas una tolerancia numerica en los bordes y la
-caminata de salida de la descarga que no emitia eventos. Resultado con semilla
-42: co-ocupaciones 23 -> 3 (canonica) y 373 -> 21 (100% extra grande).
-**Cierre tecnico (commit `258d9f7`).** Decision del Director: zona de espera
-configurable (`zonas_espera`), validada como los estacionamientos, con
-eleccion automatica si no se define; el ocioso reserva su celda sin fin y
-nunca estorba. Mas una verificacion al EJECUTAR (no se entra a una celda con
-otro agente adentro: se replanifica). Resultado con semilla 42: **0
-co-ocupaciones en operacion** en la canonica y en 100% extra grande (queda 1
-en la ventana de arranque, excepcion documentada). Corrida desde la web: 0 en
-operacion y 20/20 posiciones visor = JSON. Duracion: +3,8% canonica, +53,6%
-extra grande (ver BK-23). **Falta:** OK del Director para regenerar el
-baseline e integrar.
 
 ### BK-23 — el despacho manda un segundo equipo a una ubicacion ocupada
 
