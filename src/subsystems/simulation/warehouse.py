@@ -1259,7 +1259,15 @@ class AlmacenMejorado:
         # BUGFIX: Delegar al dispatcher que tiene la logica correcta
         # (compara completados vs total en lugar de verificar si lista esta vacia)
         terminado = self.dispatcher.simulacion_ha_terminado()
-        
+
+        # QA H-26: con camiones activos, un pedido no termina al llegar a la
+        # zona de descarga sino al subir al camion. Antes la corrida cortaba
+        # con 1-3 pallets todavia esperando el ultimo camion.
+        if terminado and self.outbound_process is not None:
+            _staged = int((getattr(self, 'outbound_metrics', None) or {}).get('pallets_staged', 0))
+            if _staged > int(self.outbound_process.pallets_shipped):
+                terminado = False
+
         if terminado and not self._simulation_finished:
             self._simulation_finished = True
             print(f"[ALMACEN] Simulacion finalizada en t={self.env.now:.2f}")
