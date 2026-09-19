@@ -24,6 +24,7 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-27 — prioridades muertas sin aviso cuando el mapa cambia de equipo | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-21) |
 | BK-29 — con outbound activo hay operarios que arrancan dentro de un carril | ABIERTO (2026-09-19) | Baja | A definir | Ninguno (QA H-23) |
 | **BK-25 — operarios que se pisan en la zona de descarga (tambien con la flota canonica)** | **PROPUESTA LISTA (2026-09-19)** | **Alta (realismo)** | F0 1 dia; F1 3-4 dias; F2 2-3 dias | Decisiones D1-D9 de `docs/PROPUESTA_DISENO_CIRCULACION_Y_LAYOUT.md` (QA H-15, H-27) |
+| BK-31 — adoptar el layout grande `WH1 v2.tmx` (tiene anden de muelle) | ABIERTO (2026-09-19) | Media | Chico (falta estacionamientos/recepcion) | Decision del Director |
 | BK-30 — el muelle de salida (outbound) no es realista en WH1 | ABIERTO (2026-09-19) | Media (realismo, solo con outbound) | F3 de la propuesta, 3-4 dias | Decisiones D3 y D10 de la propuesta (QA H-25) |
 | BK-24 — la estrategia "Cercania" casi no se distingue de "cualquier tarea" | ABIERTO (2026-09-19) | Media (diseno) | A definir | Decision de diseno (QA H-13) |
 | BK-23 — el despacho manda un segundo equipo a una ubicacion ocupada | ABIERTO (2026-09-18) | Media (realismo/eficiencia) | A definir | Ninguno (sale de BK-15) |
@@ -267,6 +268,23 @@ carril de celdas bloqueadas. Algunos operarios ya estaban parados ahi al
 arrancar: el buscador de rutas avisa "Start position ... is not walkable" (60
 veces con semilla 42) y esos primeros movimientos salen de una celda que ya
 no es transitable.
+
+### BK-31 — el layout grande `WH1 v2.tmx` no esta adoptado ni completo
+
+Existe `layouts/WH1 v2.tmx` (30x42, commit `5ec15ca` del 2026-06-06): mismos
+racks y mismas ubicaciones de picking que WH1, mas un ANDEN de muelle real
+(franja de 10 filas, x=3..28) con 7 carriles de 2 celdas de ancho por 10 de
+fondo. Verificado 2026-09-19: el motor corre con el (headless y desde la web,
+300 pedidos, 8.281 s, 1 co-ocupacion de arranque) y el visor lo dibuja bien
+desde la correccion de H-28.
+
+Lo que falta para adoptarlo:
+- No tiene celdas de estacionamiento (WH1 tiene 28) ni de recepcion (14):
+  INIT-11 F2 e INIT-7 no se pueden probar sobre el.
+- Las 7 zonas de descarga de la base apuntan a la fila 29 (la primera del
+  anden); con el muelle activo habria que definir las celdas de cada carril.
+- El canonico y el baseline del gate siguen en WH1: adoptarlo es decision del
+  Director (afecta todas las mediciones comparables).
 
 ### BK-30 — el muelle de salida (outbound) no es realista en WH1 (QA H-25)
 
