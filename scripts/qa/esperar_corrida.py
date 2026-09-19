@@ -17,6 +17,19 @@ import time
 RAIZ = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
+def _termina_con_fin(ruta):
+    """True si la ultima linea del .jsonl es el evento SIMULATION_END."""
+    try:
+        with open(ruta, 'rb') as f:
+            f.seek(0, os.SEEK_END)
+            tam = f.tell()
+            f.seek(max(0, tam - 400))
+            cola = f.read().decode('utf-8', 'replace').strip().splitlines()
+        return bool(cola) and 'SIMULATION_END' in cola[-1]
+    except OSError:
+        return False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--timeout', type=float, default=600)
@@ -33,8 +46,12 @@ def main():
         for carpeta in glob.glob(os.path.join(RAIZ, 'output', 'simulation_*')):
             if os.path.getmtime(carpeta) < desde:
                 continue
-            if glob.glob(os.path.join(carpeta, 'replay_*.jsonl')) and \
-                    glob.glob(os.path.join(carpeta, '*.xlsx')):
+            jsonl = glob.glob(os.path.join(carpeta, 'replay_*.jsonl'))
+            # El Excel se escribe ANTES de que termine el .jsonl: la corrida
+            # recien esta completa cuando el .jsonl cierra con SIMULATION_END
+            # (leccion del bloque 4: se analizo un .jsonl a medio escribir).
+            if jsonl and glob.glob(os.path.join(carpeta, '*.xlsx')) and \
+                    _termina_con_fin(jsonl[0]):
                 print(os.path.relpath(carpeta, RAIZ), os.path.relpath(temporal, RAIZ))
                 return 0
         time.sleep(3)

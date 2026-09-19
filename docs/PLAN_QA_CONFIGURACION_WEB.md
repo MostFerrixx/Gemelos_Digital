@@ -6,10 +6,11 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 4 — Tiempos (sigue el orden de la sección 6).
-**Último cerrado:** Bloque 2 — Despacho y tours (19/09): 7/7 casos pasan en
-los 3 niveles; 140/140 posiciones visor = JSON. Sin errores; 1 observación
-de diseño (H-13).
+**Objetivo inmediato:** Bloque 5 — Flota.
+**Último cerrado:** Bloque 4 — Tiempos (19/09): 16 de 17 casos pasan en los 3
+niveles (4.13 no aplicable con los datos actuales); 200/200 posiciones visor
+= JSON. **1 error crítico encontrado y corregido: H-14** (el tiempo por celda
+se ignoraba con la capa anti-colisión activa).
 Después: Bloque 2 — Despacho y tours.
 **Último cerrado:** Bloque 1 completo (18/09): 11 corridas, todas pasan tras
 corregir H-07; 220/220 posiciones visor = JSON.
@@ -73,6 +74,13 @@ cualquiera, es un hallazgo.
 7. **No se crean ni editan archivos `.py` del proyecto mientras corre una
    simulación**: el servidor de desarrollo se reinicia solo y cancela la
    corrida (lección del bloque 0).
+8. **Las carpetas de corridas se borran solo por nombre exacto**, nunca con
+   patrones (lección del bloque 4: una limpieza por patrón borró evidencia).
+9. **Parámetros con firmas independientes pueden probarse en una misma
+   corrida** (p. ej. tiempo por celda → pasos a pie; factor → pasos de
+   montacargas; horquilla → picks de montacargas). Si uno fallara, lo delata
+   su propia firma. Parámetros que se enmascaran entre sí (p. ej. el mínimo de
+   pick tapa a los demás términos) van por separado.
 
 ## 3. Método de verificación
 
@@ -458,6 +466,18 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-2.5 | 19/09 | 5/5/2 \| idéntico | Escalones usados: 3 a 5, 6 a 10, 12 a 15, 39 al almacén; **0 violaciones** | 20/20 | **PASA** | — |
 | QA-2.6 | 19/09 | Tour Simple + 50/50 zonas 1-2 \| idéntico | **0 de 62** recorridos mezclan zonas; 315/303 tareas (51/49); descargas físicas en (3,29) y (7,29) | 20/20 | **PASA** | — |
 | QA-2.7 | 19/09 | Tour Mixto + 50/50 \| idéntico | **53 de 66** recorridos mezclan zonas, y esas 53 rondas de descarga pasan físicamente por las dos zonas | 20/20 | **PASA** | — |
+| QA-4.1 | 19/09 | Real → Demo en la web vuelve a 0,1 / 0,8 / 2 | = valores canónicos: pasos 0,1 / 0,08 s, horquilla 2 s, picks exactos (todas las corridas de control) | — | **PASA** | — |
+| QA-4.2 (1.er intento) | 19/09 | Real: 1 / 0,5 / 8 \| idéntico | Horquilla 8 s aplicada (623/623 picks exactos) pero **pasos de 0,1 s en vez de 1,0 s**: el tiempo por celda se ignoraba | — | **FALLA** | H-14 |
+| QA-4.2 (reprueba) | 19/09 | idéntico | Pasos **1,0 s** a pie y **0,5 s** montacargas; 586/586 picks exactos; 0 co-ocupaciones en operación | 20/20 | **PASA** | H-14 cerrado |
+| QA-4.3/4.4/4.5 | 19/09 | 0,5 / 0,25 / 20 \| idéntico; la web muestra "Personalizado" | Pasos 0,5 s a pie y **0,125 s** montacargas; picks de montacargas = fórmula + **40 s** (2 × 20); 624/624 exactos | 20/20 | **PASA** | — |
+| QA-4.6/4.7/4.8/4.10 | 19/09 | base 30, unidad 10, kg 0, volumen 0,5 \| idéntico | **605/605** picks = fórmula exacta con los 4 términos | 20/20 | **PASA** | — |
+| QA-4.9 | 19/09 | mínimo 60 \| idéntico | Mínimo exacto 60,000 s a pie y 64,000 s montacargas (60 + 2×2); 613/613 exactos | 20/20 | **PASA** | — |
+| QA-4.11/4.12 | 19/09 | Pequeño ×3 +20 s; Mediano pack 25 \| idéntico | 634/634 picks exactos (Pequeño con ×3 +20); **todas** las descargas de Mediano = 30 s (5 + 25), las demás 5 s | 20/20 | **PASA** | — |
+| QA-4.13 | 19/09 | — | **No aplicable**: los 50 SKUs tienen clase; ninguno usa la fila GENERAL. Se retoma en el bloque 6 con un Excel de prueba | — | N/A | — |
+| QA-4.14 | 19/09 | velocidad por carga ON \| idéntico | A pie: vacío 0,1 s/paso, cargado 0,114–0,2 s (tope 50%); montacargas 0,08 s cargado o vacío | 20/20 | **PASA** | — |
+| QA-4.15 | 19/09 | + aplicar a montacargas \| idéntico | Montacargas cargado **0,16 s** (0,08 / 0,5), vacío 0,08 s | 20/20 | **PASA** | — |
+| QA-4.16 | 19/09 | variabilidad CV 0,25 \| idéntico | σ log medida 0,251 vs 0,246 (+0,7 errores estándar), media real/esperado 0,995 | 20/20 | **PASA** | — |
+| QA-4.17 | 19/09 | CV 0,5 \| idéntico | σ log 0,455 vs 0,472 (−1,3 errores estándar); el generador probado aparte con 200.000 muestras da CV 0,501 | 20/20 | **PASA** | — |
 | H-01 reprueba 1 | 18/09 | Corrida canónica: copia temporal **idéntica** a `config.json` (antes faltaba `cercania_tour_mode`) y = metadata | — | — | **PASA** | H-01 cerrado |
 | QA-1.1 | 18/09 | `total_ordenes` 50 \| 50 | 50 pedidos, 107 tareas, todas completadas; fin 1.415 s | 20/20 | **PASA** | — |
 | QA-1.2 | 18/09 | 600 \| 600 | 600 pedidos, 1.195 tareas completadas; fin 15.178 s = **2,08×** el control (esperado ~2×) | 20/20 | **PASA** | H-05 (evidencia) |
@@ -493,6 +513,7 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24; la sección 4.1 → BK-2
 | H-09 | OBS | QA-1.7 | La ruta del archivo de órdenes se guarda **absoluta** (`D:\...\uploads\...`): un preset o `config.json` con archivo no funciona en otra carpeta o máquina | `/api/upload-orders` devuelve la ruta absoluta | Guardarla relativa al proyecto | Abierto |
 | H-10 | OBS (realismo) | QA-1.7, 1.8 | Con pocas tareas (10-34), **un operario de cada tipo se lleva todo el trabajo** en un solo recorrido y el otro queda ocioso toda la corrida | Ejecución de Plan + tope de tareas por tour: el primero que pide arma el tour más grande posible | Evaluar reparto más equilibrado (tope por tour configurable, o repartir cuando hay ociosos). Decisión de diseño | Abierto |
 | H-11 | OBS (realismo) | QA-1.8 | El cumplimiento (fill rate) queda en 100% aunque una línea se rechazó por SKU inexistente: la línea rechazada no cuenta como pedida | `service_level` se calcula sobre lo aceptado | Contar lo rechazado como no servido (el cliente lo pidió) | Abierto |
+| H-14 | **CRÍTICO** | QA-4.2 | **El tiempo por celda configurado se ignoraba.** Con la capa anti-colisión activa (canónico) todo el movimiento sale del plan, y el planificador se creaba con `time_per_cell=0.1` fijo: el perfil "Real" (1,0 s/celda) o cualquier valor de la web no cambiaba la velocidad de nadie (el factor de montacargas y la horquilla sí se aplicaban) | `warehouse.py`: `SpaceTimePlanner(time_per_cell=0.1)` | **Corregido** (`c06742d`): se lee de `tiempos.time_per_cell`. +3 tests. Gate PASS (el canónico usa 0,1) | **Cerrado** (reprobado) |
 | H-13 | OBS (diseño) | QA-2.3, 2.4 | **Cercanía casi no se distingue de "cualquier tarea".** (1) El radio por defecto (100) no filtra nada en este mapa (distancia máxima ~42). (2) Más de fondo: todo recorrido termina en la zona de descarga, así que la cercanía se mide siempre desde ahí; con radio 5, 61 de 64 recorridos no tenían nada cerca y cayeron al almacén completo. Además, por código, Cercanía filtra por equipo compatible pero **no** por prioridad de área (Plan y Global sí): sin verificar su efecto | Diseño de la estrategia | → BK-24 | Abierto |
 | H-12 | MENOR | QA-1.9 | Con "Todo o Nada", la vista previa dice "10 Órdenes" y no avisa que el pedido con el ítem inválido se descarta entero | La vista previa no mira la política | Mostrar "órdenes que se descartarán" según la política | Abierto |
 
@@ -532,3 +553,13 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24; la sección 4.1 → BK-2
   trabajo, no la del mismo instante después de su primer paso
   (`analizar_replay.posicion_al_pedir`); sin eso aparecieron 18 "violaciones"
   falsas del radio. QA-2.4/2.5 reescritos con el criterio correcto.
+- 2026-09-19 — Bloque 4 cerrado. Herramienta nueva:
+  `scripts/qa/verificar_tiempos.py` (cada pick contra la fórmula con la
+  config de la corrida y los datos maestros; duración de pasos y descargas).
+  **Lecciones de método:** (1) el Excel de resultados se escribe ANTES de que
+  termine el `.jsonl`: `esperar_corrida.py` ahora exige que el `.jsonl` cierre
+  con `SIMULATION_END` (se analizó un archivo a medio escribir y parecieron
+  40 tareas colgadas que no existían; descartado además con 6 semillas);
+  (2) al medir la variabilidad, restar los componentes fijos (horquilla) y
+  usar la muestra completa, con el error estándar como criterio; (3) reglas 8
+  y 9 agregadas.
