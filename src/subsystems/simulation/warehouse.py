@@ -276,10 +276,16 @@ class AlmacenMejorado:
                 clearance=float(tw_cfg.get('clearance', 0.0))
             )
             if pathfinder is not None:
+                # QA H-14: el tiempo por celda sale de la configuracion
+                # (tiempos.time_per_cell). Estaba fijo en 0.1: con la capa
+                # anti-colision activa (canonico) todo el movimiento sale del
+                # plan, asi que el perfil "Real" (1.0 s/celda) o cualquier
+                # valor elegido en la web no cambiaba la velocidad de nadie.
                 self.spacetime_planner = SpaceTimePlanner(
                     pathfinder=pathfinder,
                     reservation_table=self.reservation_table,
-                    time_per_cell=0.1,
+                    time_per_cell=float((configuracion.get('tiempos') or {})
+                                        .get('time_per_cell', 0.1)),
                     dt_wait=float(tw_cfg.get('dt_wait', 0.1)),
                     max_expansions=int(tw_cfg.get('max_expansions', 20000)),
                     allow_diagonal=bool(tw_cfg.get('allow_diagonal', True)),
