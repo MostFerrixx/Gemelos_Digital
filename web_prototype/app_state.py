@@ -123,7 +123,12 @@ class ReplayData:
                 state['agents'][agent_id]['position'] = pos
                 state['agents'][agent_id]['type'] = event.get('agent_type') or data.get('agent_type', 'Unknown')
                 state['agents'][agent_id]['status'] = event.get('status') or data.get('status', 'idle')
-                
+                # QA H-17: la carga y la capacidad REALES viajan en el evento;
+                # sin esto el visor mostraba siempre 0 de 100 (o de 200).
+                for clave in ('cargo_volume', 'capacidad'):
+                    if data.get(clave) is not None:
+                        state['agents'][agent_id][clave] = data[clave]
+
         elif etype == 'work_order_update':
             wo_id = data.get('id') or event.get('id')
             if wo_id:
