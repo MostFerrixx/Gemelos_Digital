@@ -464,13 +464,15 @@ class FleetManager {
         this.clearAllGroups();
 
         // Fix 1 (BK-04): repartir las areas REALES del layout (this.workAreas), no
-        // nombres hardcodeados. Heuristica: areas "de piso" -> GroundOperator; el resto
-        // (racks altos / especiales) -> Forklift. Cada area cae en exactamente un grupo,
-        // asi la flota por defecto cubre TODAS por construccion (valida sola).
+        // nombres hardcodeados. QA H-18: el reparto sigue el MAPA de equipo por
+        // area que el cliente ve en pantalla (la fuente de verdad); la convencion
+        // de nombres queda solo como fallback de las areas sin mapa. Cada area cae
+        // en exactamente un grupo, asi la flota por defecto es valida por
+        // construccion.
         const areas = (this.workAreas || []).slice();
-        const isGround = (a) => /ground|piso|floor|suelo|terrestre|level[_-]?0|l0/i.test(a);
-        const groundAreas = areas.filter(isGround);
-        const forkAreas = areas.filter(a => !isGround(a));
+        const tipoDe = (a) => this._tipoBaseDe(this._expectedEquipmentForArea(a));
+        const groundAreas = areas.filter(a => tipoDe(a) === 'GroundOperator');
+        const forkAreas = areas.filter(a => tipoDe(a) !== 'GroundOperator');
 
         if (!areas.length) {
             this.configurator.showNotification(
@@ -480,15 +482,32 @@ class FleetManager {
 
         // Operarios terrestres: cubren las areas de piso (todas, si no hay de forklift)
         this.addGroup('GroundOperator');
+        this._aplicarFleetDefaults('GroundOperator', 0);
         this.addDefaultPriorities('GroundOperator', 0, groundAreas);
 
         // Montacargas: cubren el resto (racks / especiales)
         this.addGroup('Forklift');
+        this._aplicarFleetDefaults('Forklift', 0);
         this.addDefaultPriorities('Forklift', 0, forkAreas);
 
         this.updateAreaCoverage();
         this.configurator.showNotification(
             'Flota por defecto generada (cubre todas las areas del layout)', 'success');
+    }
+
+    // QA H-18: capacidad y descarga del grupo generado salen de `fleet_defaults`
+    // de la configuracion cargada (el mismo bloque que usa el motor), si existe.
+    _aplicarFleetDefaults(agentType, groupIndex) {
+        const cfg = (this.configurator && this.configurator.currentConfig) || {};
+        const fd = (cfg.fleet_defaults || {})[agentType] || {};
+        const container = agentType === 'GroundOperator'
+            ? document.getElementById('ground-operators-container')
+            : document.getElementById('forklifts-container');
+        const g = container && container.querySelector(
+            `[data-agent-type="${agentType}"][data-index="${groupIndex}"]`);
+        if (!g) return;
+        if (fd.capacity != null) g.querySelector('.input-capacidad').value = fd.capacity;
+        if (fd.discharge_time != null) g.querySelector('.input-tiempo-descarga').value = fd.discharge_time;
     }
 
     addDefaultPriorities(agentType, groupIndex, workAreas) {
@@ -499,7 +518,7 @@ class FleetManager {
         const groupElement = container.querySelector(`[data-agent-type="${agentType}"][data-index="${groupIndex}"]`);
         if (!groupElement) return;
 
-        workAreas.forEach(wa => {
+        workAreas.forEach((wa, i) => {
             // Add a priority row
             this.addWorkAreaPriority(agentType, groupIndex);
 
@@ -511,6 +530,9 @@ class FleetManager {
             if (lastRow) {
                 const select = lastRow.querySelector('.work-area-select');
                 select.value = wa;
+                // QA H-18: prioridades 1, 2, 3... en el orden del layout (antes
+                // todas 1 = empate); reproduce la flota canonica.
+                lastRow.querySelector('.input-priority').value = i + 1;
             }
         });
     }
