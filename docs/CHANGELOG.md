@@ -12,6 +12,19 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ## 2026-09-19
 
+- **QA H-19 -- con outbound activo los ociosos quedaban trabados** (`61697d8`).
+  Las celdas de espera de BK-15 se elegian antes de que el outbound
+  convirtiera cada descarga en un carril bloqueado; quedaban adentro y el
+  ocioso intentaba llegar para siempre (semilla 42: 64.817 avisos, +28% de
+  duracion; en la web congelo el navegador). Ahora se arman despues. Gate
+  PASS; +2 tests.
+- **QA H-18 -- "Generar Flota por Defecto" sigue el mapa de equipo por
+  area** (`f011034`); prioridades 1,2,3 y `fleet_defaults`.
+- **QA H-17 -- el visor muestra la carga y capacidad reales** (`63c9c39`);
+  antes siempre 0 de 100/200.
+- **Plan de QA: bloque 5 (Flota, 11/11).** Abiertos: H-15 atasco en la
+  descarga con flota grande (BK-25, decision del Director), H-16 tope de
+  tareas por recorrido sin control (BK-22), H-20..H-23 (BK-26..BK-29).
 - **QA H-14 -- el tiempo por celda configurado gobernaba nada** (`c06742d`).
   Con la capa anti-colision activa (canonico) el movimiento sale del plan, y
   el planificador se creaba con `time_per_cell=0.1` fijo: el perfil "Real"

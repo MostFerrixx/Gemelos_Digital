@@ -19,6 +19,10 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-08 — confirmar work_area_equipment con el almacen real | ABIERTO (2026-07-25) | **Alta** (supuesto activo) | Trivial (config) | Lectura del almacen real (Director/cliente) |
 | BK-09 — flota 2+2 sub-dimensionada (hallazgo de negocio) | ABIERTO (2026-07-25) | Media | Trivial (config) | Decision de negocio del Director |
 | BK-10 — el boton "Restart" responde success pero NO reinicia el servidor | ABIERTO (2026-09-07) | Baja | ~30 min | Ninguno |
+| BK-28 — sin bloque `outbound`, la web lo enciende y la consola no | ABIERTO (2026-09-19) | Media | Chico | Decision del Director (QA H-22) |
+| BK-26 — la consola del Simulation Runner no tiene limite de lineas | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-20) |
+| BK-27 — prioridades muertas sin aviso cuando el mapa cambia de equipo | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-21) |
+| BK-29 — con outbound activo hay operarios que arrancan dentro de un carril | ABIERTO (2026-09-19) | Baja | A definir | Ninguno (QA H-23) |
 | **BK-25 — atasco circular en la zona de descarga con flota grande** | **ABIERTO (2026-09-19)** | **Alta (realismo)** | A definir | Decision de diseno del Director (QA H-15) |
 | BK-24 — la estrategia "Cercania" casi no se distingue de "cualquier tarea" | ABIERTO (2026-09-19) | Media (diseno) | A definir | Decision de diseno (QA H-13) |
 | BK-23 — el despacho manda un segundo equipo a una ubicacion ocupada | ABIERTO (2026-09-18) | Media (realismo/eficiencia) | A definir | Ninguno (sale de BK-15) |
@@ -207,6 +211,36 @@ rendiciones.
 En un almacen real, quien espera para descargar deja libre el paso de salida
 (hace cola a un costado o en un pulmon). Ademas, una zona de descarga de
 varios metros suele admitir mas de un operario a la vez.
+
+### BK-28 — sin bloque `outbound`, la web lo enciende y la consola no (QA H-22)
+
+Si una configuracion no trae el bloque `outbound`, el motor lo toma como
+apagado. La web, en cambio, al cargarla marca el muelle de salida como
+ENCENDIDO (y lo mismo con `congestion`). Esta hecho asi a proposito
+(comentario en `app.js`: "ausencia de bloque = usar defaults validados (ON)").
+Resultado: el mismo archivo da una simulacion desde la web y otra desde
+consola. Salio en QA-5.10 al importar un archivo sin ese bloque.
+
+### BK-26 — la consola del Simulation Runner no tiene limite de lineas (QA H-20)
+
+La ventana "Simulation Runner" agrega al documento cada linea que imprime la
+simulacion, sin tope. Con H-19 fueron decenas de miles de lineas: el
+navegador se congelo y la corrida termino sin resultados.
+
+### BK-27 — prioridades muertas sin aviso cuando el mapa cambia de equipo (QA H-21)
+
+Si en "Equipo por Area" un area pasa a otro tipo de equipo (ej. Area_High a
+los de a pie), los grupos del tipo anterior (montacargas) conservan su fila
+"Area_High: prioridad 1". Esa fila ya no hace nada (el mapa manda) y el
+formulario no lo avisa: el cliente ve una prioridad que no se aplica.
+
+### BK-29 — con outbound activo hay operarios que arrancan dentro de un carril (QA H-23)
+
+Con el muelle de salida activo, cada zona de descarga se convierte en un
+carril de celdas bloqueadas. Algunos operarios ya estaban parados ahi al
+arrancar: el buscador de rutas avisa "Start position ... is not walkable" (60
+veces con semilla 42) y esos primeros movimientos salen de una celda que ya
+no es transitable.
 
 ### BK-24 — la estrategia "Cercania" casi no se distingue de "cualquier tarea" (QA H-13)
 

@@ -6,7 +6,12 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 5 — Flota (en curso: 5.1 a 5.5 hechos; sigue 5.6).
+**Objetivo inmediato:** Bloque 3 — Motor avanzado.
+**Último cerrado:** Bloque 5 — Flota (19/09): 11 de 11 casos pasan; 160/160
+posiciones visor = JSON (desde 5.6 también carga y capacidad). **3 errores
+corregidos: H-17** (el panel mostraba siempre 0 de 100/200), **H-18** ("Generar
+Flota por Defecto" ignoraba el mapa de equipo) y **H-19** (con outbound activo
+los ociosos quedaban trabados intentando llegar a una celda bloqueada).
 **Pendiente de decisión del Director: H-15 / BK-25** (atasco circular en la
 zona de descarga con flota grande).
 **Último cerrado:** Bloque 4 — Tiempos (19/09): 16 de 17 casos pasan en los 3
@@ -484,6 +489,15 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-5.2 | 19/09 | 4 + 4 \| idéntico | 8 agentes, todos trabajan; fin 6.756 s (semilla libre) y 7.178 s (semilla fija): **casi no mejora** contra 2+2. Atasco circular en la descarga 1: 28 rendiciones del planificador, 32 co-ocupaciones (hasta 6 agentes en (3,29)) | 40/40 | **PASA** la configuración; **revela H-15** | H-15 |
 | QA-5.3/5.4/5.5 | 19/09 | terrestre cap. 50 + descarga 60 s; montacargas cap. 3000 \| idéntico | Carga máx. terrestre **50**; recorridos: montacargas 19,1 tareas vs terrestres 4,2; descarga terrestre **60,0 s**, montacargas 5 s; 626/626 picks exactos. 21 co-ocupaciones en la descarga (H-15). Montacargas cortado en 20 tareas pese a capacidad 3000 (H-16) | 20/20 posiciones; **capacidad y carga del panel: FALLA** (siempre 0 de 100) | **PASA** tras corregir H-17 | H-15, H-16, H-17 |
 | H-17 reprueba | 19/09 | — | — | Panel del visor en t=11.983: barras 100% (50/50), 20% (10/50), 3,2% (95/3000), 15,0% (451/3000) = JSON | **PASA** | H-17 cerrado |
+| QA-5.6 | 19/09 | Montacargas Special 1, High 2 \| idéntico | Última asignación Special 2.073 s, High 7.457 s (el control canónico al revés: High 5.045, Special 7.549); 18/18 recorridos respetan la prioridad | 20/20 (con carga y capacidad) | **PASA** | — |
+| QA-5.7 | 19/09 | Area_High → a pie; a pie Ground 1, High 2 \| idéntico | Las 260 tareas de Area_High las hacen los de a pie, 0 los montacargas (aunque éstos siguen listando Area_High con prioridad 1: el mapa manda). A pie: primero Ground, después High. Carga máx. 150 | 20/20 | **PASA** | H-21 |
+| QA-5.8 | 19/09 | Sin grupo de montacargas | Cobertura en rojo "2 sin agente — no se podrá guardar/correr"; Run, Aplicar y Guardar con nombre bloqueados con mensaje claro (qué área y dónde corregir); `config.json` y `output/` intactos | — | **PASA** | — |
+| QA-5.9 | 19/09 | Flota vacía | "Flota vacía… Genera o agrega una flota"; Run y Aplicar bloqueados: "La flota está vacía (0 agentes)…" | — | **PASA** | — |
+| QA-5.10 (1.er intento) | 19/09 | Con el mapa canónico genera 2+2 150/1000; **con Area_High → a pie genera una flota que la misma pantalla rechaza** ("1 con tipo incorrecto") mientras avisa "cubre todas las áreas" | — | — | **FALLA** | H-18 |
+| QA-5.10 (reprueba) | 19/09 | Mapa canónico → idéntica al canónico (High 1, Special 2); Area_High → a pie → válida; `fleet_defaults` importado (a pie 90, montacargas 1200 / 8 s) → aplicado \| idéntico | Carga máx. 90 y 1.200; descargas de montacargas 8 s; 609/609 picks exactos | 20/20 | **PASA** | H-18 cerrado |
+| QA-5.11 | 19/09 | 2 grupos a pie: 1×150 y 1×60 \| idéntico | GroundOp-01 carga máx. 150, GroundOp-02 **60**; 155 vs 113 tareas | 20/20; el panel muestra 150 y 60 | **PASA** | — |
+| H-19 (detección) | 19/09 | Corrida web con outbound activo (salió de un Importar mal armado, ver §11) | 64.817 avisos "Goal position (1,29)/(5,29) is not walkable"; el navegador se congeló y la corrida murió sin resultados | — | **FALLA** | H-19, H-20 |
+| H-19 reprueba | 19/09 | Canónico + outbound activo desde la pestaña Outbound \| idéntico | Termina en ~1 min sin avisos. Semilla 42 sin la corrección: 64.817 avisos y 24.836 s; con la corrección: 60 avisos (otro origen, H-23) y 19.436 s | — | **PASA** | H-19 cerrado |
 | H-01 reprueba 1 | 18/09 | Corrida canónica: copia temporal **idéntica** a `config.json` (antes faltaba `cercania_tour_mode`) y = metadata | — | — | **PASA** | H-01 cerrado |
 | QA-1.1 | 18/09 | `total_ordenes` 50 \| 50 | 50 pedidos, 107 tareas, todas completadas; fin 1.415 s | 20/20 | **PASA** | — |
 | QA-1.2 | 18/09 | 600 \| 600 | 600 pedidos, 1.195 tareas completadas; fin 15.178 s = **2,08×** el control (esperado ~2×) | 20/20 | **PASA** | H-05 (evidencia) |
@@ -502,7 +516,7 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 
 Los hallazgos abiertos están además en `docs/BACKLOG.md` (18/09):
 H-02→BK-13, H-03→BK-14, H-05→BK-15, H-06→BK-16, H-08→BK-17, H-09→BK-18,
-H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24, H-15→BK-25, H-16→BK-22; la sección 4.1 → BK-22.
+H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24, H-15→BK-25, H-16→BK-22, H-20→BK-26, H-21→BK-27, H-22→BK-28, H-23→BK-29; la sección 4.1 → BK-22.
 
 | # | Severidad | Caso | Descripción | Causa raíz | Propuesta | Estado |
 |---|---|---|---|---|---|---|
@@ -525,6 +539,12 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24, H-15→BK-25, H-16→BK-
 | H-15 | **MAYOR** (realismo) | QA-5.2, 5.5 | **Atasco circular en la zona de descarga.** La descarga admite un solo operario; los que esperan turno se paran en las celdas vecinas (2,29), (4,29), (3,28), que son la única salida del que descarga. Nadie cede; tras 10 min de reintentos el motor se rinde, avanza por la ruta fija y vuelven las co-ocupaciones (hasta 6 agentes en (3,29)). Duplicar la flota casi no acorta la corrida | Capacidad 1 de la descarga + espera en la boca de salida | → BK-25. **Decisión de diseño del Director** | Abierto |
 | H-16 | MENOR (configurabilidad) | QA-5.4 | El tope de tareas por recorrido (`max_wos_por_tour`, 20) no tiene control en la web: un montacargas de capacidad 3000 sigue cortando sus recorridos en 20 tareas y el cliente no sabe por qué | Clave del motor sin control | → BK-22 | Abierto |
 | H-17 | MENOR (visor) | QA-5.3 (N3) | **El panel del visor mostraba siempre carga 0 de capacidad 100 (terrestre) o 200 (montacargas)**, sin importar la configuración ni lo que llevaba el operario | `app_state._apply_event_to_state` descartaba `cargo_volume` y `capacidad` del evento; `routers/replay.py` completaba con 100/200 fijos | **Corregido** (`63c9c39`): se copian del evento. +1 test | **Cerrado** (reprobado) |
+| H-18 | **MAYOR** (usabilidad) | QA-5.10 | **"Generar Flota por Defecto" ignoraba el mapa de equipo por área** que está en la misma tarjeta: repartía las áreas por el nombre. Con Area_High → a pie armaba una flota que la pantalla rechazaba, mientras avisaba "cubre todas las áreas". Además dejaba todas las prioridades en 1 (empate) y usaba 150/1000/5 s fijos aunque la config trajera `fleet_defaults` | `fleet-manager._executeDefaultFleet`: reparto por nombre | **Corregido** (`f011034`): reparte por el mapa; prioridades 1, 2, 3 en orden del layout (reproduce la flota canónica); capacidad y descarga desde `fleet_defaults` si existe. Manual actualizado | **Cerrado** (reprobado) |
+| H-19 | **CRÍTICO** (con outbound) | Corrida web 5.10 (1.er intento) | **Con el muelle de salida activo, los operarios sin trabajo quedaban trabados.** Las celdas de espera de BK-15 se elegían antes de que el outbound convirtiera cada descarga en un carril de 8 celdas bloqueadas: (1,29), (5,29)… quedaban adentro de un carril y el ocioso intentaba llegar para siempre. Semilla 42: 64.817 avisos, duración +28%. En la web, el aluvión de avisos congeló el navegador y la corrida terminó sin resultados. El gate no lo veía (el canónico tiene el outbound apagado) | Orden de construcción en `warehouse.py` (lo introdujo BK-15) | **Corregido** (`61697d8`): las zonas de espera se arman después del outbound y todo el carril cuenta como descarga. +2 tests. Gate PASS | **Cerrado** (reprobado) |
+| H-20 | MENOR (usabilidad) | H-19 | La consola del "Simulation Runner" agrega cada línea del log sin límite: con decenas de miles de líneas el navegador se congela | Sin tope de líneas | → BK-26 | Abierto |
+| H-21 | OBS (usabilidad) | QA-5.7 | Si el mapa le da un área a otro tipo de equipo, las prioridades de esa área en los grupos del tipo anterior quedan en el formulario sin aviso: no hacen nada y confunden | Sin aviso | → BK-27 | Abierto |
+| H-22 | MENOR (decisión) | QA-5.10 (1.er intento) | Una configuración **sin** bloque `outbound` (o `congestion`) corre desde la web con el outbound **encendido** y desde consola **apagado**: el mismo archivo da dos simulaciones distintas | Decisión explícita en `app.js` ("ausencia de bloque = ON") | → BK-28. **Decisión del Director** | Abierto |
+| H-23 | OBS (realismo) | H-19 reprueba | Con outbound activo algunos operarios arrancan dentro de celdas que el carril después bloquea (60 avisos "Start position … is not walkable") | Posición inicial anterior al bloqueo de carriles | → BK-29 | Abierto |
 
 ## 11. Registro de cambios de este plan
 
@@ -575,3 +595,12 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24, H-15→BK-25, H-16→BK-
 - 2026-09-19 — Bloque 5 (en curso). El nivel 3 suma la **carga y capacidad**
   de cada operario en el panel (no solo celda y estado): así apareció H-17.
   Lección: comparar cada dato que el visor dibuja, no solo la posición.
+- 2026-09-19 — Bloque 5 cerrado. **Lecciones de método:** (1) un archivo
+  para Importar se arma desde `/api/configurator/config` y se verifica que
+  traiga la config completa: se usó una ruta inexistente (`/api/config`,
+  404) y se importó un archivo casi vacío; la corrida salió con los valores
+  por defecto del formulario (así aparecieron H-22 y, por el outbound
+  encendido, H-19). (2) Un proceso de una investigación anterior (traza de
+  H-05) quedó corriendo 10 horas en segundo plano: al cerrar una
+  investigación, verificar que no queden procesos vivos. (3) El gate solo
+  prueba el canónico (outbound apagado): H-19 se escapó por eso.
