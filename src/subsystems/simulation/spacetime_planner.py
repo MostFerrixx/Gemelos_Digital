@@ -261,10 +261,15 @@ class SpaceTimePlanner:
             path.append((pcell, round(pt, _T_QUANT)))
             key = (pcell, p_iid)
         path.reverse()
-        # Anclar el primer paso a t0: si la PRIMERA salida fue retrasada, la
-        # espera inicial queda dentro del primer delta (el ejecutor hara el
-        # timeout largo y la reserva cubrira la permanencia en el origen).
+        # Anclar el primer paso a t0. QA H-27: si la PRIMERA salida fue
+        # retrasada, la espera en el origen se hace EXPLICITA (paso con la celda
+        # repetida). Antes quedaba dentro del primer delta y el ejecutor, que
+        # entra a la celda nueva al empezar cada paso, se adelantaba a la celda
+        # siguiente en vez de esperar en el origen.
+        primera_salida = path[0][1]
         path[0] = (path[0][0], round(float(t0), _T_QUANT))
+        if len(path) > 1 and primera_salida > path[0][1] + 1e-9:
+            path.insert(1, (path[0][0], primera_salida))
         waits = 0
         for i in range(1, len(path)):
             if (path[i][1] - path[i - 1][1]) > dur + 1e-9:
@@ -335,15 +340,24 @@ class SpaceTimePlanner:
         # llegar. Antes el origen quedaba libre al instante de salir y otro
         # podia entrar mientras este todavia no habia terminado de salir
         # (hotspot de la zona de descarga).
+        # QA H-27: el origen se ocupa SOLO durante el paso (un `dur` desde la
+        # salida), que es lo que valido el A*. Antes se reservaba hasta la
+        # salida de la celda SIGUIENTE: si el plan esperaba ahi, el agente
+        # ocupaba dos celdas toda la espera y se rechazaban planes validos.
+        dur = self._dur(speed)
         prev_cell, prev_t = plan[0]
         completo = True
         for (cell, t) in plan[1:]:
-            completo = _reserve_or_skip(prev_cell, prev_t, t) and completo
-            if _reserve_or_skip(cell, prev_t, t):
-                if cell != prev_cell:
-                    self.table.reserve_move(prev_cell, cell, prev_t, t, agent_id)
+            if cell == prev_cell:
+                # espera explicita en la misma celda
+                completo = _reserve_or_skip(cell, prev_t, t) and completo
             else:
-                completo = False
+                t_paso = min(float(t), float(prev_t) + dur)
+                completo = _reserve_or_skip(prev_cell, prev_t, t_paso) and completo
+                if _reserve_or_skip(cell, prev_t, t):
+                    self.table.reserve_move(prev_cell, cell, prev_t, t_paso, agent_id)
+                else:
+                    completo = False
             prev_cell, prev_t = cell, t
 
         # BK-15: un plan que no se pudo reservar ENTERO no se ejecuta. Antes el
