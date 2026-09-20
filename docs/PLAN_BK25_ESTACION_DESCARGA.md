@@ -174,3 +174,20 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   la de 8 (126.782 esperas, 102.085 movimientos bloqueados, 24.704 planes sin
   solucion) y reaparecen choques. Ese es el escenario que justifica la F2
   (cesion del paso) y, probablemente, mas capacidad de pulmon.
+- **2026-09-20** — **El Director detecta un defecto del mapa**: todos los
+  pasillos de picking son de 2 celdas de ancho, pero el del borde derecho tenia
+  UNA sola, porque el mapa terminaba en la columna 29 (se camina por 1-2, 5-6,
+  ... 25-26 y 29). Era un embudo donde nadie podia cruzarse. `WH1 v3` pasa a
+  31 columnas (se agrega la 30) y el ultimo pasillo queda completo.
+
+  | Escenario (mapa v3, estacion, semilla 42) | Antes | Con el pasillo completo |
+  |---|---|---|
+  | 4+4 repartido | 5.067 s | **4.754 s** |
+  | 8+8 repartido | 26.736 s | **2.698 s** |
+  | 4+4 todo al carril 1 | 8.951 s | 8.951 s |
+
+  La saturacion con 16 operarios era ese embudo: ahora 16 rinden casi el doble
+  que 8. Y con el mapa corregido, "esperar" y "pisar" dan el MISMO resultado
+  (0 co-ocupaciones fuera del arranque): D6 queda como red de seguridad, no
+  como parche. **Leccion:** antes de cambiar el motor, revisar si el mapa
+  cumple lo que el diseno supone.
