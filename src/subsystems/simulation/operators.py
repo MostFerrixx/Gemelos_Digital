@@ -762,6 +762,54 @@ class BaseOperator:
             total += self._pick_dwell_estimate_equipo(wo)
         return total
 
+    # ------------------------------------------------------------------
+    # BK-25 F1.c: turno en la estacion de descarga
+    # ------------------------------------------------------------------
+    def _estacion_de(self, staging_id):
+        """La estacion de esa zona, o None si la feature esta apagada."""
+        gestor = getattr(self.almacen, 'estaciones', None)
+        return gestor.estacion(staging_id) if gestor is not None else None
+
+    def _espera_turno_s(self):
+        cfg = (self.almacen.configuracion.get('estaciones', {}) or {}) if hasattr(self.almacen, 'configuracion') else {}
+        return float(cfg.get('espera_turno_s', 0.5))
+
+    def _tomar_turno_estacion(self, estacion):
+        """Pide turno; si no hay puesto libre, espera en la fila (o donde no
+        estorbe) y vuelve a pedir. Devuelve la columna del puesto."""
+        espera = self._espera_turno_s()
+        while True:
+            puesto_x = estacion.tomar(self.id)
+            if puesto_x is not None:
+                return puesto_x
+            destino = self._celda_de_fila_libre(estacion)
+            if destino is not None and tuple(self.current_position) != destino:
+                yield from self._outbound_nav_to(destino)
+            else:
+                self._esperar_sin_estorbar()
+            self._tw_reserve_dwell(espera)
+            yield self.env.timeout(espera)
+
+    def _celda_de_fila_libre(self, estacion):
+        """Primera celda de fila que no tenga a otro agente encima."""
+        cm = getattr(self.almacen, 'congestion_manager', None)
+        for puesto_x in sorted(estacion.puestos):
+            for celda in estacion.celdas_de_fila(puesto_x):
+                otros = (cm.occupied.get(tuple(celda)) or set()) - {self.id} if cm is not None else set()
+                if not otros:
+                    return tuple(celda)
+        return None
+
+    def _salir_de_la_estacion(self, estacion, puesto_x):
+        """Sale por SU costado (regla del Director) y recien ahi suelta el
+        turno: hasta que no libera fisicamente la celda, nadie entra."""
+        salida = estacion.salidas.get(puesto_x)
+        try:
+            if salida is not None and tuple(self.current_position) != tuple(salida):
+                yield from self._outbound_nav_to(tuple(salida))
+        finally:
+            estacion.liberar(self.id)
+
     def _esperar_sin_estorbar(self):
         """BK-15 (C4): el operario sin trabajo camina a su celda de espera y la
         reserva SIN FIN, asi los demas planifican alrededor de el. En la
@@ -1740,6 +1788,13 @@ class BaseOperator:
                 yield from self._outbound_discharge_lanes(staging_id, staging_wos)
                 continue
             staging_location = staging_locs.get(staging_id, (3, 29))
+            # BK-25 F1.c: con la estacion activa, primero se pide TURNO; el
+            # destino pasa a ser el puesto asignado (una columna del carril).
+            _estacion = self._estacion_de(staging_id)
+            _puesto_x = None
+            if _estacion is not None:
+                _puesto_x = yield from self._tomar_turno_estacion(_estacion)
+                staging_location = _estacion.celda_de_trabajo(_puesto_x) or staging_location
             # IMPORTANTE: Usar cantidad_inicial * sku.volumen porque cantidad_restante ya es 0 despues del picking
             volumen_staging = sum(wo.cantidad_inicial * wo.sku.volumen for wo in staging_wos)
 
@@ -1874,6 +1929,9 @@ class BaseOperator:
             # con el siguiente que llegaba a descargar. El punto de
             # estacionamiento se DISPERSA por agente (reusa _spawn_lane, BFS
             # determinista) para que los idle no se apilen en la misma celda.
+            if _estacion is not None and _puesto_x is not None:
+                yield from self._salir_de_la_estacion(_estacion, _puesto_x)
+
             if self._tw_exec_active() and getattr(self.almacen, 'zonas_espera', None) is None:
                 _exit_cell = (staging_location[0], staging_location[1] - 1)
                 if _exit_cell[1] >= 0:

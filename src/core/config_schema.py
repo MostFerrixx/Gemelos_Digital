@@ -246,6 +246,16 @@ class ZonaEsperaConfig(BaseModel):
     alto: Optional[int] = None
 
 
+class EstacionesConfig(BaseModel):
+    """BK-25 F1.c: la zona de descarga como estacion con turno
+    (lector: subsystems.simulation.stations + operators).
+    Ausente o enabled=false -> comportamiento historico."""
+    model_config = ConfigDict(extra="allow")
+    enabled: Optional[bool] = None       # default False
+    cola_max: Optional[int] = None       # celdas de fila por puesto (default 1)
+    espera_turno_s: Optional[float] = None   # cada cuanto reintenta pedir turno
+
+
 class DistribucionTipo(BaseModel):
     """AUD8-2 (2026-07-11): las claves de distribucion_tipos son CLASES DE
     MANEJO reales (SKU.clase de la hoja SkuCatalog); la mezcla estocastica
@@ -308,6 +318,7 @@ class WarehouseConfig(BaseModel):
 
     # BK-15: donde esperan los operarios sin trabajo (ausente = automaticas).
     zonas_espera: Optional[Dict[str, ZonaEsperaConfig]] = None
+    estaciones: Optional[EstacionesConfig] = None
 
     # --- Layout y datos (layout_manager / data_manager) ---
     layout_file: Optional[str] = None

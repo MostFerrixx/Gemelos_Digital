@@ -386,6 +386,25 @@ class AlmacenMejorado:
         else:
             print("[OUTBOUND] desactivado (enabled:false) - comportamiento actual.")
 
+        # BK-25 F1.c: la zona de descarga como ESTACION CON TURNO (un puesto por
+        # columna del carril, entrada por el frente, salida por su costado, fila
+        # delante). Opt-in: sin el bloque `estaciones` no cambia nada.
+        self.estaciones = None
+        _cfg_est = configuracion.get('estaciones', {}) or {}
+        if bool(_cfg_est.get('enabled', False)) and data_manager is not None and layout_manager is not None:
+            from .stations import GestorEstaciones
+            _zonas = data_manager.get_outbound_staging_zones() or {}
+            _puntos = getattr(data_manager, 'puntos_de_picking_ordenados', None) or []
+            self.estaciones = GestorEstaciones(
+                _zonas, layout_manager.is_walkable,
+                layout_manager.grid_width, layout_manager.grid_height,
+                picks=[(pt.get('x'), pt.get('y')) for pt in _puntos],
+                cola_max=int(_cfg_est.get('cola_max', 1)))
+            _res = self.estaciones.resumen()
+            print(f"[ESTACIONES] {self.estaciones} cola_max={_res['cola_max']}")
+            for _aviso in _res['avisos']:
+                print(f"[ESTACIONES][WARN] {_aviso}")
+
         # BK-15 (C4, decision del Director 2026-09-18): el operario sin trabajo
         # espera en una celda donde no estorba (zonas_espera, o elegidas por el
         # simulador) y la reserva sin fin: los demas lo rodean. Requiere la
