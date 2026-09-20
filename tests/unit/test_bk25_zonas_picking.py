@@ -89,3 +89,37 @@ def test_apagado_no_filtra_nada():
     a = types.SimpleNamespace(id='GroundOp-01', type='GroundOperator')
     wos = [_WO('W1', (1, 3)), _WO('W2', (5, 3))]
     assert d._candidatos_de_mi_zona(a, wos) == wos
+
+
+def _despachador_staging(reparto=True, en_curso=None):
+    from subsystems.simulation.dispatcher import DispatcherV11
+    d = DispatcherV11.__new__(DispatcherV11)
+    d.repartir_por_staging = reparto
+    d.stagings_en_curso = dict(en_curso or {})
+    return d
+
+
+class _WOStaging:
+    def __init__(self, id_, staging_id):
+        self.id = id_
+        self.staging_id = staging_id
+
+
+def test_los_pickers_van_a_muelles_distintos():
+    """BK-25 (idea del Director): si varios trabajan pedidos del mismo carril,
+    se encolan todos ahi a descargar."""
+    d = _despachador_staging(en_curso={1: 2, 2: 0, 3: 1})
+    wos = [_WOStaging('A', 1), _WOStaging('B', 2), _WOStaging('C', 3)]
+    assert [w.id for w in d._candidatos_repartiendo_staging(wos)] == ['B']   # el muelle mas libre
+
+
+def test_si_todos_los_muelles_estan_igual_no_filtra():
+    d = _despachador_staging(en_curso={1: 1, 2: 1})
+    wos = [_WOStaging('A', 1), _WOStaging('B', 2)]
+    assert len(d._candidatos_repartiendo_staging(wos)) == 2
+
+
+def test_reparto_apagado_no_filtra():
+    d = _despachador_staging(reparto=False, en_curso={1: 5, 2: 0})
+    wos = [_WOStaging('A', 1), _WOStaging('B', 2)]
+    assert len(d._candidatos_repartiendo_staging(wos)) == 2

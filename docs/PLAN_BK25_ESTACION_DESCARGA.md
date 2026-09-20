@@ -15,9 +15,10 @@
 - **F1 CERRADA.** El canonico corre con el mapa v3, los datos v3, la estacion
   con turno y "esperar" como ultimo recurso. Baseline nuevo `02796701`.
 - Hecha la **capa 1** (una ubicacion, un operario + consolidar por ubicacion).
-- Capa 3 (zonas) IMPLEMENTADA pero **apagada**: medida, hoy empeora (ver el
-  registro). Falta la capa 2 (cupo por pasillo, decidido: capacidad 2) y
-  entender la cola de la descarga con flota grande.
+- Hecho el **reparto por muelle** (idea del Director): -65% con 16 operarios.
+- Capa 3 (zonas) implementada y apagada: mejora mucho con el reparto (32.329
+  -> 10.100 s) pero sigue peor que sin zonas; hay que revisarla.
+- **Siguiente: capa 2** (cupo por pasillo, capacidad 2).
 - Hecho: **F1.a**, la base guarda todas las celdas de cada carril.
 - Hecho: **F0** (el que espera ocupa una sola celda) en la rama
   `fix/bk25-estacion-descarga`, medido, sin integrar a `main` todavia.
@@ -280,3 +281,21 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   las celdas de entrada de los carriles 2 y 3 casi 6.000 s, 83.814 movimientos
   bloqueados). La zonificacion sincroniza a los pickers y los manda todos a
   descargar a la vez. Hay que resolver esa cola antes de encender las zonas.
+- **2026-09-20** — **Reparto por muelle de salida (idea del Director).** Si
+  varios piqueadores trabajan pedidos del MISMO carril, se encolan todos ahi a
+  descargar. Ahora cada operario toma pedidos del muelle menos ocupado en ese
+  momento (`despacho.repartir_por_staging`, default true; no excluye nada: si
+  todos los muelles estan igual, no filtra).
+
+  | Escenario (semilla 42) | Antes | Con reparto |
+  |---|---|---|
+  | 16 operarios, repartido | 8.124 s | **2.841 s** |
+  | 16 operarios, ademas zonificados | 32.329 s | 10.100 s |
+  | 8 operarios, repartido | 4.772 s | 4.799 s |
+  | Canonico (todo al carril 1) | 8.891 s | 8.891 s (gate PASS) |
+
+  Con pocos operarios no cambia (no se estorban); con muchos es la diferencia
+  entre trabajar y hacer cola. El canonico no se mueve porque manda el 100% al
+  carril 1: ese numero mejora cuando el Director defina el reparto real (D9).
+  +3 tests (346). Las zonas siguen apagadas: con reparto mejoran mucho pero
+  todavia rinden menos que sin ellas.

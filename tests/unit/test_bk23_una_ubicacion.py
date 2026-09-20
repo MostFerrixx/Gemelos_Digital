@@ -44,6 +44,9 @@ def _despachador(configuracion=None):
     d.una_ubicacion_un_operario = bool(_desp.get('una_ubicacion_un_operario', True))
     d.consolidar_por_ubicacion = bool(_desp.get('consolidar_por_ubicacion', True))
     d.max_wos_por_tour = 20
+    d.repartir_por_staging = False        # BK-25: se prueba aparte
+    d.stagings_en_curso = {}
+    d.zonas_activas = False
     d.env = types.SimpleNamespace(now=0.0)
     d.almacen = types.SimpleNamespace(registrar_evento=lambda *a, **k: None)
     d.operadores_activos = {}

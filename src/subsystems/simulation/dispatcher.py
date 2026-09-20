@@ -89,6 +89,11 @@ class DispatcherV11:
                                  for k, v in (_zp.get('asignacion', {}) or {}).items()}
         self.robo_de_trabajo = bool(_zp.get('robo_de_trabajo', True))
         self.tareas_robadas = 0
+        # BK-25: repartir a los operarios entre muelles de salida DISTINTOS.
+        # Con muchos pickers, si varios trabajan pedidos del mismo carril se
+        # encolan todos ahi a descargar (medido: 59% del tiempo esperando turno).
+        self.repartir_por_staging = bool(_desp.get('repartir_por_staging', True))
+        self.stagings_en_curso: Dict[Any, int] = {}    # {staging_id: cuantos van}
         self.work_orders_en_progreso: Dict[str, Any] = {}        # {operator_id: current_WO}
         self.work_orders_completados: List[Any] = []             # COMPLETED state
         # INIT-7 F2: cola SEPARADA de putaway (no contamina los pools de pick;
@@ -580,6 +585,25 @@ class DispatcherV11:
         self.tareas_robadas += 1
         return candidatos
 
+    def _candidatos_repartiendo_staging(self, candidatos: List[Any]) -> List[Any]:
+        """Deja las WOs de los muelles MENOS ocupados ahora mismo.
+
+        No excluye nada de forma permanente: si todos los muelles tienen la
+        misma carga, devuelve todo. Cada estrategia sigue eligiendo como antes
+        dentro de ese subconjunto."""
+        if not self.repartir_por_staging or not candidatos:
+            return candidatos
+        carga = {}
+        for wo in candidatos:
+            sid = getattr(wo, 'staging_id', None)
+            carga.setdefault(sid, self.stagings_en_curso.get(sid, 0))
+        if not carga:
+            return candidatos
+        minimo = min(carga.values())
+        preferidos = [wo for wo in candidatos
+                      if carga.get(getattr(wo, 'staging_id', None), 0) == minimo]
+        return preferidos or candidatos
+
     def _wos_de_la_misma_ubicacion(self, wo: Any, candidatos: List[Any]) -> List[Any]:
         """Las demas lineas pendientes del mismo hueco (realismo: el picker que
         llega a una ubicacion se lleva todo lo que hay ahi)."""
@@ -607,6 +631,7 @@ class DispatcherV11:
                      and self._wo_elegible_por_ola(wo)]
         candidatos = self._candidatos_sin_ubicacion_ajena(operator, candidatos)  # BK-23
         candidatos = self._candidatos_de_mi_zona(operator, candidatos)  # BK-25 zonas
+        candidatos = self._candidatos_repartiendo_staging(candidatos)
 
         # INIT-4 (C2): priorizar pedidos urgentes (opt-in; no-op si flag off)
         candidatos = self._aplicar_prioridad_pedido(candidatos)
@@ -639,6 +664,7 @@ class DispatcherV11:
         # BK-23: fuera las ubicaciones que ya tiene tomadas otro operario
         candidatos_compatibles = self._candidatos_sin_ubicacion_ajena(operator, candidatos_compatibles)
         candidatos_compatibles = self._candidatos_de_mi_zona(operator, candidatos_compatibles)
+        candidatos_compatibles = self._candidatos_repartiendo_staging(candidatos_compatibles)
 
         if not candidatos_compatibles:
             # Debug log to understand why no WOs are compatible
@@ -689,6 +715,7 @@ class DispatcherV11:
         # BK-23: fuera las ubicaciones que ya tiene tomadas otro operario
         candidatos_compatibles = self._candidatos_sin_ubicacion_ajena(operator, candidatos_compatibles)
         candidatos_compatibles = self._candidatos_de_mi_zona(operator, candidatos_compatibles)
+        candidatos_compatibles = self._candidatos_repartiendo_staging(candidatos_compatibles)
 
         if not candidatos_compatibles:
             return []
@@ -1223,6 +1250,7 @@ class DispatcherV11:
         candidatos = [wo for wo in candidatos if self._wo_elegible_por_ola(wo)]
         candidatos = self._candidatos_sin_ubicacion_ajena(operator, candidatos)  # BK-23
         candidatos = self._candidatos_de_mi_zona(operator, candidatos)  # BK-25 zonas
+        candidatos = self._candidatos_repartiendo_staging(candidatos)
 
         # INIT-4 (C2): priorizar pedidos urgentes (opt-in; no-op si flag off)
         candidatos = self._aplicar_prioridad_pedido(candidatos)
@@ -1397,6 +1425,14 @@ class DispatcherV11:
             if operator_id not in self.work_orders_asignados:
                 self.work_orders_asignados[operator_id] = []
             self.work_orders_asignados[operator_id].append(wo)
+
+            # BK-25: este operario pasa a contar en su muelle de destino
+            if self.repartir_por_staging:
+                _sid = getattr(wo, 'staging_id', None)
+                if _sid is not None and not any(
+                        getattr(o, 'staging_id', None) == _sid
+                        for o in self.work_orders_asignados.get(operator_id, [])[:-1]):
+                    self.stagings_en_curso[_sid] = self.stagings_en_curso.get(_sid, 0) + 1
 
             # BK-23: la ubicacion queda tomada por este operario hasta que la libere
             if self.una_ubicacion_un_operario:
@@ -1716,6 +1752,13 @@ class DispatcherV11:
             operator: Operator instance
         """
         operator_id = f"{operator.type}_{operator.id}"
+
+        # BK-25: el operario deja de contar en los muelles de su recorrido
+        if self.repartir_por_staging:
+            for _sid in {getattr(o, 'staging_id', None)
+                         for o in self.work_orders_asignados.get(operator_id, [])}:
+                if _sid in self.stagings_en_curso:
+                    self.stagings_en_curso[_sid] = max(0, self.stagings_en_curso[_sid] - 1)
 
         # BK-23: limpieza -- al cerrar el recorrido no queda ninguna ubicacion
         # tomada por este operario (por si alguna WO no paso por el completado).

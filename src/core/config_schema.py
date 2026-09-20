@@ -269,6 +269,7 @@ class DespachoConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
     una_ubicacion_un_operario: Optional[bool] = None
     consolidar_por_ubicacion: Optional[bool] = None
+    repartir_por_staging: Optional[bool] = None   # BK-25: pickers a muelles distintos
 
 
 class EstacionesConfig(BaseModel):
