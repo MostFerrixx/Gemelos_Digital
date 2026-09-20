@@ -196,6 +196,14 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   queda de **32 x 43**, con todos los pasillos de 2 celdas y racks a ambos
   lados (patron `#PP##PP#...##PP#`). Mismas mediciones que con 31 columnas
   (4+4 repartido 4.754 s, 8+8 repartido 2.698 s, 4+4 al carril 1 8.951 s).
-  PENDIENTE de decision: las 24 celdas nuevas de la columna 30 son pasillo
-  transitable pero NO tienen ubicaciones de almacenamiento en el Excel
-  (el almacen sigue con 360). Crearlas seria ampliar la capacidad.
+  RESUELTO: el Director pidio crear tambien esas ubicaciones.
+- **2026-09-20** — Se crean las 24 ubicaciones de la columna 30 con la MISMA
+  logica que traian las demas, deducida de los datos: 24 filas (y=3..26) por
+  columna; `pick_sequence` en zigzag por columna (indice 15 -> descendente,
+  384 a 361); area en bloques de 2 filas sin repetir el area del bloque
+  anterior; `WorkGroup` atado al area (A=Ground, B=High, C=Special); SKU y
+  cantidad del mismo rango que el resto (50 SKU, 20 a 100). El almacen pasa de
+  360 a **384 ubicaciones** (154 Ground / 154 High / 76 Special).
+  Medido (mapa v3, estacion, semilla 42): 4+4 repartido 4.450 s, 8+8 repartido
+  2.574 s, 4+4 al carril 1 8.682 s. Sin rendiciones del planificador salvo 2
+  en el caso 8+8.
