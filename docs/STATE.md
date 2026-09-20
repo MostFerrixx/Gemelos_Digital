@@ -13,7 +13,7 @@
   integrada).
 - **Baseline vigente: `sha256=02796701...`, 17.088.496 bytes**, seed 42
   (`tests/baseline.json`). Cambio intencional del 2026-09-20 (BK-25 F1: mapa
-  nuevo + estacion de descarga con turno). El anterior era `5c7f4c32`.
+  nuevo + estacion de descarga con turno). Anteriores: `5c7f4c32` y `02796701` (mismo dia).
 - REGLA pinneada por tests BN-05 e IN-43: la metadata del .jsonl NO puede
   contener valores wall-clock.
 - En Windows `core.autocrlf=true`: `config.json` puede figurar como modificado
@@ -23,7 +23,7 @@
 
 ```
 python -m pytest -q                # 331 passed, 1 deselected (~28s)
-python scripts/regression_gate.py  # GATE PASS esperado (baseline 02796701)
+python scripts/regression_gate.py  # GATE PASS esperado (baseline 7f82a5ab)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
 
