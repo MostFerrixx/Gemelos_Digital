@@ -904,7 +904,9 @@ class BaseOperator:
         reintentos (congestion.timewindow.replan_wait_s / replan_max_retries)."""
         tw = ((self.configuracion or {}).get('congestion') or {}).get('timewindow') or {}
         return (float(tw.get('replan_wait_s', 0.5)),
-                int(tw.get('replan_max_retries', 1200)))
+                int(tw.get('replan_max_retries', 1200)),
+                str(tw.get('ultimo_recurso', 'ruta_estatica')),
+                int(tw.get('espera_extra_factor', 10)))
 
     def _timewindow_execute_plan(self, segment_path, speed, on_before, on_after,
                                  time_per_cell, goal_dwell=0.0, fallback=True):
@@ -1049,7 +1051,12 @@ class BaseOperator:
                     # planificar (la espera se reserva: el agente sigue ahi).
                     # La ruta estatica sin garantias queda como ultimo recurso,
                     # visible en exec_fallbacks.
-                    espera, reintentos = self._tw_replan_params()
+                    espera, reintentos, _ultimo_recurso, _factor = self._tw_replan_params()
+                    # QA D6: "esperar" = nunca pisar a otro; se aguanta mucho mas
+                    # (un pasillo de UNA celda de ancho obliga a esperar al que
+                    # esta adentro) y recien al final se cae a la ruta estatica.
+                    if _ultimo_recurso == 'esperar':
+                        reintentos = reintentos * max(1, _factor)
                     planner = getattr(self.almacen, 'spacetime_planner', None)
                     destino = tuple(segment_path[-1])
                     for intento in range(reintentos + 1):
@@ -1074,6 +1081,12 @@ class BaseOperator:
                             if nuevo and len(nuevo) > 1:
                                 segment_path = nuevo
                         if ultimo:
+                            if _ultimo_recurso == 'esperar':
+                                logger.warning(
+                                    "[%s] t=%.1f se rinde tras esperar %.0f s en %s: "
+                                    "avanza por la ruta fija (revisar el mapa: pasillo sin salida?)",
+                                    self.id, self.env.now, reintentos * espera,
+                                    tuple(self.current_position))
                             break
                         if planner is not None:
                             planner.shadow_metrics["replan_waits"] += 1

@@ -119,6 +119,10 @@ class TimewindowConfig(BaseModel):
     # BK-15: sin plan reservable, esperar y replanificar (lector: operators).
     replan_wait_s: Optional[float] = None
     replan_max_retries: Optional[int] = None
+    # QA D6 (BK-25): que hace el que lleva mucho rato trabado.
+    # "ruta_estatica" (historico: avanza y puede pisar a otro) | "esperar".
+    ultimo_recurso: Optional[str] = None
+    espera_extra_factor: Optional[int] = None
 
 
 class CongestionConfig(BaseModel):

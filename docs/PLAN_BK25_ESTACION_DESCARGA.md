@@ -58,7 +58,7 @@ el motor se rinde a los 10 minutos simulados y termina pisando a otro operario
 | D3 | Con camiones activos, un pallet por linea de pedido o un contenedor por pedido | Contenedor por pedido |
 | D4 | Cuantos esperan en la fila de cada carril antes de ir al pulmon | 1 por puesto; con el anden de 3 filas cabe comodo |
 | D5 | Pasillos de picking de un solo sentido | Dejar preparado, no activar |
-| D6 | Que hace el que lleva 10 minutos trabado | Retroceder y avisar; nunca pisar |
+| D6 | Que hace el que lleva 10 minutos trabado | **"esperar"**, ya implementado y medido: cuesta 2% de jornada y deja 0 choques. Falta tu OK para dejarlo por defecto |
 | D7 | Formato de la regla en la configuracion (flecha o rectangulo) | Flecha |
 | D8 | Mapa sin salida posible | La web bloquea y explica; consola corre en modo degradado con aviso |
 | D9 / D-A6 | Reparto real entre los 7 muelles, o consolidacion por tienda/ruta | Con destinos reales, consolidar (ya existe `destino_staging_map`); sin ellos, repartir |
@@ -154,3 +154,23 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   muelles, la 4+4 casi duplica a la 2+2. Es el argumento medido para D9.
   PENDIENTE: 5 cruces "en movimiento" en un pasillo de picking del borde
   derecho (celdas (29,8)-(29,10)), sin relacion con la descarga.
+- **2026-09-20** — Los 5 cruces que quedaban NO eran de la descarga: el pasillo
+  de picking del borde derecho (columna 29) mide UNA celda de ancho (los demas,
+  dos), asi que ahi dos operarios no pueden cruzarse y el motor terminaba
+  atravesando a uno. Se implemento la decision D6 como opcion
+  (`congestion.timewindow.ultimo_recurso`: "ruta_estatica" historico |
+  "esperar"), con aviso `[WARN]` si aun asi se rinde. Medido (mapa v3,
+  semilla 42, con estacion):
+
+  | Escenario | Jornada | Co-ocupaciones | Rendiciones |
+  |---|---|---|---|
+  | 4+4 todo al carril 1 | 8.951 s | 0 (fuera del arranque) | 0 |
+  | 4+4 repartido, pisando (historico) | 4.971 s | 5 | 2 |
+  | **4+4 repartido, esperando (D6)** | **5.067 s** | **0** | **0** |
+  | 8+8 repartido, esperando | 26.736 s | 11 | 2 |
+
+  "Esperar" cuesta 2% de jornada y elimina la fisica imposible. **Con 16
+  operarios el almacen se satura**: la jornada se multiplica por cinco contra
+  la de 8 (126.782 esperas, 102.085 movimientos bloqueados, 24.704 planes sin
+  solucion) y reaparecen choques. Ese es el escenario que justifica la F2
+  (cesion del paso) y, probablemente, mas capacidad de pulmon.
