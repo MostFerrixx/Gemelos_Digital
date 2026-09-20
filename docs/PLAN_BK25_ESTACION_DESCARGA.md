@@ -12,8 +12,8 @@
 
 ## 1. Estado actual
 
-- **En curso: F1.a** — que la base de datos guarde TODAS las celdas de cada
-  carril (hoy guarda una sola por zona).
+- **En curso: F1.c** — la estacion con turno sobre el mapa v3.
+- Hecho: **F1.a**, la base guarda todas las celdas de cada carril.
 - Hecho: **F0** (el que espera ocupa una sola celda) en la rama
   `fix/bk25-estacion-descarga`, medido, sin integrar a `main` todavia.
 - Hecho: **mapa WH1 v3** (anden de 3 filas) y su Excel, commit `73439bd`.
@@ -68,9 +68,9 @@ el motor se rinde a los 10 minutos simulados y termina pisando a otro operario
 | Fase | Que incluye | Estado |
 |---|---|---|
 | **F0** | El que espera ocupa una sola celda (sobre-reserva del origen) | HECHO, en rama, sin integrar |
-| **F1.a** | La base guarda todas las celdas de cada carril (hoy solo una por zona) | EN CURSO |
+| **F1.a** | La base guarda todas las celdas de cada carril | HECHO (`442bc7e`), gate PASS |
 | **F1.b** | Adoptar `WH1 v3`: reimportar el Excel v3, estacionamientos y muelles en el mapa, canonico y baseline nuevos | Siguiente |
-| **F1.c** | Estacion con turno: puestos por columna, entrada, fila, salidas de un sentido, pulmon; deduccion automatica y validacion; metricas | Siguiente |
+| **F1.c** | Estacion con turno: puestos por columna, entrada, fila, salidas de un sentido, pulmon; deduccion automatica y validacion; metricas | EN CURSO |
 | **F1.d** | Medicion con flota grande (4+4 y 8+8, todo a un carril y con reparto) | Siguiente |
 | **F2** | Cesion por solicitud (apagada por defecto) + medicion con flota grande | Despues de F1 |
 | **F3** | Muelle de salida sobre la misma estacion: carriles reales, sin saltos, unidad de staging segun D3 | Despues de F2 |
@@ -93,3 +93,11 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
 - **2026-09-19** — Al probar la importacion del Excel v3 aparece el problema
   de F1.a: `staging_areas` tiene clave primaria `staging_id`, asi que
   `INSERT OR REPLACE` deja una sola celda por zona (la ultima del carril).
+- **2026-09-19** — F1.a hecha (`442bc7e`): clave primaria (zona, x, y),
+  el importador inserta todas las celdas, las bases viejas se migran solas al
+  importar y el ancla de cada zona es su primera celda (el frente del carril).
+  Verificado con los tres casos (Excel v3 en base nueva, Excel canonico, y
+  Excel v3 sobre una base con la tabla vieja). Gate PASS aislado de F0: el
+  cambio no altera el comportamiento del motor. +3 tests (320 en total).
+  DECISION de orden: el canonico y el baseline se cambian al FINAL de F1, con
+  las mediciones hechas, para no regenerar el baseline dos veces.
