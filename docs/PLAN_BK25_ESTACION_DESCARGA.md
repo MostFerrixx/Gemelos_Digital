@@ -191,3 +191,11 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   (0 co-ocupaciones fuera del arranque): D6 queda como red de seguridad, no
   como parche. **Leccion:** antes de cambiar el motor, revisar si el mapa
   cumple lo que el diseno supone.
+- **2026-09-20** — Decision del Director: en vez de dejar el ultimo pasillo con
+  rack de un solo lado, se le agrega la fila de racks que le faltaba. `WH1 v3`
+  queda de **32 x 43**, con todos los pasillos de 2 celdas y racks a ambos
+  lados (patron `#PP##PP#...##PP#`). Mismas mediciones que con 31 columnas
+  (4+4 repartido 4.754 s, 8+8 repartido 2.698 s, 4+4 al carril 1 8.951 s).
+  PENDIENTE de decision: las 24 celdas nuevas de la columna 30 son pasillo
+  transitable pero NO tienen ubicaciones de almacenamiento en el Excel
+  (el almacen sigue con 360). Crearlas seria ampliar la capacidad.
