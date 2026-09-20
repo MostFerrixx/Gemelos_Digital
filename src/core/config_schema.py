@@ -250,6 +250,16 @@ class ZonaEsperaConfig(BaseModel):
     alto: Optional[int] = None
 
 
+class RutasEstocasticasConfig(BaseModel):
+    """BK-25: cuantas RUTAS se piquean en modo aleatorio (idea del Director).
+    Las rutas se reparten entre los muelles segun `outbound_staging_distribution`
+    y cada pedido sale por el muelle de su ruta (consolidacion).
+    Lector: subsystems.simulation.warehouse."""
+    model_config = ConfigDict(extra="allow")
+    enabled: Optional[bool] = None      # default False
+    cantidad: Optional[int] = None      # cuantas rutas
+
+
 class ZonasPickingConfig(BaseModel):
     """BK-25 capa 3: zonas de picking, una por pasillo (numeradas de izquierda
     a derecha por el simulador). Como en un WMS estandar (SAP EWM "activity
@@ -347,6 +357,7 @@ class WarehouseConfig(BaseModel):
     estaciones: Optional[EstacionesConfig] = None
     despacho: Optional[DespachoConfig] = None
     zonas_picking: Optional[ZonasPickingConfig] = None
+    rutas_estocasticas: Optional[RutasEstocasticasConfig] = None
     database_file: Optional[str] = None   # BK-25 F1.b: datos maestros alternativos
 
     # --- Layout y datos (layout_manager / data_manager) ---

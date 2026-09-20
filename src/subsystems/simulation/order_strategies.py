@@ -272,7 +272,10 @@ class StochasticOrderStrategy(OrderGenerationStrategy):
                     wo_adjusted_count += 1
 
                 # Select staging ID based on distribution
-                staging_id = almacen._seleccionar_staging_id()
+                # BK-25: con rutas activas, el muelle sale de la RUTA del pedido
+                # (consolidacion), no de un sorteo por pedido.
+                ruta, staging_ruta = almacen._seleccionar_ruta()
+                staging_id = staging_ruta if staging_ruta is not None else almacen._seleccionar_staging_id()
                 
                 # Create work orders
                 for cantidad in cantidades:
@@ -291,6 +294,8 @@ class StochasticOrderStrategy(OrderGenerationStrategy):
                         # INIT-11 F0: WG real de la ubicacion (antes derivado del nombre)
                         work_group=almacen._obtener_work_group(ubicacion, work_area)
                     )
+                    if ruta:
+                        work_order.ruta = ruta      # BK-25: para metricas y QA
                     all_work_orders.append(work_order)
 
             order_counter += 1

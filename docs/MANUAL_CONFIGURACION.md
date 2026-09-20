@@ -498,6 +498,21 @@ gana:
 2. Destino mapeado en **Destino → Zona** (abajo).
 3. Reparto aleatorio por porcentaje.
 
+## Rutas a Piquear (modo aleatorio)
+
+Pestaña *Outbound Staging*. Cuántas rutas (o tiendas) se piquean en el turno.
+
+- Con la casilla apagada, cada pedido aleatorio sortea su muelle por separado.
+- Con la casilla encendida, el simulador crea esa cantidad de rutas y le ata
+  cada una a un muelle. Todos los pedidos de una ruta salen por el mismo
+  muelle, como pasa en la operación real con las rutas de reparto.
+- El reparto por zona de abajo decide **cuántas rutas** le tocan a cada muelle:
+  con 30% el muelle 1 se lleva el 30% de las rutas. Un muelle en 0% no recibe
+  ninguna.
+
+Es el equivalente, en modo aleatorio, del *Mapeo de destinos* que se usa con
+pedidos de archivo.
+
 ## Reparto Aleatorio por Zona
 
 Siete porcentajes (**Staging 1 a 7**) que **deben sumar 100%**. Es el último

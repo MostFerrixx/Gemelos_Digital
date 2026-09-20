@@ -1186,6 +1186,13 @@ class WebConfigurator {
         // MEJ-3: map_scale eliminada (sin lector desde que se archivo el viewer Pygame).
 
         // Tab 5: Outbound Staging
+        // BK-25: rutas del modo aleatorio
+        const rutasCfg = config.rutas_estocasticas || {};
+        const togRutas = document.getElementById('toggle-rutas');
+        if (togRutas) togRutas.checked = rutasCfg.enabled === true;
+        const rutasCant = document.getElementById('rutas-cantidad');
+        if (rutasCant) rutasCant.value = rutasCfg.cantidad != null ? rutasCfg.cantidad : 7;
+
         const stagingDist = config.outbound_staging_distribution || {};
         for (let i = 1; i <= 7; i++) {
             const value = stagingDist[i.toString()] || (i === 1 ? 100 : 0);
@@ -1377,6 +1384,10 @@ class WebConfigurator {
 
             // Tab 5: Outbound Staging
             outbound_staging_distribution: {},
+            rutas_estocasticas: {
+                enabled: document.getElementById('toggle-rutas')?.checked === true,
+                cantidad: WebConfigurator.numero('rutas-cantidad', 7)
+            },
 
             // Contadores de flota (fallback del motor cuando agent_types = [];
             // num_operarios_total es legacy-informativo pero REQUIRED_KEYS lo exige).

@@ -299,3 +299,13 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   carril 1: ese numero mejora cuando el Director defina el reparto real (D9).
   +3 tests (346). Las zonas siguen apagadas: con reparto mejoran mucho pero
   todavia rinden menos que sin ellas.
+- **2026-09-20** — **Rutas en modo aleatorio (idea del Director).** Hasta hoy,
+  agrupar por ruta solo existia con pedidos de archivo (`destino_staging_map`).
+  Ahora en modo aleatorio se puede decir CUANTAS rutas se piquean
+  (`rutas_estocasticas {enabled, cantidad}`, con su control en la pestana
+  Outbound): el simulador crea esas rutas, le ata cada una a un muelle segun
+  el % de `outbound_staging_distribution` (un muelle en 0% no recibe ninguna)
+  y todos los pedidos de una ruta salen por el mismo muelle.
+  Verificado desde la web: 14 rutas con reparto 30/20/20/10/10/10/0 ->
+  210/121/160/41/41/58 tareas por muelle, 1 co-ocupacion (la del arranque),
+  0 rendiciones. +4 tests (350). Apagado por defecto: gate PASS.

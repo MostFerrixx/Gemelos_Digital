@@ -230,6 +230,10 @@ class AlmacenMejorado:
             '1': 100, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0
         })
 
+        # BK-25: rutas del modo aleatorio. Se reparten entre los muelles segun
+        # ese mismo %, y cada pedido sale por el muelle de SU ruta.
+        self._preparar_rutas_estocasticas()
+
         # INIT-6 Opcion B: mapa destino (tienda/zona de reparto) -> staging_id.
         # Mismo patron que work_area_equipment (MEJ-3 QA-3): tabla explicita en
         # config, no convencion implicita. Vacio por defecto -> sin efecto
@@ -830,6 +834,54 @@ class AlmacenMejorado:
         if ubicacion is not None:
             return indice['por_coord'].get((ubicacion[0], ubicacion[1], work_area))
         return None
+
+    # ------------------------------------------------------------------
+    # BK-25: rutas en modo aleatorio (idea del Director)
+    # ------------------------------------------------------------------
+    def _preparar_rutas_estocasticas(self) -> None:
+        """Reparte N rutas entre los muelles segun el % de cada uno.
+
+        En modo aleatorio no hay tiendas reales, pero el cliente si sabe
+        cuantas rutas piquea en un turno. Cada ruta queda atada a un muelle
+        (consolidacion, como con `destino_staging_map`), y el reparto por
+        muelle decide cuantas rutas le tocan a cada uno."""
+        cfg = (self.configuracion.get('rutas_estocasticas', {}) or {})
+        self.rutas_estocasticas = None
+        if not bool(cfg.get('enabled', False)):
+            return
+        cantidad = max(1, int(cfg.get('cantidad', 0) or 0))
+        pesos = {int(k): float(v) for k, v in (self.outbound_staging_distribution or {}).items()
+                 if float(v) > 0}
+        if not pesos:
+            pesos = {1: 100.0}
+        total = sum(pesos.values())
+        # cuantas rutas por muelle: proporcional al %, al menos 1 por muelle abierto
+        por_muelle = {}
+        for sid, peso in sorted(pesos.items()):
+            por_muelle[sid] = max(1, int(round(cantidad * peso / total)))
+        # ajustar el sobrante o faltante en el muelle de mayor peso
+        mayor = max(pesos, key=lambda k: (pesos[k], -k))
+        por_muelle[mayor] += cantidad - sum(por_muelle.values())
+        if por_muelle[mayor] < 1:
+            por_muelle[mayor] = 1
+        rutas = {}
+        n = 0
+        for sid in sorted(por_muelle):
+            for _ in range(por_muelle[sid]):
+                n += 1
+                rutas['RUTA_%02d' % n] = sid
+        self.rutas_estocasticas = rutas
+        print(f"[RUTAS] {len(rutas)} rutas repartidas por muelle: "
+              f"{ {sid: c for sid, c in sorted(por_muelle.items())} }")
+
+    def _seleccionar_ruta(self):
+        """Devuelve (ruta, staging_id) de un pedido nuevo, o (None, None) si
+        las rutas no estan activas."""
+        rutas = getattr(self, 'rutas_estocasticas', None)
+        if not rutas:
+            return None, None
+        ruta = random.choice(sorted(rutas))
+        return ruta, rutas[ruta]
 
     def _seleccionar_staging_id(self) -> int:
         """
