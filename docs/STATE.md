@@ -4,98 +4,91 @@
 > presente, nada mas. Historial -> `docs/CHANGELOG.md`. Pendientes ->
 > `docs/BACKLOG.md`. Identidad/reglas/arquitectura -> `CLAUDE.md`.
 
-**Ultima actualizacion:** 2026-09-19
+**Ultima actualizacion:** 2026-09-20
 
 ## Git
 
-- `main` integra por fast-forward (ramas re-apiladas, sin commits de merge):
-  INIT-11 F0-F2, el plan de QA de la configuracion web y sus correcciones
-  (H-01, H-07, H-14, H-17, H-18, H-19, H-26) y la capa anti-colision (BK-15).
-- Rama de trabajo del QA: `qa/configuracion-web` (se integra a `main` al
-  cerrar cada bloque, con gate PASS).
-- Baseline byte-identico vigente: **`sha256=5c7f4c32...`, 16.591.951 bytes**,
-  seed 42 (`tests/baseline.json`). Sin cambios desde BK-15 (H-19 no altera
-  el canonico: el outbound esta apagado).
+- `main` integra por fast-forward. Rama de trabajo: `qa/configuracion-web`;
+  la iniciativa BK-25 se desarrollo en `fix/bk25-estacion-descarga` (ya
+  integrada).
+- **Baseline vigente: `sha256=02796701...`, 17.088.496 bytes**, seed 42
+  (`tests/baseline.json`). Cambio intencional del 2026-09-20 (BK-25 F1: mapa
+  nuevo + estacion de descarga con turno). El anterior era `5c7f4c32`.
 - REGLA pinneada por tests BN-05 e IN-43: la metadata del .jsonl NO puede
   contener valores wall-clock.
 - En Windows `core.autocrlf=true`: `config.json` puede figurar como modificado
-  solo por finales de linea. Git y el gate normalizan; restaurar con
-  `git checkout -- config.json` antes de commitear.
+  solo por finales de linea. Git y el gate normalizan.
 
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 312 passed, 1 deselected (~40s)
-python scripts/regression_gate.py  # GATE PASS esperado (baseline 5c7f4c32)
+python -m pytest -q                # 331 passed, 1 deselected (~28s)
+python scripts/regression_gate.py  # GATE PASS esperado (baseline 02796701)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
 
-OJO: el gate solo cubre el canonico (outbound apagado). H-19 se escapo por
-eso; `tests/unit/test_qa_h19_espera_con_outbound.py` cubre ahora ese caso.
+## EL CANONICO CAMBIO (2026-09-20)
 
-## En curso: plan de QA de la configuracion web
+- **Mapa: `layouts/WH1 v3.tmx`** (32 x 43). Es el v2 del Director mas: anden de
+  3 filas delante de los carriles y el ultimo pasillo de picking completo (2
+  celdas con racks a ambos lados; antes tenia 1 y era un embudo que
+  estrangulaba toda la corrida).
+- **Datos: `layouts/Warehouse_Logic_v3.xlsx`** importados a `warehouse.db`
+  (respaldo del anterior en `warehouse.db.bak`, sin versionar): **384
+  ubicaciones** (antes 360) y **140 celdas de carril** (7 carriles de 2x10).
+- **`estaciones: {enabled: true, cola_max: 1}`**: cada carril es una estacion
+  con turno (un puesto por columna, entrada por el frente, salida por su
+  costado de un solo sentido, fila de 1 y pulmon).
+- **`congestion.timewindow.ultimo_recurso: "esperar"`**: el que no puede pasar
+  espera; ya no atraviesa a otro (QA D6).
+- `database_file` es configurable (antes la base estaba fija en el codigo).
 
-`docs/PLAN_QA_CONFIGURACION_WEB.md` (documento vivo: seccion 0 = objetivo
-inmediato; seccion 9 = registro de cada prueba; seccion 10 = hallazgos).
-Metodo: cada control se configura SOLO desde la web y se verifica en 3
-niveles (llega a la corrida / cambia el comportamiento / el visor muestra lo
-mismo que el JSON, incluidas carga y capacidad desde el bloque 5).
-- Hecho: bloques 0, 1, 2, 3 (5/6), 4 y 5 (11/11). Corregidos H-01, H-07,
-  H-05 (BK-15), H-14, H-17, H-18, H-19 y H-26.
-- **Siguiente: bloque 7 (Outbound Staging).** Luego 8, 10, 9, 11, 12 y las
-  combinadas; el 6 (Layout y Datos) espera a INIT-10.
-- Servidor de QA: `web-qa` de `.claude/launch.json` (sin recarga automatica;
-  ver BK-16). Herramientas en `scripts/qa/`.
+## En curso: BK-25 (atasco en la descarga)
 
-## INIT-11 Task Path (en pausa mientras avanza el QA)
+Plan vivo: **`docs/PLAN_BK25_ESTACION_DESCARGA.md`** (fases, decisiones con su
+porque y registro de avance). Analisis de fondo del consultor externo en
+`docs/PROPUESTA_DISENO_CIRCULACION_Y_LAYOUT.md` y
+`docs/PROPUESTA_DISENO_CEDER_EL_PASO.md`.
 
-Plan v2: **`docs/PLAN_INIT11_TASK_PATH.md`**. F0, F1 y F2 hechas e
-integradas. **Siguiente: F3** (pick -> punto de transferencia -> staging), que
-es punto de control con el Director.
+- **F1 CERRADA** (F0 sobre-reserva, F1.a base multicelda, F1.b datos v3,
+  F1.c estacion con turno, F1.c2 salidas de un sentido, F1.d canonico nuevo).
+  Medido con semilla 42: 4+4 repartido 4.450 s, 8+8 repartido 2.574 s,
+  4+4 todo al carril 1 8.682 s, sin co-ocupaciones fuera del arranque.
+- **Siguiente: F2** — cesion por solicitud (que el que espera se corra cuando
+  otro necesita pasar), apagada por defecto y medida con flota grande.
+
+## QA de la configuracion web (en pausa mientras avanza BK-25)
+
+`docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0, 1, 2, 3, 4 y 5.
+**Siguiente: bloque 7 (Outbound Staging)**; el 6 (Layout y Datos) conviene
+rehacerlo ahora que el canonico cambio de mapa.
 
 ## Decisiones del Director pendientes
 
-1. **BK-25 / QA H-15 + H-27 (alta, realismo) -- PROPUESTA LISTA:**
-   `docs/PROPUESTA_DISENO_CIRCULACION_Y_LAYOUT.md` (consultor Fable 5.1;
-   encargo en `docs/CONSULTA_DISENO_CIRCULACION_Y_LAYOUT.md`). Pasa tambien
-   con la flota canonica (3 de 4 corridas con semilla libre). Decisiones
-   D1-D10 en su seccion 7 y D-A1 a D-A6 en el adenda
-   `docs/PROPUESTA_DISENO_CEDER_EL_PASO.md` (ceder el paso, pulmon, v2).
-   F0 (corregir que el que espera ocupe dos celdas)
-   mueve el baseline. **D1 aprobado; F0 hecho en la rama
-   `fix/bk25-estacion-descarga` (`be65b04`)**: mejora el canonico pero sola
-   empeora la flota 4+4 (se queda en el atasco en vez de pisar); se integra
-   junto con F1. Pendientes D2-D10.
-   **BK-30 / QA H-25:** el muelle de salida no es realista en WH1 (D3, D10).
-2. **BK-28 / QA H-22:** una config sin bloque `outbound` corre con outbound
-   encendido desde la web y apagado desde consola.
-3. **BK-16:** el servidor del cliente se reinicia solo al cambiar un `.py` y
-   cancela simulaciones (ligado a BK-10).
-4. **BK-19 / BK-23:** reparto del trabajo (un solo operario se lleva todo con
-   pocas tareas; segundo equipo mandado a una ubicacion ocupada).
-5. **BK-08:** confirmar que Area_High/Area_Special son 100% montacargas.
-   **BK-09:** flota 2+2 sub-dimensionada.
-6. Reparto de `outbound_staging_distribution` (hoy 100% a la zona 1; agrava
-   BK-25).
-7. **BK-07** areas mixtas, **BK-02** FIFO en UI, **INIT-10** modelo de
-   almacen propio, **BK-24** Cercania.
+1. **D3:** con camiones activos, un pallet por linea de pedido (hoy) o un
+   contenedor por pedido. Recomendacion: contenedor por pedido.
+2. **D9 / D-A6:** reparto real entre los 7 muelles o consolidacion por
+   tienda/ruta (`destino_staging_map` ya existe). Hoy el canonico manda el
+   100% al carril 1, que es el peor caso.
+3. **D5** (pasillos de un solo sentido), **D7** (formato de las reglas),
+   **D8** (que hacer con un mapa sin salida posible).
+4. **BK-16:** el servidor del cliente se reinicia solo al cambiar un `.py`.
+5. **BK-19 / BK-23:** reparto del trabajo entre operarios.
+6. **BK-30:** el muelle de salida (outbound) sigue sin ser realista.
+7. **BK-02** FIFO en UI, **INIT-10** modelo de almacen propio.
 
 ## Que esta VIVO y ACTIVO ahora mismo (ademas de CLAUDE.md §3/§5)
 
-- Congestion timewindow ACTIVA en el canonico, con las garantias de BK-15:
-  con la semilla 42 da 0 co-ocupaciones, pero con semilla libre aparecen
-  en la descarga tambien con la flota canonica (BK-25, H-27); los ociosos esperan en celdas elegidas
-  automaticamente o en `zonas_espera`, siempre fuera de los carriles de
-  descarga (H-19).
+- Congestion timewindow + BK-15 (zonas de espera) + BK-25 (estacion con turno,
+  salidas de un solo sentido, esperar en vez de pisar).
 - BK-06: `work_area_equipment` manda; "Generar Flota por Defecto" lo respeta.
-- Canonico con `agent_types` explicito (2 terrestres + 2 montacargas).
 - INIT-8 nucleo ACTIVO; F3/F4 e inbound opt-in. INIT-11 personas/equipos/
-  perfiles/estacionamientos: opt-in, sin editor web todavia (BK-22).
+  perfiles/estacionamientos: opt-in, sin editor web (BK-22).
 
 ## Bugs conocidos (no criticos)
 
 - Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-30.
 - Al reiniciar el servidor a mano puede quedar un proceso hijo de
-  `multiprocessing` reteniendo el puerto 8000: hay que cerrarlo tambien.
+  `multiprocessing` reteniendo el puerto 8000.
 - El visor no interpola posiciones entre snapshots (mitigado con "Saltar
   tiempos muertos").
