@@ -59,7 +59,9 @@ es punto de control con el Director.
    `docs/PROPUESTA_DISENO_CIRCULACION_Y_LAYOUT.md` (consultor Fable 5.1;
    encargo en `docs/CONSULTA_DISENO_CIRCULACION_Y_LAYOUT.md`). Pasa tambien
    con la flota canonica (3 de 4 corridas con semilla libre). Decisiones
-   D1-D10 en su seccion 7; F0 (corregir que el que espera ocupe dos celdas)
+   D1-D10 en su seccion 7 y D-A1 a D-A6 en el adenda
+   `docs/PROPUESTA_DISENO_CEDER_EL_PASO.md` (ceder el paso, pulmon, v2).
+   F0 (corregir que el que espera ocupe dos celdas)
    mueve el baseline. **D1 aprobado; F0 hecho en la rama
    `fix/bk25-estacion-descarga` (`be65b04`)**: mejora el canonico pero sola
    empeora la flota 4+4 (se queda en el atasco en vez de pisar); se integra

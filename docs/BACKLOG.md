@@ -184,6 +184,9 @@ ubicacion de la tarea esta ocupada o reservada por otro agente.
 
 ### BK-25 — operarios que se pisan en la zona de descarga (QA H-15, H-27)
 
+**Actualizacion 2026-09-19 (2):** adenda del consultor sobre ceder el paso y
+donde esperar: `docs/PROPUESTA_DISENO_CEDER_EL_PASO.md` (decisiones D-A1 a D-A6).
+
 **Actualizacion 2026-09-19.** No es solo con flota grande: con la flota
 canonica 2+2 y semilla libre, 3 de 4 corridas web tuvieron co-ocupaciones en
 la descarga (1/7/3/0). Con la semilla 42 da 0 por casualidad. Consulta de
@@ -270,6 +273,14 @@ veces con semilla 42) y esos primeros movimientos salen de una celda que ya
 no es transitable.
 
 ### BK-31 — el layout grande `WH1 v2.tmx` no esta adoptado ni completo
+
+**Verificado 2026-09-19 (2):** existe `layouts/Warehouse_Logic_v2.xlsx` con las
+140 celdas de carril (20 por carril) y las MISMAS PickingLocations que el actual
+(identicas fila por fila). PERO no trae las hojas `SkuCatalog` (50 SKU con
+volumen/peso/clase, ACTIVAS hoy: gobiernan los tiempos de pick) ni `InboundDocks`.
+Adoptar v2 = armar un Excel combinado (PickingLocations + OutboundStaging del v2 +
+SkuCatalog del actual), reimportarlo, dibujar estacionamientos y muelles en el
+mapa, y regenerar el baseline.
 
 Existe `layouts/WH1 v2.tmx` (30x42, commit `5ec15ca` del 2026-06-06): mismos
 racks y mismas ubicaciones de picking que WH1, mas un ANDEN de muelle real
