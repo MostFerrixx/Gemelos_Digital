@@ -15,9 +15,9 @@
 - **F1 CERRADA.** El canonico corre con el mapa v3, los datos v3, la estacion
   con turno y "esperar" como ultimo recurso. Baseline nuevo `02796701`.
 - Hecha la **capa 1** (una ubicacion, un operario + consolidar por ubicacion).
-- **Siguiente: decidir la capa 2** (cupo por pasillo) y la capa 3
-  (zonificacion + robo de trabajo). Decisiones D-B1 a D-B8 del adenda
-  `docs/PROPUESTA_DISENO_ZONIFICACION_PASILLOS.md`.
+- Capa 3 (zonas) IMPLEMENTADA pero **apagada**: medida, hoy empeora (ver el
+  registro). Falta la capa 2 (cupo por pasillo, decidido: capacidad 2) y
+  entender la cola de la descarga con flota grande.
 - Hecho: **F1.a**, la base guarda todas las celdas de cada carril.
 - Hecho: **F0** (el que espera ocupa una sola celda) en la rama
   `fix/bk25-estacion-descarga`, medido, sin integrar a `main` todavia.
@@ -264,3 +264,19 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   del planificador en los cuatro escenarios. Baseline nuevo `0c441704`.
   +4 tests (336). Quedan 3 co-ocupaciones en el 8+8 repartido: las ataca la
   capa 2 (cupo por pasillo).
+- **2026-09-20** — **Decisiones del Director:** cupo de pasillo = 2; una zona
+  POR PASILLO y a cada operario se le pueden asignar varias (mas cerca del
+  estandar WMS); la estrategia por defecto se queda como esta.
+  **Investigacion del estandar** (SAP EWM "activity area", Dynamics "zone",
+  zone picking pick-and-pass / pick-and-merge): la zona es un atributo de la
+  UBICACION (dato maestro, por rangos de pasillo) y la ASIGNACION de personas
+  a zonas es configuracion de operacion, que cambia por turno.
+  **Implementado:** `aisles.py` deduce los pasillos del mapa (WH1 v3: 8
+  pasillos de ancho 2, con sus bocas) y el despacho filtra por zona con robo
+  de trabajo (`zonas_picking`, apagado por defecto). +7 tests (343).
+  **MEDIDO Y NO SIRVE TODAVIA**: 8+8 repartido con una zona por picker pasa
+  de 8.124 s a 32.329 s. La causa NO son los pasillos: los operarios terminan
+  esperando turno en la descarga (59% del tiempo en "unloading", clavados en
+  las celdas de entrada de los carriles 2 y 3 casi 6.000 s, 83.814 movimientos
+  bloqueados). La zonificacion sincroniza a los pickers y los manda todos a
+  descargar a la vez. Hay que resolver esa cola antes de encender las zonas.

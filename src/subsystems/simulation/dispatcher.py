@@ -81,6 +81,14 @@ class DispatcherV11:
         _desp = (configuracion or {}).get('despacho', {}) or {}
         self.una_ubicacion_un_operario = bool(_desp.get('una_ubicacion_un_operario', True))
         self.consolidar_por_ubicacion = bool(_desp.get('consolidar_por_ubicacion', True))
+        # BK-25 capa 3: zonas de picking (una por pasillo). Como en un WMS:
+        # la zona es del mapa y a quien le toca cada zona es configuracion.
+        _zp = (configuracion or {}).get('zonas_picking', {}) or {}
+        self.zonas_activas = bool(_zp.get('enabled', False))
+        self.zonas_por_agente = {str(k): [int(z) for z in (v or [])]
+                                 for k, v in (_zp.get('asignacion', {}) or {}).items()}
+        self.robo_de_trabajo = bool(_zp.get('robo_de_trabajo', True))
+        self.tareas_robadas = 0
         self.work_orders_en_progreso: Dict[str, Any] = {}        # {operator_id: current_WO}
         self.work_orders_completados: List[Any] = []             # COMPLETED state
         # INIT-7 F2: cola SEPARADA de putaway (no contamina los pools de pick;
@@ -541,6 +549,37 @@ class DispatcherV11:
                 libres.append(wo)
         return libres
 
+    def _zonas_de(self, operator: Any) -> List[int]:
+        """Zonas asignadas al operario: por id, por equipo o por tipo."""
+        for clave in (str(getattr(operator, 'id', '')),
+                      str(getattr(operator, 'equipo_id', '')),
+                      str(getattr(operator, 'type', ''))):
+            if clave and clave in self.zonas_por_agente:
+                return self.zonas_por_agente[clave]
+        return []
+
+    def _zona_de_wo(self, wo: Any) -> Optional[int]:
+        mapa = getattr(self.almacen, 'pasillos', None)
+        celda = self._celda_de(wo)
+        return mapa.numero_de(celda) if (mapa is not None and celda) else None
+
+    def _candidatos_de_mi_zona(self, operator: Any, candidatos: List[Any]) -> List[Any]:
+        """Deja solo las WOs de las zonas del operario. Si no le queda ninguna y
+        el robo de trabajo esta activo, puede tomar de otra zona (asi nadie se
+        queda parado mientras otra zona esta atrasada)."""
+        if not self.zonas_activas or not candidatos:
+            return candidatos
+        mias = self._zonas_de(operator)
+        if not mias:
+            return candidatos                      # sin zonas asignadas: todo el almacen
+        propias = [wo for wo in candidatos if self._zona_de_wo(wo) in mias]
+        if propias:
+            return propias
+        if not self.robo_de_trabajo:
+            return []
+        self.tareas_robadas += 1
+        return candidatos
+
     def _wos_de_la_misma_ubicacion(self, wo: Any, candidatos: List[Any]) -> List[Any]:
         """Las demas lineas pendientes del mismo hueco (realismo: el picker que
         llega a una ubicacion se lleva todo lo que hay ahi)."""
@@ -567,6 +606,7 @@ class DispatcherV11:
                      if operator.can_handle_work_area(wo.work_area)
                      and self._wo_elegible_por_ola(wo)]
         candidatos = self._candidatos_sin_ubicacion_ajena(operator, candidatos)  # BK-23
+        candidatos = self._candidatos_de_mi_zona(operator, candidatos)  # BK-25 zonas
 
         # INIT-4 (C2): priorizar pedidos urgentes (opt-in; no-op si flag off)
         candidatos = self._aplicar_prioridad_pedido(candidatos)
@@ -598,6 +638,7 @@ class DispatcherV11:
                                  and self._wo_elegible_por_ola(wo)]
         # BK-23: fuera las ubicaciones que ya tiene tomadas otro operario
         candidatos_compatibles = self._candidatos_sin_ubicacion_ajena(operator, candidatos_compatibles)
+        candidatos_compatibles = self._candidatos_de_mi_zona(operator, candidatos_compatibles)
 
         if not candidatos_compatibles:
             # Debug log to understand why no WOs are compatible
@@ -647,6 +688,7 @@ class DispatcherV11:
                                  and self._wo_elegible_por_ola(wo)]
         # BK-23: fuera las ubicaciones que ya tiene tomadas otro operario
         candidatos_compatibles = self._candidatos_sin_ubicacion_ajena(operator, candidatos_compatibles)
+        candidatos_compatibles = self._candidatos_de_mi_zona(operator, candidatos_compatibles)
 
         if not candidatos_compatibles:
             return []
@@ -1180,6 +1222,7 @@ class DispatcherV11:
         # INIT-4 (C3): descartar WOs cuya ola aun no se libero (no-op si waves off)
         candidatos = [wo for wo in candidatos if self._wo_elegible_por_ola(wo)]
         candidatos = self._candidatos_sin_ubicacion_ajena(operator, candidatos)  # BK-23
+        candidatos = self._candidatos_de_mi_zona(operator, candidatos)  # BK-25 zonas
 
         # INIT-4 (C2): priorizar pedidos urgentes (opt-in; no-op si flag off)
         candidatos = self._aplicar_prioridad_pedido(candidatos)

@@ -250,6 +250,19 @@ class ZonaEsperaConfig(BaseModel):
     alto: Optional[int] = None
 
 
+class ZonasPickingConfig(BaseModel):
+    """BK-25 capa 3: zonas de picking, una por pasillo (numeradas de izquierda
+    a derecha por el simulador). Como en un WMS estandar (SAP EWM "activity
+    area", Dynamics "zone"), la zona sale del mapa y la ASIGNACION de
+    operarios a zonas es configuracion de operacion.
+    Lector: subsystems.simulation.dispatcher."""
+    model_config = ConfigDict(extra="allow")
+    enabled: Optional[bool] = None                     # default False
+    # {id de operario | equipo | tipo: [numeros de pasillo]}
+    asignacion: Optional[Dict[str, List[int]]] = None
+    robo_de_trabajo: Optional[bool] = None             # default True
+
+
 class DespachoConfig(BaseModel):
     """BK-23 (capa 1): una ubicacion, un operario a la vez
     (lector: subsystems.simulation.dispatcher). Ambos default true."""
@@ -332,6 +345,7 @@ class WarehouseConfig(BaseModel):
     zonas_espera: Optional[Dict[str, ZonaEsperaConfig]] = None
     estaciones: Optional[EstacionesConfig] = None
     despacho: Optional[DespachoConfig] = None
+    zonas_picking: Optional[ZonasPickingConfig] = None
     database_file: Optional[str] = None   # BK-25 F1.b: datos maestros alternativos
 
     # --- Layout y datos (layout_manager / data_manager) ---
