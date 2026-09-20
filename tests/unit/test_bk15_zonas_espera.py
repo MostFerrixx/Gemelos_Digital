@@ -115,3 +115,16 @@ def test_ze07_web_valida_las_zonas_contra_el_mapa_real(tmp_path):
     cfg["zonas_espera"] = {"Z": {"x": 3, "y": 29}}   # acceso al carril 1 (mapa v3)
     ok, errores = manager.validate_config(cfg)
     assert not ok and any("acceso" in e for e in errores)
+
+
+def test_ze08_no_se_espera_en_la_franja_de_circulacion():
+    """BK-25: la franja entre los racks y las descargas es el paso de todos.
+
+    Era la mas cercana a la descarga, asi que ganaba siempre; con flota grande
+    los que esperaban la tapaban entre todos.
+    """
+    # picks hasta y=2; descargas en y=4 -> la fila 3 es la franja de circulacion
+    picks = [(1, y) for y in range(3)] + [(6, y) for y in range(3)]
+    g = GestorZonasEspera({}, transitable, 9, 5, picks, [(4, 4)], [], 2)
+    assert g._franja_de_circulacion() == {3}
+    assert all(c[1] != 3 for c in g.celdas), g.celdas

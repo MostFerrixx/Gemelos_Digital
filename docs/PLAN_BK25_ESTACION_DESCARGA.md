@@ -14,8 +14,9 @@
 
 - **F1 CERRADA.** El canonico corre con el mapa v3, los datos v3, la estacion
   con turno y "esperar" como ultimo recurso. Baseline nuevo `02796701`.
-- **Siguiente: F2** — cesion por solicitud (que el que espera se corra),
-  apagada por defecto y medida con flota grande.
+- **Siguiente: decidir como se resuelve el ATASCO EN LOS PASILLOS con flota
+  grande (ver el registro del 2026-09-20). La cesion por solicitud, tal como
+  esta especificada, NO lo resuelve.
 - Hecho: **F1.a**, la base guarda todas las celdas de cada carril.
 - Hecho: **F0** (el que espera ocupa una sola celda) en la rama
   `fix/bk25-estacion-descarga`, medido, sin integrar a `main` todavia.
@@ -218,3 +219,25 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   (4 se actualizaron: fijaban el mapa viejo o suponian la estacion apagada).
   Verificado desde la WEB: corrida de 602 tareas, 1 co-ocupacion (la del
   arranque), 0 rendiciones, y el visor dibuja el mapa 32x43.
+- **2026-09-20** — **Medicion seria (una corrida por vez) y hallazgo nuevo.**
+  LECCION DE METODO: medir lanzando varias simulaciones EN PARALELO no es
+  fiable; ademas una copia vieja del script de diagnostico corria con la flota
+  canonica en vez de la pedida. Numeros validos (semilla 42, uno por vez):
+
+  | Escenario | Jornada | Co-ocupaciones | Rendiciones |
+  |---|---|---|---|
+  | Todo al carril 1, 2+2 | 8.769 s | 1 (arranque) | 0 |
+  | Todo al carril 1, 4+4 | 8.682 s | 2 | 0 |
+  | Todo al carril 1, 8+8 | 8.068 s | 4 | 1 |
+  | Repartido, 4+4 | 4.450 s | 1 (arranque) | 0 |
+  | Repartido, 8+8 | 12.666 s | 4 | 2 |
+
+  **Atasco de pasillo (nuevo):** con 16 operarios y trabajo repartido, CINCO
+  operarios a pie quedan trabados en el mismo pasillo de 2 celdas (columnas
+  9-10, filas 17-19). GroundOp-04 pasa 12.111 s quieto en (10,19). Los
+  montacargas terminan a los 2.574 s; la jornada se estira a 12.666 s por esos
+  cinco. **La cesion por solicitud NO lo resuelve**: su regla dice que solo
+  cede quien no tiene destino, y aca los cinco tienen tarea.
+  Corregido en el camino: los ociosos ya no esperan en la franja de
+  circulacion (ahora van a los bloques laterales). No cambia la duracion del
+  canonico (8.769 / 8.682 s) pero si el .jsonl: baseline nuevo.

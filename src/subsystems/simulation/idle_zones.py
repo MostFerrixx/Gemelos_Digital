@@ -135,9 +135,27 @@ class GestorZonasEspera:
         def vecinos(c):
             return sum(1 for _ in self._vecinos(c))
 
-        candidatas.sort(key=lambda c: (vecinos(c) > 3, dist.get(c, 10 ** 6),
+        # BK-25: la franja de circulacion DELANTE de las zonas de descarga (entre
+        # los racks y los carriles) es por donde pasa todo el almacen. Es la mas
+        # cercana, asi que ganaba siempre, y con flota grande los que esperaban la
+        # tapaban entre todos (medido: 16 operarios, 60% del tiempo parados y
+        # 23.910 rutas sin solucion). Queda como ULTIMO recurso.
+        franja = self._franja_de_circulacion()
+
+        candidatas.sort(key=lambda c: (c[1] in franja, vecinos(c) > 3,
+                                       dist.get(c, 10 ** 6),
                                        vecinos(c), -c[1], c[0]))
         return candidatas
+
+    def _franja_de_circulacion(self) -> Set[int]:
+        """Filas entre el ultimo rack de picking y la primera celda de descarga."""
+        if not self.picks or not self.descargas:
+            return set()
+        ultimo_pick = max(y for _, y in self.picks)
+        primera_descarga = min(y for _, y in self.descargas)
+        if primera_descarga <= ultimo_pick:
+            return set()
+        return set(range(ultimo_pick + 1, primera_descarga))
 
     def _distancias(self, origenes) -> Dict[Cell, int]:
         dist: Dict[Cell, int] = {}
