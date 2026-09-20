@@ -23,7 +23,7 @@
 
 ```
 python -m pytest -q                # 331 passed, 1 deselected (~28s)
-python scripts/regression_gate.py  # GATE PASS esperado (baseline 7f82a5ab)
+python scripts/regression_gate.py  # GATE PASS esperado (baseline 0c441704)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
 

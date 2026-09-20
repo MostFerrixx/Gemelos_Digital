@@ -250,6 +250,14 @@ class ZonaEsperaConfig(BaseModel):
     alto: Optional[int] = None
 
 
+class DespachoConfig(BaseModel):
+    """BK-23 (capa 1): una ubicacion, un operario a la vez
+    (lector: subsystems.simulation.dispatcher). Ambos default true."""
+    model_config = ConfigDict(extra="allow")
+    una_ubicacion_un_operario: Optional[bool] = None
+    consolidar_por_ubicacion: Optional[bool] = None
+
+
 class EstacionesConfig(BaseModel):
     """BK-25 F1.c: la zona de descarga como estacion con turno
     (lector: subsystems.simulation.stations + operators).
@@ -323,6 +331,7 @@ class WarehouseConfig(BaseModel):
     # BK-15: donde esperan los operarios sin trabajo (ausente = automaticas).
     zonas_espera: Optional[Dict[str, ZonaEsperaConfig]] = None
     estaciones: Optional[EstacionesConfig] = None
+    despacho: Optional[DespachoConfig] = None
     database_file: Optional[str] = None   # BK-25 F1.b: datos maestros alternativos
 
     # --- Layout y datos (layout_manager / data_manager) ---

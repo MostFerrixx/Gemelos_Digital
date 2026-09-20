@@ -73,6 +73,14 @@ class DispatcherV11:
         self.lista_maestra_work_orders: List[Any] = []          # All WOs (source of truth)
         self.work_orders_pendientes: List[Any] = []              # PENDING state
         self.work_orders_asignados: Dict[str, List[Any]] = {}    # {operator_id: [WO1, WO2...]}
+        # BK-23 (capa 1): una ubicacion, un operario a la vez. El despacho mandaba
+        # varias tareas del MISMO hueco a operarios distintos; una vez ahi se
+        # tapaban las salidas entre ellos (medido: 5 operarios en (10,18), uno
+        # trabado 12.111 s). {(x, y): operator_id}
+        self.ubicaciones_comprometidas: Dict[Any, str] = {}
+        _desp = (configuracion or {}).get('despacho', {}) or {}
+        self.una_ubicacion_un_operario = bool(_desp.get('una_ubicacion_un_operario', True))
+        self.consolidar_por_ubicacion = bool(_desp.get('consolidar_por_ubicacion', True))
         self.work_orders_en_progreso: Dict[str, Any] = {}        # {operator_id: current_WO}
         self.work_orders_completados: List[Any] = []             # COMPLETED state
         # INIT-7 F2: cola SEPARADA de putaway (no contamina los pools de pick;
@@ -511,6 +519,39 @@ class DispatcherV11:
             logger.warning(f"[DISPATCHER WARN] Estrategia desconocida '{self.estrategia}', usando Optimizacion Global")
             return self._estrategia_optimizacion_global(operator)
 
+    # ------------------------------------------------------------------
+    # BK-23 (capa 1): una ubicacion, un operario a la vez
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _celda_de(wo: Any):
+        try:
+            return tuple(wo.ubicacion)
+        except Exception:
+            return None
+
+    def _candidatos_sin_ubicacion_ajena(self, operator: Any, candidatos: List[Any]) -> List[Any]:
+        """Saca las WOs cuya ubicacion esta tomada por OTRO operario."""
+        if not self.una_ubicacion_un_operario or not self.ubicaciones_comprometidas:
+            return candidatos
+        mio = f"{operator.type}_{operator.id}"
+        libres = []
+        for wo in candidatos:
+            duenio = self.ubicaciones_comprometidas.get(self._celda_de(wo))
+            if duenio is None or duenio == mio:
+                libres.append(wo)
+        return libres
+
+    def _wos_de_la_misma_ubicacion(self, wo: Any, candidatos: List[Any]) -> List[Any]:
+        """Las demas lineas pendientes del mismo hueco (realismo: el picker que
+        llega a una ubicacion se lleva todo lo que hay ahi)."""
+        if not self.consolidar_por_ubicacion:
+            return []
+        celda = self._celda_de(wo)
+        if celda is None:
+            return []
+        return [o for o in candidatos
+                if o is not wo and self._celda_de(o) == celda]
+
     def _estrategia_fifo(self, operator: Any) -> List[Any]:
         """
         FIFO Strategy - Take first N WorkOrders that fit operator capacity
@@ -525,6 +566,7 @@ class DispatcherV11:
         candidatos = [wo for wo in self.work_orders_pendientes
                      if operator.can_handle_work_area(wo.work_area)
                      and self._wo_elegible_por_ola(wo)]
+        candidatos = self._candidatos_sin_ubicacion_ajena(operator, candidatos)  # BK-23
 
         # INIT-4 (C2): priorizar pedidos urgentes (opt-in; no-op si flag off)
         candidatos = self._aplicar_prioridad_pedido(candidatos)
@@ -554,6 +596,8 @@ class DispatcherV11:
         candidatos_compatibles = [wo for wo in self.work_orders_pendientes
                                  if operator.can_handle_work_area(wo.work_area)
                                  and self._wo_elegible_por_ola(wo)]
+        # BK-23: fuera las ubicaciones que ya tiene tomadas otro operario
+        candidatos_compatibles = self._candidatos_sin_ubicacion_ajena(operator, candidatos_compatibles)
 
         if not candidatos_compatibles:
             # Debug log to understand why no WOs are compatible
@@ -601,6 +645,8 @@ class DispatcherV11:
         candidatos_compatibles = [wo for wo in self.work_orders_pendientes
                                  if operator.can_handle_work_area(wo.work_area)
                                  and self._wo_elegible_por_ola(wo)]
+        # BK-23: fuera las ubicaciones que ya tiene tomadas otro operario
+        candidatos_compatibles = self._candidatos_sin_ubicacion_ajena(operator, candidatos_compatibles)
 
         if not candidatos_compatibles:
             return []
@@ -884,6 +930,15 @@ class DispatcherV11:
         if primera_volume <= operator.capacity:
             tour_wos.append(primera_wo)
             volume_acumulado += primera_volume
+            # BK-23: el que va a un hueco se lleva TODAS las lineas de ese hueco
+            # que le quepan (un picker real no vuelve tres veces al mismo lugar).
+            for hermana in self._wos_de_la_misma_ubicacion(primera_wo, candidatos):
+                if len(tour_wos) >= self.max_wos_por_tour:
+                    break
+                v = hermana.calcular_volumen_restante()
+                if volume_acumulado + v <= operator.capacity:
+                    tour_wos.append(hermana)
+                    volume_acumulado += v
         else:
             logger.error(f"[DISPATCHER ERROR] Primera WO {primera_wo.id} excede capacidad")
             return []
@@ -1124,6 +1179,7 @@ class DispatcherV11:
 
         # INIT-4 (C3): descartar WOs cuya ola aun no se libero (no-op si waves off)
         candidatos = [wo for wo in candidatos if self._wo_elegible_por_ola(wo)]
+        candidatos = self._candidatos_sin_ubicacion_ajena(operator, candidatos)  # BK-23
 
         # INIT-4 (C2): priorizar pedidos urgentes (opt-in; no-op si flag off)
         candidatos = self._aplicar_prioridad_pedido(candidatos)
@@ -1298,6 +1354,12 @@ class DispatcherV11:
             if operator_id not in self.work_orders_asignados:
                 self.work_orders_asignados[operator_id] = []
             self.work_orders_asignados[operator_id].append(wo)
+
+            # BK-23: la ubicacion queda tomada por este operario hasta que la libere
+            if self.una_ubicacion_un_operario:
+                celda = self._celda_de(wo)
+                if celda is not None:
+                    self.ubicaciones_comprometidas[celda] = operator_id
 
             # Update WorkOrder state
             wo.status = "assigned"
@@ -1474,6 +1536,15 @@ class DispatcherV11:
         """
         operator_id = f"{operator.type}_{operator.id}"
         wo = work_order
+
+        # BK-23: si al operario no le queda ninguna tarea de esa ubicacion, la suelta
+        if self.una_ubicacion_un_operario:
+            celda = self._celda_de(wo)
+            if celda is not None and self.ubicaciones_comprometidas.get(celda) == operator_id:
+                quedan = [o for o in self.work_orders_asignados.get(operator_id, [])
+                          if o is not wo and self._celda_de(o) == celda]
+                if not quedan:
+                    self.ubicaciones_comprometidas.pop(celda, None)
         
         # Remove from assigned list
         if operator_id in self.work_orders_asignados:
@@ -1602,7 +1673,14 @@ class DispatcherV11:
             operator: Operator instance
         """
         operator_id = f"{operator.type}_{operator.id}"
-        
+
+        # BK-23: limpieza -- al cerrar el recorrido no queda ninguna ubicacion
+        # tomada por este operario (por si alguna WO no paso por el completado).
+        if self.una_ubicacion_un_operario:
+            for celda, duenio in list(self.ubicaciones_comprometidas.items()):
+                if duenio == operator_id:
+                    self.ubicaciones_comprometidas.pop(celda, None)
+
         # Operator back to available
         if operator_id in self.operadores_activos:
             del self.operadores_activos[operator_id]

@@ -14,9 +14,10 @@
 
 - **F1 CERRADA.** El canonico corre con el mapa v3, los datos v3, la estacion
   con turno y "esperar" como ultimo recurso. Baseline nuevo `02796701`.
-- **Siguiente: decidir como se resuelve el ATASCO EN LOS PASILLOS con flota
-  grande (ver el registro del 2026-09-20). La cesion por solicitud, tal como
-  esta especificada, NO lo resuelve.
+- Hecha la **capa 1** (una ubicacion, un operario + consolidar por ubicacion).
+- **Siguiente: decidir la capa 2** (cupo por pasillo) y la capa 3
+  (zonificacion + robo de trabajo). Decisiones D-B1 a D-B8 del adenda
+  `docs/PROPUESTA_DISENO_ZONIFICACION_PASILLOS.md`.
 - Hecho: **F1.a**, la base guarda todas las celdas de cada carril.
 - Hecho: **F0** (el que espera ocupa una sola celda) en la rama
   `fix/bk25-estacion-descarga`, medido, sin integrar a `main` todavia.
@@ -241,3 +242,25 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   Corregido en el camino: los ociosos ya no esperan en la franja de
   circulacion (ahora van a los bloques laterales). No cambia la duracion del
   canonico (8.769 / 8.682 s) pero si el .jsonl: baseline nuevo.
+- **2026-09-20** — **Consulta 3 al consultor y capa 1 hecha.** Su hallazgo,
+  que VERIFIQUE en el replay: los cinco trabados no coincidieron por azar en
+  el pasillo, el despacho les dio tareas del MISMO hueco (10,18): 5 operarios
+  distintos con tarea ahi. En esa corrida hubo 54 huecos con 2 operarios a la
+  vez, 4 con 3, 2 con 4 y uno con 5. Es BK-23.
+  Implementado: `despacho.una_ubicacion_un_operario` y
+  `despacho.consolidar_por_ubicacion` (ambos default true): la ubicacion queda
+  tomada por un operario hasta que termina, las cuatro estrategias la excluyen
+  para los demas, y quien va a un hueco se lleva todas sus lineas que quepan.
+
+  | Escenario (semilla 42) | Antes | Con la capa 1 |
+  |---|---|---|
+  | Repartido, 8+8 | 12.666 s, 2 rendiciones | **8.124 s, 0 rendiciones** |
+  | Repartido, 4+4 | 4.450 s | 4.772 s |
+  | Todo al carril 1, 2+2 | 8.769 s | 8.891 s |
+  | Todo al carril 1, 8+8 | 8.068 s, 1 rendicion | 7.789 s, 0 rendiciones |
+
+  Gana donde estaba roto (-36% con 16 operarios) y cuesta 1-7% donde ya iba
+  bien: es el precio de no permitir lo fisicamente imposible. Cero rendiciones
+  del planificador en los cuatro escenarios. Baseline nuevo `0c441704`.
+  +4 tests (336). Quedan 3 co-ocupaciones en el 8+8 repartido: las ataca la
+  capa 2 (cupo por pasillo).
