@@ -10,6 +10,25 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-20
+
+- **BK-25 F1 -- la zona de descarga pasa a ser una ESTACION CON TURNO**
+  (`fe2b17b`..`61e2a30`). Los operarios que esperaban turno tapaban la salida
+  del que descargaba; el motor se rendia a los 10 minutos y los hacia pisarse
+  (QA H-15). Ahora cada carril tiene un puesto por columna, entrada por el
+  frente, salida por su costado de un solo sentido, fila con turno propio y
+  pulmon. Ademas: el que espera ya no ocupa dos celdas (H-27, bug del
+  planificador introducido en BK-15), la base guarda todas las celdas de cada
+  carril, `database_file` es configurable y el ultimo recurso pasa a ser
+  ESPERAR en vez de atravesar a otro (D6).
+  **Canonico nuevo:** mapa `WH1 v3.tmx` (32x43, anden de 3 filas y el ultimo
+  pasillo completo -- era de 1 celda y estrangulaba todo) y datos
+  `Warehouse_Logic_v3.xlsx` (384 ubicaciones, carriles de 2x10).
+  Medido con semilla 42: 8+8 repartido 26.736 -> 2.574 s; 4+4 repartido
+  4.450 s; 4+4 todo al carril 1 24.933 -> 8.682 s; co-ocupaciones fuera del
+  arranque = 0. Baseline `5c7f4c32` -> `02796701`. Plan y decisiones en
+  `docs/PLAN_BK25_ESTACION_DESCARGA.md`.
+
 ## 2026-09-19
 
 - **QA H-26 -- con outbound, la corrida esperaba al ultimo camion**

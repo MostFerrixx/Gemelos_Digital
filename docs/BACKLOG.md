@@ -23,7 +23,7 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-26 — la consola del Simulation Runner no tiene limite de lineas | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-20) |
 | BK-27 — prioridades muertas sin aviso cuando el mapa cambia de equipo | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-21) |
 | BK-29 — con outbound activo hay operarios que arrancan dentro de un carril | ABIERTO (2026-09-19) | Baja | A definir | Ninguno (QA H-23) |
-| **BK-25 — operarios que se pisan en la zona de descarga (tambien con la flota canonica)** | **PROPUESTA LISTA (2026-09-19)** | **Alta (realismo)** | F0 1 dia; F1 3-4 dias; F2 2-3 dias | Decisiones D1-D9 de `docs/PROPUESTA_DISENO_CIRCULACION_Y_LAYOUT.md` (QA H-15, H-27) |
+| BK-25 — estacion de descarga con turno | **F1 CERRADA (2026-09-20)**, sigue F2 (cesion del paso) | Alta (realismo) | F2 3-4 dias | Plan vivo: `docs/PLAN_BK25_ESTACION_DESCARGA.md` |
 | BK-31 — adoptar el layout grande `WH1 v2.tmx` (tiene anden de muelle) | ABIERTO (2026-09-19) | Media | Chico (falta estacionamientos/recepcion) | Decision del Director |
 | BK-30 — el muelle de salida (outbound) no es realista en WH1 | ABIERTO (2026-09-19) | Media (realismo, solo con outbound) | F3 de la propuesta, 3-4 dias | Decisiones D3 y D10 de la propuesta (QA H-25) |
 | BK-24 — la estrategia "Cercania" casi no se distingue de "cualquier tarea" | ABIERTO (2026-09-19) | Media (diseno) | A definir | Decision de diseno (QA H-13) |
