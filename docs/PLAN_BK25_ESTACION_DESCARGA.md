@@ -12,8 +12,8 @@
 
 ## 1. Estado actual
 
-- **En curso: F1.c2** — que las salidas sean de un solo sentido tambien para
-  los buscadores de rutas.
+- **En curso: F1.d** — cerrar F1: encender la estacion en el canonico, nuevo
+  baseline, y los 5 cruces que quedan en un pasillo de picking.
 - Hecho: **F1.a**, la base guarda todas las celdas de cada carril.
 - Hecho: **F0** (el que espera ocupa una sola celda) en la rama
   `fix/bk25-estacion-descarga`, medido, sin integrar a `main` todavia.
@@ -72,8 +72,8 @@ el motor se rinde a los 10 minutos simulados y termina pisando a otro operario
 | **F1.a** | La base guarda todas las celdas de cada carril | HECHO (`442bc7e`), gate PASS |
 | **F1.b** | Datos del v3 importables y medibles sin tocar los de produccion (`database_file` configurable) | HECHO; el cambio del canonico queda para F1.d |
 | **F1.c** | Estacion con turno: puestos por columna, entrada, fila y salida por su costado; deduccion automatica y avisos | HECHO (`a78a98b`), apagada por defecto |
-| **F1.c2** | Que la salida sea de un solo sentido y prohibido detenerse (reglas de circulacion en los dos buscadores de rutas) | EN CURSO |
-| **F1.d** | Medicion con flota grande (4+4 y 8+8, todo a un carril y con reparto) | Siguiente |
+| **F1.c2** | Salidas de un solo sentido, fila con turno propio y reservada | HECHO (`e107cd3`) |
+| **F1.d** | Medicion con flota grande (hecha para 4+4, falta 8+8) y cambio del canonico + baseline | EN CURSO |
 | **F2** | Cesion por solicitud (apagada por defecto) + medicion con flota grande | Despues de F1 |
 | **F3** | Muelle de salida sobre la misma estacion: carriles reales, sin saltos, unidad de staging segun D3 | Despues de F2 |
 | **F4** | Reglas de circulacion editables desde la web + capa del visor que las muestra | Despues de F3 |
@@ -133,3 +133,24 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   La flota 4+4 pasa a rendir mas que la 2+2 (5.249 s contra 9.124 s), que era
   el criterio de exito. Faltan 2 co-ocupaciones y 1 rendicion para llegar a 0:
   se atacan en F1.c2 (salidas de un solo sentido).
+- **2026-09-19** — F1.c2 (`e107cd3`). Tres correcciones encadenadas, cada una
+  medida:
+  1. `database_file` no llegaba al motor: la primera medicion habia corrido
+     con los datos viejos (una celda por zona). Corregido.
+  2. Con 2 puestos por carril aparecieron 42 co-ocupaciones: varios elegian la
+     MISMA celda de fila. La fila pasa a repartirse con turno propio -> 13.
+  3. Las 13 restantes eran cruces: alguien pasaba por encima del que esperaba.
+     La celda de espera ahora queda reservada -> 1 (la del arranque).
+
+  | Escenario (4+4, mapa v3, semilla 42) | Duracion | Co-ocupaciones | Rendiciones |
+  |---|---|---|---|
+  | Todo al carril 1, sin estacion | 24.933 s | 23 | 23 |
+  | **Todo al carril 1, con estacion** | **8.951 s** | **1 (arranque)** | **0** |
+  | Repartido en 7 carriles, con estacion | 4.971 s | 6 | 2 |
+  | 2+2 repartido, con estacion (referencia) | 9.156 s | 1 | 0 |
+
+  Con un solo carril, duplicar la flota ya casi no rinde (8.951 contra 9.115 s):
+  el cuello pasa a ser el carril, que es lo REALISTA. Repartiendo entre los 7
+  muelles, la 4+4 casi duplica a la 2+2. Es el argumento medido para D9.
+  PENDIENTE: 5 cruces "en movimiento" en un pasillo de picking del borde
+  derecho (celdas (29,8)-(29,10)), sin relacion con la descarga.
