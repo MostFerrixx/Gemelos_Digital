@@ -41,6 +41,13 @@ class Estacion:
         self.colas = {x: list(v) for x, v in colas.items()}
         self.avisos = list(avisos)
         self.ocupante: Dict[int, Optional[str]] = {x: None for x in self.puestos}
+        # BK-25 F1.c2: la FILA tambien se reparte con turno. Si varios eligen
+        # la misma celda de espera terminan encimados (medido: 42 co-ocupaciones
+        # en las entradas del carril 1 con flota 4+4).
+        self.fila_ocupante: Dict[Celda, Optional[str]] = {}
+        for celdas in self.colas.values():
+            for celda in celdas:
+                self.fila_ocupante.setdefault(tuple(celda), None)
 
     # ---------------------------------------------------------------- turnos
     def puesto_libre(self) -> Optional[int]:
@@ -59,6 +66,7 @@ class Estacion:
         if x is None or self.ocupante.get(x) is not None:
             return None
         self.ocupante[x] = agent_id
+        self.liberar_fila(agent_id)      # al entrar, suelta su lugar en la fila
         return x
 
     def puesto_de(self, agent_id: str) -> Optional[int]:
@@ -67,10 +75,33 @@ class Estacion:
                 return x
         return None
 
+    def tomar_celda_de_fila(self, agent_id: str) -> Optional[Celda]:
+        """Reserva una celda de la fila para el agente (una por agente)."""
+        actual = self.celda_de_fila_de(agent_id)
+        if actual is not None:
+            return actual
+        for celda in sorted(self.fila_ocupante):
+            if self.fila_ocupante[celda] is None:
+                self.fila_ocupante[celda] = agent_id
+                return celda
+        return None
+
+    def celda_de_fila_de(self, agent_id: str) -> Optional[Celda]:
+        for celda, quien in self.fila_ocupante.items():
+            if quien == agent_id:
+                return celda
+        return None
+
+    def liberar_fila(self, agent_id: str) -> None:
+        celda = self.celda_de_fila_de(agent_id)
+        if celda is not None:
+            self.fila_ocupante[celda] = None
+
     def liberar(self, agent_id: str) -> Optional[int]:
         x = self.puesto_de(agent_id)
         if x is not None:
             self.ocupante[x] = None
+        self.liberar_fila(agent_id)
         return x
 
     # ------------------------------------------------------------- consultas
@@ -89,6 +120,43 @@ class Estacion:
     def __repr__(self):
         return ("Estacion(id=%d, puestos=%s, entradas=%s, salidas=%s)"
                 % (self.staging_id, sorted(self.puestos), self.entradas, self.salidas))
+
+
+class ReglasCirculacion:
+    """BK-25 F1.c2: sentido unico de las salidas y celdas donde no se para.
+
+    Regla del Director: por la salida de un puesto SOLO se sale, y nadie se
+    queda parado ahi. La hacen cumplir los DOS buscadores de rutas, porque
+    ambos piden los vecinos a `Pathfinder.get_neighbors`.
+    """
+
+    def __init__(self, salidas: Dict[Celda, Celda], celdas_de_zona: Dict[Celda, Celda]):
+        # {celda de salida: celda del puesto que la usa}
+        self.salidas = {tuple(k): tuple(v) for k, v in salidas.items()}
+        # {celda del carril: celda de entrada de su columna}
+        self.celdas_de_zona = {tuple(k): (tuple(v) if v else None)
+                               for k, v in celdas_de_zona.items()}
+
+    def permite(self, origen: Celda, destino: Celda) -> bool:
+        origen, destino = tuple(origen), tuple(destino)
+        puesto = self.salidas.get(destino)
+        if puesto is not None and origen != puesto:
+            return False                     # a la salida solo se entra desde su puesto
+        entrada = self.celdas_de_zona.get(destino)
+        if destino in self.celdas_de_zona:
+            # al carril solo se entra por su entrada, o avanzando dentro de el
+            if origen not in self.celdas_de_zona and origen != entrada:
+                return False
+            if origen in self.celdas_de_zona and origen[0] != destino[0]:
+                return False                 # no se cambia de columna por dentro
+        return True
+
+    def puede_detenerse(self, celda: Celda) -> bool:
+        return tuple(celda) not in self.salidas
+
+    def __repr__(self):
+        return "ReglasCirculacion(%d salidas, %d celdas de carril)" % (
+            len(self.salidas), len(self.celdas_de_zona))
 
 
 class GestorEstaciones:
@@ -203,6 +271,21 @@ class GestorEstaciones:
             for celda in est.salidas.values():
                 out[tuple(celda)] = sid
         return out
+
+    def reglas(self) -> ReglasCirculacion:
+        """Reglas de circulacion deducidas: salidas de un sentido y carriles."""
+        salidas: Dict[Celda, Celda] = {}
+        celdas_de_zona: Dict[Celda, Celda] = {}
+        for est in self.estaciones.values():
+            for puesto_x, celda_salida in est.salidas.items():
+                frente = est.celda_de_trabajo(puesto_x)
+                if frente is not None:
+                    salidas[tuple(celda_salida)] = tuple(frente)
+            for puesto_x, celdas in est.puestos.items():
+                entrada = est.entradas.get(puesto_x)
+                for celda in celdas:
+                    celdas_de_zona[tuple(celda)] = tuple(entrada) if entrada else None
+        return ReglasCirculacion(salidas, celdas_de_zona)
 
     def resumen(self) -> Dict[str, object]:
         return {

@@ -97,6 +97,13 @@ class Pathfinder:
             if self.is_walkable(nx, ny):
                 neighbors.append(((nx, ny), cost))
 
+        # BK-25 F1.c2: reglas de circulacion (salidas de un solo sentido).
+        # Sin reglas cargadas no cambia nada. Como el A* espacio-temporal
+        # pide los vecinos aqui, los dos buscadores las respetan.
+        reglas = getattr(self, "reglas_circulacion", None)
+        if reglas is not None:
+            neighbors = [(nb, c) for (nb, c) in neighbors if reglas.permite(pos, nb)]
+
         return neighbors
 
     def heuristic(self, a: Tuple[int, int], b: Tuple[int, int]) -> float:

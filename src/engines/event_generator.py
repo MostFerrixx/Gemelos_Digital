@@ -167,7 +167,10 @@ class EventGenerator:
         # 4. Crear DataManager
         layout_file = self.configuracion.get('layout_file', '')
         sequence_file = self.configuracion.get('sequence_file', '')
-        self.data_manager = DataManager(layout_file, sequence_file, headless=True)
+        # BK-25 F1.b: la configuracion decide de que base salen los datos
+        # maestros (`database_file`); sin ella, warehouse.db de siempre.
+        self.data_manager = DataManager(layout_file, sequence_file, headless=True,
+                                        configuracion=self.configuracion)
         
         # 5. Crear calculador de costos
         self.cost_calculator = AssignmentCostCalculator(self.data_manager)

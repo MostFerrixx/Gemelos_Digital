@@ -783,22 +783,35 @@ class BaseOperator:
             if puesto_x is not None:
                 return puesto_x
             destino = self._celda_de_fila_libre(estacion)
-            if destino is not None and tuple(self.current_position) != destino:
-                yield from self._outbound_nav_to(destino)
+            if destino is not None:
+                if tuple(self.current_position) != destino:
+                    yield from self._outbound_nav_to(destino)
+                # F1.c2: mientras espera turno, su celda queda RESERVADA; si no,
+                # otro le pasa por encima camino a otra cosa (medido: cruces en
+                # las entradas del carril 1).
+                self._reservar_espera_abierta(destino)
             else:
                 self._esperar_sin_estorbar()
-            self._tw_reserve_dwell(espera)
             yield self.env.timeout(espera)
 
     def _celda_de_fila_libre(self, estacion):
-        """Primera celda de fila que no tenga a otro agente encima."""
-        cm = getattr(self.almacen, 'congestion_manager', None)
-        for puesto_x in sorted(estacion.puestos):
-            for celda in estacion.celdas_de_fila(puesto_x):
-                otros = (cm.occupied.get(tuple(celda)) or set()) - {self.id} if cm is not None else set()
-                if not otros:
-                    return tuple(celda)
-        return None
+        """Pide una celda de la fila SOLO para este agente (turno propio);
+        si la fila esta llena devuelve None y el agente se va al pulmon."""
+        celda = estacion.tomar_celda_de_fila(self.id)
+        return tuple(celda) if celda is not None else None
+
+    def _reservar_espera_abierta(self, celda):
+        """Reserva sin fin la celda donde el agente espera (mismo mecanismo que
+        usan los ociosos en BK-15): los demas planifican rodeandolo."""
+        planner = getattr(self.almacen, 'spacetime_planner', None)
+        if planner is None or not self._tw_exec_active():
+            return
+        from .idle_zones import ESPERA_ABIERTA_S
+        celda = tuple(celda)
+        propia = [iv for iv in planner.table.reservations.get(celda, [])
+                  if iv[2] == self.id and iv[1] >= ESPERA_ABIERTA_S / 2]
+        if not propia:
+            planner.reserve_dwell(celda, float(self.env.now), ESPERA_ABIERTA_S, self.id)
 
     def _salir_de_la_estacion(self, estacion, puesto_x):
         """Sale por SU costado (regla del Director) y recien ahi suelta el

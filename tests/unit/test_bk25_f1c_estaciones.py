@@ -86,3 +86,30 @@ def test_f1c_geometria_real_del_layout_v3():
     assert est.salidas == {3: (2, 30), 4: (5, 30)}
     assert g.resumen()['puestos_totales'] == 14       # 7 carriles x 2
     assert not g.resumen()['avisos']
+
+
+def test_f1c2_por_la_salida_solo_se_sale():
+    reglas = _gestor().reglas()
+    assert reglas.permite((3, 8), (2, 8))        # desde su puesto, si
+    assert not reglas.permite((2, 7), (2, 8))    # bajando por el pasillo, no
+    assert not reglas.permite((4, 8), (2, 8))    # desde el otro puesto, tampoco
+    assert not reglas.puede_detenerse((2, 8))    # y nadie se queda parado ahi
+
+
+def test_f1c2_al_carril_solo_se_entra_por_su_entrada():
+    reglas = _gestor().reglas()
+    assert reglas.permite((3, 7), (3, 8))        # por la entrada, si
+    assert reglas.permite((3, 8), (3, 9))        # hacia el fondo de SU columna, si
+    assert not reglas.permite((2, 8), (3, 8))    # desde la salida, no
+    assert not reglas.permite((3, 9), (4, 9))    # cambiando de columna por dentro, no
+
+
+def test_f1c2_la_fila_es_de_a_uno():
+    est = _gestor(cola_max=1).estacion(1)
+    a = est.tomar_celda_de_fila('A')
+    b = est.tomar_celda_de_fila('B')
+    assert a is not None and b is not None and a != b      # una celda por agente
+    assert est.tomar_celda_de_fila('C') is None            # fila llena -> pulmon
+    est.tomar('A')                                         # al entrar al puesto
+    assert est.celda_de_fila_de('A') is None               # suelta su lugar
+    assert est.tomar_celda_de_fila('C') == a

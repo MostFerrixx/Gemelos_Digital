@@ -404,6 +404,18 @@ class AlmacenMejorado:
             print(f"[ESTACIONES] {self.estaciones} cola_max={_res['cola_max']}")
             for _aviso in _res['avisos']:
                 print(f"[ESTACIONES][WARN] {_aviso}")
+            # F1.c2: las salidas son de un solo sentido tambien para el calculo
+            # de rutas. Se cargan en el Pathfinder, que es el que da los vecinos
+            # al A* estatico Y al espacio-temporal.
+            self.reglas_circulacion = self.estaciones.reglas()
+            _pf = (getattr(self, "pathfinder", None)
+                   or getattr(getattr(self, "route_calculator", None), "pathfinder", None))
+            if _pf is not None:
+                _pf.reglas_circulacion = self.reglas_circulacion
+            _pf2 = getattr(getattr(self, "spacetime_planner", None), "pathfinder", None)
+            if _pf2 is not None and _pf2 is not _pf:
+                _pf2.reglas_circulacion = self.reglas_circulacion
+            print(f"[ESTACIONES] {self.reglas_circulacion}")
 
         # BK-15 (C4, decision del Director 2026-09-18): el operario sin trabajo
         # espera en una celda donde no estorba (zonas_espera, o elegidas por el
@@ -419,6 +431,9 @@ class AlmacenMejorado:
             # varias celdas NO caminables (F2.d); todas cuentan como descarga
             # (ni ellas ni su acceso pueden ser celda de espera).
             _descargas = list(data_manager.get_outbound_staging_locations().values())
+            # F1.c2: tampoco se espera en una salida de un solo sentido.
+            if getattr(self, "estaciones", None) is not None:
+                _descargas.extend(self.estaciones.todas_las_salidas().keys())
             for _zona in (self.staging_zones or {}).values():
                 _descargas.extend(_sl.cell for _sl in _zona.slots)
             puntos = getattr(data_manager, 'puntos_de_picking_ordenados', None) or []
