@@ -12,8 +12,10 @@
 
 ## 1. Estado actual
 
-- **En curso: F1.d** — cerrar F1: encender la estacion en el canonico, nuevo
-  baseline, y los 5 cruces que quedan en un pasillo de picking.
+- **F1 CERRADA.** El canonico corre con el mapa v3, los datos v3, la estacion
+  con turno y "esperar" como ultimo recurso. Baseline nuevo `02796701`.
+- **Siguiente: F2** — cesion por solicitud (que el que espera se corra),
+  apagada por defecto y medida con flota grande.
 - Hecho: **F1.a**, la base guarda todas las celdas de cada carril.
 - Hecho: **F0** (el que espera ocupa una sola celda) en la rama
   `fix/bk25-estacion-descarga`, medido, sin integrar a `main` todavia.
@@ -73,8 +75,8 @@ el motor se rinde a los 10 minutos simulados y termina pisando a otro operario
 | **F1.b** | Datos del v3 importables y medibles sin tocar los de produccion (`database_file` configurable) | HECHO; el cambio del canonico queda para F1.d |
 | **F1.c** | Estacion con turno: puestos por columna, entrada, fila y salida por su costado; deduccion automatica y avisos | HECHO (`a78a98b`), apagada por defecto |
 | **F1.c2** | Salidas de un solo sentido, fila con turno propio y reservada | HECHO (`e107cd3`) |
-| **F1.d** | Medicion con flota grande (hecha para 4+4, falta 8+8) y cambio del canonico + baseline | EN CURSO |
-| **F2** | Cesion por solicitud (apagada por defecto) + medicion con flota grande | Despues de F1 |
+| **F1.d** | Medicion con flota grande y cambio del canonico + baseline | HECHO |
+| **F2** | Cesion por solicitud (apagada por defecto) + medicion con flota grande | SIGUIENTE |
 | **F3** | Muelle de salida sobre la misma estacion: carriles reales, sin saltos, unidad de staging segun D3 | Despues de F2 |
 | **F4** | Reglas de circulacion editables desde la web + capa del visor que las muestra | Despues de F3 |
 | **F5** | Pasillos de un solo sentido (D5), solo si el Director lo pide | Diferida |
@@ -207,3 +209,12 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   Medido (mapa v3, estacion, semilla 42): 4+4 repartido 4.450 s, 8+8 repartido
   2.574 s, 4+4 al carril 1 8.682 s. Sin rendiciones del planificador salvo 2
   en el caso 8+8.
+- **2026-09-20** — **F1 cerrada.** El canonico pasa a: mapa `WH1 v3.tmx`
+  (32x43), datos `Warehouse_Logic_v3.xlsx` (384 ubicaciones, 140 celdas de
+  carril) importados a `warehouse.db` (respaldo en `warehouse.db.bak`),
+  `estaciones.enabled=true` y `congestion.timewindow.ultimo_recurso=esperar`
+  (D6: no pisar a otro; con el mapa corregido no cuesta jornada).
+  Baseline nuevo: **`02796701...`, 17.088.496 bytes**. 331 tests en verde
+  (4 se actualizaron: fijaban el mapa viejo o suponian la estacion apagada).
+  Verificado desde la WEB: corrida de 602 tareas, 1 co-ocupacion (la del
+  arranque), 0 rendiciones, y el visor dibuja el mapa 32x43.

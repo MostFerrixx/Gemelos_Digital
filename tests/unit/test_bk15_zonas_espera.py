@@ -100,8 +100,11 @@ def test_ze07_web_valida_las_zonas_contra_el_mapa_real(tmp_path):
     import json
     from web_prototype.config_manager import WebConfigurationManager
     (tmp_path / "layouts").mkdir()
-    for nombre in ("Warehouse_Logic.xlsx", "WH1.tmx"):
-        shutil.copy2(os.path.join(PROJECT_ROOT, "layouts", nombre), tmp_path / "layouts" / nombre)
+    # los archivos que nombra el config canonico (cambian al adoptar otro layout)
+    for nombre in ['WH1 v3.tmx', 'WH1.tmx', 'Warehouse_Logic.xlsx', 'Warehouse_Logic_v3.xlsx']:
+        origen = os.path.join(PROJECT_ROOT, "layouts", nombre)
+        if os.path.exists(origen):
+            shutil.copy2(origen, tmp_path / "layouts" / nombre)
     shutil.copy2(os.path.join(PROJECT_ROOT, "warehouse.db"), tmp_path / "warehouse.db")
     with open(os.path.join(PROJECT_ROOT, "config.json"), encoding="utf-8") as f:
         cfg = json.load(f)
@@ -109,6 +112,6 @@ def test_ze07_web_valida_las_zonas_contra_el_mapa_real(tmp_path):
     cfg["zonas_espera"] = {"Z": {"x": 5, "y": 29}}
     ok, errores = manager.validate_config(cfg)
     assert ok, errores
-    cfg["zonas_espera"] = {"Z": {"x": 3, "y": 28}}   # acceso a la descarga 1
+    cfg["zonas_espera"] = {"Z": {"x": 3, "y": 29}}   # acceso al carril 1 (mapa v3)
     ok, errores = manager.validate_config(cfg)
     assert not ok and any("acceso" in e for e in errores)

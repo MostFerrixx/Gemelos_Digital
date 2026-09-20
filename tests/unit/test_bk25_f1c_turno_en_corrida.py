@@ -21,7 +21,9 @@ def _correr(tmp_path, monkeypatch, estaciones):
     with open(os.path.join(PROJECT_ROOT, "config.json"), encoding="utf-8") as f:
         cfg = json.load(f)
     cfg["total_ordenes"] = 25
-    if estaciones is not None:
+    if estaciones is None:
+        cfg.pop("estaciones", None)      # el canonico ya la trae encendida
+    else:
         cfg["estaciones"] = estaciones
     ruta = tmp_path / "config.json"
     ruta.write_text(json.dumps(cfg), encoding="utf-8")

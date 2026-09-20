@@ -62,8 +62,8 @@
       }
     }
   ],
-  "layout_file": "layouts/WH1.tmx",
-  "sequence_file": "layouts/Warehouse_Logic.xlsx",
+  "layout_file": "layouts/WH1 v3.tmx",
+  "sequence_file": "layouts/Warehouse_Logic_v3.xlsx",
   "work_area_equipment": {
     "Area_Ground": "GroundOperator",
     "Area_High": "Forklift",
@@ -92,7 +92,8 @@
       "dt_wait": 0.1,
       "max_expansions": 20000,
       "plan_horizon": 0,
-      "allow_diagonal": false
+      "allow_diagonal": false,
+      "ultimo_recurso": "esperar"
     }
   },
   "outbound": {
@@ -145,5 +146,9 @@
         "recargo": 0
       }
     }
+  },
+  "estaciones": {
+    "enabled": true,
+    "cola_max": 1
   }
 }

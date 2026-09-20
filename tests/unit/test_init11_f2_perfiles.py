@@ -281,7 +281,8 @@ def _config_web(**cambios):
 def _manager(tmp_path):
     from web_prototype.config_manager import WebConfigurationManager
     (tmp_path / "layouts").mkdir()
-    for nombre in ("Warehouse_Logic.xlsx", "WH1.tmx"):
+    # los archivos que nombra el config canonico (cambian al adoptar otro layout)
+    for nombre in ['WH1 v3.tmx', 'WH1.tmx', 'Warehouse_Logic.xlsx', 'Warehouse_Logic_v3.xlsx']:
         origen = os.path.join(PROJECT_ROOT, "layouts", nombre)
         if os.path.exists(origen):
             shutil.copy2(origen, tmp_path / "layouts" / nombre)
