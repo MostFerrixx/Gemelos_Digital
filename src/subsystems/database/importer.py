@@ -157,10 +157,41 @@ class ExcelImporter:
         conn.execute("DELETE FROM inventory")
         conn.execute("DELETE FROM locations")
         conn.execute("DELETE FROM sku_catalog")
+        self._ensure_staging_areas_multicelda(conn)
         conn.execute("DELETE FROM staging_areas")
         # INIT-7 F0: tabla nueva -- crearla si la DB es anterior al schema
         self._ensure_inbound_docks_table(conn)
         conn.execute("DELETE FROM inbound_docks")
+
+    @staticmethod
+    def _ensure_staging_areas_multicelda(conn: sqlite3.Connection):
+        """BK-25 F1.a: una zona de descarga puede tener VARIAS celdas.
+
+        La tabla vieja tenia PRIMARY KEY (staging_id): de las 20 celdas de un
+        carril quedaba una sola. Se reconstruye conservando lo que hubiera.
+        """
+        fila = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='staging_areas'"
+        ).fetchone()
+        if fila is None:
+            return
+        sql_actual = fila[0] or ""
+        if "PRIMARY KEY (staging_id, legacy_x, legacy_y)" in sql_actual:
+            return
+        print("[IMPORTER] Migrando staging_areas: varias celdas por zona (BK-25 F1.a)")
+        conn.executescript("""
+            ALTER TABLE staging_areas RENAME TO staging_areas_old;
+            CREATE TABLE staging_areas (
+                staging_id INTEGER NOT NULL,
+                staging_type TEXT DEFAULT 'OUTBOUND',
+                legacy_x INTEGER,
+                legacy_y INTEGER,
+                PRIMARY KEY (staging_id, legacy_x, legacy_y)
+            );
+            INSERT OR IGNORE INTO staging_areas (staging_id, staging_type, legacy_x, legacy_y)
+                SELECT staging_id, staging_type, legacy_x, legacy_y FROM staging_areas_old;
+            DROP TABLE staging_areas_old;
+        """)
 
     @staticmethod
     def _ensure_inbound_docks_table(conn: sqlite3.Connection):
@@ -366,7 +397,7 @@ class ExcelImporter:
                 
                 if staging_id > 0:
                     conn.execute("""
-                        INSERT OR REPLACE INTO staging_areas 
+                        INSERT OR IGNORE INTO staging_areas
                         (staging_id, staging_type, legacy_x, legacy_y)
                         VALUES (?, 'OUTBOUND', ?, ?)
                     """, (staging_id, x, y))

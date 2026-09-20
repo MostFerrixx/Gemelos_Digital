@@ -88,12 +88,18 @@ CREATE TABLE IF NOT EXISTS order_lines (
 -- ================================================================
 -- STAGING AREAS (Outbound staging locations)
 -- ================================================================
+-- BK-25 F1.a: una zona puede tener VARIAS celdas (un carril de descarga real
+-- mide, por ejemplo, 2 celdas de ancho por 10 de fondo). Antes la clave
+-- primaria era staging_id y el importador usaba INSERT OR REPLACE: de las 20
+-- celdas de un carril quedaba UNA sola (la ultima). El orden de insercion se
+-- conserva con rowid: la PRIMERA celda de cada zona es su ancla (el frente).
 CREATE TABLE IF NOT EXISTS staging_areas (
-    staging_id INTEGER PRIMARY KEY,               -- e.g., 1, 2, 3...
+    staging_id INTEGER NOT NULL,                  -- e.g., 1, 2, 3...
     staging_type TEXT DEFAULT 'OUTBOUND',         -- 'INBOUND', 'OUTBOUND', 'CROSSDOCK'
     -- Temporary: store coordinates during transition
     legacy_x INTEGER,
-    legacy_y INTEGER
+    legacy_y INTEGER,
+    PRIMARY KEY (staging_id, legacy_x, legacy_y)
 );
 
 -- ================================================================

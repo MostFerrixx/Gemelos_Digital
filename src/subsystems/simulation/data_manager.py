@@ -345,6 +345,7 @@ class DataManager:
             SELECT staging_id, legacy_x, legacy_y
             FROM staging_areas
             WHERE staging_type = 'OUTBOUND'
+            ORDER BY rowid
         """)
         
         zone_dict = {}
