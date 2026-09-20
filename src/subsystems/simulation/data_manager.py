@@ -61,7 +61,11 @@ class DataManager:
 
         # Resolve project root for database path
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-        self.db_path = os.path.join(project_root, 'warehouse.db')
+        # BK-25 F1.b: la base es configurable (`database_file`). Estaba fija en
+        # el codigo, asi que no se podia correr con otros datos maestros sin
+        # pisar los de produccion. Ausente -> 'warehouse.db' de siempre.
+        _db = str(self.configuracion.get('database_file') or 'warehouse.db')
+        self.db_path = _db if os.path.isabs(_db) else os.path.join(project_root, _db)
 
         # Resolve Excel path (for fallback)
         if not os.path.isabs(excel_file_path):

@@ -12,8 +12,8 @@
 
 ## 1. Estado actual
 
-- **En curso: F1.b** — adoptar el mapa v3 (reimportar, estacionamientos y
-  muelles) para poder medir con 2 puestos por carril.
+- **En curso: F1.c2** — que las salidas sean de un solo sentido tambien para
+  los buscadores de rutas.
 - Hecho: **F1.a**, la base guarda todas las celdas de cada carril.
 - Hecho: **F0** (el que espera ocupa una sola celda) en la rama
   `fix/bk25-estacion-descarga`, medido, sin integrar a `main` todavia.
@@ -70,9 +70,9 @@ el motor se rinde a los 10 minutos simulados y termina pisando a otro operario
 |---|---|---|
 | **F0** | El que espera ocupa una sola celda (sobre-reserva del origen) | HECHO, en rama, sin integrar |
 | **F1.a** | La base guarda todas las celdas de cada carril | HECHO (`442bc7e`), gate PASS |
-| **F1.b** | Adoptar `WH1 v3`: reimportar el Excel v3, estacionamientos y muelles en el mapa, canonico y baseline nuevos | EN CURSO |
+| **F1.b** | Datos del v3 importables y medibles sin tocar los de produccion (`database_file` configurable) | HECHO; el cambio del canonico queda para F1.d |
 | **F1.c** | Estacion con turno: puestos por columna, entrada, fila y salida por su costado; deduccion automatica y avisos | HECHO (`a78a98b`), apagada por defecto |
-| **F1.c2** | Que la salida sea de un solo sentido y prohibido detenerse (reglas de circulacion en los dos buscadores de rutas) | Pendiente dentro de F1 |
+| **F1.c2** | Que la salida sea de un solo sentido y prohibido detenerse (reglas de circulacion en los dos buscadores de rutas) | EN CURSO |
 | **F1.d** | Medicion con flota grande (4+4 y 8+8, todo a un carril y con reparto) | Siguiente |
 | **F2** | Cesion por solicitud (apagada por defecto) + medicion con flota grande | Despues de F1 |
 | **F3** | Muelle de salida sobre la misma estacion: carriles reales, sin saltos, unidad de staging segun D3 | Despues de F2 |
@@ -114,3 +114,22 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   **Apagada por defecto**: gate byte-identico verificado aparte de F0.
   +8 tests (328 en total). Falta F1.c2: que las salidas sean de un solo
   sentido tambien para los buscadores de rutas.
+- **2026-09-19** — F1.b: la base de datos pasa a ser configurable
+  (`database_file`); estaba fija en el codigo y no se podia correr con otros
+  datos maestros sin pisar los de produccion. Se importo el Excel v3 a
+  `warehouse_v3.db` (7 zonas, 140 celdas, 50 SKU) y se comprobo que los
+  estacionamientos (config) y los muelles (Excel) no dependen de las celdas
+  pintadas en el mapa: el v3 no pierde ninguna funcion.
+- **2026-09-19** — **F1.d (primera medicion), mapa v3, semilla 42, todo al
+  carril 1:**
+
+  | Escenario | Duracion | Co-ocupaciones | Rendiciones | Esperas de replanificacion |
+  |---|---|---|---|---|
+  | 2+2 sin estacion | 9.145 s | 1 (arranque) | 0 | 0 |
+  | 2+2 con estacion | 9.124 s | 1 (arranque) | 0 | 0 |
+  | 4+4 sin estacion | 23.499 s | 19 | 16 | 39.827 |
+  | **4+4 con estacion** | **5.249 s** | **2** | **1** | **3.627** |
+
+  La flota 4+4 pasa a rendir mas que la 2+2 (5.249 s contra 9.124 s), que era
+  el criterio de exito. Faltan 2 co-ocupaciones y 1 rendicion para llegar a 0:
+  se atacan en F1.c2 (salidas de un solo sentido).

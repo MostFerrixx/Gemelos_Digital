@@ -636,3 +636,6 @@ LIMPIAR_TEMPORALES.bat
 !tests/test_*.py
 !tests/unit/test_*.py
 temp_web/
+warehouse_v3.db
+warehouse_v3.db-shm
+warehouse_v3.db-wal

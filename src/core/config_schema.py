@@ -319,6 +319,7 @@ class WarehouseConfig(BaseModel):
     # BK-15: donde esperan los operarios sin trabajo (ausente = automaticas).
     zonas_espera: Optional[Dict[str, ZonaEsperaConfig]] = None
     estaciones: Optional[EstacionesConfig] = None
+    database_file: Optional[str] = None   # BK-25 F1.b: datos maestros alternativos
 
     # --- Layout y datos (layout_manager / data_manager) ---
     layout_file: Optional[str] = None
