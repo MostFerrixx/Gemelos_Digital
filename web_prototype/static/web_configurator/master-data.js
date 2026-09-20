@@ -89,10 +89,36 @@ class MasterDataManager {
         const cont = document.getElementById(cfg.editor);
         if (!cont) return;
         try {
-            const r = await fetch('/api/master-data/table/' + tabla + '?limit=100');
+            // BK-25: un carril de descarga puede tener decenas de celdas (20 por
+            // carril en WH1 v3): el editor fila-por-fila no sirve y ademas se
+            // cortaba en 100. Se pide todo y se resume por zona.
+            const r = await fetch('/api/master-data/table/' + tabla + '?limit=1000');
             if (!r.ok) { cont.innerHTML = '<em>Sin datos. Aplicá el Excel maestro primero.</em>'; return; }
             const data = await r.json();
             if (!data.filas.length) { cont.innerHTML = '<em>Sin filas.</em>'; return; }
+
+            // Agrupar por id: si una zona trae varias celdas es un CARRIL, y
+            // eso se edita en el Excel maestro, no celda por celda aca.
+            const porId = new Map();
+            data.filas.forEach(f => {
+                const id = f[cfg.colId];
+                if (!porId.has(id)) porId.set(id, []);
+                porId.get(id).push(f);
+            });
+            const hayCarriles = [...porId.values()].some(v => v.length > 1);
+            if (hayCarriles) {
+                cont.innerHTML = '<p class="description-text">Estas zonas son carriles de varias celdas. ' +
+                    'Se definen en el Excel maestro (hoja OutboundStaging) y se aplican desde arriba.</p>' +
+                    [...porId.entries()].map(([id, celdas]) => {
+                        const xs = celdas.map(c => c[cfg.colX]), ys = celdas.map(c => c[cfg.colY]);
+                        return `<div class="coord-row"><span class="coord-label">${cfg.etiqueta} ${id}</span>
+                            <span>${celdas.length} celdas &middot; columnas ${Math.min(...xs)}-${Math.max(...xs)}
+                            &middot; filas ${Math.min(...ys)}-${Math.max(...ys)}</span></div>`;
+                    }).join('');
+                const boton = document.getElementById('btn-save-staging-coords');
+                if (boton && tabla === 'staging_areas') boton.style.display = 'none';
+                return;
+            }
 
             cont.innerHTML = data.filas.map(f => `
                 <div class="coord-row" data-id="${f[cfg.colId]}">
