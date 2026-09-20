@@ -800,6 +800,37 @@ class BaseOperator:
         celda = estacion.tomar_celda_de_fila(self.id)
         return tuple(celda) if celda is not None else None
 
+    # ------------------------------------------------------------------
+    # BK-25 capa 2: cupo por pasillo
+    # ------------------------------------------------------------------
+    def _pedir_lugar_en_pasillo(self, destino):
+        """Antes de meterse a un pasillo, pide lugar. Si esta lleno espera
+        AFUERA (donde no estorba) y reintenta: nunca hay mas operarios adentro
+        que el cupo."""
+        gestor = getattr(self.almacen, 'cupo_pasillos', None)
+        if gestor is None or not gestor.activo:
+            return
+        numero = gestor.pasillo_de(destino)
+        if numero is None:
+            return
+        actual = getattr(self, '_pasillo_actual', None)
+        if actual == numero:
+            return
+        if actual is not None:
+            gestor.salir(self.id, actual)
+            self._pasillo_actual = None
+        espera = self._espera_turno_s()
+        while not gestor.entrar(numero, self.id):
+            self._esperar_sin_estorbar()
+            yield self.env.timeout(espera)
+        self._pasillo_actual = numero
+
+    def _salir_del_pasillo(self):
+        gestor = getattr(self.almacen, 'cupo_pasillos', None)
+        if gestor is not None and gestor.activo:
+            gestor.salir(self.id, getattr(self, '_pasillo_actual', None))
+        self._pasillo_actual = None
+
     def _reservar_espera_abierta(self, celda):
         """Reserva sin fin la celda donde el agente espera (mismo mecanismo que
         usan los ociosos en BK-15): los demas planifican rodeandolo."""
@@ -1726,6 +1757,10 @@ class BaseOperator:
             segment_path = segment_paths[idx] if idx < len(segment_paths) else []
             segment_distance = segment_distances[idx] if idx < len(segment_distances) else 0
 
+            # BK-25 capa 2: pedir lugar en el pasillo del proximo pick
+            if wo is not None and getattr(wo, 'ubicacion', None):
+                yield from self._pedir_lugar_en_pasillo(tuple(wo.ubicacion))
+
             if segment_path and len(segment_path) > 1:
                 self.status = "moving"
 
@@ -1816,6 +1851,7 @@ class BaseOperator:
             staging_location = staging_locs.get(staging_id, (3, 29))
             # BK-25 F1.c: con la estacion activa, primero se pide TURNO; el
             # destino pasa a ser el puesto asignado (una columna del carril).
+            self._salir_del_pasillo()   # BK-25: al ir a descargar deja el pasillo
             _estacion = self._estacion_de(staging_id)
             _puesto_x = None
             if _estacion is not None:

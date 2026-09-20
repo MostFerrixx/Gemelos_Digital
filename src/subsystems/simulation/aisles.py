@@ -129,3 +129,70 @@ class MapaDePasillos:
     def __repr__(self):
         return "MapaDePasillos(%d pasillos, anchos %s)" % (
             len(self.pasillos), sorted({p.ancho for p in self.pasillos}))
+
+
+class GestorCupoPasillos:
+    """BK-25 capa 2: cuantos operarios pueden estar a la vez en un pasillo.
+
+    Decision del Director: capacidad 2 (el ancho del pasillo). Con dos adentro
+    siempre se pueden cruzar usando la otra columna; con tres o mas aparecen
+    los bloqueos que se midieron con flota grande.
+
+    El cupo se controla en la BOCA: nunca hay "mas de" adentro, porque el que
+    no entra espera afuera.
+    """
+
+    def __init__(self, mapa: MapaDePasillos, configuracion: Optional[Dict] = None):
+        cfg = (configuracion or {}).get('pasillos', {}) or {}
+        self.mapa = mapa
+        self.activo = bool(cfg.get('enabled', False))
+        self.capacidad_default = int(cfg.get('capacidad_default', 0) or 0)
+        explicita = {int(k): int(v) for k, v in (cfg.get('capacidad', {}) or {}).items()}
+        self.capacidad: Dict[int, int] = {}
+        self.avisos: List[str] = []
+        for p in mapa.pasillos:
+            cap = explicita.get(p.numero, self.capacidad_default or mapa.capacidad_sugerida(p.numero))
+            self.capacidad[p.numero] = max(1, cap)
+            if cap > p.ancho:
+                self.avisos.append(
+                    "pasillo %d: capacidad %d para un ancho de %d; puede haber bloqueos"
+                    % (p.numero, cap, p.ancho))
+        self.adentro: Dict[int, Set[str]] = {p.numero: set() for p in mapa.pasillos}
+        self.esperas = 0
+
+    def pasillo_de(self, celda) -> Optional[int]:
+        return self.mapa.numero_de(celda)
+
+    def hay_lugar(self, numero: int, agent_id: str) -> bool:
+        if not self.activo or numero is None:
+            return True
+        dentro = self.adentro.get(numero, set())
+        return agent_id in dentro or len(dentro) < self.capacidad.get(numero, 1)
+
+    def entrar(self, numero: int, agent_id: str) -> bool:
+        """Toma un lugar en el pasillo. False si esta lleno (hay que esperar)."""
+        if not self.activo or numero is None:
+            return True
+        if not self.hay_lugar(numero, agent_id):
+            self.esperas += 1
+            return False
+        self.adentro.setdefault(numero, set()).add(agent_id)
+        return True
+
+    def salir(self, agent_id: str, numero: Optional[int] = None) -> None:
+        if not self.activo:
+            return
+        numeros = [numero] if numero is not None else list(self.adentro)
+        for n in numeros:
+            self.adentro.get(n, set()).discard(agent_id)
+
+    def ocupacion(self) -> Dict[int, int]:
+        return {n: len(v) for n, v in sorted(self.adentro.items())}
+
+    def resumen(self) -> Dict[str, object]:
+        return {'activo': self.activo, 'capacidad': dict(self.capacidad),
+                'esperas': self.esperas, 'avisos': list(self.avisos)}
+
+    def __repr__(self):
+        return "GestorCupoPasillos(activo=%s, capacidades=%s)" % (
+            self.activo, sorted(set(self.capacidad.values())))

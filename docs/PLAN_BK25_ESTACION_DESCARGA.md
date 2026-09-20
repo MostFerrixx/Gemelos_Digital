@@ -309,3 +309,23 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   Verificado desde la web: 14 rutas con reparto 30/20/20/10/10/10/0 ->
   210/121/160/41/41/58 tareas por muelle, 1 co-ocupacion (la del arranque),
   0 rendiciones. +4 tests (350). Apagado por defecto: gate PASS.
+- **2026-09-20** — **Capa 2 (cupo por pasillo): implementada, medida y NO
+  conviene encenderla.** `aisles.GestorCupoPasillos` + control en
+  `operators` (se pide lugar antes de entrar al pasillo del proximo pick y se
+  suelta al ir a descargar), clave `pasillos {enabled, capacidad_default,
+  capacidad}`, apagada por defecto.
+
+  | Escenario (semilla 42) | Sin cupo | Con cupo 2 |
+  |---|---|---|
+  | 16 operarios repartidos | 2.841 s, 1 co-ocupacion | 21.224 s, 13 |
+  | 8 operarios repartidos | 4.799 s, 1 | 5.251 s, 1 |
+  | 16 operarios + zonas | 10.100 s | 26.787 s, 11 |
+
+  **Por que no sirve hoy:** el atasco que el cupo venia a evitar (cinco en un
+  pasillo) ya lo elimino la capa 1 (un hueco, un operario) junto con el
+  reparto por muelle. Lo que agrega ahora es espera: el que no entra camina
+  hasta una celda de espera y vuelve, una y otra vez, y esas idas y vueltas
+  generan MAS choques que los que evita. Queda apagado, con sus tests, por si
+  un layout de pasillos angostos lo necesita.
+  PENDIENTE si se retoma: que el que espera se quede en la boca del pasillo
+  en vez de volver al pulmon.

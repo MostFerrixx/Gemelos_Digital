@@ -123,3 +123,27 @@ def test_reparto_apagado_no_filtra():
     d = _despachador_staging(reparto=False, en_curso={1: 5, 2: 0})
     wos = [_WOStaging('A', 1), _WOStaging('B', 2)]
     assert len(d._candidatos_repartiendo_staging(wos)) == 2
+
+
+def _gestor_cupo(cfg=None):
+    from subsystems.simulation.aisles import GestorCupoPasillos
+    return GestorCupoPasillos(_mapa(), cfg or {'pasillos': {'enabled': True, 'capacidad_default': 2}})
+
+
+def test_cupo_deja_entrar_hasta_la_capacidad():
+    g = _gestor_cupo()
+    assert g.entrar(1, 'A') and g.entrar(1, 'B')
+    assert not g.entrar(1, 'C')            # lleno: el tercero espera afuera
+    assert g.entrar(2, 'C')                # en otro pasillo si entra
+    g.salir('A', 1)
+    assert g.entrar(1, 'C')
+
+
+def test_cupo_apagado_no_limita():
+    g = _gestor_cupo({'pasillos': {'enabled': False}})
+    assert all(g.entrar(1, str(i)) for i in range(5))
+
+
+def test_cupo_avisa_si_supera_el_ancho():
+    g = _gestor_cupo({'pasillos': {'enabled': True, 'capacidad_default': 4}})
+    assert any('ancho' in a for a in g.resumen()['avisos'])

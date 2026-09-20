@@ -250,6 +250,16 @@ class ZonaEsperaConfig(BaseModel):
     alto: Optional[int] = None
 
 
+class PasillosConfig(BaseModel):
+    """BK-25 capa 2: cuantos operarios caben a la vez en un pasillo.
+    Decision del Director: 2 (el ancho del pasillo).
+    Lector: subsystems.simulation.aisles + operators."""
+    model_config = ConfigDict(extra="allow")
+    enabled: Optional[bool] = None            # default False
+    capacidad_default: Optional[int] = None   # 0 -> usa el ancho del pasillo
+    capacidad: Optional[Dict[str, int]] = None  # {numero de pasillo: cupo}
+
+
 class RutasEstocasticasConfig(BaseModel):
     """BK-25: cuantas RUTAS se piquean en modo aleatorio (idea del Director).
     Las rutas se reparten entre los muelles segun `outbound_staging_distribution`
@@ -358,6 +368,7 @@ class WarehouseConfig(BaseModel):
     despacho: Optional[DespachoConfig] = None
     zonas_picking: Optional[ZonasPickingConfig] = None
     rutas_estocasticas: Optional[RutasEstocasticasConfig] = None
+    pasillos: Optional[PasillosConfig] = None
     database_file: Optional[str] = None   # BK-25 F1.b: datos maestros alternativos
 
     # --- Layout y datos (layout_manager / data_manager) ---

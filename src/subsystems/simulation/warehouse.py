@@ -393,6 +393,7 @@ class AlmacenMejorado:
         # BK-25 capa 3: los PASILLOS del mapa (una zona de picking por pasillo,
         # numerados de izquierda a derecha). Tambien los usa el cupo por pasillo.
         self.pasillos = None
+        self.cupo_pasillos = None
         if data_manager is not None and layout_manager is not None:
             from .aisles import MapaDePasillos
             _pts = getattr(data_manager, 'puntos_de_picking_ordenados', None) or []
@@ -402,6 +403,13 @@ class AlmacenMejorado:
                                                layout_manager.grid_width,
                                                layout_manager.grid_height)
                 print(f"[PASILLOS] {self.pasillos}")
+                # BK-25 capa 2: cupo por pasillo (decision del Director: 2).
+                from .aisles import GestorCupoPasillos
+                self.cupo_pasillos = GestorCupoPasillos(self.pasillos, configuracion)
+                if self.cupo_pasillos.activo:
+                    print(f"[PASILLOS] {self.cupo_pasillos}")
+                    for _aviso in self.cupo_pasillos.resumen()['avisos']:
+                        print(f"[PASILLOS][WARN] {_aviso}")
 
         # BK-25 F1.c: la zona de descarga como ESTACION CON TURNO (un puesto por
         # columna del carril, entrada por el frente, salida por su costado, fila
