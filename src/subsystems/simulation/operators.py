@@ -1927,6 +1927,10 @@ class BaseOperator:
                     if _exit_cell[1] >= 0:
                         self._jump_to(_exit_cell)
 
+            # QA-7.7: ya en su puesto, suelta la entrada para el que sigue.
+            if _estacion is not None:
+                _estacion.llego_al_puesto(self.id)
+
             # DESCARGAR GRANULAR en este staging (V12: Progreso visible por WO)
             self.status = "unloading"
 

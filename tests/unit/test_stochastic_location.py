@@ -90,3 +90,27 @@ def test_init1_fallback_si_sku_no_tiene_punto_real():
     assert len(wos) > 0
     for wo in wos:
         assert wo.ubicacion == (5, 5)  # unico punto disponible via fallback
+
+
+def test_qa77_un_pedido_sale_entero_por_un_solo_muelle():
+    """QA-7.7: el muelle se sortea por PEDIDO. Con siete muelles abiertos, las
+    lineas de un mismo pedido nunca quedan repartidas entre carriles."""
+    import random
+    random.seed(7)
+    catalogo = {"SKU-PEQ-001": SKU("SKU-PEQ-001", volumen=5)}
+    puntos = [
+        {"ubicacion_grilla": (1, 1), "WorkArea": "Area_Ground",
+         "pick_sequence": 1, "sku_initial": "SKU-PEQ-001", "qty_initial": 100},
+    ]
+    alm = _almacen(puntos, catalogo, total_ordenes=200)
+    alm.outbound_staging_distribution = {str(i): 14 for i in range(1, 8)}
+    alm.rutas_estocasticas = None
+
+    wos = StochasticOrderStrategy().generate_work_orders(alm)
+
+    por_pedido = {}
+    for wo in wos:
+        por_pedido.setdefault(wo.order_id, set()).add(wo.staging_id)
+    assert len({s for v in por_pedido.values() for s in v}) > 1   # si reparte
+    partidos = [o for o, v in por_pedido.items() if len(v) > 1]
+    assert not partidos, "pedidos partidos entre muelles: %s" % partidos[:5]

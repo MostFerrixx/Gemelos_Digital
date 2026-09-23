@@ -110,6 +110,37 @@ def test_f1c2_la_fila_es_de_a_uno():
     b = est.tomar_celda_de_fila('B')
     assert a is not None and b is not None and a != b      # una celda por agente
     assert est.tomar_celda_de_fila('C') is None            # fila llena -> pulmon
-    est.tomar('A')                                         # al entrar al puesto
+    est.tomar('A')                                         # recibe puesto: aparta la puerta
+    est.llego_al_puesto('A')                               # ya adentro
     assert est.celda_de_fila_de('A') is None               # suelta su lugar
     assert est.tomar_celda_de_fila('C') == a
+
+
+def test_qa77_el_de_afuera_no_le_gana_el_puesto_al_de_la_fila():
+    """Abrazo mortal medido en el carril 1: F esperaba en la entrada del
+    puesto 3 y G, que venia de afuera, se quedo con el puesto 3. G no podia
+    pasar por la entrada y F esperaba un puesto con dueno."""
+    est = _gestor(cola_max=1).estacion(1)
+    est.tomar('A'); est.tomar('B')                         # los dos puestos ocupados
+    est.llego_al_puesto('A'); est.llego_al_puesto('B')
+    assert est.tomar_celda_de_fila('F') == (3, 7)          # F espera en la puerta del 3
+    est.liberar('A')                                       # se libera el puesto 3
+    assert est.tomar('G') is None                          # G (de afuera) no se lo gana
+    assert est.tomar('F') == 3                             # es de F
+
+
+def test_qa77_quien_recibe_el_puesto_aparta_la_entrada_hasta_llegar():
+    est = _gestor(cola_max=1).estacion(1)
+    assert est.tomar('G') == 3                             # viene de afuera, puesto libre
+    assert est.celda_de_fila_de('G') == (3, 7)             # la puerta queda apartada
+    assert est.tomar_celda_de_fila('F') == (4, 7)          # F no se para en SU puerta
+    est.llego_al_puesto('G')
+    assert est.celda_de_fila_de('G') is None
+
+
+def test_qa77_el_de_la_fila_toma_otro_puesto_si_esa_columna_no_tiene_fila():
+    est = _gestor(cola_max=1).estacion(1)
+    est.tomar('A'); est.llego_al_puesto('A')               # puesto 3 ocupado
+    est.fila_ocupante[(3, 7)] = 'F'                        # F espera en la puerta del 3
+    assert est.tomar('F') == 4                             # el 4 esta libre y sin fila
+    assert est.celda_de_fila_de('F') == (4, 7)             # se muda a la puerta del 4

@@ -57,17 +57,50 @@ class Estacion:
                 return x
         return None
 
+    def primero_en_fila(self, puesto_x: int) -> Optional[str]:
+        """Quien espera mas cerca de la entrada de esa columna (o None)."""
+        for celda in self.colas.get(puesto_x) or []:
+            quien = self.fila_ocupante.get(tuple(celda))
+            if quien is not None:
+                return quien
+        return None
+
     def tomar(self, agent_id: str, puesto_x: Optional[int] = None) -> Optional[int]:
-        """Asigna un puesto al agente. Devuelve la columna, o None si no hay."""
+        """Asigna un puesto al agente. Devuelve la columna, o None si no hay.
+
+        QA-7.7 (abrazo mortal medido en el carril 1): la fila se RESPETA. Un
+        puesto libre es primero de quien espera en la fila de esa columna; el
+        que viene de afuera no se lo gana. Y quien recibe el puesto se queda
+        con la celda de ENTRADA hasta llegar (`llego_al_puesto`): si no, otro
+        se para en la unica puerta a esperar un puesto que ya tiene dueno, y
+        ninguno de los dos avanza nunca mas.
+        """
         actual = self.puesto_de(agent_id)
         if actual is not None:
             return actual
-        x = puesto_x if puesto_x is not None else self.puesto_libre()
-        if x is None or self.ocupante.get(x) is not None:
-            return None
-        self.ocupante[x] = agent_id
-        self.liberar_fila(agent_id)      # al entrar, suelta su lugar en la fila
-        return x
+        if puesto_x is not None:
+            candidatos = [puesto_x]
+        else:
+            propia = self.celda_de_fila_de(agent_id)
+            candidatos = sorted(self.ocupante,
+                                key=lambda x: (propia not in (self.colas.get(x) or []), x))
+        for x in candidatos:
+            if self.ocupante.get(x, 'no-existe') is not None:
+                continue
+            primero = self.primero_en_fila(x)
+            if primero is not None and primero != agent_id:
+                continue                     # le toca al que ya esta en la fila
+            self.ocupante[x] = agent_id
+            self.liberar_fila(agent_id)      # deja su lugar en la fila...
+            entrada = self.entradas.get(x)
+            if entrada is not None and tuple(entrada) in self.fila_ocupante:
+                self.fila_ocupante[tuple(entrada)] = agent_id   # ...y aparta la puerta
+            return x
+        return None
+
+    def llego_al_puesto(self, agent_id: str) -> None:
+        """Ya esta en su puesto: suelta la entrada para el siguiente de la fila."""
+        self.liberar_fila(agent_id)
 
     def puesto_de(self, agent_id: str) -> Optional[int]:
         for x, quien in self.ocupante.items():

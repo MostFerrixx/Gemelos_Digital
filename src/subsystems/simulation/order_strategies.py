@@ -237,6 +237,13 @@ class StochasticOrderStrategy(OrderGenerationStrategy):
 
             sku = random.choice(skus_tipo)
 
+            # QA-7.7: el muelle (y la ruta) es del PEDIDO, no de cada linea:
+            # un pedido sale entero por un solo muelle. Antes se sorteaba por
+            # linea y la mitad de los pedidos quedaba partida entre carriles.
+            # BK-25: con rutas activas, el muelle sale de la RUTA del pedido.
+            ruta, staging_ruta = almacen._seleccionar_ruta()
+            staging_id = staging_ruta if staging_ruta is not None else almacen._seleccionar_staging_id()
+
             # Generate 1-3 work orders per order
             num_wos = random.randint(1, 3)
 
@@ -271,12 +278,6 @@ class StochasticOrderStrategy(OrderGenerationStrategy):
                 if len(cantidades) > 1:
                     wo_adjusted_count += 1
 
-                # Select staging ID based on distribution
-                # BK-25: con rutas activas, el muelle sale de la RUTA del pedido
-                # (consolidacion), no de un sorteo por pedido.
-                ruta, staging_ruta = almacen._seleccionar_ruta()
-                staging_id = staging_ruta if staging_ruta is not None else almacen._seleccionar_staging_id()
-                
                 # Create work orders
                 for cantidad in cantidades:
                     wo_counter += 1
