@@ -186,7 +186,8 @@ defaults que reproducen el comportamiento histórico. Por eso una corrida sin el
   primero, 1 pallet/viaje, stock via `data_manager.add_stock`); slotting
   conmutable `slotting_strategy` (`fija_por_sku` / `cercana_al_muelle` /
   `abc_rotacion`, resuelto en `inbound.resolve_slotting` al aterrizar el
-  pallet) con UI en el tab "Inbound" del configurador; KPIs
+  pallet) con UI en el tab "Inbound" del configurador; `pallet_release`
+  (`per_pallet` default / `full_truck`: cuando queda disponible cada pallet); KPIs
   `build_inbound_summary` (dock-to-stock, distancia de putaway, muelles) en
   metadata/API/panel del visor/hoja Excel + `avg_dock_to_stock`/
   `avg_putaway_distance` comparables en el A/B; flujo mixto F5:

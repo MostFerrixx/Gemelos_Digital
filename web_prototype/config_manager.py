@@ -276,6 +276,13 @@ class WebConfigurationManager:
                                 "destino_staging_map['" + str(destino) + "'] = '" + str(staging_id)
                                 + "' debe ser un staging_id entero entre 1 y 7.")
             
+            # QA H-35: cuando se libera cada pallet recibido.
+            inb = config.get('inbound')
+            if isinstance(inb, dict) and 'pallet_release' in inb:
+                if inb['pallet_release'] not in ('per_pallet', 'full_truck'):
+                    errors.append("inbound.pallet_release debe ser 'per_pallet' o "
+                                  "'full_truck' (llego: " + repr(inb['pallet_release']) + ").")
+
             # BK-25 capas 2 y 3: zonas de picking y cupo por pasillo.
             zp = config.get('zonas_picking')
             if isinstance(zp, dict):

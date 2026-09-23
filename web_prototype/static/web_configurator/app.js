@@ -1348,6 +1348,7 @@ class WebConfigurator {
         _setVal('inbound-pallets-per-truck', inb.pallets_per_truck, 10);
         _setVal('inbound-units-per-pallet', inb.units_per_pallet, 20);
         _setVal('inbound-unload-time', inb.unload_time_per_pallet, 15);
+        _setVal('inbound-pallet-release', inb.pallet_release, 'per_pallet');
         _setVal('inbound-putaway-load-time', inb.putaway_load_time, 10);
         _setVal('inbound-slotting', inb.slotting_strategy, 'fija_por_sku');
         _setVal('inbound-putaway-priority', inb.putaway_priority, 'picks_first');
@@ -1440,6 +1441,7 @@ class WebConfigurator {
                 asn_file_path: 'layouts/Inbound Test.json',
                 truck_interval: 600.0, num_trucks: 5, pallets_per_truck: 10,
                 units_per_pallet: 20, unload_time_per_pallet: 15.0,
+                pallet_release: 'per_pallet',
                 putaway_load_time: 10.0, slotting_strategy: 'fija_por_sku',
                 putaway_priority: 'picks_first', cross_dock_enabled: false
             },
@@ -1602,6 +1604,8 @@ class WebConfigurator {
             _numField('inbound-units-per-pallet', 'units_per_pallet', 1, false);
             _numField('inbound-unload-time', 'unload_time_per_pallet', 0, true);
             _numField('inbound-putaway-load-time', 'putaway_load_time', 0, true);
+            const release = document.getElementById('inbound-pallet-release')?.value;
+            if (release) baseInb.pallet_release = release;
             const slot = document.getElementById('inbound-slotting')?.value;
             if (slot) baseInb.slotting_strategy = slot;
             // INIT-7 F5: prioridad de flota + cross-docking

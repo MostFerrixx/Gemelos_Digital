@@ -596,9 +596,13 @@ camiones que llegan a los muelles, descargan pallets y operarios que los guardan
   **Cantidad de camiones**, **Pallets por camión**, **Unidades por pallet**. La
   agenda es finita: la simulación termina cuando todo lo recibido quedó guardado.
 - **Descarga por pallet (s)** — cuánto tarda el camión en bajar cada pallet al
-  muelle. Cada pallet queda disponible para guardarse apenas se baja (no hace
-  falta esperar a que se vacíe el camión); el camión ocupa el muelle hasta
-  bajar el último.
+  muelle. El camión ocupa el muelle hasta bajar el último.
+- **Cuándo se puede guardar cada pallet** — *Apenas se baja del camión*
+  (default): cada pallet queda disponible para guardarse en cuanto toca el
+  muelle. *Cuando se descargó el camión completo*: todos quedan disponibles
+  juntos al terminar la descarga (operación que controla el camión contra el
+  ASN antes de liberar). Con 10 pallets de 60 s, el primero espera 9 minutos
+  más en el segundo modo.
 - **Carga del pallet por el operario (s)** — cuánto tarda el operario en tomar el
   pallet del muelle antes de llevarlo a su ubicación.
 

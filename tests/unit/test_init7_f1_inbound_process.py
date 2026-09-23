@@ -208,3 +208,22 @@ def test_in16_asn_canonico_carga():
     trucks = load_asn_trucks(os.path.join(root, 'layouts', 'Inbound Test.json'))
     assert len(trucks) == 5
     assert trucks[0]['truck_id'] == 'IN-001'
+
+
+def test_qa_h35_liberacion_de_pallets_configurable():
+    """Decision del Director (2026-09-23): per_pallet (default) libera cada
+    pallet apenas se baja; full_truck, todos juntos al terminar el camion."""
+    trucks = [{'truck_id': 'IN-001', 'arrival_time': 100, 'dock_id': 1,
+               'lines': [{'sku_id': 'SKU001', 'quantity': 5},
+                         {'sku_id': 'SKU002', 'quantity': 7},
+                         {'sku_id': 'SKU003', 'quantity': 3}]}]
+    por_pallet, _ = _run(trucks)
+    assert [p.t_unloaded for p in por_pallet.inbound_buffer] == [110.0, 120.0, 130.0]
+    completo, _ = _run(trucks, {'pallet_release': 'full_truck'})
+    assert [p.t_unloaded for p in completo.inbound_buffer] == [130.0, 130.0, 130.0]
+    # el camion se va a la misma hora en los dos modos
+    for alm in (por_pallet, completo):
+        assert [e['t'] for e in _eventos(alm, 'inbound_truck_departed')] == [130.0]
+    # un valor que no existe cae al default (con aviso)
+    raro, proc = _run(trucks, {'pallet_release': 'cuando_quiera'})
+    assert proc.pallet_release == 'per_pallet'

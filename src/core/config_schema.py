@@ -166,6 +166,8 @@ class InboundConfig(BaseModel):
     units_per_pallet: Optional[int] = None   # modo stochastic (qty por pallet)
     num_trucks: Optional[int] = None         # modo stochastic (agenda finita, F2)
     unload_time_per_pallet: Optional[float] = None
+    # QA H-35: per_pallet (default: disponible apenas se baja) | full_truck
+    pallet_release: Optional[str] = None
     putaway_load_time: Optional[float] = None  # F2: cargar pallet en muelle (s)
     # fija_por_sku | cercana_al_muelle | abc_rotacion (F3)
     slotting_strategy: Optional[str] = None

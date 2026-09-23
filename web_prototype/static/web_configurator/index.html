@@ -933,6 +933,16 @@
                                         buffer del muelle.</p>
                                 </div>
                                 <div class="form-group">
+                                    <label for="inbound-pallet-release">Cuándo se puede guardar cada pallet</label>
+                                    <select id="inbound-pallet-release">
+                                        <option value="per_pallet">Apenas se baja del camión</option>
+                                        <option value="full_truck">Cuando se descargó el camión completo</option>
+                                    </select>
+                                    <p class="help-text">"Camión completo" modela una operación que primero baja y
+                                        controla todo el camión contra el ASN y recién después libera los pallets
+                                        para guardar.</p>
+                                </div>
+                                <div class="form-group">
                                     <label for="inbound-putaway-load-time">Carga del pallet por el operario (s)</label>
                                     <input type="number" id="inbound-putaway-load-time" value="10" min="0" step="0.5">
                                     <p class="help-text">Tiempo que tarda el operario en tomar el pallet del

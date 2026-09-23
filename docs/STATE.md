@@ -22,7 +22,7 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 371 passed, 1 deselected (~30s)
+python -m pytest -q                # 372 passed, 1 deselected (~30s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline 62c65ebf)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```

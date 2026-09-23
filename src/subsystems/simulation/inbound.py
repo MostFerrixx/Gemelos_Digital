@@ -41,6 +41,9 @@ INPALLET_PUTAWAY = "putaway_assigned"      # F2: WO de putaway asignada
 INPALLET_STORED = "stored"                 # F2: depositado en ubicacion
 
 
+# QA H-35: cuando queda disponible cada pallet recibido.
+PALLET_RELEASE_MODES = ("per_pallet", "full_truck")
+
 class InboundPallet:
     """
     Carga unitaria que llega en un camion (1 linea del ASN = 1 pallet).
@@ -327,6 +330,16 @@ class InboundProcess:
         self.unload_time_per_pallet = float(
             self.config.get("unload_time_per_pallet", 15.0))
         self.units_per_pallet = int(self.config.get("units_per_pallet", 20))
+        # QA H-35 (decision del Director 2026-09-23): cuando queda disponible
+        # cada pallet para guardarse. per_pallet = apenas se baja (default);
+        # full_truck = recien cuando se descargo el camion completo (operacion
+        # que controla el camion contra el ASN antes de liberar).
+        self.pallet_release = str(self.config.get("pallet_release", "per_pallet"))
+        if self.pallet_release not in PALLET_RELEASE_MODES:
+            print(f"[INBOUND][WARN] pallet_release='{self.pallet_release}' no "
+                  f"existe (opciones: {', '.join(PALLET_RELEASE_MODES)}); se usa "
+                  f"'per_pallet'.")
+            self.pallet_release = "per_pallet"
         self._trucks = trucks
         self.trucks_received = 0
         self.pallets_unloaded = 0
@@ -428,15 +441,18 @@ class InboundProcess:
             })
 
             # Descarga: unload_time POR PALLET (espejo de loading_time del
-            # outbound). QA-8.4: cada pallet queda disponible APENAS se baja
-            # (antes se publicaban todos al final: el primero quedaba
-            # "invisible" hasta que bajaba el ultimo). El camion ocupa el
-            # muelle hasta bajar el ultimo pallet.
+            # outbound). El camion ocupa el muelle hasta bajar el ultimo.
+            # pallet_release: per_pallet -> cada pallet queda disponible
+            # APENAS se baja; full_truck -> todos juntos al terminar.
             n = len(lines)
+            camion_completo = self.pallet_release == "full_truck"
+            if camion_completo:
+                yield self.env.timeout(self.unload_time_per_pallet * n)
 
             buffer = getattr(self.almacen, 'inbound_buffer', None)
             for i, line in enumerate(lines, start=1):
-                yield self.env.timeout(self.unload_time_per_pallet)
+                if not camion_completo:
+                    yield self.env.timeout(self.unload_time_per_pallet)
                 pallet = InboundPallet(
                     pallet_id=f"INP-{truck_id}-{i}",
                     truck_id=truck_id,
