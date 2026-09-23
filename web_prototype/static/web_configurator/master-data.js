@@ -275,6 +275,11 @@ class MasterDataManager {
                 + (data.backup ? ' Copia de seguridad: <code>' + data.backup + '</code>' : ''),
                 'ok');
             this.excelSubido = null;
+            // QA H-41: el aviso de la subida decia "todavia no se aplico".
+            const subida = document.getElementById('excel-upload-result');
+            if (subida && subida.style.display !== 'none' && subida.innerHTML) {
+                this._resultado('excel-upload-result', '<strong>Aplicado.</strong> Este Excel es el que usa el simulador.', 'ok');
+            }
             this.cargarResumen();
             this.cargarTabla();
         } catch (e) {
@@ -334,12 +339,20 @@ class MasterDataManager {
             if (!data.filas.length) {
                 cont.innerHTML = '<em>Sin resultados.</em>';
             } else {
-                const cols = data.columnas;
+                // QA H-39: `equipment_required` de la base NO la usa el motor
+                // (manda el mapa de equipos de la pestana Flota) y decia
+                // GroundOperator hasta en racks altos. Se oculta y, si la tabla
+                // tiene area de trabajo, se muestra el equipo que de verdad aplica.
+                const EQUIPO = 'equipo (segun Flota)';
+                const cols = data.columnas.filter(c => c !== 'equipment_required');
+                const mapa = this.configurator?.fleetManager?.getWorkAreaEquipment?.() || {};
+                if (cols.includes('work_area')) cols.splice(cols.indexOf('work_area') + 1, 0, EQUIPO);
+                const valor = (f, c) => c === EQUIPO ? (mapa[f.work_area] || '-') : (f[c] ?? '');
                 cont.innerHTML = '<table class="master-table"><thead><tr>'
                     + cols.map(c => '<th>' + c + '</th>').join('')
                     + '</tr></thead><tbody>'
                     + data.filas.map(f => '<tr>'
-                        + cols.map(c => '<td>' + (f[c] ?? '') + '</td>').join('')
+                        + cols.map(c => '<td>' + valor(f, c) + '</td>').join('')
                         + '</tr>').join('')
                     + '</tbody></table>';
             }

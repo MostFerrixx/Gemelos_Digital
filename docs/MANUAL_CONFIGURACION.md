@@ -483,11 +483,16 @@ De dónde salen el mapa y los datos maestros del negocio.
 
 - **Archivo Layout (.tmx)** — el mapa físico del almacén (hecho con Tiled).
   Define pasillos, racks, muelles y zonas. Con **Examinar** podés subir uno
-  nuevo: se valida (que se abra bien, tamaño y capas) y se actualiza la ruta.
+  nuevo: se valida (que se abra bien, tamaño y capas) **y que todas las
+  ubicaciones, zonas de salida y muelles de los datos en uso queden dentro del
+  mapa y sobre celdas transitables**. Si algo no cierra, se rechaza y el
+  mensaje dice qué puntos fallan; si pasa, se actualiza la ruta.
 - **Archivo de Secuencia (.xlsx)** — el Excel maestro: ubicaciones, secuencia de
   picking, catálogo de productos, zonas de salida y muelles. Con **Examinar**
   subís uno nuevo. **Subirlo no lo aplica**: primero te muestra qué contiene y
-  si hay errores; recién con **Aplicar Excel** pasa a usarse.
+  si hay errores (hojas, columnas y coordenadas contra el mapa configurado: un
+  carril sobre un rack o una ubicación fuera del mapa se rechazan); recién con
+  **Aplicar Excel** pasa a usarse.
 
 ## Datos Maestros en Uso
 

@@ -10,6 +10,18 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-23 (cont. 5)
+
+- **QA bloque 6 (Layout y Datos) cerrado, 8 de 8.** H-43: se aceptaban
+  mapas y Excel incompatibles (un TMX sin capas de 10x10 pasaba; un Excel con
+  un carril sobre un rack se aplicaba). Ahora el TMX se valida con la regla
+  del motor y contra los datos en uso, y el Excel contra el mapa configurado,
+  con mensajes que dicen que punto corregir. H-39: la tabla de ubicaciones
+  muestra el equipo segun Flota (antes GroundOperator en racks altos). H-41:
+  el aviso de la subida se actualiza al aplicar. Probado de punta a punta:
+  aplicar un Excel cambia stock, clase de SKU y carriles en la corrida;
+  datos restaurados. Abierto BK-35.
+
 ## 2026-09-23 (cont. 4)
 
 - **Liberacion de pallets configurable** (pedido del Director sobre H-35):

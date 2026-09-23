@@ -23,6 +23,7 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-26 — la consola del Simulation Runner no tiene limite de lineas | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-20) |
 | BK-27 — prioridades muertas sin aviso cuando el mapa cambia de equipo | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-21) |
 | BK-32 — la pestana Outbound tiene 7 zonas fijas | ABIERTO (2026-09-23) | Media (configurabilidad) | Medio | Ninguno (QA H-32) |
+| BK-35 — Layout y Datos: ver el stock y leer areas de la base | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-40, H-42) |
 | BK-34 — el KPI "distancia de guardado" mezcla la caminata al muelle | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-37) |
 | BK-33 — la ruta de cada pedido no viaja en el replay | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-33) |
 | BK-25 — estacion de descarga con turno | **F1 CERRADA (2026-09-20)**, sigue F2 (cesion del paso) | Alta (realismo) | F2 3-4 dias | Plan vivo: `docs/PLAN_BK25_ESTACION_DESCARGA.md` |
@@ -279,6 +280,14 @@ no se configura bien. Propuesta: armar las casillas desde las zonas de
 Con "Rutas a Piquear" la WO tiene `wo.ruta`, pero los 8 puntos que emiten
 `work_order_update` (dispatcher y operators) no la incluyen: ni el visor ni el
 QA ven la ruta. Emitirla solo si hay rutas (el canonico no cambia).
+
+### BK-35 — Layout y Datos: ver el stock y leer areas de la base (QA H-40, H-42)
+
+1. El stock por ubicacion no se ve en la web. `inventory` es la copia de
+   trabajo que cambia en cada corrida: mostrar `inventory_baseline` si existe
+   (si no, `inventory`), o sea el stock del Excel aplicado.
+2. "Cargar Work Areas" lee el Excel configurado; deberia leer la base que usa
+   el motor (`locations.work_area`), igual que el resto de la pestana.
 
 ### BK-34 — el KPI "distancia de guardado" mezcla la caminata al muelle (QA H-37)
 

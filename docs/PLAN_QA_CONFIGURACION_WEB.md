@@ -6,8 +6,12 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 6 — Layout y Datos (rehacer con el mapa v3),
-despues 10, 9, 11, 12 y las combinadas.
+**Objetivo inmediato:** Bloque 10 — Barra superior y ciclo de configuración
+(despues 9, 11, 12 y las combinadas).
+**Ultimo cerrado:** Bloque 6 — Layout y Datos (23/09): 8 de 8 (6.7 y 6.8 vienen
+del bloque 7). Corregidos **H-43** (mapas y Excel incompatibles se aceptaban),
+**H-39** (columna de equipo engañosa) y **H-41** (aviso de subida viejo).
+Abiertos H-40 y H-42 (BK-35). Datos restaurados e idénticos al respaldo.
 **Ultimo cerrado:** Bloque 8 — Inbound (23/09): 10 de 10 casos pasan.
 Corregidos **H-35** (los pallets salian todos juntos al final del camion),
 **H-36** (el panel de recepcion del visor no aparecia nunca) y **H-38** (el
@@ -373,6 +377,8 @@ Salvo indicación, todo lo demás queda en el canónico.
 | QA-6.4 | Aplicar Excel modificado (p. ej. una clase de SKU distinta) | La simulación refleja el cambio; backup creado; restaurar al final |
 | QA-6.5 | Cargar Work Areas | Desplegables de Flota con las áreas del Excel |
 | QA-6.6 | Subir TMX inválido | Rechazo con mensaje claro |
+| QA-6.7 | Mover un carril en el Excel (viene de QA-7.5) y aplicarlo | N2: las descargas pasan a las celdas nuevas; restaurar |
+| QA-6.8 | Excel con una zona sobre un rack (viene de QA-7.6) | Rechazo con mensaje que dice qué punto corregir |
 
 ### Bloque 7 — Outbound Staging
 
@@ -527,6 +533,15 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-3.6 (1.er intento) | 19/09 | Capacidad 2 \| identico | Max 2 por camion; pero **quedaron 3 pallets sin despachar** (1-3 en las 4 corridas con outbound) | — | **PASA** con hallazgo | H-26 |
 | QA-3.6 (reprueba) | 19/09 | identico | 622 tareas, **622 despachadas**, 0 pendientes | Camiones con carga y pallets del visor = JSON en t=15.000 (157/314) y al final (318/622) | **PASA** | H-26 cerrado |
 | Zonas y cupo por pasillo (controles nuevos, 23/09) | 23/09 | Terrestres → 1-4, montacargas → 5-9, cupo 2 \| idéntico; el canónico sin tocar NO agrega los bloques | Asignación aplicada; `[WARN]` por el pasillo 9 inexistente; el terrestre sale de su zona recién cuando su zona se agotó (t=1.841 vs última propia t=1.828; montacargas 3.808 vs 3.661); texto "uno al tres" bloquea la corrida con mensaje | — | **PASA** | — |
+| QA-6.1 | 23/09 | — | La pestaña muestra 384 / 50 / 140 / 3 = `warehouse.db` | — | **PASA** con hallazgo | H-39, H-40 |
+| QA-6.2 | 23/09 | — | 4 tablas; paginado 1-25 → 26-50 de 384; búsqueda "Area_Special" = 76 (= base) | — | **PASA** | — |
+| QA-6.3 | 23/09 | Excel modificado subido SIN aplicar (LOC-001 63→999 u; SKU001 extra_grande→pequeño) | Resumen correcto y "todavía no se aplicó"; la corrida sigue con el stock viejo: pedido de 1.400 u de SKU039 con 918 sin servir (= 1.400 − 482) | — | **PASA** | — |
+| QA-6.4 | 23/09 | Aplicar ese Excel | Copia de seguridad creada; la base cambia (SKU039 1.418 u, SKU001 pequeño). Misma corrida: **1.401/1.401 servidas**; pick de SKU001 **75,7 → 25,3 s**. Restaurado e idéntico al respaldo | — | **PASA** con hallazgo | H-41 |
+| QA-6.5 | 23/09 | Cargar Work Areas | Los desplegables de Flota muestran Area_Ground / High / Special | — | **PASA** con observación | H-42 |
+| QA-6.6 (1.er intento) | 23/09 | TMX de texto basura / TMX sin capas | Basura rechazada, pero **un mapa sin capas de 10×10 se aceptó** y quedó como mapa de la configuración | — | **FALLA** | H-43 |
+| QA-6.6 (reprueba) | 23/09 | Basura / sin capas / WH1 v2 / WH1 | Rechazados con mensaje: "XML ilegible", "no tiene capas de tiles", "24 puntos... quedan FUERA del mapa de 30 × 42", "164 puntos..."; el mapa configurado no cambia; WH1 v3 válido (527 puntos) | — | **PASA** | H-43 cerrado |
+| QA-6.7 | 23/09 | Carril 1 bajado una fila en el Excel y aplicado | Descargas en (3,31)/(4,31); 590/590 tareas. Restaurado e idéntico al respaldo | — | **PASA** | — |
+| QA-6.8 | 23/09 | Excel con la zona 1 sobre un rack (0,3) | Rechazo: "caen sobre celdas bloqueadas... zona de salida 1 (0, 3)" (antes se aceptaba) | — | **PASA** tras corregir | H-43 |
 | QA-8.1 | 23/09 | Inbound ON, determinista, ASN de ejemplo \| idéntico | 5 camiones con las horas y muelles del ASN (el que no trae muelle va al 1), 10 pallets descargados y 10 guardados, 619/619 tareas. Pallets de un mismo camión publicados todos juntos (0 s entre sí) | Panel de recepción: **no aparecía nunca**; tras corregir, 9/9 valores = JSON | **PASA** tras corregir | H-35, H-36 |
 | QA-8.2 | 23/09 | Estocástico 3 × 4, intervalo 300 \| idéntico | Llegadas 300 / 600 / 900 s; 12 putaways | — | **PASA** | — |
 | QA-8.3 | 23/09 | 50 unidades por pallet \| idéntico | 12 pallets de 50 u (600 u recibidas) | — | **PASA** | — |
@@ -537,6 +552,11 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-8.8 | 23/09 | Cross-docking, determinista con backorders (800 u SKU029 con 790, 340 u SKU046 con 334) \| idéntico | 2 `WO-XD` (24 y 12 u, lo que trajo IN-001); 36 u rescatadas; fill-rate 90,1 → **93,2%** efectivo (= (1.045+36)/1.160) | — | **PASA** | — |
 | QA-8.9 | 23/09 | Cross-docking en estocástico \| `true` | La UI avisa en naranja; el motor lo apaga (`cross_dock_enabled: false` en el resumen); 0 `WO-XD` | — | **PASA** | — |
 | QA-8.10 | 23/09 | Muelle 1 a (6,1) desde la web | Los pallets del muelle 1 se cargan en (6,1); 10/10 guardados. (0,3) rechazado: "no son transitables... hay un rack". Restaurado (3,1). Al comparar con el respaldo apareció que `inventory` había cambiado | — | **PASA** con hallazgo | H-38 |
+| H-39 | MENOR (usabilidad) | QA-6.1 | La tabla de ubicaciones mostraba `equipment_required` = GroundOperator en las 384 (también racks altos). El motor no la usa: manda el mapa de equipos de Flota | Columna heredada de la base | **Corregido**: se oculta y se muestra "equipo (según Flota)" (Area_High → Forklift) | **Cerrado** |
+| H-40 | OBS (usabilidad) | QA-6.1 | El stock por ubicación no se ve en la web. Ojo: `inventory` es la copia de trabajo (cambia en cada corrida); lo correcto sería mostrar el stock del Excel aplicado | Sin tabla de stock | → BK-35 | Abierto |
+| H-41 | MENOR (usabilidad) | QA-6.4 | Tras aplicar el Excel, el aviso de la subida seguía diciendo "todavía no se aplicó" | `master-data.js` no lo actualizaba | **Corregido**: pasa a "Aplicado" | **Cerrado** (verificado) |
+| H-42 | OBS | QA-6.5 | "Cargar Work Areas" lee las áreas del Excel configurado, no de la base que usa el motor: si se editó el Excel y no se aplicó, pueden no coincidir | `/api/configurator/work-areas` | Leerlas de la base → BK-35 | Abierto |
+| H-43 | **MAYOR** (usabilidad/datos) | QA-6.6, 6.8 | **Mapas y Excel incompatibles se aceptaban.** Un TMX sin capas de 10×10 pasaba la validación (solo miraba `<map>`) y quedaba como mapa; un Excel con un carril sobre un rack o ubicaciones fuera del mapa se aplicaba igual. En ambos casos la corrida se rompe después | Validación mínima (XML y columnas) | **Corregido**: el TMX se valida con la regla del motor y contra los datos en uso; el Excel, contra el mapa configurado. Mensajes con qué punto corregir. +6 tests | **Cerrado** (reprobado desde la web) |
 | QA-7.1 | 23/09 | 100% zona 3 \| idéntico | 300 pedidos, 594 tareas completadas, **todas con staging 3**; las 667 descargas en (11,30) y (12,30), los dos puestos del carril 3 | 20/20 | **PASA** | H-34 |
 | H-35 | MENOR (realismo) | QA-8.1, 8.4 | Los pallets de un camión quedaban disponibles **todos juntos al final** de la descarga: con 10 pallets de 60 s, el primero esperaba 9 minutos en el piso sin poder guardarse | Simplificación de INIT-7 ("el camión abre puertas una vez") | **Corregido**: cada pallet queda disponible apenas se baja. Por pedido del Director queda **configurable** (`inbound.pallet_release`: `per_pallet` default / `full_truck`, control "Cuándo se puede guardar cada pallet"); verificado desde la web (60 s vs 0 s entre pallets) | **Cerrado** (reprobado QA-8.4) |
 | H-36 | **MAYOR** (visor) | QA-8.1 (N3) | **El panel de recepción del visor no aparecía nunca**: la API mandaba `inbound_summary` fuera de `metrics`, donde lo busca el visor | `routers/replay.get_snapshot` | **Corregido**: viaja también en `metrics` (y en `/api/state` y `/api/metrics`). +1 test | **Cerrado** (verificado en el visor) |
