@@ -8,7 +8,8 @@ import os
 import simpy
 import random
 from typing import Optional, List, Dict, Any
-from .order_strategies import create_order_strategy, OrderGenerationStrategy
+from .order_strategies import (create_order_strategy, OrderGenerationStrategy,
+                               DeterministicOrderStrategy)
 
 # BK-06 F2: capacidad por area derivada de la flota real + el mapa de equipos.
 from core.fleet import (capacidad_por_agente, capacidades_por_area,
@@ -993,6 +994,14 @@ class AlmacenMejorado:
         Delegates to either StochasticOrderStrategy (random) or
         DeterministicOrderStrategy (file-based) based on configuration.
         """
+        # QA-8.10: TODA corrida arranca con el stock de la base maestra. Antes
+        # solo el modo determinista restauraba; en modo aleatorio el stock que
+        # sumaba cada putaway quedaba guardado en warehouse.db para siempre.
+        dm = getattr(self, 'data_manager', None)
+        if (dm is not None and hasattr(dm, 'restore_inventory_baseline')
+                and not isinstance(self.order_strategy, DeterministicOrderStrategy)):
+            dm.restore_inventory_baseline()   # el determinista ya lo hace adentro
+
         # Delegate to strategy pattern
         all_work_orders = self.order_strategy.generate_work_orders(self)
 

@@ -88,7 +88,8 @@ def test_in10_deterministic_llegadas_y_descarga():
     assert [p.id for p in almacen.inbound_buffer] == [
         'INP-IN-001-1', 'INP-IN-001-2', 'INP-IN-002-1']
     assert all(p.status == 'in_dock_buffer' for p in almacen.inbound_buffer)
-    assert almacen.inbound_buffer[0].t_unloaded == 120.0
+    # QA-8.4: cada pallet queda disponible apenas se baja (10 s cada uno)
+    assert [p.t_unloaded for p in almacen.inbound_buffer] == [110.0, 120.0, 410.0]
 
     assert proc.trucks_received == 2
     assert proc.pallets_unloaded == 3

@@ -428,13 +428,15 @@ class InboundProcess:
             })
 
             # Descarga: unload_time POR PALLET (espejo de loading_time del
-            # outbound). Se descarga todo y recien entonces se publican los
-            # pallets al buffer (el camion abre puertas una vez).
+            # outbound). QA-8.4: cada pallet queda disponible APENAS se baja
+            # (antes se publicaban todos al final: el primero quedaba
+            # "invisible" hasta que bajaba el ultimo). El camion ocupa el
+            # muelle hasta bajar el ultimo pallet.
             n = len(lines)
-            yield self.env.timeout(self.unload_time_per_pallet * n)
 
             buffer = getattr(self.almacen, 'inbound_buffer', None)
             for i, line in enumerate(lines, start=1):
+                yield self.env.timeout(self.unload_time_per_pallet)
                 pallet = InboundPallet(
                     pallet_id=f"INP-{truck_id}-{i}",
                     truck_id=truck_id,

@@ -155,6 +155,11 @@ class ExcelImporter:
         conn.execute("DELETE FROM order_lines")
         conn.execute("DELETE FROM orders")
         conn.execute("DELETE FROM inventory")
+        # QA-8.10: la foto de stock que usa el simulador para arrancar cada
+        # corrida (inventory_baseline, la crea data_manager) es del Excel
+        # ANTERIOR: si no se borra, el stock nuevo nunca se usa. La proxima
+        # corrida la vuelve a sacar del inventario recien importado.
+        conn.execute("DROP TABLE IF EXISTS inventory_baseline")
         conn.execute("DELETE FROM locations")
         conn.execute("DELETE FROM sku_catalog")
         self._ensure_staging_areas_multicelda(conn)

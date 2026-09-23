@@ -246,7 +246,10 @@ def get_snapshot(t: float):
             },
             "service_level": replay_data.service_level,  # INIT-5: nivel de servicio (backorders)
             "sla_summary": replay_data.sla_summary,  # INIT-4b: cumplimiento de SLA (due_time)
-            "bottleneck_summary": replay_data.bottleneck_summary  # MEJ-BOTTLENECK: cuellos de botella
+            "bottleneck_summary": replay_data.bottleneck_summary,  # MEJ-BOTTLENECK: cuellos de botella
+            # QA-8.1 (N3): el panel de recepcion del visor lee de aca; faltaba
+            # y el panel no aparecia nunca.
+            "inbound_summary": replay_data.inbound_summary
         }
     }
 
@@ -318,6 +321,7 @@ def get_state(t: float):
         "service_level": replay_data.service_level,  # INIT-5: nivel de servicio (backorders)
         "sla_summary": replay_data.sla_summary,  # INIT-4b: cumplimiento de SLA (due_time)
         "bottleneck_summary": replay_data.bottleneck_summary,  # MEJ-BOTTLENECK: cuellos de botella
+        "inbound_summary": replay_data.inbound_summary,  # INIT-7 F4
         "agents": current_state['agents'],
         "work_orders": current_state['work_orders']
     }
@@ -370,6 +374,7 @@ def get_metrics(t: float):
         "service_level": replay_data.service_level,  # INIT-5: nivel de servicio (backorders)
         "sla_summary": replay_data.sla_summary,  # INIT-4b: cumplimiento de SLA (due_time)
         "bottleneck_summary": replay_data.bottleneck_summary,  # MEJ-BOTTLENECK: cuellos de botella
+        "inbound_summary": replay_data.inbound_summary,  # INIT-7 F4
         "work_orders": {
             "total": wo_total,
             "staged": wo_completed,
