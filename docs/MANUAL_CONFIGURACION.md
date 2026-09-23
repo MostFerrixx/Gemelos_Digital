@@ -502,7 +502,8 @@ gana:
 
 Pestaña *Outbound Staging*. Cuántas rutas (o tiendas) se piquean en el turno.
 
-- Con la casilla apagada, cada pedido aleatorio sortea su muelle por separado.
+- Con la casilla apagada, cada pedido aleatorio sortea su muelle por separado
+  (el pedido entero sale por ese muelle; nunca se parte entre dos).
 - Con la casilla encendida, el simulador crea esa cantidad de rutas y le ata
   cada una a un muelle. Todos los pedidos de una ruta salen por el mismo
   muelle, como pasa en la operación real con las rutas de reparto.
@@ -529,6 +530,10 @@ Filas de **nombre de destino** (ej. `TIENDA_NORTE`) → **zona de staging (1-7)*
 Solo tiene efecto en modo **Determinista**, cuando el pedido trae el campo
 `destino`. Los pedidos de un mismo destino **siempre salen agrupados**, sin
 importar el reparto aleatorio. Es la forma de modelar rutas de reparto reales.
+
+Si una fila tiene destino pero la zona está vacía o fuera de 1-7, la corrida
+**no arranca** y el mensaje dice qué fila corregir (antes se ignoraba en
+silencio y esos pedidos caían al reparto aleatorio).
 
 ---
 

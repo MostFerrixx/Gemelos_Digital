@@ -226,9 +226,13 @@ class WebConfigurator {
         if (!container) return map;
         container.querySelectorAll('.destino-staging-row').forEach(row => {
             const name = row.querySelector('.destino-staging-name').value.trim();
-            const zone = parseInt(row.querySelector('.destino-staging-zone').value, 10);
-            if (name && !isNaN(zone) && zone >= 1 && zone <= 7) {
-                map[name] = zone;
+            const raw = row.querySelector('.destino-staging-zone').value.trim();
+            const zone = parseInt(raw, 10);
+            // QA-7.4: una fila con destino y zona invalida ya no se descarta en
+            // silencio (sus pedidos caian al reparto sin aviso): viaja tal cual
+            // y la validacion del servidor bloquea la corrida diciendo cual es.
+            if (name) {
+                map[name] = (String(zone) === raw) ? zone : raw;
             }
         });
         return map;
