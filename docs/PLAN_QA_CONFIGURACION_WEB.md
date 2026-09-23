@@ -6,8 +6,13 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 8 — Inbound (despues 6 rehecho con el mapa
-nuevo, 10, 9, 11, 12 y las combinadas).
+**Objetivo inmediato:** Bloque 6 — Layout y Datos (rehacer con el mapa v3),
+despues 10, 9, 11, 12 y las combinadas.
+**Ultimo cerrado:** Bloque 8 — Inbound (23/09): 10 de 10 casos pasan.
+Corregidos **H-35** (los pallets salian todos juntos al final del camion),
+**H-36** (el panel de recepcion del visor no aparecia nunca) y **H-38** (el
+stock de la base cambiaba entre corridas y "Aplicar Excel" no lo renovaba).
+Abierto H-37 (KPI de distancia de guardado, BK-34).
 **Ultimo cerrado:** Bloque 7 — Outbound Staging (23/09): 5 casos pasan (7.1,
 7.2, 7.3, 7.4, 7.7 nuevo); 7.5 y 7.6 pasan al bloque 6 (las zonas ahora son
 carriles y se editan en el Excel). **2 errores criticos corregidos: H-29**
@@ -521,7 +526,21 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-3.6 (1.er intento) | 19/09 | Capacidad 2 \| identico | Max 2 por camion; pero **quedaron 3 pallets sin despachar** (1-3 en las 4 corridas con outbound) | — | **PASA** con hallazgo | H-26 |
 | QA-3.6 (reprueba) | 19/09 | identico | 622 tareas, **622 despachadas**, 0 pendientes | Camiones con carga y pallets del visor = JSON en t=15.000 (157/314) y al final (318/622) | **PASA** | H-26 cerrado |
 | Zonas y cupo por pasillo (controles nuevos, 23/09) | 23/09 | Terrestres → 1-4, montacargas → 5-9, cupo 2 \| idéntico; el canónico sin tocar NO agrega los bloques | Asignación aplicada; `[WARN]` por el pasillo 9 inexistente; el terrestre sale de su zona recién cuando su zona se agotó (t=1.841 vs última propia t=1.828; montacargas 3.808 vs 3.661); texto "uno al tres" bloquea la corrida con mensaje | — | **PASA** | — |
+| QA-8.1 | 23/09 | Inbound ON, determinista, ASN de ejemplo \| idéntico | 5 camiones con las horas y muelles del ASN (el que no trae muelle va al 1), 10 pallets descargados y 10 guardados, 619/619 tareas. Pallets de un mismo camión publicados todos juntos (0 s entre sí) | Panel de recepción: **no aparecía nunca**; tras corregir, 9/9 valores = JSON | **PASA** tras corregir | H-35, H-36 |
+| QA-8.2 | 23/09 | Estocástico 3 × 4, intervalo 300 \| idéntico | Llegadas 300 / 600 / 900 s; 12 putaways | — | **PASA** | — |
+| QA-8.3 | 23/09 | 50 unidades por pallet \| idéntico | 12 pallets de 50 u (600 u recibidas) | — | **PASA** | — |
+| QA-8.4 | 23/09 | Descarga 60 s \| idéntico | Pallets del mismo camión separados **60 s** (antes de H-35: 0 s) | — | **PASA** tras corregir | H-35 |
+| QA-8.5 | 23/09 | Carga 45 s \| idéntico | Carga medida = fórmula por clase al segundo: pequeño 36, mediano 45, pesado 72,5, extra grande 114 s | — | **PASA** | — |
+| QA-8.6 | 23/09 | Picking primero vs Recepción primero \| idéntico | Espera pallet→agente 4.886 → **326 s**; dock-to-stock 4.893 → 332 s | Panel = JSON | **PASA** | — |
+| QA-8.7 | 23/09 | Fija / cercana / ABC con el mismo ASN \| idéntico | Destinos distintos en las tres. Muelle→ubicación: fija 15,6, **cercana 10,3**, ABC 21,5 celdas (ABC ubica por rotación, cerca de la salida). El KPI "distancia de guardado" da 29,7 / 35,9 / 45,9: suma la caminata hasta el muelle | — | **PASA** con hallazgo | H-37 |
+| QA-8.8 | 23/09 | Cross-docking, determinista con backorders (800 u SKU029 con 790, 340 u SKU046 con 334) \| idéntico | 2 `WO-XD` (24 y 12 u, lo que trajo IN-001); 36 u rescatadas; fill-rate 90,1 → **93,2%** efectivo (= (1.045+36)/1.160) | — | **PASA** | — |
+| QA-8.9 | 23/09 | Cross-docking en estocástico \| `true` | La UI avisa en naranja; el motor lo apaga (`cross_dock_enabled: false` en el resumen); 0 `WO-XD` | — | **PASA** | — |
+| QA-8.10 | 23/09 | Muelle 1 a (6,1) desde la web | Los pallets del muelle 1 se cargan en (6,1); 10/10 guardados. (0,3) rechazado: "no son transitables... hay un rack". Restaurado (3,1). Al comparar con el respaldo apareció que `inventory` había cambiado | — | **PASA** con hallazgo | H-38 |
 | QA-7.1 | 23/09 | 100% zona 3 \| idéntico | 300 pedidos, 594 tareas completadas, **todas con staging 3**; las 667 descargas en (11,30) y (12,30), los dos puestos del carril 3 | 20/20 | **PASA** | H-34 |
+| H-35 | MENOR (realismo) | QA-8.1, 8.4 | Los pallets de un camión quedaban disponibles **todos juntos al final** de la descarga: con 10 pallets de 60 s, el primero esperaba 9 minutos en el piso sin poder guardarse | Simplificación de INIT-7 ("el camión abre puertas una vez") | **Corregido**: cada pallet queda disponible apenas se baja. Test actualizado | **Cerrado** (reprobado QA-8.4) |
+| H-36 | **MAYOR** (visor) | QA-8.1 (N3) | **El panel de recepción del visor no aparecía nunca**: la API mandaba `inbound_summary` fuera de `metrics`, donde lo busca el visor | `routers/replay.get_snapshot` | **Corregido**: viaja también en `metrics` (y en `/api/state` y `/api/metrics`). +1 test | **Cerrado** (verificado en el visor) |
+| H-37 | OBS (usabilidad) | QA-8.7 | El KPI "distancia de guardado" suma la caminata del operario HASTA el muelle (depende de dónde estaba): no sirve para comparar estrategias de slotting (cercana salía peor que fija) | `operators._execute_putaway_tour` mide muelle + destino | Agregar el KPI "muelle → ubicación" → BK-34 | Abierto |
+| H-38 | **MAYOR** (datos) | QA-8.10 | **El stock de `warehouse.db` cambiaba entre corridas.** (1) Solo el modo determinista restauraba el stock al arrancar: en aleatorio cada putaway sumaba stock a la base para siempre. (2) "Aplicar Excel" no borraba la foto de stock que usa el simulador (`inventory_baseline`): seguía siendo la del Excel anterior (360 ubicaciones con el v3 de 384); las 24 nuevas nunca se restauraban y un cambio de stock en el Excel se ignoraba | `order_strategies` restauraba solo en determinista; el importador no tocaba la tabla | **Corregido**: toda corrida restaura; el importador borra la foto (la próxima corrida la saca del Excel nuevo). Base reaplicada desde la web. +2 tests; dos corridas seguidas arrancan en 22.066 u | **Cerrado** |
 | QA-7.2 | 23/09 | 15/15/14/14/14/14/14 \| idéntico | Tareas por carril 13,6 / 15,4 / 11,8 / 15,9 / 14,7 / 15,4 / 13,3 % (máx. 2,2 pp de desvío) | — | **PASA** con hallazgo | H-29 |
 | QA-7.3 | 23/09 | — | Suma 110: la insignia marca el error en vivo y Run se bloquea ("must sum to 100% (current: 110%)", en inglés: H-08); no se lanzó corrida | — | **PASA** | — |
 | QA-7.4 | 23/09 | Determinista, 71 pedidos con `destino`; 6 tiendas mapeadas a los carriles 7..2, reparto 100% al 1 \| mapa idéntico | Cada tienda sale entera por su carril (10/10 pedidos cada una); el pedido con `staging_id` 3 explícito le gana a su destino. La fila "TIENDA_7 → 9" **desapareció sin aviso** y sus pedidos cayeron al carril 1 | — | **PASA** con hallazgo | H-31 |

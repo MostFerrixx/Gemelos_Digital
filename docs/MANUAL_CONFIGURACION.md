@@ -596,7 +596,9 @@ camiones que llegan a los muelles, descargan pallets y operarios que los guardan
   **Cantidad de camiones**, **Pallets por camión**, **Unidades por pallet**. La
   agenda es finita: la simulación termina cuando todo lo recibido quedó guardado.
 - **Descarga por pallet (s)** — cuánto tarda el camión en bajar cada pallet al
-  muelle.
+  muelle. Cada pallet queda disponible para guardarse apenas se baja (no hace
+  falta esperar a que se vacíe el camión); el camión ocupa el muelle hasta
+  bajar el último.
 - **Carga del pallet por el operario (s)** — cuánto tarda el operario en tomar el
   pallet del muelle antes de llevarlo a su ubicación.
 

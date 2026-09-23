@@ -22,7 +22,7 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 368 passed, 1 deselected (~35s)
+python -m pytest -q                # 371 passed, 1 deselected (~30s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline 62c65ebf)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
@@ -58,9 +58,10 @@ python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min
 
 ## QA de la configuracion web
 
-`docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0, 1, 2, 3, 4, 5 y 7.
-**Siguiente: bloque 8 (Inbound)**; despues 6 (rehacer con el mapa nuevo), 10,
-9, 11, 12 y las combinadas.
+`docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0, 1, 2, 3, 4, 5, 7 y 8.
+**Siguiente: bloque 6 (Layout y Datos, rehacer con el mapa v3)**; despues 10,
+9, 11, 12 y las combinadas. El bloque 8 corrigio H-35, H-36 y H-38 (stock de
+la base entre corridas); abierto H-37 (BK-34).
 El bloque 7 corrigio H-29, H-30 y H-31; abiertos H-32 (BK-32) y H-33
 (BK-33). H-34 cerrado con BK-29.
 
@@ -83,6 +84,10 @@ del paso) probablemente innecesaria**: se retoma solo si una medicion la pide.
 
 ## Bugs conocidos (no criticos)
 
-- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-33 (BK-29 cerrado).
+- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-34 (BK-29 cerrado).
+- `warehouse.db` es la copia de trabajo del stock: cada corrida la restaura al
+  arrancar desde `inventory_baseline`; "Aplicar Excel" borra esa foto (H-38).
+  El respaldo de la base anterior al v3 es `warehouse_pre_v3_backup.db` (sin
+  versionar); `warehouse.db.bak` ahora es la del v3.
 - Al reiniciar el servidor a mano puede quedar un proceso hijo de
   `multiprocessing` reteniendo el puerto 8000.

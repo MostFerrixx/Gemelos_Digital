@@ -23,6 +23,7 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-26 — la consola del Simulation Runner no tiene limite de lineas | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-20) |
 | BK-27 — prioridades muertas sin aviso cuando el mapa cambia de equipo | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-21) |
 | BK-32 — la pestana Outbound tiene 7 zonas fijas | ABIERTO (2026-09-23) | Media (configurabilidad) | Medio | Ninguno (QA H-32) |
+| BK-34 — el KPI "distancia de guardado" mezcla la caminata al muelle | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-37) |
 | BK-33 — la ruta de cada pedido no viaja en el replay | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-33) |
 | BK-25 — estacion de descarga con turno | **F1 CERRADA (2026-09-20)**, sigue F2 (cesion del paso) | Alta (realismo) | F2 3-4 dias | Plan vivo: `docs/PLAN_BK25_ESTACION_DESCARGA.md` |
 | BK-31 — adoptar el layout grande `WH1 v2.tmx` (tiene anden de muelle) | ABIERTO (2026-09-19) | Media | Chico (falta estacionamientos/recepcion) | Decision del Director |
@@ -278,6 +279,14 @@ no se configura bien. Propuesta: armar las casillas desde las zonas de
 Con "Rutas a Piquear" la WO tiene `wo.ruta`, pero los 8 puntos que emiten
 `work_order_update` (dispatcher y operators) no la incluyen: ni el visor ni el
 QA ven la ruta. Emitirla solo si hay rutas (el canonico no cambia).
+
+### BK-34 — el KPI "distancia de guardado" mezcla la caminata al muelle (QA H-37)
+
+`putaway_distance` = caminata del operario hasta el muelle + muelle ->
+ubicacion. La primera parte depende de donde estaba, asi que no compara
+estrategias de slotting (QA-8.7: cercana 35,9 vs fija 29,7 en el KPI, pero
+10,3 vs 15,6 celdas muelle -> ubicacion). Propuesta: emitir y mostrar los dos
+tramos por separado (panel del visor, Excel, A/B).
 
 ### BK-31 — el layout grande `WH1 v2.tmx` no esta adoptado ni completo
 

@@ -10,6 +10,17 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-23 (cont. 3)
+
+- **QA bloque 8 (Inbound) cerrado, 10 de 10.** H-35: cada pallet queda
+  disponible apenas se baja del camion (antes, todos al final). H-36: el panel
+  de recepcion del visor no aparecia nunca (`inbound_summary` fuera de
+  `metrics`). H-38: el stock de `warehouse.db` cambiaba entre corridas (el
+  modo aleatorio no restauraba y "Aplicar Excel" no renovaba la foto
+  `inventory_baseline`, que seguia siendo del Excel anterior). Base
+  reaplicada. Abierto BK-34 (KPI de distancia de guardado). Gate PASS sin
+  cambio de baseline (el canonico no usa inbound).
+
 ## 2026-09-23 (cont. 2)
 
 - **Zonas y cupo por pasillo con control en la web** (decision del Director:
