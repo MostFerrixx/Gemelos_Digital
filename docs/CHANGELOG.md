@@ -10,6 +10,14 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-23 (cont. 2)
+
+- **Zonas y cupo por pasillo con control en la web** (decision del Director:
+  apagados por defecto, disponibles para pruebas). Dos tarjetas en
+  Estrategias; se emiten solo si estan encendidos o ya existian (el canonico
+  queda byte-identico); validacion del servidor para textos que no se
+  entienden y `[WARN]` por pasillos inexistentes. Verificado desde la web.
+
 ## 2026-09-23 (cont.)
 
 - **BK-29 -- cada operario empieza el turno en una celda propia que no

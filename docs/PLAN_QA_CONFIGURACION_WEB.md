@@ -184,6 +184,8 @@ Columna *Firma observable*: qué se mide en el nivel 2.
 | Clases de manejo (mult, recargo, pack × 6) | `tiempos.clases_manejo` | `operators` | Pick = fórmula × mult + recargo; descarga + pack |
 | Velocidad según carga (3 campos) | `tiempos.velocidad_por_carga` | `operators` | Operario cargado tarda más por paso; montacargas no (salvo casilla) |
 | Variabilidad humana (CV) | `tiempos.variabilidad` | `operators` | Picks idénticos dejan de durar lo mismo; CV medido ≈ CV configurado |
+| Zonas de picking por pasillo (activar, ayudar en otras, asignación) | `zonas_picking` | `dispatcher` | Cada operario toma trabajo solo de sus pasillos hasta que su zona se agota |
+| Cupo por pasillo (activar, operarios por pasillo) | `pasillos` | `operators`, `aisles` | Nunca hay más operarios en un pasillo que el cupo |
 
 ### Pestaña 3 — Flota de Agentes
 
@@ -518,6 +520,7 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-3.5 | 19/09 | Intervalo 600 s \| identico | Camion cada 604-614 s; espera 593 s; duracion **63.016 s**: los operarios esperan lugar en el carril | — | **PASA** | H-25 |
 | QA-3.6 (1.er intento) | 19/09 | Capacidad 2 \| identico | Max 2 por camion; pero **quedaron 3 pallets sin despachar** (1-3 en las 4 corridas con outbound) | — | **PASA** con hallazgo | H-26 |
 | QA-3.6 (reprueba) | 19/09 | identico | 622 tareas, **622 despachadas**, 0 pendientes | Camiones con carga y pallets del visor = JSON en t=15.000 (157/314) y al final (318/622) | **PASA** | H-26 cerrado |
+| Zonas y cupo por pasillo (controles nuevos, 23/09) | 23/09 | Terrestres → 1-4, montacargas → 5-9, cupo 2 \| idéntico; el canónico sin tocar NO agrega los bloques | Asignación aplicada; `[WARN]` por el pasillo 9 inexistente; el terrestre sale de su zona recién cuando su zona se agotó (t=1.841 vs última propia t=1.828; montacargas 3.808 vs 3.661); texto "uno al tres" bloquea la corrida con mensaje | — | **PASA** | — |
 | QA-7.1 | 23/09 | 100% zona 3 \| idéntico | 300 pedidos, 594 tareas completadas, **todas con staging 3**; las 667 descargas en (11,30) y (12,30), los dos puestos del carril 3 | 20/20 | **PASA** | H-34 |
 | QA-7.2 | 23/09 | 15/15/14/14/14/14/14 \| idéntico | Tareas por carril 13,6 / 15,4 / 11,8 / 15,9 / 14,7 / 15,4 / 13,3 % (máx. 2,2 pp de desvío) | — | **PASA** con hallazgo | H-29 |
 | QA-7.3 | 23/09 | — | Suma 110: la insignia marca el error en vivo y Run se bloquea ("must sum to 100% (current: 110%)", en inglés: H-08); no se lanzó corrida | — | **PASA** | — |

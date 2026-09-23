@@ -278,6 +278,41 @@ Log-Normal (nunca negativa, con cola hacia la derecha).
 y esconden cuellos de botella. La corrida sigue siendo reproducible bajo la
 misma semilla, así que los experimentos A/B siguen funcionando.
 
+## Zonas de Picking por Pasillo *(opcional, apagado por defecto)*
+
+Cada pasillo de picking es una zona. El simulador los deduce del mapa y los
+numera de izquierda a derecha (en WH1 v3 hay 8). Como en un WMS de mercado, la
+zona es un dato de la ubicación y **a quién le toca cada zona** es
+configuración de la operación.
+
+- **Asignación:** filas "quién → pasillos". *Quién* puede ser el id de un
+  operario (`GroundOp-01`), su equipo o su tipo (`GroundOperator`,
+  `Forklift`). *Pasillos* acepta listas y rangos: `1-3, 5`. Quien no figura
+  trabaja en todo el almacén.
+- **Si su zona no tiene trabajo, ayuda en otras:** encendido (recomendado),
+  cuando a un operario no le queda nada en su zona toma trabajo de cualquier
+  otra; apagado, se queda esperando. Ojo: si un área solo la puede hacer ese
+  tipo de operario y nadie la tiene en su zona, sin esta casilla la corrida
+  no termina.
+- Un pasillo que no existe en el mapa se avisa en la consola (`[WARN]`); un
+  texto que no se entiende bloquea la corrida con un mensaje.
+
+Medido con 16 operarios (semilla 42): prácticamente igual que sin zonas
+(2.714 s contra 2.652 s). Sirve para modelar una operación que ya trabaja por
+zonas; no acelera sola.
+
+## Cupo por Pasillo *(opcional, apagado por defecto)*
+
+Cuántos operarios pueden estar a la vez dentro de un pasillo. El siguiente
+espera afuera, en una celda donde no estorba, y entra cuando alguien sale.
+
+- **Operarios por pasillo:** `0` = tantos como celdas de ancho tenga el
+  pasillo (2 en WH1 v3).
+
+Medido con 16 operarios: 3.345 s contra 2.652 s sin cupo (+26%). La capa
+anti-colisión ya impide que se pisen; el cupo modela una regla de la
+operación (por ejemplo, seguridad con montacargas).
+
 ---
 
 # PESTAÑA 3 — Flota de Agentes

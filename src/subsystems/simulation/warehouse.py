@@ -410,6 +410,17 @@ class AlmacenMejorado:
                     print(f"[PASILLOS] {self.cupo_pasillos}")
                     for _aviso in self.cupo_pasillos.resumen()['avisos']:
                         print(f"[PASILLOS][WARN] {_aviso}")
+                # Usabilidad: una zona de picking con un pasillo que no existe
+                # no filtraria nada y el operario quedaria sin trabajo.
+                _zp = configuracion.get('zonas_picking') or {}
+                if _zp.get('enabled'):
+                    _existen = set(self.pasillos.numeros)
+                    for _quien, _nums in (_zp.get('asignacion') or {}).items():
+                        _malos = sorted({int(n) for n in (_nums or [])} - _existen)
+                        if _malos:
+                            print(f"[PASILLOS][WARN] zonas_picking: a '{_quien}' se le "
+                                  f"asignan pasillos que no existen {_malos}; este mapa "
+                                  f"tiene los pasillos 1 a {len(_existen)}.")
 
         # BK-25 F1.c: la zona de descarga como ESTACION CON TURNO (un puesto por
         # columna del carril, entrada por el frente, salida por su costado, fila

@@ -22,7 +22,7 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 364 passed, 1 deselected (~30s)
+python -m pytest -q                # 368 passed, 1 deselected (~35s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline 62c65ebf)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
@@ -49,7 +49,8 @@ python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min
 - `rutas_estocasticas {enabled, cantidad}`: N rutas atadas a muelles en modo
   aleatorio (control web "Rutas a Piquear").
 - `zonas_picking` (una zona por pasillo) y `pasillos` (cupo por pasillo):
-  apagados. RE-MEDIDOS el 23/09 (sus mediciones previas estaban afectadas por
+  apagados POR DECISION del Director (se usan para pruebas); desde el 23/09
+  tienen control en la web (pestana Estrategias). RE-MEDIDOS el 23/09 (sus mediciones previas estaban afectadas por
   el error del pulmon): zonas 2.714 s vs 2.652 s sin zonas (+2%, empate
   practico); cupo 3.345 s (+26%).
 - `inicio_turno {zonas, usar_estacionamientos, radio_estacionamiento}`
@@ -76,11 +77,9 @@ del paso) probablemente innecesaria**: se retoma solo si una medicion la pide.
    pedido. Recomendacion: contenedor por pedido.
 3. **D5** (pasillos de un solo sentido), **D7** (formato de las reglas),
    **D8** (mapa sin salida posible).
-4. Zonas de picking: tras la re-medicion empatan con "sin zonas"; decidir
-   si se encienden (realismo: operario asignado a pasillos) o quedan apagadas.
-5. **BK-16:** el servidor del cliente se reinicia solo al cambiar un `.py`.
-6. **BK-30:** el muelle de salida (outbound) sigue sin ser realista.
-7. **BK-02** FIFO en UI, **INIT-10** modelo de almacen propio.
+4. **BK-16:** el servidor del cliente se reinicia solo al cambiar un `.py`.
+5. **BK-30:** el muelle de salida (outbound) sigue sin ser realista.
+6. **BK-02** FIFO en UI, **INIT-10** modelo de almacen propio.
 
 ## Bugs conocidos (no criticos)
 

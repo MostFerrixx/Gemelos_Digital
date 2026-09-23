@@ -276,6 +276,22 @@ class WebConfigurationManager:
                                 "destino_staging_map['" + str(destino) + "'] = '" + str(staging_id)
                                 + "' debe ser un staging_id entero entre 1 y 7.")
             
+            # BK-25 capas 2 y 3: zonas de picking y cupo por pasillo.
+            zp = config.get('zonas_picking')
+            if isinstance(zp, dict):
+                for quien, lista in (zp.get('asignacion') or {}).items():
+                    if (not isinstance(lista, list) or not lista
+                            or not all(isinstance(n, int) and n >= 1 for n in lista)):
+                        errors.append(
+                            "zonas_picking: los pasillos de '" + str(quien) + "' ('"
+                            + str(lista) + "') deben ser numeros o rangos, por ejemplo 1-3, 5.")
+            cp = config.get('pasillos')
+            if isinstance(cp, dict) and 'capacidad_default' in cp:
+                cap = cp['capacidad_default']
+                if not isinstance(cap, int) or cap < 0:
+                    errors.append("pasillos.capacidad_default debe ser un entero >= 0 "
+                                  "(0 = el ancho del pasillo).")
+
             # Validate agent_types if present
             if 'agent_types' in config:
                 if not isinstance(config['agent_types'], list):

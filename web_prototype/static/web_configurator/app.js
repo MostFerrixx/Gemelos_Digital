@@ -75,6 +75,12 @@ class WebConfigurator {
         // Layout & Data buttons
         document.getElementById('btn-load-work-areas').addEventListener('click', () => this.loadWorkAreas());
 
+        // BK-25 capas 2 y 3: zonas y cupo por pasillo.
+        ['zonas-enabled', 'cupo-enabled'].forEach(id => {
+            document.getElementById(id)?.addEventListener('change', () => this._updatePasillosVisibility());
+        });
+        document.getElementById('btn-add-zona')?.addEventListener('click', () => this._addZonaRow());
+
         // INIT-6 Opcion B: agregar fila de destino_staging_map
         const addDestinoBtn = document.getElementById('btn-add-destino-staging');
         if (addDestinoBtn) {
@@ -218,6 +224,102 @@ class WebConfigurator {
         row.querySelector('.destino-staging-zone').value = stagingId;
         row.querySelector('.btn-remove-priority').addEventListener('click', () => row.remove());
         container.appendChild(row);
+    }
+
+    // BK-25 capas 2 y 3: zonas de picking y cupo por pasillo.
+    _updatePasillosVisibility() {
+        [['zonas-enabled', 'zonas-options'], ['cupo-enabled', 'cupo-options']].forEach(([t, o]) => {
+            const tog = document.getElementById(t), opts = document.getElementById(o);
+            if (tog && opts) opts.style.display = tog.checked ? 'block' : 'none';
+        });
+    }
+
+    // "1-3, 5" -> [1, 2, 3, 5]; null si el texto no se entiende.
+    static parsePasillos(texto) {
+        const out = [];
+        for (const parte of String(texto).split(',').map(p => p.trim()).filter(Boolean)) {
+            const m = parte.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
+            if (!m) return null;
+            const desde = parseInt(m[1], 10), hasta = m[2] ? parseInt(m[2], 10) : desde;
+            if (desde < 1 || hasta < desde) return null;
+            for (let n = desde; n <= hasta; n++) if (!out.includes(n)) out.push(n);
+        }
+        return out.length ? out : null;
+    }
+
+    static textoPasillos(lista) {
+        const nums = [...new Set((lista || []).map(Number))].sort((a, b) => a - b);
+        const tramos = [];
+        for (const n of nums) {
+            const ult = tramos[tramos.length - 1];
+            if (ult && n === ult[1] + 1) ult[1] = n; else tramos.push([n, n]);
+        }
+        return tramos.map(([a, b]) => a === b ? String(a) : a + '-' + b).join(', ');
+    }
+
+    _addZonaRow(quien = '', pasillos = '') {
+        const cont = document.getElementById('zonas-list');
+        if (!cont) return;
+        const row = document.createElement('div');
+        row.className = 'destino-staging-row zona-row';
+        row.innerHTML = `
+            <input type="text" class="zona-quien" placeholder="Ej: GroundOp-01 o Forklift">
+            <input type="text" class="zona-pasillos" placeholder="Ej: 1-3, 5">
+            <button class="btn-remove-priority" title="Quitar">&#10005;</button>`;
+        row.querySelector('.zona-quien').value = quien;
+        row.querySelector('.zona-pasillos').value = pasillos;
+        row.querySelector('.btn-remove-priority').addEventListener('click', () => row.remove());
+        cont.appendChild(row);
+    }
+
+    _renderPasillos(config) {
+        const zp = config.zonas_picking || {};
+        const zt = document.getElementById('zonas-enabled');
+        if (zt) zt.checked = zp.enabled === true;
+        const robo = document.getElementById('zonas-robo');
+        if (robo) robo.checked = zp.robo_de_trabajo !== false;
+        const cont = document.getElementById('zonas-list');
+        if (cont) {
+            cont.innerHTML = '';
+            Object.entries(zp.asignacion || {}).forEach(([quien, lista]) =>
+                this._addZonaRow(quien, WebConfigurator.textoPasillos(lista)));
+        }
+        const cp = config.pasillos || {};
+        const ct = document.getElementById('cupo-enabled');
+        if (ct) ct.checked = cp.enabled === true;
+        const cap = document.getElementById('cupo-capacidad');
+        if (cap) cap.value = cp.capacidad_default != null ? cp.capacidad_default : 0;
+        this._updatePasillosVisibility();
+    }
+
+    // Se emiten solo si estan encendidos o ya existian en el config de origen
+    // (el canonico sin estos bloques queda byte-identico).
+    _serializePasillos(config) {
+        const origen = this.currentConfig || {};
+        const zonasOn = document.getElementById('zonas-enabled')?.checked === true;
+        if (zonasOn || origen.zonas_picking) {
+            const asignacion = {};
+            document.querySelectorAll('#zonas-list .zona-row').forEach(row => {
+                const quien = row.querySelector('.zona-quien').value.trim();
+                const texto = row.querySelector('.zona-pasillos').value.trim();
+                if (!quien) return;
+                // Texto que no se entiende: viaja tal cual y el servidor
+                // bloquea la corrida diciendo cual es (nada se descarta en silencio).
+                asignacion[quien] = WebConfigurator.parsePasillos(texto) || texto;
+            });
+            config.zonas_picking = Object.assign({}, origen.zonas_picking || {}, {
+                enabled: zonasOn,
+                robo_de_trabajo: document.getElementById('zonas-robo')?.checked !== false,
+                asignacion
+            });
+        }
+        const cupoOn = document.getElementById('cupo-enabled')?.checked === true;
+        if (cupoOn || origen.pasillos) {
+            config.pasillos = Object.assign({}, origen.pasillos || {}, {
+                enabled: cupoOn,
+                capacidad_default: WebConfigurator.numero('cupo-capacidad', 0)
+            });
+        }
     }
 
     _serializeDestinoStagingRows() {
@@ -1189,6 +1291,9 @@ class WebConfigurator {
         document.getElementById('sequence-file').value = config.sequence_file || 'layouts/Warehouse_Logic.xlsx';
         // MEJ-3: map_scale eliminada (sin lector desde que se archivo el viewer Pygame).
 
+        // Tab 2: zonas y cupo por pasillo (BK-25 capas 2 y 3)
+        this._renderPasillos(config);
+
         // Tab 5: Outbound Staging
         // BK-25: rutas del modo aleatorio
         const rutasCfg = config.rutas_estocasticas || {};
@@ -1463,6 +1568,7 @@ class WebConfigurator {
         // criterio que el bloque inbound de abajo). Antes se emitia SIEMPRE,
         // aunque fuera {}: guardar el canonico sin tocar nada le agregaba
         // `destino_staging_map: {}` y cambiaba la metadata del replay.
+        this._serializePasillos(config);
         const destinoMap = this._serializeDestinoStagingRows();
         const destinoExistia = !!(this.currentConfig
             && Object.prototype.hasOwnProperty.call(this.currentConfig, 'destino_staging_map'));

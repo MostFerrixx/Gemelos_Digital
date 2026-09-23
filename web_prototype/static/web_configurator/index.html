@@ -536,6 +536,67 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- BK-25 capas 2 y 3: zonas y cupo por pasillo (apagados por
+                         defecto; decision del Director: se usan para pruebas). -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Zonas de Picking por Pasillo</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Cada pasillo de picking es una zona; el simulador
+                                los numera de izquierda a derecha (1 = el primero). A cada operario, equipo o
+                                tipo se le asignan una o varias zonas y solo toma trabajo de ellas. Apagado,
+                                todos trabajan en todo el almacén.</p>
+                            <div class="form-group">
+                                <label class="toggle-label">
+                                    <input type="checkbox" id="zonas-enabled">
+                                    <span>Trabajar por zonas de pasillo</span>
+                                </label>
+                            </div>
+                            <div id="zonas-options" style="display:none;">
+                                <div class="form-group">
+                                    <label class="toggle-label">
+                                        <input type="checkbox" id="zonas-robo" checked>
+                                        <span>Si su zona no tiene trabajo, ayuda en otras</span>
+                                    </label>
+                                </div>
+                                <div class="work-area-priorities-header">
+                                    <div class="work-area-priorities-title">Asignación</div>
+                                    <button id="btn-add-zona" class="btn-add-priority">+ Añadir</button>
+                                </div>
+                                <div id="zonas-list"></div>
+                                <span class="help-text">Quién: id del operario (GroundOp-01), su equipo o su
+                                    tipo (GroundOperator, Forklift). Pasillos: lista o rangos, por ejemplo
+                                    <code>1-3, 5</code>. Quien no figura trabaja en todo el almacén.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Cupo por Pasillo</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="description-text">Cuántos operarios pueden estar a la vez dentro de un
+                                pasillo; el siguiente espera afuera, donde no estorba. Apagado, no hay límite
+                                (la capa anti-colisión igual impide que se pisen).</p>
+                            <div class="form-group">
+                                <label class="toggle-label">
+                                    <input type="checkbox" id="cupo-enabled">
+                                    <span>Limitar operarios por pasillo</span>
+                                </label>
+                            </div>
+                            <div id="cupo-options" style="display:none;">
+                                <div class="form-group">
+                                    <label>Operarios por pasillo</label>
+                                    <input type="number" id="cupo-capacidad" min="0" max="20" value="0">
+                                    <span class="help-text">0 = tantos como celdas de ancho tenga el pasillo
+                                        (2 en WH1 v3).</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Tab 3: Flota de Agentes -->
