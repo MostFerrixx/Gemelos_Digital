@@ -22,7 +22,6 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-28 — sin bloque `outbound`, la web lo enciende y la consola no | ABIERTO (2026-09-19) | Media | Chico | Decision del Director (QA H-22) |
 | BK-26 — la consola del Simulation Runner no tiene limite de lineas | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-20) |
 | BK-27 — prioridades muertas sin aviso cuando el mapa cambia de equipo | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-21) |
-| BK-29 — operarios que arrancan dentro de un carril (con y sin outbound) | ABIERTO (2026-09-19) | Media | A definir | Ninguno (QA H-23) |
 | BK-32 — la pestana Outbound tiene 7 zonas fijas | ABIERTO (2026-09-23) | Media (configurabilidad) | Medio | Ninguno (QA H-32) |
 | BK-33 — la ruta de cada pedido no viaja en el replay | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-33) |
 | BK-25 — estacion de descarga con turno | **F1 CERRADA (2026-09-20)**, sigue F2 (cesion del paso) | Alta (realismo) | F2 3-4 dias | Plan vivo: `docs/PLAN_BK25_ESTACION_DESCARGA.md` |
@@ -267,20 +266,6 @@ los de a pie), los grupos del tipo anterior (montacargas) conservan su fila
 "Area_High: prioridad 1". Esa fila ya no hace nada (el mapa manda) y el
 formulario no lo avisa: el cliente ve una prioridad que no se aplica.
 
-### BK-29 — con outbound activo hay operarios que arrancan dentro de un carril (QA H-23)
-
-Con el muelle de salida activo, cada zona de descarga se convierte en un
-carril de celdas bloqueadas. Algunos operarios ya estaban parados ahi al
-arrancar: el buscador de rutas avisa "Start position ... is not walkable" (60
-veces con semilla 42) y esos primeros movimientos salen de una celda que ya
-no es transitable.
-
-**Ampliado 2026-09-23 (QA H-34):** tambien SIN outbound. El punto de partida
-de todos es la primera celda de la zona 1, que desde BK-25 es un puesto de
-descarga (3,30): la flota nace dentro del carril 1. Es el origen probable de la
-co-ocupacion del arranque que se ve en todas las mediciones. Propuesta: punto
-de partida configurable (un estacionamiento, INIT-11 F2 ya los tiene).
-
 ### BK-32 — la pestana Outbound tiene 7 zonas fijas (QA H-32)
 
 `index.html` trae 7 casillas (`staging-1..7`), el editor Destino -> Zona y
@@ -320,6 +305,11 @@ Lo que falta para adoptarlo:
   Director (afecta todas las mediciones comparables).
 
 ### BK-30 — el muelle de salida (outbound) no es realista en WH1 (QA H-25)
+
+**Nota 2026-09-23 (de BK-29, cerrado):** con outbound activo quedan 58 avisos
+"Start position ... is not walkable" (semilla 42). Ya no son del arranque:
+salen de las celdas del fondo del carril (p. ej. (4,38)) donde el outbound
+deja cada pallet y desde donde el operario vuelve a salir.
 
 Con el muelle de salida activo:
 - Cada tarea se convierte en su propio pallet, que se deposita de a uno en
@@ -417,6 +407,9 @@ un componente fantasma. Hoy el motor lee estas claves que la web no muestra
   (INIT-11; su editor es la fase F10 del plan).
 - `zonas_espera` y `congestion.timewindow.replan_wait_s` / `replan_max_retries`
   (BK-15).
+- `inicio_turno` (zonas de inicio, `usar_estacionamientos`,
+  `radio_estacionamiento`; BK-29). Sin el bloque funciona solo (celdas de
+  espera), por eso no bloquea a nadie.
 - `priority_dispatch_enabled` y `waves` (prioridad de pedidos y olas, INIT-4).
 - `fleet_defaults` (BK-06).
 - Parametros de la capa anti-colision (`congestion.spawn_offset`,

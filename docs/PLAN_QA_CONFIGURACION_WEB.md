@@ -14,8 +14,7 @@ carriles y se editan en el Excel). **2 errores criticos corregidos: H-29**
 (en modo aleatorio un pedido salia partido entre muelles) y **H-30** (abrazo
 mortal en la estacion de descarga, destapado por H-29); **H-31** corregido
 (fila de destino invalida descartada en silencio). Abiertos: H-32 (7 zonas
-fijas), H-33 (la ruta no viaja en el replay), H-34 (la flota nace dentro del
-carril 1).
+fijas) y H-33 (la ruta no viaja en el replay). H-34 cerrado con BK-29.
 **Ultimo cerrado:** Bloque 3 — Motor avanzado (19/09): 5 de 6 pasan; QA-3.1
 falla por H-15 (tambien con la flota canonica). Corregido **H-26** (quedaban
 pallets sin despachar al terminar). Consulta de diseno de H-15 hecha:
@@ -572,7 +571,7 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24, H-15→BK-25, H-16→BK-
 | H-20 | MENOR (usabilidad) | H-19 | La consola del "Simulation Runner" agrega cada línea del log sin límite: con decenas de miles de líneas el navegador se congela | Sin tope de líneas | → BK-26 | Abierto |
 | H-21 | OBS (usabilidad) | QA-5.7 | Si el mapa le da un área a otro tipo de equipo, las prioridades de esa área en los grupos del tipo anterior quedan en el formulario sin aviso: no hacen nada y confunden | Sin aviso | → BK-27 | Abierto |
 | H-22 | MENOR (decisión) | QA-5.10 (1.er intento) | Una configuración **sin** bloque `outbound` (o `congestion`) corre desde la web con el outbound **encendido** y desde consola **apagado**: el mismo archivo da dos simulaciones distintas | Decisión explícita en `app.js` ("ausencia de bloque = ON") | → BK-28. **Decisión del Director** | Abierto |
-| H-23 | OBS (realismo) | H-19 reprueba | Con outbound activo algunos operarios arrancan dentro de celdas que el carril después bloquea (60 avisos "Start position … is not walkable") | Posición inicial anterior al bloqueo de carriles | → BK-29 | Abierto |
+| H-23 | OBS (realismo) | H-19 reprueba | Con outbound activo algunos operarios arrancan dentro de celdas que el carril después bloquea (60 avisos "Start position … is not walkable") | Posición inicial anterior al bloqueo de carriles | → BK-29 | **Arranque corregido** (BK-29). Los 58 avisos que quedan son del outbound al salir del fondo del carril → BK-30 |
 | H-24 | OBS | QA-3.2 | Con la anti-colision apagada, los operarios sin trabajo se quedan parados sobre la zona de descarga el resto de la corrida (las zonas de espera dependen de esa capa). Es el modo "sin fisica" de comparacion | Zonas de espera solo con planificador | Documentar en el manual | Abierto |
 | H-25 | **MAYOR** (realismo, decision) | QA-3.3, 3.5 | **El muelle de salida (outbound) no es realista en WH1.** Cada tarea es un pallet; se depositan de a uno y un operario por carril: la corrida dura x2,1 (x8,6 con camion cada 600 s). Las 7 zonas se expanden a manchas de 8 celdas que tapan las filas 28-29 enteras (el pasillo frontal queda en 1 fila); 52 saltos de 2-3 celdas al entrar o salir del carril; los camiones nunca cargaron mas de 7 de 8 | Modelo de carriles de INIT-3 sobre un mapa sin anden | → BK-30. Decisiones D3 y D10 de la propuesta de diseno | Abierto |
 | H-26 | MENOR | QA-3.6 | **Con outbound, la corrida terminaba con 1-3 pallets sin despachar**: cortaba al llegar la ultima tarea a la zona, sin esperar el ultimo camion | `simulacion_ha_terminado` solo miraba las tareas | **Corregido** (`dcf71b3`): con camiones activos termina cuando se despacho todo. +1 test. Gate PASS | **Cerrado** (reprobado) |
@@ -583,7 +582,7 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24, H-15→BK-25, H-16→BK-
 | H-31 | MENOR (usabilidad) | QA-7.4 | Una fila de Destino → Zona con zona fuera de 1-7 **se descartaba en silencio** y sus pedidos caían al reparto sin aviso | `app.js _serializeDestinoStagingRows` filtraba la fila | **Corregido**: la fila viaja y la validación del servidor bloquea la corrida diciendo cuál es | **Cerrado** (reprobado) |
 | H-32 | MENOR (configurabilidad) | QA-7.2 | La pestaña Outbound tiene **7 casillas fijas** (y el editor de destinos y la validación del servidor aceptan solo 1-7): un mapa con 5 o 10 carriles no se puede configurar bien | Número de zonas fijo en `index.html`, `app.js` y `config_manager.py` | Armar las casillas desde las zonas de `warehouse.db` → BK nuevo | Abierto |
 | H-33 | OBS (usabilidad) | QA-7.7 | La **ruta** de cada pedido no viaja en el replay: ni el visor ni el QA pueden ver qué ruta es cada pedido | La WO la tiene (`wo.ruta`) pero los 8 puntos que emiten `work_order_update` no la incluyen | Emitirla solo si hay rutas (no cambia el canónico) | Abierto |
-| H-34 | OBS (realismo) | QA-7.1 | Todos los operarios **nacen dentro del carril 1**: el punto de partida es la primera celda de la zona 1 (3,30), que ahora es un puesto de descarga. Es el origen probable de la co-ocupación del arranque | Depot = primera celda del staging 1 | Punto de partida configurable (estacionamiento) — junto con H-23/BK-29 | Abierto |
+| H-34 | OBS (realismo) | QA-7.1 | Todos los operarios **nacen dentro del carril 1**: el punto de partida es la primera celda de la zona 1 (3,30), que ahora es un puesto de descarga. Es el origen probable de la co-ocupación del arranque | Depot = primera celda del staging 1 | **Corregido** (BK-29): cada operario nace en una celda propia (zonas de inicio > estacionamiento > celdas de espera). Semilla 42: 0 co-ocupaciones, tambien en el arranque | **Cerrado** |
 
 
 ## 11. Registro de cambios de este plan

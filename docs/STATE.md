@@ -9,10 +9,11 @@
 ## Git
 
 - `main` integra por fast-forward. Rama de trabajo: `qa/configuracion-web`.
-- **Baseline vigente: `sha256=f9089cba...`, 17.281.043 bytes**, seed 42
-  (`tests/baseline.json`). Cambio intencional del 2026-09-23 (QA H-29: el
-  muelle se sortea por pedido, lo que cambia la secuencia aleatoria; y H-30:
-  la estacion respeta la fila). Anterior: `0c441704`.
+- **Baseline vigente: `sha256=62c65ebf...`, 17.302.142 bytes**, seed 42
+  (`tests/baseline.json`). Cambio intencional del 2026-09-23 (BK-29: cada
+  operario empieza el turno en una celda propia; y el que espera turno sin
+  lugar en la fila va de verdad al pulmon). Anteriores del mismo dia:
+  `f9089cba` (QA H-29/H-30), `0c441704`.
 - REGLA pinneada por tests BN-05 e IN-43: la metadata del .jsonl NO puede
   contener valores wall-clock.
 - En Windows `core.autocrlf=true`: `config.json` puede figurar como modificado
@@ -21,8 +22,8 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 357 passed, 1 deselected (~40s)
-python scripts/regression_gate.py  # GATE PASS esperado (baseline f9089cba)
+python -m pytest -q                # 364 passed, 1 deselected (~30s)
+python scripts/regression_gate.py  # GATE PASS esperado (baseline 62c65ebf)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
 
@@ -39,21 +40,28 @@ python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min
 - Despacho: una ubicacion, un operario (BK-23 capa 1) y reparto de
   piqueadores entre muelles (`despacho.repartir_por_staging`), ambos activos.
 - Reparto de salida: sigue 100% al carril 1 (decision D9 pendiente).
+- Inicio del turno (BK-29): cada operario nace en una celda propia (zonas de
+  inicio > estacionamiento de su equipo > celdas de espera). Semilla 42:
+  **0 co-ocupaciones en los 10 escenarios medidos**, tambien en el arranque.
 
 ## Opt-in nuevos (apagados por defecto)
 
 - `rutas_estocasticas {enabled, cantidad}`: N rutas atadas a muelles en modo
   aleatorio (control web "Rutas a Piquear").
 - `zonas_picking` (una zona por pasillo) y `pasillos` (cupo por pasillo):
-  implementados y medidos PEORES que sin ellos; quedan apagados.
+  apagados. RE-MEDIDOS el 23/09 (sus mediciones previas estaban afectadas por
+  el error del pulmon): zonas 2.714 s vs 2.652 s sin zonas (+2%, empate
+  practico); cupo 3.345 s (+26%).
+- `inicio_turno {zonas, usar_estacionamientos, radio_estacionamiento}`
+  (BK-29): opcional; sin control web todavia (BK-22).
 
 ## QA de la configuracion web
 
 `docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0, 1, 2, 3, 4, 5 y 7.
 **Siguiente: bloque 8 (Inbound)**; despues 6 (rehacer con el mapa nuevo), 10,
 9, 11, 12 y las combinadas.
-El bloque 7 corrigio H-29, H-30 y H-31; abiertos H-32 (BK-32), H-33 (BK-33)
-y H-34 (BK-29 ampliado).
+El bloque 7 corrigio H-29, H-30 y H-31; abiertos H-32 (BK-32) y H-33
+(BK-33). H-34 cerrado con BK-29.
 
 ## BK-25 (atasco en la descarga)
 
@@ -68,15 +76,14 @@ del paso) probablemente innecesaria**: se retoma solo si una medicion la pide.
    pedido. Recomendacion: contenedor por pedido.
 3. **D5** (pasillos de un solo sentido), **D7** (formato de las reglas),
    **D8** (mapa sin salida posible).
-4. Si se revisan las zonas de picking (rinden peor) o se descartan.
+4. Zonas de picking: tras la re-medicion empatan con "sin zonas"; decidir
+   si se encienden (realismo: operario asignado a pasillos) o quedan apagadas.
 5. **BK-16:** el servidor del cliente se reinicia solo al cambiar un `.py`.
 6. **BK-30:** el muelle de salida (outbound) sigue sin ser realista.
 7. **BK-02** FIFO en UI, **INIT-10** modelo de almacen propio.
 
 ## Bugs conocidos (no criticos)
 
-- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-33.
-- La flota arranca dentro del carril 1 (BK-29): origen probable de la unica
-  co-ocupacion que queda, la del arranque.
+- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-33 (BK-29 cerrado).
 - Al reiniciar el servidor a mano puede quedar un proceso hijo de
   `multiprocessing` reteniendo el puerto 8000.

@@ -350,3 +350,27 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   | 8+8 repartido | 2.841 s | **2.604 s** |
 
   Baseline `0c441704` -> `f9089cba`.
+- **2026-09-23** — **BK-29 (donde empieza el turno) y un error de F1.c que
+  invalidaba mediciones.** Cada operario nace en una celda propia: zonas de
+  inicio > estacionamiento de su equipo > celdas de espera (`inicio_turno.py`).
+  Al medirlo aparecio una traba de 6.000 s con 8+8 todo al carril 1. Causa
+  (introspeccion de los generadores SimPy): en `_tomar_turno_estacion` y en el
+  cupo por pasillo, `self._esperar_sin_estorbar()` se llamaba SIN `yield
+  from`; como es un generador, no hacia nada y el que no tenia lugar en la
+  fila esperaba parado en medio del pasillo. Existia desde F1.c. +1 test con
+  `ast` que falla si cualquier generador del motor se llama suelto.
+  **Las mediciones de zonas y cupo estaban afectadas por ese error:**
+
+  | Escenario (semilla 42) | Antes | Ahora |
+  |---|---|---|
+  | 2+2 canonico | 9.047 s, 1 co-ocupacion | 9.049 s, **0** |
+  | 4+4 todo al carril 1 | 5.234 s, 1 | 4.752 s, **0** |
+  | 8+8 todo al carril 1 | 3.693 s, 1 | **2.725 s, 0** |
+  | 8+8 repartido | 2.604 s, 1 | 2.652 s, **0** |
+  | 8+8 repartido + zonas 1x1 | 10.100 s | **2.714 s, 0** |
+  | 8+8 repartido + cupo 2 | 21.224 s, 13 | **3.345 s, 0** |
+
+  0 co-ocupaciones en los 10 escenarios medidos (incluido el arranque). Las
+  zonas quedan practicamente empatadas con "sin zonas" (+2%): la conclusion
+  "rinden peor" era del error. El cupo sigue siendo mas lento (+26%) pero ya
+  no es catastrofico. Baseline `f9089cba` -> `62c65ebf`.

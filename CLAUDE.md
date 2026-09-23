@@ -236,6 +236,12 @@ defaults que reproducen el comportamiento histórico. Por eso una corrida sin el
   `subsystems/simulation/parking.py`, `dispatcher._asignar_por_perfiles`,
   `operators` (`usar_equipo`, `_aplicar_cambio_de_equipo`). Sin `perfiles`, el
   despacho es el historico (gate byte-identico).
+- **`inicio_turno`** (BK-29, bloque opcional; SIN el bloque igual actua):
+  donde empieza el turno cada operario. Cadena `inicio_turno.zonas` >
+  estacionamiento de su equipo (`usar_estacionamientos`,
+  `radio_estacionamiento`) > celdas de espera (respaldo automatico). Lector:
+  `subsystems/simulation/inicio_turno.py` + `operators.agent_process`. Sin
+  capa anti-colision (sin celdas de espera) se usa el arranque historico.
 - Refactor **Template Method** en `operators.py`: `BaseOperator.agent_process()` +
   hook `_do_picking_at()` por subclase (Ground/Forklift). Logging por nivel en todo
   el hot-path (DEBUG silenciado en producción).

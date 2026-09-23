@@ -10,6 +10,21 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-23 (cont.)
+
+- **BK-29 -- cada operario empieza el turno en una celda propia que no
+  estorba** (`inicio_turno.py`). Antes nacian alrededor de la zona de salida
+  1: con semilla 42, en un puesto, en una SALIDA, en la entrada y dentro del
+  carril. Cadena: `inicio_turno.zonas` > estacionamiento de su equipo >
+  celdas de espera (respaldo automatico en cualquier mapa), con las mismas
+  reglas de validez que las celdas de espera. Al medirlo aparecio un error de
+  BK-25 F1.c: el que esperaba turno sin lugar en la fila no iba al pulmon
+  (faltaba `yield from`) y se quedaba parado en el pasillo. Corregido, con un
+  test `ast` que vigila toda esa clase de error. 0 co-ocupaciones en los 10
+  escenarios; 8+8 todo al carril 1 3.693 -> 2.725 s; zonas 10.100 -> 2.714 s
+  y cupo 21.224 -> 3.345 s (sus mediciones previas estaban afectadas).
+  Baseline `f9089cba` -> `62c65ebf`.
+
 ## 2026-09-23
 
 - **QA bloque 7 (Outbound Staging) cerrado + 2 criticos corregidos.**
