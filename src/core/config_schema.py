@@ -250,6 +250,15 @@ class ZonaEsperaConfig(BaseModel):
     alto: Optional[int] = None
 
 
+class InicioTurnoConfig(BaseModel):
+    """BK-29: donde empieza el turno cada operario
+    (lector: subsystems.simulation.inicio_turno)."""
+    model_config = ConfigDict(extra="allow")
+    zonas: Optional[Dict[str, ZonaEsperaConfig]] = None   # rectangulos x, y, ancho, alto
+    usar_estacionamientos: Optional[bool] = None          # default True
+    radio_estacionamiento: Optional[int] = None           # default 6 celdas
+
+
 class PasillosConfig(BaseModel):
     """BK-25 capa 2: cuantos operarios caben a la vez en un pasillo.
     Decision del Director: 2 (el ancho del pasillo).
@@ -369,6 +378,7 @@ class WarehouseConfig(BaseModel):
     zonas_picking: Optional[ZonasPickingConfig] = None
     rutas_estocasticas: Optional[RutasEstocasticasConfig] = None
     pasillos: Optional[PasillosConfig] = None
+    inicio_turno: Optional[InicioTurnoConfig] = None      # BK-29
     database_file: Optional[str] = None   # BK-25 F1.b: datos maestros alternativos
 
     # --- Layout y datos (layout_manager / data_manager) ---
@@ -462,6 +472,9 @@ def validate_config_schema(config: Dict[str, Any]) -> Tuple[List[str], List[str]
     for nombre, zona in (model.zonas_espera or {}).items():
         for key in _extras_of(zona):
             warnings.append("clave DESCONOCIDA: 'zonas_espera.%s.%s'" % (nombre, key))
+    if model.inicio_turno is not None:
+        for key in _extras_of(model.inicio_turno):
+            warnings.append("clave DESCONOCIDA: 'inicio_turno.%s'" % key)
     if model.tiempos is not None and model.tiempos.pick_time_model is not None:
         for key in _extras_of(model.tiempos.pick_time_model):
             warnings.append("clave DESCONOCIDA: 'tiempos.pick_time_model.%s'" % key)

@@ -778,12 +778,17 @@ class BaseOperator:
         """Pide turno; si no hay puesto libre, espera en la fila (o donde no
         estorbe) y vuelve a pedir. Devuelve la columna del puesto."""
         espera = self._espera_turno_s()
+        gestor_espera = getattr(self.almacen, 'zonas_espera', None)
         while True:
             puesto_x = estacion.tomar(self.id)
             if puesto_x is not None:
+                if gestor_espera is not None:
+                    gestor_espera.liberar(self.id)      # deja el pulmon
                 return puesto_x
             destino = self._celda_de_fila_libre(estacion)
             if destino is not None:
+                if gestor_espera is not None:
+                    gestor_espera.liberar(self.id)      # deja el pulmon
                 if tuple(self.current_position) != destino:
                     yield from self._outbound_nav_to(destino)
                 # F1.c2: mientras espera turno, su celda queda RESERVADA; si no,
@@ -791,7 +796,10 @@ class BaseOperator:
                 # las entradas del carril 1).
                 self._reservar_espera_abierta(destino)
             else:
-                self._esperar_sin_estorbar()
+                # BK-29: faltaba `yield from` (es un generador): el que no tenia
+                # lugar en la fila se quedaba esperando donde estaba, en medio
+                # de un pasillo, y trababa a los demas.
+                yield from self._esperar_sin_estorbar()
             yield self.env.timeout(espera)
 
     def _celda_de_fila_libre(self, estacion):
@@ -821,8 +829,11 @@ class BaseOperator:
             self._pasillo_actual = None
         espera = self._espera_turno_s()
         while not gestor.entrar(numero, self.id):
-            self._esperar_sin_estorbar()
+            yield from self._esperar_sin_estorbar()     # BK-29: faltaba yield from
             yield self.env.timeout(espera)
+        gestor_espera = getattr(self.almacen, 'zonas_espera', None)
+        if gestor_espera is not None:
+            gestor_espera.liberar(self.id)
         self._pasillo_actual = numero
 
     def _salir_del_pasillo(self):
@@ -1661,11 +1672,24 @@ class BaseOperator:
         # Inicializar posicion en depot
         staging_locs = self.almacen.data_manager.get_outbound_staging_locations()
         depot_location = staging_locs.get(1, (3, 29))  # Staging 1 como depot default
-        # Iniciativa #2 / Fase 2: dispersion espacial (anden distinto por agente).
-        spawn_cell = self._spawn_lane(depot_location)
+        # BK-29: cada operario empieza el turno en una celda propia que no
+        # estorba (zonas de inicio > estacionamiento > celdas de espera).
+        gestor_inicio = getattr(self.almacen, 'inicio_turno', None)
+        spawn_cell = None
+        if gestor_inicio is not None:
+            spawn_cell = gestor_inicio.celda_para(self.id, self.equipo_id, depot_location)
+        nace_en_su_celda = spawn_cell is not None
+        if not nace_en_su_celda:
+            # Arranque historico. Iniciativa #2 / Fase 2: dispersion espacial.
+            spawn_cell = self._spawn_lane(depot_location)
         self._set_pos(spawn_cell)
         # Fase 3 (cell mode): reservar la celda de spawn (invariante de exclusion).
         self._claim_spawn(spawn_cell)
+        if nace_en_su_celda:
+            # Como un ocioso: su celda queda reservada hasta que salga.
+            self._reservar_espera_abierta(spawn_cell)
+            logger.info("[%s] empieza el turno en %s (%s)", self.id, spawn_cell,
+                        gestor_inicio.origen.get(self.id))
 
         logger.info(f"[{self.id}] Proceso iniciado en depot {spawn_cell}")
 

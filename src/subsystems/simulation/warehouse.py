@@ -617,6 +617,17 @@ class AlmacenMejorado:
             self.estacionamientos = GestorEstacionamientos(
                 configuracion, equipos, en_uso, layout_manager)
 
+        # BK-29 (decision del Director 2026-09-23): donde empieza el turno cada
+        # operario. Cadena: zonas de inicio > estacionamiento de su equipo >
+        # celdas de espera. Requiere las celdas de espera (capa anti-colision);
+        # sin ellas se mantiene el arranque historico.
+        self.inicio_turno = None
+        if self.zonas_espera is not None:
+            from .inicio_turno import GestorInicioTurno
+            self.inicio_turno = GestorInicioTurno(
+                configuracion, self.zonas_espera, self.estacionamientos)
+            print(f"[INICIO-TURNO] {self.inicio_turno}")
+
         if not self.operator_capacities:
             print("[ALMACEN][WARN] No se pudo derivar capacidad por area de la "
                   "flota; se usa el fallback global. Revisa work_area_equipment "

@@ -206,11 +206,13 @@ class GestorZonasEspera:
 
     # ------------------------------------------------------------ asignacion
 
-    def asignar(self, agent_id: str, desde: Cell) -> Optional[Cell]:
-        """Celda de espera libre mas cercana (por camino) para este agente."""
+    def asignar(self, agent_id: str, desde: Cell,
+                excluir: Iterable[Cell] = ()) -> Optional[Cell]:
+        """Celda de espera libre mas cercana (por camino) para este agente.
+        `excluir`: celdas que ya tienen duenio por otra via (BK-29: inicio)."""
         if agent_id in self.asignadas:
             return self.asignadas[agent_id]
-        ocupadas = set(self.asignadas.values())
+        ocupadas = set(self.asignadas.values()) | {tuple(c) for c in excluir}
         libres = [c for c in self.celdas if c not in ocupadas]
         if not libres:
             return None
