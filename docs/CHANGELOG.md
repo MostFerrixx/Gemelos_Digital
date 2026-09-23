@@ -10,6 +10,35 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-23
+
+- **QA bloque 7 (Outbound Staging) cerrado + 2 criticos corregidos.**
+  H-29: en modo aleatorio el muelle (y la ruta) se sorteaba por LINEA: 184 de
+  300 pedidos salian partidos entre carriles; ahora uno por pedido. H-30:
+  abrazo mortal en la estacion de descarga (el puesto se lo llevaba el
+  primero que lo pedia aunque otro esperara en la unica puerta): la fila se
+  respeta y quien recibe el puesto aparta la entrada hasta llegar. H-31: una
+  fila Destino -> Zona invalida ya no se descarta en silencio. 8+8 todo al
+  carril 1: 7.789 -> 3.693 s. Baseline `0c441704` -> `f9089cba`. Abiertos:
+  BK-32 (7 zonas fijas en la web), BK-33 (la ruta no viaja en el replay),
+  BK-29 ampliado (la flota nace dentro del carril 1).
+
+## 2026-09-20 (cont.)
+
+- **BK-23 capa 1 + reparto por muelle + rutas aleatorias** (`c0ac29b`,
+  `b00c465`, `39be419`, `30329d2`, `27d0a65`). Una ubicacion, un operario a la
+  vez (el que va a un hueco se lleva todas sus lineas); los piqueadores toman
+  pedidos del muelle menos cargado (`despacho.repartir_por_staging`); en modo
+  aleatorio "Rutas a Piquear" crea N rutas atadas a muelles segun el reparto
+  (`rutas_estocasticas`, con control web); los ociosos no esperan en la franja
+  de circulacion. Causa raiz del atasco con tarea (hallada por el consultor):
+  cinco operarios mandados al mismo hueco. 16 operarios repartidos 8.124 ->
+  2.841 s. Baseline `0c441704`.
+- **BK-25 capas 2 y 3, implementadas y APAGADAS** (`6dd01a1`, `565cab2`):
+  pasillos deducidos del mapa, zonas de picking (1 por pasillo, varias por
+  operario) y cupo por pasillo. Medidas peores que sin ellas (zonas 10.100 s,
+  cupo 21.224 s vs 2.841 s): quedan con sus tests por si un layout las pide.
+
 ## 2026-09-20
 
 - **BK-25 F1 -- la zona de descarga pasa a ser una ESTACION CON TURNO**

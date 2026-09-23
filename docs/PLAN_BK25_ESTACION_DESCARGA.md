@@ -329,3 +329,24 @@ rendiciones del planificador, y que la flota 4+4 rinda claramente mas que la
   un layout de pasillos angostos lo necesita.
   PENDIENTE si se retoma: que el que espera se quede en la boca del pasillo
   en vez de volver al pulmon.
+- **2026-09-23** — **Abrazo mortal en la estacion (QA H-30), corregido.** Lo
+  destapo otro arreglo del QA (H-29: en modo aleatorio el muelle se sorteaba
+  por linea; al sortearlo por pedido cambio la secuencia de la semilla 42) y
+  la corrida canonica se trabo en t=2.350 s. En el carril 1, dos operarios
+  tenian los puestos asignados pero estaban DETRAS de las entradas, y en las
+  entradas esperaban otros dos a que se liberara un puesto que ya tenia dueno.
+  Causa: `Estacion.tomar` daba el puesto al primero que lo pedia, aunque otro
+  esperara en la fila, y al darlo soltaba la entrada. Arreglo: (1) la fila se
+  respeta: un puesto libre es de quien espera en la entrada de esa columna;
+  (2) quien recibe el puesto aparta la entrada hasta llegar
+  (`llego_al_puesto`). +3 tests. Medido (semilla 42, antes = codigo previo a
+  H-29 y H-30; los pedidos cambian, asi que +-10% es ruido):
+
+  | Escenario | Antes | Ahora |
+  |---|---|---|
+  | 2+2 todo al carril 1 | 8.891 s | 9.047 s |
+  | 4+4 todo al carril 1 | 4.791 s | 5.234 s |
+  | 8+8 todo al carril 1 | 7.789 s | **3.693 s** |
+  | 8+8 repartido | 2.841 s | **2.604 s** |
+
+  Baseline `0c441704` -> `f9089cba`.

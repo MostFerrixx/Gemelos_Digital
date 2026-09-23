@@ -2,12 +2,20 @@
 
 > **Documento vivo.** Se actualiza a medida que se ejecutan las pruebas: se
 > agregan casos que falten, se quitan los que sobren y se registra cada
-> resultado en la sección 9. Última actualización: 2026-09-18.
+> resultado en la sección 9. Última actualización: 2026-09-23.
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 7 — Outbound Staging (despues 8, 10, 11, 12;
-el 6 espera a INIT-10).
+**Objetivo inmediato:** Bloque 8 — Inbound (despues 6 rehecho con el mapa
+nuevo, 10, 9, 11, 12 y las combinadas).
+**Ultimo cerrado:** Bloque 7 — Outbound Staging (23/09): 5 casos pasan (7.1,
+7.2, 7.3, 7.4, 7.7 nuevo); 7.5 y 7.6 pasan al bloque 6 (las zonas ahora son
+carriles y se editan en el Excel). **2 errores criticos corregidos: H-29**
+(en modo aleatorio un pedido salia partido entre muelles) y **H-30** (abrazo
+mortal en la estacion de descarga, destapado por H-29); **H-31** corregido
+(fila de destino invalida descartada en silencio). Abiertos: H-32 (7 zonas
+fijas), H-33 (la ruta no viaja en el replay), H-34 (la flota nace dentro del
+carril 1).
 **Ultimo cerrado:** Bloque 3 — Motor avanzado (19/09): 5 de 6 pasan; QA-3.1
 falla por H-15 (tambien con la flota canonica). Corregido **H-26** (quedaban
 pallets sin despachar al terminar). Consulta de diseno de H-15 hecha:
@@ -367,8 +375,9 @@ Salvo indicación, todo lo demás queda en el canónico.
 | QA-7.2 | Reparto 15/15/14/14/14/14/14 | N2: proporciones ±6 pp |
 | QA-7.3 | Reparto que suma 110 | La UI bloquea |
 | QA-7.4 | Destino → zona (determinista con `destino`) | N2: todos los pedidos de cada destino en su zona, aunque el reparto diga otra |
-| QA-7.5 | Mover coordenadas de la zona 1 (Guardar ubicaciones) | N2: descargas en la celda nueva; restaurar |
-| QA-7.6 | Coordenada sobre un rack | Rechazo con mensaje |
+| QA-7.5 | ~~Mover coordenadas de la zona 1 (Guardar ubicaciones)~~ | **Pasa al bloque 6**: desde BK-25 las zonas son carriles de 20 celdas; la pestaña las muestra resumidas y remite al Excel maestro (el botón se oculta) |
+| QA-7.6 | ~~Coordenada sobre un rack~~ | **Pasa al bloque 6** (validación del Excel maestro) |
+| QA-7.7 | Rutas a Piquear: 10 rutas, reparto 40/30/30 (aleatorio) | N1: `rutas_estocasticas {enabled, cantidad:10}`. N2: cada pedido sale entero por un solo carril; solo carriles 1-3 |
 
 ### Bloque 8 — Inbound
 
@@ -510,6 +519,13 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-3.5 | 19/09 | Intervalo 600 s \| identico | Camion cada 604-614 s; espera 593 s; duracion **63.016 s**: los operarios esperan lugar en el carril | — | **PASA** | H-25 |
 | QA-3.6 (1.er intento) | 19/09 | Capacidad 2 \| identico | Max 2 por camion; pero **quedaron 3 pallets sin despachar** (1-3 en las 4 corridas con outbound) | — | **PASA** con hallazgo | H-26 |
 | QA-3.6 (reprueba) | 19/09 | identico | 622 tareas, **622 despachadas**, 0 pendientes | Camiones con carga y pallets del visor = JSON en t=15.000 (157/314) y al final (318/622) | **PASA** | H-26 cerrado |
+| QA-7.1 | 23/09 | 100% zona 3 \| idéntico | 300 pedidos, 594 tareas completadas, **todas con staging 3**; las 667 descargas en (11,30) y (12,30), los dos puestos del carril 3 | 20/20 | **PASA** | H-34 |
+| QA-7.2 | 23/09 | 15/15/14/14/14/14/14 \| idéntico | Tareas por carril 13,6 / 15,4 / 11,8 / 15,9 / 14,7 / 15,4 / 13,3 % (máx. 2,2 pp de desvío) | — | **PASA** con hallazgo | H-29 |
+| QA-7.3 | 23/09 | — | Suma 110: la insignia marca el error en vivo y Run se bloquea ("must sum to 100% (current: 110%)", en inglés: H-08); no se lanzó corrida | — | **PASA** | — |
+| QA-7.4 | 23/09 | Determinista, 71 pedidos con `destino`; 6 tiendas mapeadas a los carriles 7..2, reparto 100% al 1 \| mapa idéntico | Cada tienda sale entera por su carril (10/10 pedidos cada una); el pedido con `staging_id` 3 explícito le gana a su destino. La fila "TIENDA_7 → 9" **desapareció sin aviso** y sus pedidos cayeron al carril 1 | — | **PASA** con hallazgo | H-31 |
+| QA-7.4 (reprueba H-31) | 23/09 | Fila "TIENDA_X → 9" | Run bloqueado: "destino_staging_map['TIENDA_X'] = '9' debe ser un staging_id entero entre 1 y 7." | — | **PASA** | H-31 cerrado |
+| QA-7.7 (1.er intento) | 23/09 | `rutas_estocasticas {enabled, cantidad:10}`, 40/30/30 \| idéntico | **150 de 300 pedidos partidos entre carriles** (sin rutas: 184 de 300) | — | **FALLA** | H-29 |
+| QA-7.7 (reprueba) | 23/09 | idéntico | 300 pedidos, **0 partidos**, 584/584 completadas; pedidos por carril 38 / 32 / 30 % | — | **PASA** | H-29 y H-30 cerrados |
 | H-01 reprueba 1 | 18/09 | Corrida canónica: copia temporal **idéntica** a `config.json` (antes faltaba `cercania_tour_mode`) y = metadata | — | — | **PASA** | H-01 cerrado |
 | QA-1.1 | 18/09 | `total_ordenes` 50 \| 50 | 50 pedidos, 107 tareas, todas completadas; fin 1.415 s | 20/20 | **PASA** | — |
 | QA-1.2 | 18/09 | 600 \| 600 | 600 pedidos, 1.195 tareas completadas; fin 15.178 s = **2,08×** el control (esperado ~2×) | 20/20 | **PASA** | H-05 (evidencia) |
@@ -561,7 +577,14 @@ H-10→BK-19, H-11→BK-20, H-12→BK-21, H-13→BK-24, H-15→BK-25, H-16→BK-
 | H-25 | **MAYOR** (realismo, decision) | QA-3.3, 3.5 | **El muelle de salida (outbound) no es realista en WH1.** Cada tarea es un pallet; se depositan de a uno y un operario por carril: la corrida dura x2,1 (x8,6 con camion cada 600 s). Las 7 zonas se expanden a manchas de 8 celdas que tapan las filas 28-29 enteras (el pasillo frontal queda en 1 fila); 52 saltos de 2-3 celdas al entrar o salir del carril; los camiones nunca cargaron mas de 7 de 8 | Modelo de carriles de INIT-3 sobre un mapa sin anden | → BK-30. Decisiones D3 y D10 de la propuesta de diseno | Abierto |
 | H-26 | MENOR | QA-3.6 | **Con outbound, la corrida terminaba con 1-3 pallets sin despachar**: cortaba al llegar la ultima tarea a la zona, sin esperar el ultimo camion | `simulacion_ha_terminado` solo miraba las tareas | **Corregido** (`dcf71b3`): con camiones activos termina cuando se despacho todo. +1 test. Gate PASS | **Cerrado** (reprobado) |
 | H-27 | **MAYOR** (causa de H-15) | Consulta de diseno | **El que espera ocupa dos celdas.** Si el plan de un operario incluye una espera, el planificador le reserva tambien la celda de la que salio durante toda la espera, aunque ya no esta ahi. Esa reserva de mas choca con otras y se rechazan planes validos: 92-95% de los planes rechazados en corridas 2+2. Lo introdujo BK-15 (C2) | `spacetime_planner._plan_reserve_core` usa el tiempo de SALIDA de la celda siguiente como fin de la reserva del origen | Hallado por el consultor (Fable 5.1) y **confirmado**: reproduccion de 25 lineas + lectura del ejecutor (se mueve y espera en la celda nueva). → BK-25 F0 | Abierto |
-| H-28 | **MAYOR** (visor) | Prueba del layout grande | **El visor dibujaba el mapa de `config.json`, no el de la corrida cargada.** Correr desde la web no toca `config.json`: con `layouts/WH1 v2.tmx` la simulacion usaba 30x42 y el visor dibujaba 30x30 (el almacen equivocado). Es lo que el Director recordaba como "el layout nuevo no cargaba" | `routers/replay.get_layout` resolvia solo desde el config | **Corregido** (`b7ba14a`): el mapa sale de la metadata del replay. +2 tests | **Cerrado** (verificado en el visor) |
+| H-28 | **MAYOR** (visor) | Prueba del layout grande | **El visor dibujaba el mapa de `config.json`, no el de la corrida cargada.** Correr desde la web no toca `config.json`: con `layouts/WH1 v2.tmx` la simulacion usaba 30x42 y el visor dibujaba 30x30 (el almacen equivocado). Es lo que el Director recordaba como "el layout nuevo no cargaba" | `routers/replay.get_layout` resolvia solo desde el config | **Corregido** (`b7ba14a`): el mapa sale de la metadata del replay. +2 tests | **Cerrado** (verificado en el visor) |
+| H-29 | **CRÍTICO** (realismo) | QA-7.7, 7.2 | **En modo aleatorio un pedido salía partido entre muelles.** El carril (y la ruta, con Rutas a Piquear) se sorteaba por LÍNEA, no por pedido: 184 de 300 pedidos quedaban repartidos en 2-3 carriles; con rutas, un mismo pedido pertenecía a varias rutas. Un pedido es de una tienda: sale entero por un muelle | `order_strategies.StochasticOrderStrategy`: el sorteo estaba dentro del bucle de líneas | **Corregido**: se sortea una vez por pedido. +1 test (falla con el código viejo). Cambia la secuencia aleatoria → baseline nuevo | **Cerrado** (reprobado QA-7.7) |
+| H-30 | **CRÍTICO** | Gate tras H-29 | **Abrazo mortal en la estación de descarga.** Con otra secuencia de pedidos (H-29), la corrida canónica (semilla 42) se trababa en t≈2.350 s y la cortaba el vigilante: 392 de 624 tareas sin hacer. Carril 1: los operarios con puesto asignado estaban DETRÁS de las entradas, y en las entradas (la única puerta de cada puesto) esperaban otros dos a que se liberara un puesto que ya tenía dueño | `Estacion.tomar` daba el puesto al primero que lo pedía, aunque otro esperara en la fila; y al dárselo soltaba la entrada, donde podía pararse otro | **Corregido**: (1) la fila se respeta (el puesto es de quien espera en la entrada de esa columna); (2) quien recibe el puesto aparta la entrada hasta llegar. +3 tests. Canónica: 624/624 | **Cerrado** |
+| H-31 | MENOR (usabilidad) | QA-7.4 | Una fila de Destino → Zona con zona fuera de 1-7 **se descartaba en silencio** y sus pedidos caían al reparto sin aviso | `app.js _serializeDestinoStagingRows` filtraba la fila | **Corregido**: la fila viaja y la validación del servidor bloquea la corrida diciendo cuál es | **Cerrado** (reprobado) |
+| H-32 | MENOR (configurabilidad) | QA-7.2 | La pestaña Outbound tiene **7 casillas fijas** (y el editor de destinos y la validación del servidor aceptan solo 1-7): un mapa con 5 o 10 carriles no se puede configurar bien | Número de zonas fijo en `index.html`, `app.js` y `config_manager.py` | Armar las casillas desde las zonas de `warehouse.db` → BK nuevo | Abierto |
+| H-33 | OBS (usabilidad) | QA-7.7 | La **ruta** de cada pedido no viaja en el replay: ni el visor ni el QA pueden ver qué ruta es cada pedido | La WO la tiene (`wo.ruta`) pero los 8 puntos que emiten `work_order_update` no la incluyen | Emitirla solo si hay rutas (no cambia el canónico) | Abierto |
+| H-34 | OBS (realismo) | QA-7.1 | Todos los operarios **nacen dentro del carril 1**: el punto de partida es la primera celda de la zona 1 (3,30), que ahora es un puesto de descarga. Es el origen probable de la co-ocupación del arranque | Depot = primera celda del staging 1 | Punto de partida configurable (estacionamiento) — junto con H-23/BK-29 | Abierto |
+
 
 ## 11. Registro de cambios de este plan
 
