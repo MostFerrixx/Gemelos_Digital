@@ -102,11 +102,13 @@ def resolve_fleet(data: ConfigData):
 
 
 @router.get("/api/configurator/work-areas")
-def get_work_areas(sequence_file: str):
-    """Extract work areas from sequence file"""
+def get_work_areas(sequence_file: str = ""):
+    """BK-35: areas que usa el simulador (la base aplicada; el Excel solo si no
+    hay base), con aviso si el Excel configurado trae otras sin aplicar."""
     try:
-        work_areas = config_manager.extract_work_areas(sequence_file)
-        return {"success": True, "work_areas": work_areas}
+        db = config_manager.load_config().get("database_file")
+        work_areas, origen, avisos = config_manager.work_areas_en_uso(sequence_file, db)
+        return {"success": True, "work_areas": work_areas, "origen": origen, "avisos": avisos}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

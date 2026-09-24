@@ -724,6 +724,7 @@
                                     <option value="sku_catalog">Catálogo de productos</option>
                                     <option value="staging_areas">Zonas de salida</option>
                                     <option value="inbound_docks">Muelles de recepción</option>
+                                    <option value="stock">Stock inicial por ubicación</option>
                                 </select>
                                 <input type="text" id="master-table-search" placeholder="Buscar...">
                                 <span id="master-table-info" class="master-table-info"></span>
@@ -830,10 +831,10 @@
                             <button id="btn-save-staging-coords" class="btn-small">Guardar ubicaciones</button>
                         </div>
                         <div class="card-body">
-                            <p class="description-text">Dónde está físicamente cada zona de salida
-                                en el mapa. Viene del Excel maestro; se puede ajustar acá porque son
-                                pocas. <strong>Ojo:</strong> volver a aplicar el Excel reemplaza
-                                estos valores por los del archivo.</p>
+                            <p class="description-text" id="staging-coords-intro">Dónde está físicamente
+                                cada zona de salida en el mapa. Viene del Excel maestro; se puede ajustar
+                                acá porque son pocas. <strong>Ojo:</strong> volver a aplicar el Excel
+                                reemplaza estos valores por los del archivo.</p>
                             <div id="staging-coords-editor" class="coords-editor"></div>
                             <div id="staging-coords-result" class="upload-result" style="display:none;"></div>
                         </div>

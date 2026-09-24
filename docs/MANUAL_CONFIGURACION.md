@@ -462,7 +462,7 @@ idénticos. Cada grupo tiene:
   después la 2, etc.
 
 > Si el desplegable de Work Area aparece vacío, andá a la pestaña **Layout y
-> Datos** y usá **Cargar Work Areas** para leerlas del Excel.
+> Datos** y usá **Cargar Work Areas** para cargarlas.
 
 ---
 
@@ -498,7 +498,9 @@ De dónde salen el mapa y los datos maestros del negocio.
 
 Muestra lo que el simulador está usando **ahora mismo**: cuántas ubicaciones,
 productos, zonas de salida y muelles. Debajo hay una tabla para revisarlos, con
-selector, buscador y paginado (son de solo lectura: las tablas grandes se editan
+selector, buscador y paginado. **Stock inicial por ubicación** muestra con cuánto
+stock arranca cada corrida (el del último Excel aplicado). En las ubicaciones,
+la columna *equipo (según Flota)* es el equipo que de verdad las atiende (son de solo lectura: las tablas grandes se editan
 en el Excel, que es mejor herramienta para eso).
 
 **Aplicar Excel** toma el archivo (el que subiste o el configurado arriba) y
@@ -513,9 +515,10 @@ nada, y si la importación falla se restaura sola.
 
 ## Acciones de Datos
 
-- **Cargar Work Areas** — lee las áreas de trabajo del Excel y las pone
-  disponibles en los desplegables de la pestaña Flota. **Ejecutalo después de
-  cambiar el Excel.**
+- **Cargar Work Areas** — carga en los desplegables de la pestaña Flota las
+  áreas de trabajo **que usa el simulador** (las del último Excel aplicado). Si
+  el Excel configurado trae áreas que todavía no se aplicaron, avisa. Ejecutalo
+  después de aplicar un Excel nuevo.
 
 ## ¿Y las zonas y los muelles?
 

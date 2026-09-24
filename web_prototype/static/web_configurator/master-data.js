@@ -107,9 +107,14 @@ class MasterDataManager {
             });
             const hayCarriles = [...porId.values()].some(v => v.length > 1);
             if (hayCarriles) {
-                cont.innerHTML = '<p class="description-text">Estas zonas son carriles de varias celdas. ' +
-                    'Se definen en el Excel maestro (hoja OutboundStaging) y se aplican desde arriba.</p>' +
-                    [...porId.entries()].map(([id, celdas]) => {
+                // Pasada visual: el texto general decia "se puede ajustar aca" y
+                // esta explicacion quedaba apretada dentro de la grilla.
+                const intro = document.getElementById(tabla === 'staging_areas'
+                    ? 'staging-coords-intro' : 'docks-coords-intro');
+                if (intro) intro.innerHTML = 'Dónde está físicamente cada zona de salida en el mapa. '
+                    + 'Estas zonas son <strong>carriles de varias celdas</strong>: se definen en el '
+                    + 'Excel maestro (hoja OutboundStaging) y se aplican desde la pestaña Layout y Datos.';
+                cont.innerHTML = [...porId.entries()].map(([id, celdas]) => {
                         const xs = celdas.map(c => c[cfg.colX]), ys = celdas.map(c => c[cfg.colY]);
                         return `<div class="coord-row"><span class="coord-label">${cfg.etiqueta} ${id}</span>
                             <span>${celdas.length} celdas &middot; columnas ${Math.min(...xs)}-${Math.max(...xs)}

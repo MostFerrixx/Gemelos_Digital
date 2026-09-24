@@ -10,6 +10,21 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-24
+
+- **BK-35 -- Layout y Datos muestra lo que usa el simulador.** "Cargar Work
+  Areas" (y la validacion de cobertura de la flota) leen las areas de la base
+  aplicada y avisan si el Excel trae otras sin aplicar; tabla nueva "Stock
+  inicial por ubicacion" (la foto con la que arranca cada corrida, H-38); el
+  aviso "el Excel es mas nuevo" compara con la fecha de APLICACION
+  (`master_data_meta`, la escribe el importador), no con la de la base, que
+  cambia en cada corrida. +4 tests.
+- **Pasada visual de QA** (pedido del Director): `scripts/qa/capturas_web.py`
+  maneja un Chrome real sin ventana por DevTools (clics de mouse reales,
+  teclado, archivos por el selector real, capturas PNG). Primera pasada: 17
+  capturas de los bloques 6-8; corregidos el texto/diseno de "Ubicacion de las
+  Zonas" con carriles y "1 puntos".
+
 ## 2026-09-23 (cont. 5)
 
 - **QA bloque 6 (Layout y Datos) cerrado, 8 de 8.** H-43: se aceptaban

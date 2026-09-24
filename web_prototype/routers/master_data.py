@@ -207,6 +207,10 @@ def _celdas_bloqueadas(ruta: str, ancho: int, alto: int):
     return bloqueadas
 
 
+def _n_puntos(lista) -> str:
+    return "1 punto" if len(lista) == 1 else "%d puntos" % len(lista)
+
+
 def _ejemplos(lista, n=5):
     return ", ".join(lista[:n]) + (" y %d mas" % (len(lista) - n) if len(lista) > n else "")
 
@@ -220,11 +224,14 @@ def _cruzar_puntos(puntos, ancho: int, alto: int, bloqueadas, origen: str) -> Li
     tapados = ["%s %s (%d, %d)" % p for p in puntos
                if 0 <= p[2] < ancho and 0 <= p[3] < alto and (p[2], p[3]) in bloqueadas]
     if fuera:
-        errores.append("%d puntos de %s quedan FUERA del mapa de %d x %d: %s."
-                       % (len(fuera), origen, ancho, alto, _ejemplos(fuera)))
+        errores.append("%s de %s %s FUERA del mapa de %d x %d: %s."
+                       % (_n_puntos(fuera), origen, "queda" if len(fuera) == 1 else "quedan",
+                          ancho, alto, _ejemplos(fuera)))
     if tapados:
-        errores.append("%d puntos de %s caen sobre celdas bloqueadas (racks o paredes): %s. "
-                       "Los operarios no podrian llegar." % (len(tapados), origen, _ejemplos(tapados)))
+        errores.append("%s de %s %s sobre celdas bloqueadas (racks o paredes): %s. "
+                       "Los operarios no podrian llegar."
+                       % (_n_puntos(tapados), origen, "cae" if len(tapados) == 1 else "caen",
+                          _ejemplos(tapados)))
     return errores
 
 
@@ -371,6 +378,22 @@ def aplicar_excel(request: AplicarRequest):
     }
 
 
+def _meta_aplicacion(conn) -> Dict[str, Any]:
+    """BK-35: cuando y de que Excel se aplicaron los datos (si se sabe)."""
+    try:
+        meta = dict(conn.execute("SELECT clave, valor FROM master_data_meta").fetchall())
+    except sqlite3.Error:
+        return {}
+    out = {}
+    try:
+        out["aplicado_en"] = float(meta["aplicado_en"])
+    except (KeyError, TypeError, ValueError):
+        pass
+    if meta.get("excel"):
+        out["excel_aplicado"] = os.path.relpath(meta["excel"], PROJECT_ROOT)
+    return out
+
+
 def _resumen_bd() -> Dict[str, Any]:
     if not os.path.exists(DB_PATH):
         return {"disponible": False}
@@ -382,8 +405,10 @@ def _resumen_bd() -> Dict[str, Any]:
                 datos[tabla] = conn.execute("SELECT COUNT(*) FROM %s" % tabla).fetchone()[0]
             except sqlite3.Error:
                 datos[tabla] = None
-        return {"disponible": True, "conteos": datos,
-                "actualizada": os.path.getmtime(DB_PATH)}
+        out = {"disponible": True, "conteos": datos,
+               "actualizada": os.path.getmtime(DB_PATH)}
+        out.update(_meta_aplicacion(conn))
+        return out
     finally:
         conn.close()
 
@@ -406,7 +431,7 @@ def resumen():
             info["excel_actualizado"] = os.path.getmtime(excel)
             info["excel_mas_nuevo"] = (
                 info.get("disponible", False)
-                and info["excel_actualizado"] > info.get("actualizada", 0)
+                and info["excel_actualizado"] > info.get("aplicado_en", info.get("actualizada", 0))
             )
         else:
             info["excel_existe"] = False
@@ -537,9 +562,42 @@ def guardar_docks(request: CoordenadasRequest):
     return _guardar_coordenadas("inbound_docks", request.filas)
 
 
+def _leer_stock(limit: int, offset: int, q: str) -> Dict[str, Any]:
+    """BK-35: stock INICIAL por ubicacion, el que usa cada corrida al arrancar.
+
+    `inventory` es la copia de trabajo (cambia durante cada corrida); el stock
+    con el que arranca la proxima es `inventory_baseline` si existe (H-38) o,
+    si todavia no se corrio nada desde el ultimo "Aplicar Excel", `inventory`.
+    """
+    conn = _conn()
+    try:
+        hay_foto = conn.execute("SELECT count(*) FROM sqlite_master "
+                                "WHERE name='inventory_baseline'").fetchone()[0] > 0
+        stock = "COALESCE(b.qty_baseline, i.qty_available)" if hay_foto else "i.qty_available"
+        union = "LEFT JOIN inventory_baseline b ON b.location_id = i.location_id" if hay_foto else ""
+        base = ("FROM inventory i LEFT JOIN locations l ON l.location_id = i.location_id %s" % union)
+        where, params = "", []
+        if q:
+            where = " WHERE i.location_id LIKE ? OR i.sku_code LIKE ? OR l.work_area LIKE ?"
+            params = ["%%%s%%" % q] * 3
+        total = conn.execute("SELECT COUNT(*) %s%s" % (base, where), params).fetchone()[0]
+        filas = conn.execute(
+            "SELECT i.location_id, i.sku_code, %s AS stock_inicial, l.work_area, "
+            "l.legacy_x, l.legacy_y %s%s ORDER BY i.location_id LIMIT ? OFFSET ?"
+            % (stock, base, where), params + [limit, offset]).fetchall()
+        columnas = ["location_id", "sku_code", "stock_inicial", "work_area", "legacy_x", "legacy_y"]
+        return {"tabla": "stock", "hoja": "PickingLocations (qty_initial)", "columnas": columnas,
+                "total": total, "limit": limit, "offset": offset,
+                "filas": [dict(zip(columnas, f)) for f in filas]}
+    finally:
+        conn.close()
+
+
 @router.get("/api/master-data/table/{nombre}")
 def leer_tabla(nombre: str, limit: int = 50, offset: int = 0, q: str = ""):
     """Contenido paginado de una tabla de datos maestros (solo lectura)."""
+    if nombre == "stock":
+        return _leer_stock(max(1, min(int(limit), 500)), max(0, int(offset)), q)
     if nombre not in TABLAS:
         raise HTTPException(status_code=404,
                             detail="Tabla desconocida. Validas: %s" % ", ".join(TABLAS))

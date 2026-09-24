@@ -341,7 +341,8 @@ class WebConfigurationManager:
             # area" sale del mapa explicito work_area_equipment (fallback: convencion).
             agent_types = config.get('agent_types', [])
             seq = config.get('sequence_file', '')
-            required_areas = self.extract_work_areas(seq) if seq else []
+            # BK-35: las areas que de verdad usa el motor (la base).
+            required_areas = self.work_areas_en_uso(seq, config.get('database_file'))[0]
             wae = config.get('work_area_equipment', {})
             if not isinstance(wae, dict):
                 errors.append("work_area_equipment debe ser un objeto area->tipo de equipo.")
@@ -676,6 +677,44 @@ class WebConfigurationManager:
             print(f"[CONFIG_MANAGER ERROR] Error extracting work areas: {e}")
             return []
     
+    def work_areas_en_uso(self, sequence_file: str = '',
+                          database_file: Optional[str] = None) -> Tuple[List[str], str, List[str]]:
+        """BK-35: areas de trabajo que usa el SIMULADOR (la base, no el Excel).
+
+        El motor lee `warehouse.db` (o `database_file`); el Excel solo cuenta
+        despues de "Aplicar Excel". Devuelve (areas, origen, avisos): origen
+        'base' o 'excel' (solo si no hay base), y avisos si el Excel configurado
+        tiene areas distintas a las aplicadas.
+        """
+        import sqlite3
+        db = database_file or 'warehouse.db'
+        if not os.path.isabs(db):
+            db = os.path.join(self.project_root, db)
+        areas_base: List[str] = []
+        if os.path.exists(db):
+            try:
+                conn = sqlite3.connect(db)
+                try:
+                    areas_base = sorted({str(r[0]) for r in conn.execute(
+                        "SELECT DISTINCT work_area FROM locations") if r[0]})
+                finally:
+                    conn.close()
+            except sqlite3.Error as e:
+                print(f"[CONFIG_MANAGER][WARN] No se pudieron leer las areas de {db}: {e}")
+        areas_excel = self.extract_work_areas(sequence_file) if sequence_file else []
+        if not areas_base:
+            return areas_excel, 'excel', []
+        avisos = []
+        sin_aplicar = sorted(set(areas_excel) - set(areas_base))
+        ya_no = sorted(set(areas_base) - set(areas_excel)) if areas_excel else []
+        if sin_aplicar:
+            avisos.append("El Excel configurado trae areas que todavia no se aplicaron: %s. "
+                          "Aplica el Excel para que el simulador las use." % ", ".join(sin_aplicar))
+        if ya_no:
+            avisos.append("El simulador usa areas que el Excel configurado ya no trae: %s."
+                          % ", ".join(ya_no))
+        return areas_base, 'base', avisos
+
     def list_configurations(self) -> List[Dict]:
         """
         List all saved configuration presets

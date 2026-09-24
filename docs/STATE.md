@@ -4,7 +4,7 @@
 > presente, nada mas. Historial -> `docs/CHANGELOG.md`. Pendientes ->
 > `docs/BACKLOG.md`. Identidad/reglas/arquitectura -> `CLAUDE.md`.
 
-**Ultima actualizacion:** 2026-09-23
+**Ultima actualizacion:** 2026-09-24
 
 ## Git
 
@@ -22,7 +22,7 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 378 passed, 1 deselected (~37s)
+python -m pytest -q                # 382 passed, 1 deselected (~40s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline 62c65ebf)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
@@ -61,7 +61,9 @@ python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min
 `docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0 a 8.
 **Siguiente: bloque 10 (barra superior y ciclo de configuracion)**; despues 9,
 11, 12 y las combinadas. El bloque 6 corrigio H-43 (mapas y Excel
-incompatibles se aceptaban), H-39 y H-41; abiertos H-40 y H-42 (BK-35). El bloque 8 corrigio H-35, H-36 y H-38 (stock de
+incompatibles se aceptaban), H-39 y H-41; H-40 y H-42 cerrados con BK-35.
+Metodo: cada bloque cierra con una pasada visual (clics reales + capturas,
+`scripts/qa/capturas_web.py`). El bloque 8 corrigio H-35, H-36 y H-38 (stock de
 la base entre corridas); abierto H-37 (BK-34).
 El bloque 7 corrigio H-29, H-30 y H-31; abiertos H-32 (BK-32) y H-33
 (BK-33). H-34 cerrado con BK-29.
@@ -85,7 +87,7 @@ del paso) probablemente innecesaria**: se retoma solo si una medicion la pide.
 
 ## Bugs conocidos (no criticos)
 
-- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-35 (BK-29 cerrado).
+- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-34 (BK-29 y BK-35 cerrados).
 - `warehouse.db` es la copia de trabajo del stock: cada corrida la restaura al
   arrancar desde `inventory_baseline`; "Aplicar Excel" borra esa foto (H-38).
   El respaldo de la base anterior al v3 es `warehouse_pre_v3_backup.db` (sin

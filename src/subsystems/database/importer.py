@@ -137,6 +137,17 @@ class ExcelImporter:
                                        "(atributos fisicos de SKU en defaults)")
 
                 result.success = len(result.errors) == 0
+                if result.success:
+                    # BK-35: cuando y de que Excel se aplicaron los datos. La
+                    # fecha de modificacion de la base NO sirve: cada corrida
+                    # escribe en ella (restauracion del stock, H-38).
+                    import time
+                    conn.execute("CREATE TABLE IF NOT EXISTS master_data_meta "
+                                 "(clave TEXT PRIMARY KEY, valor TEXT)")
+                    conn.executemany(
+                        "INSERT OR REPLACE INTO master_data_meta VALUES (?, ?)",
+                        [("aplicado_en", repr(time.time())),
+                         ("excel", os.path.abspath(excel_path))])
                 
         except Exception as e:
             result.add_error(f"Import failed: {e}")

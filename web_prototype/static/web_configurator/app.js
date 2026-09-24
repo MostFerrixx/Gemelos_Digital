@@ -1738,10 +1738,13 @@ class WebConfigurator {
                 console.log(`[WEB_CONFIGURATOR] ${count} Work Areas loaded: ${areasList}`);
 
                 if (!silent) {
+                    const origen = result.origen === 'excel' ? ' (del Excel: no hay datos aplicados)' : '';
                     this.showNotification(
-                        `✓ ${count} Work Areas cargadas: ${areasList}`,
+                        `✓ ${count} Work Areas cargadas: ${areasList}${origen}`,
                         'success'
                     );
+                    // BK-35: el Excel trae areas distintas a las que usa el simulador
+                    (result.avisos || []).forEach(a => this.showNotification('⚠ ' + a, 'warning'));
                 }
             } else {
                 console.warn('[WEB_CONFIGURATOR] No work areas found in file, using defaults');
