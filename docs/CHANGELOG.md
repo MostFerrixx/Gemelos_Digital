@@ -10,6 +10,19 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-24 (cont.)
+
+- **Ayuda plegable en el configurador** (pedido del Director). Las
+  explicaciones de cada control quedan ocultas detras de un boton (i) junto a
+  la etiqueta o al titulo de la tarjeta (se despliegan en su lugar), cada
+  pestana tiene "Acerca de esta seccion", y "? Ayuda" en la barra superior
+  muestra/oculta todo (recordado en el navegador). Los textos cortos, avisos y
+  errores quedan visibles. Elegido frente a tooltips (se pierden al leer, no
+  andan en tactil), globos (se cortan y tapan) y panel lateral. `ayuda.js`.
+- **Tabla de datos maestros pulida:** encabezados en castellano (el nombre
+  tecnico queda en el tooltip), x/y unidas en "Posicion (x, y)" y fuera las
+  columnas internas: entra completa a 1440 px.
+
 ## 2026-09-24
 
 - **BK-35 -- Layout y Datos muestra lo que usa el simulador.** "Cargar Work

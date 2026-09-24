@@ -27,6 +27,13 @@ la UI solo lo edita. Por eso importa la diferencia entre estos dos botones:
 Si configurás algo y no apretás **Aplicar**, la simulación seguirá usando la
 configuración anterior.
 
+**La ayuda está plegada.** Para que la pantalla quede limpia, las explicaciones
+de cada control están ocultas: el botón **ⓘ** junto a una etiqueta o al título
+de una tarjeta la despliega ahí mismo, y **Acerca de esta sección** abre la
+introducción de cada pestaña. El botón **? Ayuda** de la barra superior muestra
+u oculta toda la ayuda de una vez (el navegador lo recuerda). Los avisos y
+errores nunca se pliegan.
+
 ### La barra superior
 
 En pantallas de menos de ~1760 px de ancho, las acciones secundarias

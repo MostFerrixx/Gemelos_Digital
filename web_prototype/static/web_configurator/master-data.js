@@ -69,6 +69,17 @@ class MasterDataManager {
 
     // --- Editar tablas chicas (F3) --------------------------------------
 
+    // Pulido: nombres de columna legibles (el nombre tecnico queda en el
+    // tooltip del encabezado).
+    static ENCABEZADOS = {
+        location_id: 'Ubicación', location_type: 'Tipo', work_area: 'Área',
+        equipo: 'Equipo (según Flota)', work_group: 'Grupo', pick_sequence: 'Secuencia',
+        capacity: 'Capacidad', posicion: 'Posición (x, y)', sku_code: 'SKU',
+        description: 'Descripción', volume_m3: 'Volumen (m³)', weight_kg: 'Peso (kg)',
+        category: 'Clase de manejo', staging_id: 'Zona', staging_type: 'Tipo',
+        dock_id: 'Muelle', stock_inicial: 'Stock inicial'
+    };
+
     // Config de cada tabla editable: donde se dibuja, que endpoint la guarda y
     // como se llaman sus columnas de coordenadas en la BD.
     static COORDS = {
@@ -348,13 +359,22 @@ class MasterDataManager {
                 // (manda el mapa de equipos de la pestana Flota) y decia
                 // GroundOperator hasta en racks altos. Se oculta y, si la tabla
                 // tiene area de trabajo, se muestra el equipo que de verdad aplica.
-                const EQUIPO = 'equipo (segun Flota)';
-                const cols = data.columnas.filter(c => c !== 'equipment_required');
+                const EQUIPO = 'equipo', POS = 'posicion';
+                // Pulido: columnas internas fuera y x/y en una sola "Posicion".
+                const ocultas = new Set(['equipment_required', 'created_at', 'last_updated']);
+                let cols = data.columnas.filter(c => !ocultas.has(c));
                 const mapa = this.configurator?.fleetManager?.getWorkAreaEquipment?.() || {};
                 if (cols.includes('work_area')) cols.splice(cols.indexOf('work_area') + 1, 0, EQUIPO);
-                const valor = (f, c) => c === EQUIPO ? (mapa[f.work_area] || '-') : (f[c] ?? '');
+                const par = [['legacy_x', 'legacy_y'], ['x', 'y']].find(([a, b]) => cols.includes(a) && cols.includes(b));
+                if (par) {
+                    cols.splice(cols.indexOf(par[0]), 0, POS);
+                    cols = cols.filter(c => !par.includes(c));
+                }
+                const valor = (f, c) => c === EQUIPO ? (mapa[f.work_area] || '-')
+                    : c === POS ? '(' + f[par[0]] + ', ' + f[par[1]] + ')' : (f[c] ?? '');
+                const titulo = c => MasterDataManager.ENCABEZADOS[c] || c;
                 cont.innerHTML = '<table class="master-table"><thead><tr>'
-                    + cols.map(c => '<th>' + c + '</th>').join('')
+                    + cols.map(c => '<th title="' + c + '">' + titulo(c) + '</th>').join('')
                     + '</tr></thead><tbody>'
                     + data.filas.map(f => '<tr>'
                         + cols.map(c => '<td>' + valor(f, c) + '</td>').join('')
