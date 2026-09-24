@@ -81,6 +81,18 @@ class WebConfigurator {
         });
         document.getElementById('btn-add-zona')?.addEventListener('click', () => this._addZonaRow());
 
+        // QA H-45: "Abrir Visor" abre la ULTIMA corrida (antes, el visor vacio).
+        document.getElementById('btn-open-viewer')?.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const ventana = window.open('about:blank', '_blank');   // antes del await: no lo bloquea el navegador
+            let url = '/';
+            try {
+                const r = await (await fetch('/api/replays/latest')).json();
+                if (r.disponible) url = '/?autoload=' + encodeURIComponent(r.replay);
+            } catch (err) { /* sin corridas: visor vacio */ }
+            if (ventana) ventana.location.href = url; else window.location.href = url;
+        });
+
         // INIT-6 Opcion B: agregar fila de destino_staging_map
         const addDestinoBtn = document.getElementById('btn-add-destino-staging');
         if (addDestinoBtn) {

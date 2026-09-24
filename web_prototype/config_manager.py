@@ -964,7 +964,19 @@ class WebConfigurationManager:
             print(f"[CONFIG_MANAGER ERROR] Error unsetting defaults: {e}")
     
     def _get_default_config(self) -> Dict:
-        """Get hardcoded default configuration"""
+        """Valores de fabrica: `config_default.json` (versionado, igual al
+        canonico de la version). QA H-44: antes era un dict escrito aca que
+        habia quedado viejo (mapa WH1 de 30x30, Excel anterior, clases de SKU
+        que ya no existen): "Default" armaba una configuracion que no encajaba
+        con los datos. Un test verifica que el archivo siga siendo coherente.
+        El dict de abajo es solo el ultimo recurso si el archivo falta."""
+        ruta = os.path.join(self.project_root, 'config_default.json')
+        try:
+            with open(ruta, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (OSError, ValueError) as e:
+            print(f"[CONFIG_MANAGER][WARN] No se pudo leer {ruta} ({e}); "
+                  f"se usan valores minimos de emergencia.")
         return {
             "total_ordenes": 300,
             "distribucion_tipos": {

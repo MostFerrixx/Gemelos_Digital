@@ -454,6 +454,19 @@ async def upload_replay_file(file: UploadFile = File(...)):
 # SIMULATION RUNNER ENDPOINTS
 
 
+@router.get("/api/replays/latest")
+def ultima_corrida():
+    """QA H-45: la corrida mas reciente (para "Abrir Visor" del configurador)."""
+    import glob
+    candidatos = glob.glob(os.path.join(PROJECT_ROOT, "output", "simulation_*", "replay_*.jsonl"))
+    if not candidatos:
+        return {"disponible": False}
+    ruta = max(candidatos, key=os.path.getmtime)
+    return {"disponible": True,
+            "replay": os.path.relpath(ruta, PROJECT_ROOT).replace(os.sep, "/"),
+            "fecha": os.path.getmtime(ruta)}
+
+
 @router.get("/api/validate-replay")
 def validate_replay_file(file: str):
     """Validate that a replay file exists and is readable"""

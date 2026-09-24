@@ -6,8 +6,12 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 10 — Barra superior y ciclo de configuración
-(despues 9, 11, 12 y las combinadas).
+**Objetivo inmediato:** Bloque 9 — Personas, equipos y perfiles (INIT-11, por
+Importar), despues 11, 12 y las combinadas.
+**Ultimo cerrado:** Bloque 10 — Barra superior (24/09): 8 de 8, todo con clics
+reales. Corregidos **H-44** ("Default" cargaba una configuracion vieja que no
+encajaba con los datos) y **H-45** ("Abrir Visor" abria el visor vacio).
+Abierto H-46 (presets viejos, BK-36).
 **Ultimo cerrado:** Bloque 6 — Layout y Datos (23/09): 8 de 8 (6.7 y 6.8 vienen
 del bloque 7). Corregidos **H-43** (mapas y Excel incompatibles se aceptaban),
 **H-39** (columna de equipo engañosa) y **H-41** (aviso de subida viejo).
@@ -546,12 +550,25 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | Zonas y cupo por pasillo (controles nuevos, 23/09) | 23/09 | Terrestres → 1-4, montacargas → 5-9, cupo 2 \| idéntico; el canónico sin tocar NO agrega los bloques | Asignación aplicada; `[WARN]` por el pasillo 9 inexistente; el terrestre sale de su zona recién cuando su zona se agotó (t=1.841 vs última propia t=1.828; montacargas 3.808 vs 3.661); texto "uno al tres" bloquea la corrida con mensaje | — | **PASA** | — |
 | Ayuda plegable + tabla pulida (pasada visual) | 24/09 | 55 botones (i), 56 textos plegados, 15 cortos visibles; el (i) dentro de un label no tilda la casilla; "? Ayuda" muestra todo y se recuerda al recargar; el aviso de cross-docking sigue visible; modo oscuro OK. Tabla completa a 1440 px con encabezados legibles. Corregido en la pasada: el (i) al final del encabezado corría los botones al centro | — | **PASA** tras corregir | — |
 | Pasada visual 1 (bloques 6-8 + BK-35) | 24/09 | 17 capturas con clics reales a 1440×900: tabla de stock, columna de equipo, Work Areas, TMX y Excel inválidos, Aplicar, zonas y cupo, liberación de pallets, Outbound, panel de recepción | Todos los controles se ven y responden. **2 detalles corregidos**: la tarjeta "Ubicación de las Zonas" decía "se puede ajustar acá" (con carriles no se puede) y su explicación quedaba apretada en la grilla; "1 puntos" en los mensajes | — | **PASA** tras corregir | — |
+| QA-10.1 | 24/09 | Total 123 → Run (clic real) | La corrida usa 123; `config.json` intacto (hash igual) | — | **PASA** | — |
+| QA-10.2 | 24/09 | Aplicar con cambios | `config.json` pasa a 123; `config.json.backup` nuevo = versión anterior | — | **PASA** | — |
+| QA-10.3 | 24/09 | Recargar y Aplicar sin cambios | `config.json` idéntico byte a byte | — | **PASA** | — |
+| QA-10.4 (1.er intento) | 24/09 | Default | Cargaba valores escritos en el código y viejos: mapa `WH1.tmx` (30×30), Excel anterior, 12 claves distintas del canónico | — | **FALLA** | H-44 |
+| QA-10.4 (reprueba) | 24/09 | Default | Formulario = `config_default.json` (mapa y Excel v3), 0 diferencias; `config.json` intacto | — | **PASA** | H-44 cerrado |
+| QA-10.5 | 24/09 | Guardar "QA10 preset B" (777, Cercanía) → recargar → Cargar | Formulario **idéntico** al guardado (0 diferencias). Gestionar → Eliminar borró los 2 presets de prueba | — | **PASA** | H-46 |
+| QA-10.6 | 24/09 | Importar `.json` (555 + `inicio_turno` sin control) | El formulario toma 555 y conserva `inicio_turno` | — | **PASA** | — |
+| QA-10.7 | 24/09 | Aplicar lo importado | `config.json` con 555, `inicio_turno` y `fleet_defaults`; 0 claves perdidas. Restaurado | — | **PASA** | — |
+| QA-10.8 (1.er intento) | 24/09 | Abrir Visor tras una corrida | Abría el visor **vacío** ("Sin simulación cargada") | — | **FALLA** | H-45 |
+| QA-10.8 (reprueba) | 24/09 | Abrir Visor (clic real) | Abre `/?autoload=` de la última corrida; el visor la carga | ✓ | **PASA** | H-45 cerrado |
 | QA-6.1 | 23/09 | — | La pestaña muestra 384 / 50 / 140 / 3 = `warehouse.db` | — | **PASA** con hallazgo | H-39, H-40 |
 | QA-6.2 | 23/09 | — | 4 tablas; paginado 1-25 → 26-50 de 384; búsqueda "Area_Special" = 76 (= base) | — | **PASA** | — |
 | QA-6.3 | 23/09 | Excel modificado subido SIN aplicar (LOC-001 63→999 u; SKU001 extra_grande→pequeño) | Resumen correcto y "todavía no se aplicó"; la corrida sigue con el stock viejo: pedido de 1.400 u de SKU039 con 918 sin servir (= 1.400 − 482) | — | **PASA** | — |
 | QA-6.4 | 23/09 | Aplicar ese Excel | Copia de seguridad creada; la base cambia (SKU039 1.418 u, SKU001 pequeño). Misma corrida: **1.401/1.401 servidas**; pick de SKU001 **75,7 → 25,3 s**. Restaurado e idéntico al respaldo | — | **PASA** con hallazgo | H-41 |
 | QA-6.5 | 23/09 | Cargar Work Areas | Los desplegables de Flota muestran Area_Ground / High / Special | — | **PASA** con observación | H-42 |
 | QA-6.6 (1.er intento) | 23/09 | TMX de texto basura / TMX sin capas | Basura rechazada, pero **un mapa sin capas de 10×10 se aceptó** y quedó como mapa de la configuración | — | **FALLA** | H-43 |
+| H-44 | **MAYOR** (usabilidad/datos) | QA-10.4 | **"Default" cargaba una configuración vieja** escrita en el código: mapa `WH1.tmx` de 30×30 (los datos son de 32×43), Excel anterior, flota por contadores. Correrla mezclaba un mapa con datos de otro. `load_config()` caía a lo mismo si faltaba `config.json` | `config_manager._get_default_config` con valores fijos | **Corregido**: valores de fábrica en `config_default.json` (versionado, = canónico); un test falla si deja de encajar con el mapa y el Excel | **Cerrado** (reprobado con clics reales) |
+| H-45 | MENOR (usabilidad) | QA-10.8 | "Abrir Visor" abría el visor vacío en vez de la última corrida | Enlace fijo a `/` | **Corregido**: `/api/replays/latest` y el botón abre `/?autoload=` de esa corrida | **Cerrado** |
+| H-46 | OBS | QA-10.5 | Los presets guardados con versiones anteriores traen el mapa y claves viejas; cargarlos no avisa que no encajan con los datos actuales | Sin validación al cargar | → BK-36 | Abierto |
 | QA-6.6 (reprueba) | 23/09 | Basura / sin capas / WH1 v2 / WH1 | Rechazados con mensaje: "XML ilegible", "no tiene capas de tiles", "24 puntos... quedan FUERA del mapa de 30 × 42", "164 puntos..."; el mapa configurado no cambia; WH1 v3 válido (527 puntos) | — | **PASA** | H-43 cerrado |
 | QA-6.7 | 23/09 | Carril 1 bajado una fila en el Excel y aplicado | Descargas en (3,31)/(4,31); 590/590 tareas. Restaurado e idéntico al respaldo | — | **PASA** | — |
 | QA-6.8 | 23/09 | Excel con la zona 1 sobre un rack (0,3) | Rechazo: "caen sobre celdas bloqueadas... zona de salida 1 (0, 3)" (antes se aceptaba) | — | **PASA** tras corregir | H-43 |

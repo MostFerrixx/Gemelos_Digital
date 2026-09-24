@@ -118,7 +118,9 @@ poda en limpieza:
   (gate byte-idéntico, ~30 s). Córrelos tras cualquier cambio en el motor.
 
 Fuente de datos canónica = **la RAÍZ** (`config.json`, `layouts/WH1.tmx`,
-`layouts/Warehouse_Logic.xlsx`). El árbol `data/` es una migración abandonada que
+`layouts/Warehouse_Logic.xlsx`). `config_default.json` (raíz) son los valores de
+FÁBRICA del botón "Default" de la web (el motor no lo lee); se mantiene igual al
+canónico de la versión y un test verifica que encaje con mapa y Excel. El árbol `data/` es una migración abandonada que
 solo lee código muerto/roto.
 
 **OJO con los datos maestros (verificado 2026-09-09):** `data_manager` carga de

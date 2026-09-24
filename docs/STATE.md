@@ -22,12 +22,16 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 382 passed, 1 deselected (~40s)
+python -m pytest -q                # 385 passed, 1 deselected (~35s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline 62c65ebf)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
 
 ## Canonico
+
+- `config_default.json` (raiz, versionado) = valores de fabrica del boton
+  "Default"; hoy igual a `config.json`. Si el canonico cambia de mapa o Excel,
+  actualizarlo (un test verifica que encaje con los datos).
 
 - Mapa `layouts/WH1 v3.tmx` (32 x 43, anden de 3 filas, 8 pasillos de picking
   de 2 celdas) + datos `layouts/Warehouse_Logic_v3.xlsx` importados a
@@ -58,9 +62,9 @@ python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min
 
 ## QA de la configuracion web
 
-`docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0 a 8.
-**Siguiente: bloque 10 (barra superior y ciclo de configuracion)**; despues 9,
-11, 12 y las combinadas. El bloque 6 corrigio H-43 (mapas y Excel
+`docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0 a 8 y 10.
+**Siguiente: bloque 9 (personas, equipos y perfiles)**; despues 11, 12 y las
+combinadas. El bloque 10 corrigio H-44 ("Default" viejo) y H-45 (Abrir Visor). El bloque 6 corrigio H-43 (mapas y Excel
 incompatibles se aceptaban), H-39 y H-41; H-40 y H-42 cerrados con BK-35.
 Metodo: cada bloque cierra con una pasada visual (clics reales + capturas,
 `scripts/qa/capturas_web.py`). El bloque 8 corrigio H-35, H-36 y H-38 (stock de
@@ -87,7 +91,7 @@ del paso) probablemente innecesaria**: se retoma solo si una medicion la pide.
 
 ## Bugs conocidos (no criticos)
 
-- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-34 (BK-29 y BK-35 cerrados).
+- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-36 (BK-29 y BK-35 cerrados).
 - `warehouse.db` es la copia de trabajo del stock: cada corrida la restaura al
   arrancar desde `inventory_baseline`; "Aplicar Excel" borra esa foto (H-38).
   El respaldo de la base anterior al v3 es `warehouse_pre_v3_backup.db` (sin

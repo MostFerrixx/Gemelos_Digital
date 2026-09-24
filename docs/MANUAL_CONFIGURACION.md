@@ -45,12 +45,12 @@ muestran su texto.
 | Botón | Qué hace |
 |---|---|
 | **Restart** | Reinicia el servidor web. Útil si la UI queda en un estado raro. |
-| **Default** | Restaura todos los campos del formulario a los valores por defecto. No aplica nada hasta que confirmes. |
+| **Default** | Restaura el formulario a los **valores de fábrica** (`config_default.json`, o el preset que marques como predeterminado en Gestionar). No aplica nada hasta que apretes Aplicar. |
 | **Importar** | Carga un `.json` de configuración desde tu disco al formulario. |
 | **Gestionar** | Administra los presets guardados (renombrar, borrar, marcar predeterminado). |
 | **Cargar** | Trae un preset guardado al formulario. |
 | **Guardar** | Guarda el formulario actual como preset con nombre y descripción. |
-| **Abrir Visor** | Abre el visor de replay en otra pestaña (para ver una simulación ya corrida). |
+| **Abrir Visor** | Abre el visor en otra pestaña con **la última simulación corrida** (si no hay ninguna, abre el visor vacío para importar una). |
 | **Run Simulation** | Lanza la simulación con lo que ves en pantalla, **sin modificar el `config.json`** (usa una copia temporal). |
 | **Aplicar Configuración** | Escribe el `config.json` canónico. **Este es el que "manda".** |
 

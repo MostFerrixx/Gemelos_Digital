@@ -10,6 +10,15 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-24 (cont. 2)
+
+- **QA bloque 10 (barra superior) cerrado, 8 de 8, con clics reales.** H-44:
+  "Default" cargaba una configuracion vieja escrita en el codigo (mapa WH1 de
+  30x30, Excel anterior); ahora usa `config_default.json` (valores de fabrica
+  versionados, = canonico) con un test de coherencia contra mapa y Excel.
+  H-45: "Abrir Visor" abre la ultima corrida (`/api/replays/latest`).
+  Abierto BK-36 (presets viejos).
+
 ## 2026-09-24 (cont.)
 
 - **Ayuda plegable en el configurador** (pedido del Director). Las
