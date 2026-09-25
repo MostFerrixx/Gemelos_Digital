@@ -544,9 +544,16 @@ class EventGenerator:
         # Calcular tiempo promedio de completación (si hay WOs completadas)
         avg_completion_time = simulation_time / max(total_completed, 1)
 
-        # Extraer configuración de recursos
-        ground_operators = self.configuracion.get('num_operarios_terrestres', 0)
-        forklifts = self.configuracion.get('num_montacargas', 0)
+        # Extraer configuración de recursos. QA H-47: la flota que REALMENTE
+        # simulo (antes, los contadores del config, que el motor ignora cuando
+        # hay agent_types o personas: el optimizador cobraba una flota ficticia).
+        tipos = [getattr(op, 'type', '') for op in (self.operarios or [])]
+        if tipos:
+            ground_operators = sum(1 for t in tipos if t == 'GroundOperator')
+            forklifts = sum(1 for t in tipos if t == 'Forklift')
+        else:
+            ground_operators = self.configuracion.get('num_operarios_terrestres', 0)
+            forklifts = self.configuracion.get('num_montacargas', 0)
         dispatch_strategy = self.configuracion.get('dispatch_strategy', 'unknown')
 
         # MEJ-2 v2: nivel de servicio (mismo patron/fuente que INIT-5). En modo

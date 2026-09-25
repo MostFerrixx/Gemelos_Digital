@@ -686,6 +686,15 @@ Muestra progreso, mejor score y los parámetros ganadores.
 
 ---
 
+
+> **Qué cambia de verdad cada trial** (desde el 25/09): la cantidad de operarios
+> a pie y de montacargas (repitiendo los grupos de la pestaña Flota, con su
+> capacidad y prioridades), la estrategia y el tope de tareas por recorrido. El
+> costo se calcula con la flota que realmente simuló. El primer trial es siempre
+> tu flota actual. **Con menos de 11 trials la búsqueda es al azar**: para
+> optimizar de verdad usá 30 o más. Una flota definida por *personas* (INIT-11)
+> todavía no se puede optimizar: la pestaña lo avisa.
+
 # PESTAÑA 8 — Experimentos A/B
 
 Compara **dos configuraciones** con rigor estadístico y dice si la diferencia es

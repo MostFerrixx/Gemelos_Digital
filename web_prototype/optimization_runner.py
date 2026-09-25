@@ -55,6 +55,19 @@ class OptimizationRunner:
                 "termine o cancelala primero." % self._study_name
             )
 
+        # QA H-47: una flota por `personas` todavia no se puede optimizar; se
+        # avisa en pantalla en vez de lanzar un estudio que falla en segundo plano.
+        try:
+            import json as _json
+            with open(config_path if os.path.isabs(config_path)
+                      else os.path.join(self.PROJECT_ROOT, config_path), encoding="utf-8") as f:
+                if _json.load(f).get("personas"):
+                    raise RuntimeError(
+                        "El optimizador todavia no varia una flota definida por 'personas' "
+                        "(INIT-11). Usa una configuracion con grupos de agentes.")
+        except (OSError, ValueError):
+            pass
+
         study_name = study_name or ("web_opt_%s" % time.strftime("%Y%m%d_%H%M%S"))
         storage = "sqlite:///optuna_study.db"
 

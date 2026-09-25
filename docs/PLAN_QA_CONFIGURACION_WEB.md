@@ -6,8 +6,11 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 11 — Optimización (despues 12 y las
+**Objetivo inmediato:** Bloque 12 — Experimentos A/B (despues las pruebas
 combinadas).
+**Ultimo cerrado:** Bloque 11 — Optimizacion (25/09): 2 de 2 tras corregir
+**H-47** (critico: el optimizador corria siempre la misma flota) y agregar el
+aviso de H-48.
 **Ultimo cerrado:** Bloque 9 — Personas, equipos y perfiles (25/09): 3 de 3
 con clics reales, sin hallazgos nuevos (la edicion de personas en la web sigue
 en BK-22). Casos guardados como configuraciones "QA-9.x" con replica.
@@ -460,7 +463,7 @@ Salvo indicación, todo lo demás queda en el canónico.
 | ID | Caso | Esperado |
 |---|---|---|
 | QA-11.1 | 4 trials, 2 jobs | Termina; 4 trials; parámetros dentro de rangos |
-| QA-11.2 | Costo de montacargas × 20 | El mejor trial usa menos montacargas que en QA-11.1 |
+| QA-11.2 | Costo de montacargas × 20 | Las flotas con muchos montacargas bajan en el ranking (redefinido el 25/09: con pocos trials Optuna sortea, así que "el mejor usa menos montacargas" no se puede exigir) |
 
 ### Bloque 12 — Experimentos A/B
 
@@ -563,6 +566,9 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | BK-36 réplica de configuraciones (clics reales) | 25/09 | Guardar "Canonico v3 (referencia)" → réplica con mapa, imagen, base y Excel; mover el muelle 1 a (6,1) desde la web; Cargar → muelle de vuelta en (3,1), formulario con el mapa de la réplica, badge RÉPLICA en la lista | — | **PASA** | H-46 cerrado |
 | Ayuda plegable + tabla pulida (pasada visual) | 24/09 | 55 botones (i), 56 textos plegados, 15 cortos visibles; el (i) dentro de un label no tilda la casilla; "? Ayuda" muestra todo y se recuerda al recargar; el aviso de cross-docking sigue visible; modo oscuro OK. Tabla completa a 1440 px con encabezados legibles. Corregido en la pasada: el (i) al final del encabezado corría los botones al centro | — | **PASA** tras corregir | — |
 | Pasada visual 1 (bloques 6-8 + BK-35) | 24/09 | 17 capturas con clics reales a 1440×900: tabla de stock, columna de equipo, Work Areas, TMX y Excel inválidos, Aplicar, zonas y cupo, liberación de pallets, Outbound, panel de recepción | Todos los controles se ven y responden. **2 detalles corregidos**: la tarjeta "Ubicación de las Zonas" decía "se puede ajustar acá" (con carriles no se puede) y su explicación quedaba apretada en la grilla; "1 puntos" en los mensajes | — | **PASA** tras corregir | — |
+| QA-11.1 (1.er intento) | 25/09 | 4 trials, 2 jobs (clics reales) | Terminó 4/4, parámetros en rango (terrestres 1-20, montacargas 1-10). Pero **todos los trials simularon la misma flota 2+2**: se reprodujo el trial 1 (pedía 20+7) y corrieron 4 operarios. Throughput ~270 en los 4 trials; el puntaje solo cambiaba por el costo nominal | — | **FALLA** | H-47 |
+| QA-11.1 (reprueba) | 25/09 | idem | 4/4. Throughput (puntaje × costo) acompaña a la flota: 2+2 → ~279, 9+3 → ~379, 20+10 → ~953, 1+10 → ~267 (sin piqueadores, el cuello es el trabajo a pie). Mejor 2+2 (2,15) | — | **PASA** | H-47 cerrado |
+| QA-11.2 | 25/09 | Montacargas ×20 (1.000 $/h) | Las 3 flotas con 8-9 montacargas quedan debajo de 2+2 (0,099-0,106 vs 0,122). El primer trial de cada estudio es la flota actual (arranque en caliente), el resto es sorteo con < 11 trials → aviso nuevo en la pestaña | — | **PASA** (criterio redefinido) | H-48 |
 | QA-9.1 | 25/09 | Importar (botón real) canónico + `personas`/`equipos` (Ana, Beto: transpaleta; Carla: grúa; Dario: trilateral) \| bloques en la corrida | Aviso visible en Flota ("Flota definida por personas y equipos..."). Agentes = **Ana, Beto, Carla, Dario**; Ana/Beto solo Area_Ground; Area_Special solo Dario (trilateral, como manda el mapa de equipo); el desplegable ofrece y conserva "trilateral". 618/618. Guardada como "QA-9.1" (réplica) | — | **PASA** | — |
 | QA-9.2 | 25/09 | Idem con `perfiles` + `cambio_de_perfil` (umbral 3) + `estacionamientos` (EST-1) \| bloques en la corrida | 1 `cambio_de_equipo`: Pickers-01 deja la transpaleta y toma la grúa en EST-1 (t=3.489, 65 s); sus 20 tareas altas del recorrido se asignaron a t=3.423 pero **ninguna se recogió antes del cambio** (primera a t=3.489). 604/604. Guardada como "QA-9.2" | — | **PASA** | — |
 | QA-9.3 | 25/09 | Importar QA-9.2 → Aplicar | `config.json` conserva `personas`, `equipos`, `perfiles`, `cambio_de_perfil` y `estacionamientos` idénticos. Restaurado | — | **PASA** | — |
@@ -572,6 +578,8 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-10.4 (1.er intento) | 24/09 | Default | Cargaba valores escritos en el código y viejos: mapa `WH1.tmx` (30×30), Excel anterior, 12 claves distintas del canónico | — | **FALLA** | H-44 |
 | QA-10.4 (reprueba) | 24/09 | Default | Formulario = `config_default.json` (mapa y Excel v3), 0 diferencias; `config.json` intacto | — | **PASA** | H-44 cerrado |
 | QA-10.5 | 24/09 | Guardar "QA10 preset B" (777, Cercanía) → recargar → Cargar | Formulario **idéntico** al guardado (0 diferencias). Gestionar → Eliminar borró los 2 presets de prueba | — | **PASA** | H-46 |
+| H-47 | **CRÍTICO** (optimizador) | QA-11.1 | **El optimizador no cambiaba la flota.** Variaba `num_operarios_terrestres` / `num_montacargas`, que el motor ignora cuando la flota viene en `agent_types` (el canónico): todos los trials corrían con 2+2, y además el costo se cobraba sobre esos contadores. Su recomendación de flota era ficticia (ganaba 2+2 por "barata") | `optimizer.objective` + `event_generator.export_optimization_metrics` | **Corregido**: cada trial arma `agent_types` con la flota pedida (repitiendo las plantillas de la base); el costo sale de la flota que realmente simuló; el arranque en caliente usa la flota real; con `personas` el optimizador avisa que todavía no la sabe variar. +2 tests | **Cerrado** (reprobado) |
+| H-48 | OBS (usabilidad) | QA-11.2 | Con pocos trials (< 11) Optuna sortea: el cliente cree que optimizó | TPE: 10 trials iniciales al azar | **Corregido**: aviso naranja junto a "Trials" | **Cerrado** |
 | QA-10.6 | 24/09 | Importar `.json` (555 + `inicio_turno` sin control) | El formulario toma 555 y conserva `inicio_turno` | — | **PASA** | — |
 | QA-10.7 | 24/09 | Aplicar lo importado | `config.json` con 555, `inicio_turno` y `fleet_defaults`; 0 claves perdidas. Restaurado | — | **PASA** | — |
 | QA-10.8 (1.er intento) | 24/09 | Abrir Visor tras una corrida | Abría el visor **vacío** ("Sin simulación cargada") | — | **FALLA** | H-45 |

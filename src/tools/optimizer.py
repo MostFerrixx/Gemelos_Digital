@@ -29,6 +29,18 @@ from optuna.samplers import TPESampler
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
+def flota_de_trial(base_agent_types, n_ground: int, n_forklifts: int):
+    """QA H-47: arma `agent_types` con n terrestres y n montacargas repitiendo
+    las plantillas de la config base (capacidad, prioridades, descarga). Si la
+    base no tiene plantilla de un tipo, ese tipo no se agrega."""
+    import copy as _copy
+    salida = []
+    for tipo, n in (("GroundOperator", n_ground), ("Forklift", n_forklifts)):
+        plantillas = [a for a in base_agent_types if a.get("type") == tipo]
+        salida += [_copy.deepcopy(plantillas[i % len(plantillas)]) for i in range(n)] if plantillas else []
+    return salida
+
+
 class SimulationOptimizer:
     """
     Optimizador automático de configuración de warehouse usando Optuna.
@@ -81,7 +93,12 @@ class SimulationOptimizer:
         
         with open(base_config_path, 'r', encoding='utf-8') as f:
             self.base_config = json.load(f)
-        
+        # QA H-47: una flota por `personas` (INIT-11) todavia no se sabe variar;
+        # optimizar igual daria un resultado ficticio (todos los trials iguales).
+        if (self.base_config or {}).get("personas"):
+            raise ValueError("El optimizador todavia no varia una flota definida por "
+                             "'personas' (INIT-11): quita ese bloque de la config base.")
+
         # Directorios temporales (anclados a la raiz del proyecto)
         self.temp_configs_dir = os.path.join(PROJECT_ROOT, "temp_configs")
         self.temp_metrics_dir = os.path.join(PROJECT_ROOT, "temp_metrics")
@@ -158,6 +175,12 @@ class SimulationOptimizer:
         trial_config = self.base_config.copy()
         trial_config["num_operarios_terrestres"] = n_ground
         trial_config["num_montacargas"] = n_forklifts
+        # QA H-47: la flota REAL del trial. Con `agent_types` (el canonico) el
+        # motor ignora los contadores de arriba: todos los trials corrian con
+        # la misma flota y el puntaje solo cambiaba por el costo nominal.
+        if self.base_config.get("agent_types"):
+            trial_config["agent_types"] = flota_de_trial(
+                self.base_config["agent_types"], n_ground, n_forklifts)
         trial_config["dispatch_strategy"] = dispatch_strategy
         trial_config["max_wos_por_tour"] = max_wos_por_tour
         if radio_cercania is not None:
@@ -344,9 +367,13 @@ class SimulationOptimizer:
             warm_start_pending = len(study.trials) == 0
             if warm_start_pending:
                 print("\n[OPTIMIZER] Warm-start: Enqueuing current config as baseline...")
+                # QA H-47: la flota base REAL (agent_types si existe; si no, los contadores).
+                grupos = self.base_config.get("agent_types") or []
+                n_g = sum(1 for a in grupos if a.get("type") == "GroundOperator") if grupos                     else self.base_config.get("num_operarios_terrestres", 2)
+                n_f = sum(1 for a in grupos if a.get("type") == "Forklift") if grupos                     else self.base_config.get("num_montacargas", 1)
                 study.enqueue_trial({
-                    "num_operarios_terrestres": self.base_config.get("num_operarios_terrestres", 2),
-                    "num_montacargas": self.base_config.get("num_montacargas", 1),
+                    "num_operarios_terrestres": max(1, n_g),
+                    "num_montacargas": max(1, n_f),
                     "dispatch_strategy": self.base_config.get("dispatch_strategy", "Ejecucion de Plan")
                 })
 

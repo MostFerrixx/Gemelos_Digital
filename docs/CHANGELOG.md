@@ -10,6 +10,16 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-25 (cont. 2)
+
+- **QA bloque 11 (Optimizacion) cerrado + H-47 critico corregido.** El
+  optimizador variaba contadores que el motor ignora con `agent_types`: todos
+  los trials corrian con la misma flota 2+2 (throughput ~270 en los 4) y el
+  costo se cobraba sobre esos contadores, asi que "recomendaba" 2+2 por barata.
+  Ahora cada trial arma la flota real, el costo sale de la flota simulada y el
+  arranque en caliente usa la flota real; con `personas` avisa. Aviso nuevo
+  con < 11 trials (Optuna sortea). +2 tests. BK-22 con plan por prioridad.
+
 ## 2026-09-25 (cont.)
 
 - **QA bloque 9 (personas, equipos y perfiles) cerrado, 3 de 3**, con clics

@@ -782,6 +782,17 @@ class WebConfigurator {
 
         if (!btnStart || !btnStop) return; // tab no presente (defensivo)
 
+        // QA-11.2: Optuna (TPE) sortea los primeros 10 trials; el 1ro es la
+        // flota actual. Con menos, "optimizar" es un sorteo: se avisa.
+        const trialsEl = document.getElementById('opt-n-trials');
+        const avisoTrials = document.getElementById('opt-trials-aviso');
+        const pintarAvisoTrials = () => {
+            if (trialsEl && avisoTrials) avisoTrials.style.display =
+                (parseInt(trialsEl.value, 10) || 0) < 11 ? 'block' : 'none';
+        };
+        trialsEl?.addEventListener('input', pintarAvisoTrials);
+        pintarAvisoTrials();
+
         let pollHandle = null;
         let activeStudyName = null;
 
