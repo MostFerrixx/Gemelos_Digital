@@ -23,6 +23,7 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-26 — la consola del Simulation Runner no tiene limite de lineas | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-20) |
 | BK-27 — prioridades muertas sin aviso cuando el mapa cambia de equipo | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-21) |
 | BK-32 — la pestana Outbound tiene 7 zonas fijas | ABIERTO (2026-09-23) | Media (configurabilidad) | Medio | Ninguno (QA H-32) |
+| BK-37 — objetivo del optimizador: eficiencia vs cumplir el turno | ABIERTO (2026-09-25) | Media (decision de negocio) | Chico una vez decidido | Decision del Director |
 | BK-34 — el KPI "distancia de guardado" mezcla la caminata al muelle | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-37) |
 | BK-33 — la ruta de cada pedido no viaja en el replay | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-33) |
 | BK-25 — estacion de descarga con turno | **F1 CERRADA (2026-09-20)**, sigue F2 (cesion del paso) | Alta (realismo) | F2 3-4 dias | Plan vivo: `docs/PLAN_BK25_ESTACION_DESCARGA.md` |
@@ -279,6 +280,16 @@ no se configura bien. Propuesta: armar las casillas desde las zonas de
 Con "Rutas a Piquear" la WO tiene `wo.ruta`, pero los 8 puntos que emiten
 `work_order_update` (dispatcher y operators) no la incluyen: ni el visor ni el
 QA ven la ruta. Emitirla solo si hay rutas (el canonico no cambia).
+
+### BK-37 — objetivo del optimizador: eficiencia vs cumplir el turno (QA-11.4)
+
+El puntaje es tareas/hora dividido costo/hora: mide EFICIENCIA, asi que casi
+siempre gana la flota mas chica (QA-11.4: 2+2 hace 281 tareas/hora por 130 $/h
+y "gana" contra 8+7, que hace 860 por 470 $/h). Si el objetivo real del
+cliente es terminar los pedidos del turno a tiempo, el puntaje deberia
+penalizar no llegar (duracion del turno como restriccion, o las
+penalizaciones de SLA con `due_time`). Decision de negocio del Director:
+que pregunta responde el optimizador. Lector: `optimizer.calculate_score`.
 
 ### BK-34 — el KPI "distancia de guardado" mezcla la caminata al muelle (QA H-37)
 

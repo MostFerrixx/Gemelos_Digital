@@ -770,6 +770,36 @@ class WebConfigurator {
      * /api/optimization/*). El estudio corre en background en el servidor;
      * este panel solo lanza y consulta por polling, no bloquea la pestaña.
      */
+    // QA-11: tabla de trials. Lo pedido y lo que REALMENTE se simulo, lado a
+    // lado: si difieren (como en H-47) la fila se marca en rojo.
+    _pintarTablaTrials(status) {
+        const cont = document.getElementById('opt-trials-tabla');
+        if (!cont) return;
+        const trials = status.trials || [];
+        if (!trials.length) { cont.innerHTML = ''; return; }
+        const estados = { COMPLETE: 'Listo', RUNNING: 'Corriendo', FAIL: 'Falló o cortado',
+                          CORTADO: 'Cortado', PRUNED: 'Cortado', WAITING: 'En cola' };
+        const num = (v, d = 0) => (v === null || v === undefined) ? '-' : Number(v).toLocaleString('es-AR', { maximumFractionDigits: d });
+        const filas = trials.map(t => {
+            const p = t.params || {}, s = t.flota_simulada;
+            const pedida = (p.num_operarios_terrestres ?? '-') + ' + ' + (p.num_montacargas ?? '-');
+            const simulada = s ? s.terrestres + ' + ' + s.montacargas : '-';
+            const distinta = s && (s.terrestres !== p.num_operarios_terrestres || s.montacargas !== p.num_montacargas);
+            const mejor = t.numero === status.best_trial_number;
+            const estilo = distinta ? ' style="color: var(--color-danger); font-weight:600;"'
+                         : mejor ? ' style="font-weight:600;"' : '';
+            return `<tr${estilo}><td>${t.numero}${mejor ? ' ★' : ''}</td><td>${estados[t.estado] || t.estado}</td>
+                <td>${pedida}</td><td>${simulada}${distinta ? ' ⚠' : ''}</td><td>${p.dispatch_strategy || '-'}</td>
+                <td>${p.max_wos_por_tour ?? '-'}</td><td>${num(t.tareas_por_hora, 1)}</td>
+                <td>${num(t.costo_por_hora)}</td><td>${t.puntaje == null ? '-' : Number(t.puntaje).toFixed(4)}</td></tr>`;
+        }).join('');
+        cont.innerHTML = `<table class="master-table"><thead><tr>
+            <th>Trial</th><th>Estado</th><th title="Terrestres + montacargas que pidió el optimizador">Flota pedida</th>
+            <th title="Terrestres + montacargas que corrieron de verdad">Flota simulada</th><th>Estrategia</th>
+            <th>Tope tareas</th><th>Tareas/hora</th><th>Costo/hora</th><th>Puntaje</th></tr></thead>
+            <tbody>${filas}</tbody></table>`;
+    }
+
     setupOptimizationPanel() {
         const btnStart = document.getElementById('btn-optimization-start');
         const btnStop = document.getElementById('btn-optimization-stop');
@@ -806,6 +836,7 @@ class WebConfigurator {
             studyNameEl.textContent = status.study_name || '-';
             progressTextEl.textContent =
                 `${status.n_trials_completed || 0} / ${status.n_trials_total || 0} trials`;
+            this._pintarTablaTrials(status);
             if (status.best_score !== undefined && status.best_score !== null) {
                 bestScoreEl.textContent = Number(status.best_score).toFixed(4);
                 bestParamsEl.textContent = JSON.stringify(status.best_params, null, 2);
@@ -895,6 +926,14 @@ class WebConfigurator {
                 btnStart.disabled = false;
                 btnStop.disabled = true;
                 stopPolling();
+                // QA H-49: un ultimo estado para que la tabla muestre los
+                // trials cortados (antes quedaba la foto del ultimo sondeo).
+                if (activeStudyName) {
+                    try {
+                        const r = await fetch(`/api/optimization/status?study_name=${encodeURIComponent(activeStudyName)}`);
+                        renderStatus(await r.json());
+                    } catch (e) { /* la tabla queda como estaba */ }
+                }
             } catch (err) {
                 this.showNotification(`Error inesperado: ${err.message}`, 'error');
             }

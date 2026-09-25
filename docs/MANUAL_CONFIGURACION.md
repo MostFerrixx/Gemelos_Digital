@@ -694,6 +694,15 @@ Muestra progreso, mejor score y los parámetros ganadores.
 > tu flota actual. **Con menos de 11 trials la búsqueda es al azar**: para
 > optimizar de verdad usá 30 o más. Una flota definida por *personas* (INIT-11)
 > todavía no se puede optimizar: la pestaña lo avisa.
+>
+> **Tabla de trials:** debajo del mejor resultado se ve cada trial con la flota
+> que pidió y la que se simuló de verdad (si alguna vez difieren, la fila se
+> marca en rojo), la estrategia, el tope de tareas, las tareas por hora, el costo
+> por hora y el puntaje. **Detener** corta el estudio: los trials que estaban
+> corriendo quedan como "Falló o cortado".
+>
+> **Ojo con qué mide el puntaje:** tareas por hora dividido costo por hora, o
+> sea **eficiencia**. Por eso suele ganar la flota más chica aunque tarde más.
 
 # PESTAÑA 8 — Experimentos A/B
 

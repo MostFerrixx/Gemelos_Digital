@@ -113,7 +113,22 @@ class OptimizationRunner:
             self._process.wait(timeout=5)
         except subprocess.TimeoutExpired:
             self._process.kill()
+        self._marcar_cortados()
         return True
+
+    def _marcar_cortados(self) -> None:
+        """QA H-49: los trials que se estaban corriendo al detener quedaban
+        RUNNING para siempre en la base de Optuna (la tabla los mostraba
+        "Corriendo"). Se cierran como FAIL: se cortaron, no terminaron."""
+        if not self._study_name:
+            return
+        try:
+            storage = optuna.storages.get_storage(self._storage or "sqlite:///optuna_study.db")
+            study = optuna.load_study(study_name=self._study_name, storage=storage)
+            for t in study.get_trials(deepcopy=False, states=(TrialState.RUNNING,)):
+                storage.set_trial_state_values(t._trial_id, state=TrialState.FAIL)
+        except Exception as e:
+            print(f"[OPTIMIZATION][WARN] no se pudieron cerrar los trials cortados: {e}")
 
     def status(self, study_name: Optional[str] = None,
                storage: Optional[str] = None) -> Dict[str, Any]:
@@ -149,12 +164,14 @@ class OptimizationRunner:
 
         trials = study.trials
         completed = [t for t in trials if t.state == TrialState.COMPLETE]
+        corriendo = self.is_running() and study_name == self._study_name
 
         result: Dict[str, Any] = {
             "running": self.is_running(),
             "study_name": study_name,
             "storage": storage,
-            "n_trials_total": len(trials),
+            # QA H-50: el total es lo PEDIDO (antes, los trials ya creados).
+            "n_trials_total": max(len(trials), int(study.user_attrs.get("n_trials_pedidos") or 0)),
             "n_trials_completed": len(completed),
         }
         if completed:
@@ -162,4 +179,17 @@ class OptimizationRunner:
             result["best_score"] = best.value
             result["best_params"] = best.params
             result["best_trial_number"] = best.number
+        # QA-11: cada trial con lo pedido y lo que REALMENTE se simulo.
+        result["trials"] = [{
+            "numero": t.number,
+            # QA H-49: un trial que quedo RUNNING sin estudio corriendo fue cortado.
+            "estado": ("CORTADO" if t.state == TrialState.RUNNING and not corriendo
+                       else t.state.name),
+            "puntaje": t.value,
+            "params": t.params,
+            "flota_simulada": t.user_attrs.get("flota_simulada"),
+            "tareas_por_hora": t.user_attrs.get("tareas_por_hora"),
+            "costo_por_hora": t.user_attrs.get("total_cost_per_hour"),
+            "tareas_fallidas": t.user_attrs.get("failed_wo"),
+        } for t in trials]
         return result

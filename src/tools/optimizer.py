@@ -253,7 +253,15 @@ class SimulationOptimizer:
         trial.set_user_attr("completed_wo", metrics["total_workorders_completed"])
         trial.set_user_attr("failed_wo", metrics["total_workorders_failed"])
         trial.set_user_attr("simulation_time", metrics["total_simulation_time_seconds"])
-        trial.set_user_attr("total_cost_per_hour", n_ground * self.COST_GROUND_OP + n_forklifts * self.COST_FORKLIFT)
+        # QA H-47: costo y flota de lo que REALMENTE se simulo (la pestana los
+        # muestra junto a lo pedido: una diferencia queda a la vista).
+        flota = metrics.get("resource_costs") or {}
+        sim_g, sim_f = flota.get("ground_operators", 0), flota.get("forklifts", 0)
+        trial.set_user_attr("total_cost_per_hour", sim_g * self.COST_GROUND_OP + sim_f * self.COST_FORKLIFT)
+        trial.set_user_attr("flota_simulada", {"terrestres": sim_g, "montacargas": sim_f})
+        t_sim = metrics["total_simulation_time_seconds"] or 0
+        trial.set_user_attr("tareas_por_hora",
+                            round(metrics["total_workorders_completed"] * 3600.0 / t_sim, 1) if t_sim else 0)
         # MEJ-SLA-OPT: pedidos vencidos del trial (0 si los pedidos no traen due_time)
         trial.set_user_attr("orders_late", metrics.get("orders_late", 0))
         
@@ -365,6 +373,9 @@ class SimulationOptimizer:
             
             # Warm-start: Sugerir config actual como primer trial
             warm_start_pending = len(study.trials) == 0
+            if warm_start_pending:
+                # QA H-50: el progreso de la web es "hechos / PEDIDOS".
+                study.set_user_attr("n_trials_pedidos", n_trials)
             if warm_start_pending:
                 print("\n[OPTIMIZER] Warm-start: Enqueuing current config as baseline...")
                 # QA H-47: la flota base REAL (agent_types si existe; si no, los contadores).

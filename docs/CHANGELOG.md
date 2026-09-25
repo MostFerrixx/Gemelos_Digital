@@ -10,6 +10,16 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-25 (cont. 3)
+
+- **Optimizacion: tabla de trials + Detener corregido (QA-11.3/11.4, con clics
+  reales).** La pestana muestra cada trial con la flota pedida y la simulada
+  (una diferencia como H-47 queda en rojo), tareas/hora, costo/hora y puntaje.
+  H-49: al Detener, los trials cortados quedaban "Corriendo" para siempre;
+  ahora se cierran y se ven "Falló o cortado". H-50: el progreso cuenta sobre
+  lo pedido ("3 / 12"). Abierto BK-37 (el puntaje mide eficiencia: favorece la
+  flota mas chica).
+
 ## 2026-09-25 (cont. 2)
 
 - **QA bloque 11 (Optimizacion) cerrado + H-47 critico corregido.** El

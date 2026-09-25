@@ -22,7 +22,7 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 394 passed, 1 deselected (~40s)
+python -m pytest -q                # 396 passed, 1 deselected (~45s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline 62c65ebf)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
@@ -68,7 +68,8 @@ python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min
 
 `docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0 a 11.
 **Siguiente: bloque 12 (Experimentos A/B)**; despues las combinadas. El
-bloque 11 corrigio H-47 (critico: el optimizador corria siempre la misma flota). El bloque 10 corrigio H-44 ("Default" viejo) y H-45 (Abrir Visor). El bloque 6 corrigio H-43 (mapas y Excel
+bloque 11 corrigio H-47 (critico: el optimizador corria siempre la misma flota),
+H-49 y H-50; tabla de trials nueva. El bloque 10 corrigio H-44 ("Default" viejo) y H-45 (Abrir Visor). El bloque 6 corrigio H-43 (mapas y Excel
 incompatibles se aceptaban), H-39 y H-41; H-40 y H-42 cerrados con BK-35.
 Metodo: cada bloque cierra con una pasada visual (clics reales + capturas,
 `scripts/qa/capturas_web.py`). El bloque 8 corrigio H-35, H-36 y H-38 (stock de
@@ -92,10 +93,12 @@ del paso) probablemente innecesaria**: se retoma solo si una medicion la pide.
 4. **BK-16:** el servidor del cliente se reinicia solo al cambiar un `.py`.
 5. **BK-30:** el muelle de salida (outbound) sigue sin ser realista.
 6. **BK-02** FIFO en UI, **INIT-10** modelo de almacen propio.
+7. **BK-37:** que mide el optimizador (hoy eficiencia: gana la flota mas chica)
+   o cumplir el turno.
 
 ## Bugs conocidos (no criticos)
 
-- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-34 (BK-29, BK-35 y BK-36 cerrados).
+- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-37 (BK-29, BK-35 y BK-36 cerrados).
 - `warehouse.db` es la copia de trabajo del stock: cada corrida la restaura al
   arrancar desde `inventory_baseline`; "Aplicar Excel" borra esa foto (H-38).
   El respaldo de la base anterior al v3 es `warehouse_pre_v3_backup.db` (sin
