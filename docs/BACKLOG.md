@@ -39,7 +39,7 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-19 — con pocas tareas un solo operario se lleva todo el trabajo | ABIERTO (2026-09-18) | Media (realismo) | A definir | Decision de diseno del Director (QA H-10) |
 | BK-20 — el fill rate ignora las lineas rechazadas | ABIERTO (2026-09-18) | Media (realismo) | Chico | Ninguno (QA H-11) |
 | BK-21 — la vista previa de ordenes ignora la politica de cumplimiento | ABIERTO (2026-09-18) | Baja | Chico | Ninguno (QA H-12) |
-| BK-22 — configuraciones del motor sin control en la web | ABIERTO (2026-09-18) | Media (configurabilidad) | Variable | Algunas estan planificadas (INIT-11 F10) |
+| BK-22 — configuraciones del motor sin control en la web | ABIERTO (2026-09-18), plan por prioridad acordado 2026-09-25 | Media (configurabilidad) | 1-3 chicos tras el QA; 4 = INIT-11 F10 | Ver tabla en la seccion |
 | INIT-10 — modelo de almacen propio (reemplaza a Tiled como herramienta principal) | ANALIZADO (2026-09-16) | Alta (cimiento de automatismos y mezaninas) | Alto, por etapas | Plan detallado de la etapa 2 + OK del Director |
 | **INIT-11 — Task Path: outbound en varios pasos (6 pilares)** | **PLAN v2 PROPUESTO (2026-09-16)** | **Alta (prioridad actual del Director)** | 2,5-3,5 semanas, 11 fases | OK del plan v2 (`docs/PLAN_INIT11_TASK_PATH.md`) |
 | INIT-12 — Reposicion (replenishment) como tipo de tarea | IDEA (2026-09-16) | Media | No estimado | Despues de INIT-11 (usa perfiles y equipos) |
@@ -408,6 +408,19 @@ descartar. La simulacion si lo descarta (correcto); lo que confunde es el
 aviso previo.
 
 ### BK-22 — configuraciones del motor sin control en la web
+
+**Plan acordado con el Director (2026-09-25), por prioridad:**
+
+| # | Que | Cuando | Esfuerzo |
+|---|---|---|---|
+| 1 | `max_wos_por_tour` como campo en Estrategias (QA H-16: confunde con la capacidad) | Apenas termine el QA de la web | Chico |
+| 2 | Prioridad de pedidos y olas (`priority_dispatch_enabled`, `waves`): dos tarjetas | Apenas termine el QA | Chico |
+| 3 | Eliminar `cercania_tour_mode` (estrategia descartada en BK-03) | Apenas termine el QA | Chico |
+| 4 | Editor de personas, equipos, perfiles y estacionamientos (INIT-11 F10). Hoy Flota muestra los grupos del esquema viejo y editarlos no tiene efecto cuando hay `personas` | Tarea propia, planificar con INIT-11 | 2-3 dias |
+| 5 | `inicio_turno` y `zonas_espera`: marcarlas SOBRE EL MAPA, no escribiendo coordenadas | Con INIT-10 (modelo de almacen propio) | A definir |
+| 6 | Parametros tecnicos (anti-colision, internos del outbound, tamanio de celda): seccion "Avanzado" plegada | Cuando un cliente lo pida | Chico |
+
+Detalle de lo que hoy no tiene control:
 
 Por el principio rector #2, lo que el cliente no puede ajustar desde la web es
 un componente fantasma. Hoy el motor lee estas claves que la web no muestra
