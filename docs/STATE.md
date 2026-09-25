@@ -66,9 +66,9 @@ python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min
 
 ## QA de la configuracion web
 
-`docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0 a 8 y 10.
-**Siguiente: bloque 9 (personas, equipos y perfiles)**; despues 11, 12 y las
-combinadas. El bloque 10 corrigio H-44 ("Default" viejo) y H-45 (Abrir Visor). El bloque 6 corrigio H-43 (mapas y Excel
+`docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0 a 10.
+**Siguiente: bloque 11 (optimizacion)**; despues 12 y las combinadas. El
+bloque 9 paso 3 de 3 sin hallazgos nuevos. El bloque 10 corrigio H-44 ("Default" viejo) y H-45 (Abrir Visor). El bloque 6 corrigio H-43 (mapas y Excel
 incompatibles se aceptaban), H-39 y H-41; H-40 y H-42 cerrados con BK-35.
 Metodo: cada bloque cierra con una pasada visual (clics reales + capturas,
 `scripts/qa/capturas_web.py`). El bloque 8 corrigio H-35, H-36 y H-38 (stock de

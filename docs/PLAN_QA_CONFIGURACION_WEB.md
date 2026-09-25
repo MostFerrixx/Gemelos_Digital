@@ -6,8 +6,11 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 9 — Personas, equipos y perfiles (INIT-11, por
-Importar), despues 11, 12 y las combinadas.
+**Objetivo inmediato:** Bloque 11 — Optimización (despues 12 y las
+combinadas).
+**Ultimo cerrado:** Bloque 9 — Personas, equipos y perfiles (25/09): 3 de 3
+con clics reales, sin hallazgos nuevos (la edicion de personas en la web sigue
+en BK-22). Casos guardados como configuraciones "QA-9.x" con replica.
 **Ultimo cerrado:** Bloque 10 — Barra superior (24/09): 8 de 8, todo con clics
 reales. Corregidos **H-44** ("Default" cargaba una configuracion vieja que no
 encajaba con los datos) y **H-45** ("Abrir Visor" abria el visor vacio).
@@ -560,6 +563,9 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | BK-36 réplica de configuraciones (clics reales) | 25/09 | Guardar "Canonico v3 (referencia)" → réplica con mapa, imagen, base y Excel; mover el muelle 1 a (6,1) desde la web; Cargar → muelle de vuelta en (3,1), formulario con el mapa de la réplica, badge RÉPLICA en la lista | — | **PASA** | H-46 cerrado |
 | Ayuda plegable + tabla pulida (pasada visual) | 24/09 | 55 botones (i), 56 textos plegados, 15 cortos visibles; el (i) dentro de un label no tilda la casilla; "? Ayuda" muestra todo y se recuerda al recargar; el aviso de cross-docking sigue visible; modo oscuro OK. Tabla completa a 1440 px con encabezados legibles. Corregido en la pasada: el (i) al final del encabezado corría los botones al centro | — | **PASA** tras corregir | — |
 | Pasada visual 1 (bloques 6-8 + BK-35) | 24/09 | 17 capturas con clics reales a 1440×900: tabla de stock, columna de equipo, Work Areas, TMX y Excel inválidos, Aplicar, zonas y cupo, liberación de pallets, Outbound, panel de recepción | Todos los controles se ven y responden. **2 detalles corregidos**: la tarjeta "Ubicación de las Zonas" decía "se puede ajustar acá" (con carriles no se puede) y su explicación quedaba apretada en la grilla; "1 puntos" en los mensajes | — | **PASA** tras corregir | — |
+| QA-9.1 | 25/09 | Importar (botón real) canónico + `personas`/`equipos` (Ana, Beto: transpaleta; Carla: grúa; Dario: trilateral) \| bloques en la corrida | Aviso visible en Flota ("Flota definida por personas y equipos..."). Agentes = **Ana, Beto, Carla, Dario**; Ana/Beto solo Area_Ground; Area_Special solo Dario (trilateral, como manda el mapa de equipo); el desplegable ofrece y conserva "trilateral". 618/618. Guardada como "QA-9.1" (réplica) | — | **PASA** | — |
+| QA-9.2 | 25/09 | Idem con `perfiles` + `cambio_de_perfil` (umbral 3) + `estacionamientos` (EST-1) \| bloques en la corrida | 1 `cambio_de_equipo`: Pickers-01 deja la transpaleta y toma la grúa en EST-1 (t=3.489, 65 s); sus 20 tareas altas del recorrido se asignaron a t=3.423 pero **ninguna se recogió antes del cambio** (primera a t=3.489). 604/604. Guardada como "QA-9.2" | — | **PASA** | — |
+| QA-9.3 | 25/09 | Importar QA-9.2 → Aplicar | `config.json` conserva `personas`, `equipos`, `perfiles`, `cambio_de_perfil` y `estacionamientos` idénticos. Restaurado | — | **PASA** | — |
 | QA-10.1 | 24/09 | Total 123 → Run (clic real) | La corrida usa 123; `config.json` intacto (hash igual) | — | **PASA** | — |
 | QA-10.2 | 24/09 | Aplicar con cambios | `config.json` pasa a 123; `config.json.backup` nuevo = versión anterior | — | **PASA** | — |
 | QA-10.3 | 24/09 | Recargar y Aplicar sin cambios | `config.json` idéntico byte a byte | — | **PASA** | — |

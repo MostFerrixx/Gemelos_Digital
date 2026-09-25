@@ -10,6 +10,14 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-25 (cont.)
+
+- **QA bloque 9 (personas, equipos y perfiles) cerrado, 3 de 3**, con clics
+  reales y cada caso guardado como configuracion con replica ("QA-9.x"). Sin
+  hallazgos nuevos: nombres propios, equipo por area (trilateral), cambio de
+  equipo en el estacionamiento antes de pickear en altura, y bloques
+  conservados al aplicar.
+
 ## 2026-09-25
 
 - **BK-36 -- las configuraciones guardadas son replicas completas** (decision
