@@ -190,7 +190,10 @@ def _materialize_experiment_config(selector: str) -> tuple:
     if selector == "current":
         return os.path.join(PROJECT_ROOT, "config.json"), "Actual (config.json)"
 
-    config = config_manager.load_configuration(selector)
+    # BK-36: el preset corre con SU replica (mapa, datos, archivos) y una copia
+    # descartable de su base.
+    config = config_manager.config_para_experimento(
+        selector, os.path.join(PROJECT_ROOT, "temp_web"))
     if config is None:
         raise HTTPException(status_code=404, detail=f"Preset '{selector}' no encontrado.")
     is_valid, errors = config_manager.validate_config(config)

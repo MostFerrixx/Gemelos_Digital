@@ -29,7 +29,12 @@ def _proyecto_temporal(tmp_path):
     """Copia lo minimo para que el validador funcione: config + Excel + mapa."""
     shutil.copy2(os.path.join(PROJECT_ROOT, "config.json"), tmp_path / "config.json")
     (tmp_path / "layouts").mkdir()
-    for nombre in ("Warehouse_Logic.xlsx", "WH1.tmx"):
+    # Los archivos que nombra la config (antes copiaba WH1.tmx y el Excel
+    # viejo aunque el canonico usa otros) + la imagen del mapa.
+    cfg = json.load(open(os.path.join(PROJECT_ROOT, "config.json"), encoding="utf-8"))
+    nombres = {os.path.basename(cfg["layout_file"]), os.path.basename(cfg["sequence_file"]),
+               "custom_warehouse_tileset.png", "custom_warehouse_tileset.tsx"}
+    for nombre in nombres:
         origen = os.path.join(PROJECT_ROOT, "layouts", nombre)
         if os.path.exists(origen):
             shutil.copy2(origen, tmp_path / "layouts" / nombre)

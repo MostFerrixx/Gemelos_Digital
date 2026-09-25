@@ -10,6 +10,24 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-25
+
+- **BK-36 -- las configuraciones guardadas son replicas completas** (decision
+  del Director). Guardar copia a `data/config_presets/<id>/` el mapa (con su
+  tileset/imagen), la base en uso (datos maestros + stock, incluidos cambios
+  hechos desde la web), el Excel, el archivo de pedidos y el ASN; Cargar
+  restaura esa base como base en uso (con respaldo) y apunta la config a las
+  copias; el A/B corre cada preset con una copia descartable de su base. Red
+  de seguridad: ninguna config valida si su mapa no contiene los datos de la
+  base que va a usar. No se puede borrar una replica que usa `config.json`.
+  Los 4 presets viejos (sin replica) se eliminaron. `web_prototype/replicas.py`
+  + `validacion_mapa.py`. +7 tests.
+- **Respaldos de la base con la API de backup de SQLite:** `warehouse.db` usa
+  WAL y copiar solo el `.db` (como hacia "Aplicar Excel") dejaba afuera los
+  cambios que seguian en el `-wal`.
+- **Metodo de QA:** cada prueba desde la web se guarda como configuracion
+  ("QA-<caso> ...") para trazabilidad y para repetirla con Cargar.
+
 ## 2026-09-24 (cont. 2)
 
 - **QA bloque 10 (barra superior) cerrado, 8 de 8, con clics reales.** H-44:

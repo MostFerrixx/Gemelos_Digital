@@ -20,9 +20,17 @@ la UI solo lo edita. Por eso importa la diferencia entre estos dos botones:
 - **Aplicar Configuración** — escribe lo que ves en pantalla al `config.json`
   real. Es lo que va a usar la próxima simulación. Hace backup automático y
   escritura atómica.
-- **Guardar** — guarda un *preset* con nombre en la biblioteca interna. **No**
-  toca `config.json`. Sirve para tener escenarios ("Alta demanda", "Flota
-  chica") y compararlos después en Experimentos A/B.
+- **Guardar** — guarda la configuración con un nombre **junto con una réplica
+  de todo lo que usa**: el mapa (con su imagen), los datos del almacén en uso
+  (ubicaciones, productos, carriles, muelles y stock, incluidos los cambios
+  hechos desde la web), el Excel, el archivo de pedidos y el ASN. **No** toca
+  `config.json`. Sirve para tener escenarios ("Alta demanda", "Flota chica") y
+  compararlos en Experimentos A/B.
+- **Cargar** — vuelve a dejar todo **tal cual estaba al guardar**: pone esos
+  datos como los datos en uso (los anteriores quedan respaldados en
+  `warehouse.db.bak`) y el formulario apunta a las copias guardadas. Para que
+  sea la configuración vigente, apretá **Aplicar**. Una configuración que está
+  en uso en `config.json` no se puede eliminar.
 
 Si configurás algo y no apretás **Aplicar**, la simulación seguirá usando la
 configuración anterior.

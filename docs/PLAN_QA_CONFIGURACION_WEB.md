@@ -150,6 +150,15 @@ real sin ventana a 1440×900, **clics de mouse reales** en las coordenadas del
 elemento (falla si otro lo tapa o no se ve), escritura con teclado, archivos
 por el selector real, y capturas PNG que se le muestran al Director.
 
+### Configuraciones guardadas por prueba — desde el 25/09
+
+Pedido del Director: cada caso de QA que se corre desde la web se **guarda como
+configuración** ("QA-<caso> <descripción>") antes de correrlo. Desde BK-36 una
+configuración guardada lleva la réplica de su mapa, datos y archivos, así que
+queda el respaldo exacto de lo que se probó (trazabilidad) y un caso se puede
+repetir con **Cargar** en vez de volver a tocar cada control. Están en
+`data/config_presets/` (fuera de git).
+
 ### Nivel 3 — Visor (comportamiento → pantalla)
 
 1. Se carga la corrida en el visor.
@@ -548,6 +557,7 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-3.6 (1.er intento) | 19/09 | Capacidad 2 \| identico | Max 2 por camion; pero **quedaron 3 pallets sin despachar** (1-3 en las 4 corridas con outbound) | — | **PASA** con hallazgo | H-26 |
 | QA-3.6 (reprueba) | 19/09 | identico | 622 tareas, **622 despachadas**, 0 pendientes | Camiones con carga y pallets del visor = JSON en t=15.000 (157/314) y al final (318/622) | **PASA** | H-26 cerrado |
 | Zonas y cupo por pasillo (controles nuevos, 23/09) | 23/09 | Terrestres → 1-4, montacargas → 5-9, cupo 2 \| idéntico; el canónico sin tocar NO agrega los bloques | Asignación aplicada; `[WARN]` por el pasillo 9 inexistente; el terrestre sale de su zona recién cuando su zona se agotó (t=1.841 vs última propia t=1.828; montacargas 3.808 vs 3.661); texto "uno al tres" bloquea la corrida con mensaje | — | **PASA** | — |
+| BK-36 réplica de configuraciones (clics reales) | 25/09 | Guardar "Canonico v3 (referencia)" → réplica con mapa, imagen, base y Excel; mover el muelle 1 a (6,1) desde la web; Cargar → muelle de vuelta en (3,1), formulario con el mapa de la réplica, badge RÉPLICA en la lista | — | **PASA** | H-46 cerrado |
 | Ayuda plegable + tabla pulida (pasada visual) | 24/09 | 55 botones (i), 56 textos plegados, 15 cortos visibles; el (i) dentro de un label no tilda la casilla; "? Ayuda" muestra todo y se recuerda al recargar; el aviso de cross-docking sigue visible; modo oscuro OK. Tabla completa a 1440 px con encabezados legibles. Corregido en la pasada: el (i) al final del encabezado corría los botones al centro | — | **PASA** tras corregir | — |
 | Pasada visual 1 (bloques 6-8 + BK-35) | 24/09 | 17 capturas con clics reales a 1440×900: tabla de stock, columna de equipo, Work Areas, TMX y Excel inválidos, Aplicar, zonas y cupo, liberación de pallets, Outbound, panel de recepción | Todos los controles se ven y responden. **2 detalles corregidos**: la tarjeta "Ubicación de las Zonas" decía "se puede ajustar acá" (con carriles no se puede) y su explicación quedaba apretada en la grilla; "1 puntos" en los mensajes | — | **PASA** tras corregir | — |
 | QA-10.1 | 24/09 | Total 123 → Run (clic real) | La corrida usa 123; `config.json` intacto (hash igual) | — | **PASA** | — |
@@ -568,7 +578,7 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-6.6 (1.er intento) | 23/09 | TMX de texto basura / TMX sin capas | Basura rechazada, pero **un mapa sin capas de 10×10 se aceptó** y quedó como mapa de la configuración | — | **FALLA** | H-43 |
 | H-44 | **MAYOR** (usabilidad/datos) | QA-10.4 | **"Default" cargaba una configuración vieja** escrita en el código: mapa `WH1.tmx` de 30×30 (los datos son de 32×43), Excel anterior, flota por contadores. Correrla mezclaba un mapa con datos de otro. `load_config()` caía a lo mismo si faltaba `config.json` | `config_manager._get_default_config` con valores fijos | **Corregido**: valores de fábrica en `config_default.json` (versionado, = canónico); un test falla si deja de encajar con el mapa y el Excel | **Cerrado** (reprobado con clics reales) |
 | H-45 | MENOR (usabilidad) | QA-10.8 | "Abrir Visor" abría el visor vacío en vez de la última corrida | Enlace fijo a `/` | **Corregido**: `/api/replays/latest` y el botón abre `/?autoload=` de esa corrida | **Cerrado** |
-| H-46 | OBS | QA-10.5 | Los presets guardados con versiones anteriores traen el mapa y claves viejas; cargarlos no avisa que no encajan con los datos actuales | Sin validación al cargar | → BK-36 | Abierto |
+| H-46 | OBS | QA-10.5 | Los presets guardados con versiones anteriores traen el mapa y claves viejas; cargarlos no avisa que no encajan con los datos actuales | Sin validación al cargar | **Corregido** (BK-36): cada configuración guarda la réplica de su mapa, datos y archivos y se carga tal cual; las viejas se eliminaron; ninguna config valida si su mapa no encaja con la base | **Cerrado** |
 | QA-6.6 (reprueba) | 23/09 | Basura / sin capas / WH1 v2 / WH1 | Rechazados con mensaje: "XML ilegible", "no tiene capas de tiles", "24 puntos... quedan FUERA del mapa de 30 × 42", "164 puntos..."; el mapa configurado no cambia; WH1 v3 válido (527 puntos) | — | **PASA** | H-43 cerrado |
 | QA-6.7 | 23/09 | Carril 1 bajado una fila en el Excel y aplicado | Descargas en (3,31)/(4,31); 590/590 tareas. Restaurado e idéntico al respaldo | — | **PASA** | — |
 | QA-6.8 | 23/09 | Excel con la zona 1 sobre un rack (0,3) | Rechazo: "caen sobre celdas bloqueadas... zona de salida 1 (0, 3)" (antes se aceptaba) | — | **PASA** tras corregir | H-43 |

@@ -4,7 +4,7 @@
 > presente, nada mas. Historial -> `docs/CHANGELOG.md`. Pendientes ->
 > `docs/BACKLOG.md`. Identidad/reglas/arquitectura -> `CLAUDE.md`.
 
-**Ultima actualizacion:** 2026-09-24
+**Ultima actualizacion:** 2026-09-25
 
 ## Git
 
@@ -22,12 +22,16 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 385 passed, 1 deselected (~35s)
+python -m pytest -q                # 392 passed, 1 deselected (~35s)
 python scripts/regression_gate.py  # GATE PASS esperado (baseline 62c65ebf)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
 
 ## Canonico
+
+- Configuraciones guardadas = replicas completas en `data/config_presets/`
+  (BK-36): hay una, "Canonico v3 (referencia)". Las pruebas de QA se guardan
+  como "QA-<caso> ...".
 
 - `config_default.json` (raiz, versionado) = valores de fabrica del boton
   "Default"; hoy igual a `config.json`. Si el canonico cambia de mapa o Excel,
@@ -91,7 +95,7 @@ del paso) probablemente innecesaria**: se retoma solo si una medicion la pide.
 
 ## Bugs conocidos (no criticos)
 
-- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-36 (BK-29 y BK-35 cerrados).
+- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-34 (BK-29, BK-35 y BK-36 cerrados).
 - `warehouse.db` es la copia de trabajo del stock: cada corrida la restaura al
   arrancar desde `inventory_baseline`; "Aplicar Excel" borra esa foto (H-38).
   El respaldo de la base anterior al v3 es `warehouse_pre_v3_backup.db` (sin

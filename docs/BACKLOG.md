@@ -23,7 +23,6 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-26 — la consola del Simulation Runner no tiene limite de lineas | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-20) |
 | BK-27 — prioridades muertas sin aviso cuando el mapa cambia de equipo | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-21) |
 | BK-32 — la pestana Outbound tiene 7 zonas fijas | ABIERTO (2026-09-23) | Media (configurabilidad) | Medio | Ninguno (QA H-32) |
-| BK-36 — avisar al cargar un preset que no encaja con los datos actuales | ABIERTO (2026-09-24) | Baja | Chico | Ninguno (QA H-46) |
 | BK-34 — el KPI "distancia de guardado" mezcla la caminata al muelle | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-37) |
 | BK-33 — la ruta de cada pedido no viaja en el replay | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-33) |
 | BK-25 — estacion de descarga con turno | **F1 CERRADA (2026-09-20)**, sigue F2 (cesion del paso) | Alta (realismo) | F2 3-4 dias | Plan vivo: `docs/PLAN_BK25_ESTACION_DESCARGA.md` |
@@ -280,12 +279,6 @@ no se configura bien. Propuesta: armar las casillas desde las zonas de
 Con "Rutas a Piquear" la WO tiene `wo.ruta`, pero los 8 puntos que emiten
 `work_order_update` (dispatcher y operators) no la incluyen: ni el visor ni el
 QA ven la ruta. Emitirla solo si hay rutas (el canonico no cambia).
-
-### BK-36 — avisar al cargar un preset que no encaja con los datos (QA H-46)
-
-Los presets de `data/config_presets/` guardados con versiones anteriores traen
-el mapa viejo (`WH1.tmx`) y claves obsoletas. Al cargar uno, validar mapa y
-Excel contra los datos en uso (`validar_tmx` / `_validar_excel`) y avisar.
 
 ### BK-34 — el KPI "distancia de guardado" mezcla la caminata al muelle (QA H-37)
 

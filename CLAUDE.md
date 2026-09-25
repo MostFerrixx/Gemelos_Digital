@@ -120,7 +120,10 @@ poda en limpieza:
 Fuente de datos canónica = **la RAÍZ** (`config.json`, `layouts/WH1.tmx`,
 `layouts/Warehouse_Logic.xlsx`). `config_default.json` (raíz) son los valores de
 FÁBRICA del botón "Default" de la web (el motor no lo lee); se mantiene igual al
-canónico de la versión y un test verifica que encaje con mapa y Excel. El árbol `data/` es una migración abandonada que
+canónico de la versión y un test verifica que encaje con mapa y Excel. Las
+configuraciones guardadas (`data/config_presets/`, fuera de git) son RÉPLICAS
+completas (BK-36): config + mapa + base + Excel + archivos; cargar una restaura
+su base como base en uso (`web_prototype/replicas.py`). El árbol `data/` es una migración abandonada que
 solo lee código muerto/roto.
 
 **OJO con los datos maestros (verificado 2026-09-09):** `data_manager` carga de

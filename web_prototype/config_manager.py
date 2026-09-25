@@ -336,6 +336,23 @@ class WebConfigurationManager:
                                 or ti < 1 or ti > 3600:
                             errors.append("outbound.truck_interval must be a number between 1 and 3600")
 
+            # BK-36: el mapa tiene que encajar con la base que va a usar el motor
+            # (antes se podia correr un mapa con los datos de otro almacen).
+            layout = config.get('layout_file')
+            base = config.get('database_file') or 'warehouse.db'
+            if layout:
+                ruta_mapa = layout if os.path.isabs(layout) else os.path.join(self.project_root, layout)
+                ruta_base = base if os.path.isabs(base) else os.path.join(self.project_root, base)
+                if not os.path.exists(ruta_mapa):
+                    errors.append("No existe el mapa '%s'." % layout)
+                elif os.path.exists(ruta_base):
+                    try:
+                        from web_prototype.validacion_mapa import validar_tmx
+                        r = validar_tmx(ruta_mapa, ruta_base)
+                        errors += ["Mapa '%s': %s" % (layout, e) for e in r.get('errores', [])]
+                    except Exception as e:
+                        print(f"[CONFIG_MANAGER][WARN] No se pudo cruzar el mapa con la base: {e}")
+
             # Cobertura de areas (BK-04 + hardening QA, Opcion B): la flota debe tener >=1
             # agente y cubrir cada area con un agente del TIPO capaz. El "tipo requerido por
             # area" sale del mapa explicito work_area_equipment (fallback: convencion).
@@ -748,6 +765,7 @@ class WebConfigurationManager:
                         'description': metadata.get('description', ''),
                         'created_at': metadata.get('created_at', ''),
                         'is_default': metadata.get('is_default', False),
+                        'con_replica': bool(metadata.get('replica')),
                         'filename': filename
                     })
                     
@@ -800,10 +818,19 @@ class WebConfigurationManager:
                 'configuration': config
             }
             
+            # BK-36: replica de todo lo necesario para volver a usarla tal cual
+            # (mapa + dependencias, base en uso, Excel, pedidos, ASN).
+            from web_prototype import replicas
+            manifiesto, avisos = replicas.crear_replica(
+                self.project_root, os.path.join(self.presets_dir, config_id), config)
+            preset_data['metadata']['replica'] = manifiesto
+            for aviso in avisos:
+                print(f"[CONFIG_MANAGER][WARN] {aviso}")
+
             # If setting as default, unset other defaults
             if is_default:
                 self._unset_all_defaults()
-            
+
             # Save preset file
             filename = f"{config_id}.json"
             filepath = os.path.join(self.presets_dir, filename)
@@ -841,6 +868,11 @@ class WebConfigurationManager:
                 preset_data = json.load(f)
             
             config = preset_data.get('configuration', {})
+            # BK-36: con replica, los archivos son las COPIAS guardadas.
+            manifiesto = preset_data.get('metadata', {}).get('replica')
+            if manifiesto:
+                from web_prototype import replicas
+                config = replicas.config_con_copias(config, manifiesto)
             print(f"[CONFIG_MANAGER] Loaded configuration {config_id}")
             return config
             
@@ -848,6 +880,44 @@ class WebConfigurationManager:
             print(f"[CONFIG_MANAGER ERROR] Error loading configuration {config_id}: {e}")
             return None
     
+    def manifiesto_replica(self, config_id: str) -> Optional[Dict]:
+        """BK-36: manifiesto de la replica de un preset (None si no tiene)."""
+        ruta = os.path.join(self.presets_dir, f"{config_id}.json")
+        if not os.path.exists(ruta):
+            return None
+        with open(ruta, 'r', encoding='utf-8') as f:
+            return json.load(f).get('metadata', {}).get('replica')
+
+    def cargar_con_replica(self, config_id: str) -> Tuple[Optional[Dict], Optional[str], List[str]]:
+        """BK-36: carga un preset TAL CUAL se guardo: pone su base como base en
+        uso (con respaldo) y devuelve la configuracion apuntando a sus copias.
+        Devuelve (config, respaldo, avisos)."""
+        from web_prototype import replicas
+        config = self.load_configuration(config_id)
+        if config is None:
+            return None, None, ["Configuracion %s no encontrada." % config_id]
+        manifiesto = self.manifiesto_replica(config_id)
+        if not manifiesto:
+            return config, None, ["Esta configuracion no tiene replica guardada: se cargan solo "
+                                  "sus parametros, con los datos que ya estan en uso."]
+        avisos = replicas.verificar(self.project_root, manifiesto)
+        respaldo = replicas.restaurar_base(
+            self.project_root, manifiesto, config.get('database_file') or 'warehouse.db')
+        return config, respaldo, avisos
+
+    def config_para_experimento(self, config_id: str, carpeta_temp: str) -> Optional[Dict]:
+        """BK-36: la configuracion de un preset para una corrida A/B: sus copias
+        y una copia DESCARTABLE de su base (la replica no se modifica)."""
+        from web_prototype import replicas
+        config = self.load_configuration(config_id)
+        if config is None:
+            return None
+        base = replicas.copia_temporal_de_base(
+            self.project_root, self.manifiesto_replica(config_id), carpeta_temp)
+        if base:
+            config['database_file'] = base
+        return config
+
     def delete_configuration(self, config_id: str) -> Tuple[bool, List[str]]:
         """
         Delete a configuration preset
@@ -864,8 +934,24 @@ class WebConfigurationManager:
             
             if not os.path.exists(filepath):
                 return False, [f"Configuration {config_id} not found"]
-            
+
+            # BK-36: no borrar una replica que la configuracion vigente usa
+            # (config.json quedaria apuntando a archivos que ya no existen).
+            carpeta_rel = 'data/config_presets/%s/' % config_id
+            try:
+                with open(self.config_path, 'r', encoding='utf-8') as f:
+                    vigente = f.read().replace(chr(92) * 2, '/').replace(chr(92), '/')
+            except OSError:
+                vigente = ''
+            if carpeta_rel in vigente:
+                return False, ["La configuracion vigente (config.json) usa archivos de esta "
+                               "replica. Aplica otra configuracion antes de eliminarla."]
+
             os.remove(filepath)
+            carpeta = os.path.join(self.presets_dir, config_id)
+            if os.path.isdir(carpeta):
+                import shutil
+                shutil.rmtree(carpeta, ignore_errors=True)
             print(f"[CONFIG_MANAGER] Deleted configuration {config_id}")
             return True, []
             

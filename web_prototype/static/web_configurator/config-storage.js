@@ -175,6 +175,7 @@ class ConfigurationStorage {
                     ${config.description ? `<div class="config-item-description">${config.description}</div>` : ''}
                     <div class="config-item-meta">Creado: ${date}</div>
                     ${config.is_default ? '<span class="config-item-badge">DEFAULT</span>' : ''}
+                    ${config.con_replica ? '<span class="config-item-badge" title="Guarda su mapa, sus datos y sus archivos">RÉPLICA</span>' : ''}
                 </div>
                 <div class="config-item-actions">
                     ${isLoadMode ? `
@@ -194,15 +195,23 @@ class ConfigurationStorage {
         try {
             this.configurator.showLoading('Cargando configuración...');
 
-            const response = await fetch(`/api/configurator/configurations/${configId}`);
+            // BK-36: se carga TAL CUAL se guardo: su mapa, sus datos (se
+            // restauran como datos en uso, con respaldo) y sus archivos.
+            const response = await fetch(`/api/configurator/configurations/${configId}/cargar`,
+                                         { method: 'POST' });
             const result = await response.json();
 
             this.configurator.hideLoading();
 
             if (result.success) {
-                // Load configuration into form
                 this.configurator.loadConfigToForm(result.config);
-                this.configurator.showNotification('Configuración cargada exitosamente', 'success');
+                this.configurator.showNotification(result.con_replica
+                    ? 'Configuración cargada tal cual se guardó: mapa, datos y archivos'
+                      + (result.respaldo ? ` (los datos anteriores quedaron en ${result.respaldo})` : '')
+                    : 'Configuración cargada', 'success');
+                (result.avisos || []).forEach(a => this.configurator.showNotification('⚠ ' + a, 'warning'));
+                this.configurator.masterData?.cargarResumen?.();
+                this.configurator.masterData?.cargarTabla?.();
                 this.closeModal('modal-load');
             } else {
                 this.configurator.showNotification('Error loading configuration', 'error');

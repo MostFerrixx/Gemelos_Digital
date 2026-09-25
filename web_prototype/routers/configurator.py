@@ -162,6 +162,17 @@ def get_configuration(config_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/api/configurator/configurations/{config_id}/cargar")
+def cargar_configuracion(config_id: str):
+    """BK-36: carga un preset TAL CUAL se guardo (restaura su base de datos
+    como base en uso, con respaldo, y devuelve la config con sus copias)."""
+    config, respaldo, avisos = config_manager.cargar_con_replica(config_id)
+    if config is None:
+        raise HTTPException(status_code=404, detail="Configuracion no encontrada")
+    return {"success": True, "config": config, "respaldo": respaldo, "avisos": avisos,
+            "con_replica": config_manager.manifiesto_replica(config_id) is not None}
+
+
 @router.delete("/api/configurator/configurations/{config_id}")
 def delete_configuration(config_id: str):
     """Delete a configuration preset"""
