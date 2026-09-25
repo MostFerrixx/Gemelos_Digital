@@ -984,9 +984,23 @@ class WebConfigurator {
             'total_workorders_failed': 'WOs fallidas',
             'total_simulation_time_seconds': 'Tiempo de simulación (s)',
             'avg_completion_time_seconds': 'Tiempo medio por WO (s)',
-            'throughput_wo_per_s': 'Throughput (WO/s)',
+            'throughput_wo_per_s': 'Tareas por hora',
+            'throughput_picks_per_s': 'Picks por hora',
             'fill_rate_pct': 'Fill-rate (%)',
+            'fill_rate_effective_pct': 'Fill-rate efectivo (%)',
+            'avg_dock_to_stock': 'Dock-to-stock medio (s)',
+            'avg_putaway_distance': 'Distancia de guardado media',
+            'avg_putaway_wait': 'Espera pallet-operario media (s)',
         };
+        // QA-12: los throughputs se muestran POR HORA (0,08 WO/s no se lee).
+        const POR_HORA = new Set(['throughput_wo_per_s', 'throughput_picks_per_s']);
+        // QA-12: que direccion es MEJOR en cada KPI (el color dice si B mejora
+        // o empeora; antes toda diferencia significativa salia en verde).
+        const MAYOR_ES_MEJOR = new Set(['total_workorders_completed', 'throughput_wo_per_s',
+            'throughput_picks_per_s', 'fill_rate_pct', 'fill_rate_effective_pct']);
+        const MENOR_ES_MEJOR = new Set(['total_workorders_failed', 'total_simulation_time_seconds',
+            'avg_completion_time_seconds', 'avg_dock_to_stock', 'avg_putaway_distance',
+            'avg_putaway_wait']);
 
         const setBadge = (text, cls) => {
             badge.textContent = text;
@@ -1032,12 +1046,26 @@ class WebConfigurator {
                 '</tr></thead><tbody>';
             available.forEach(r => {
                 const significant = (r.verdict || '').indexOf('SIGNIFICATIVA') !== -1;
-                html += `<tr class="${significant ? 'exp-significant' : ''}">` +
+                const k = POR_HORA.has(r.kpi) ? 3600 : 1;
+                const dec = POR_HORA.has(r.kpi) ? 1 : 2;
+                let clase = '', flecha = '';
+                if (significant && r.mean_a != null && r.mean_b != null && r.mean_a !== r.mean_b) {
+                    const sube = r.mean_b > r.mean_a;
+                    const mejora = MAYOR_ES_MEJOR.has(r.kpi) ? sube : MENOR_ES_MEJOR.has(r.kpi) ? !sube : null;
+                    if (mejora !== null) {
+                        clase = mejora ? 'exp-mejora' : 'exp-empeora';
+                        flecha = mejora ? ' (B mejor)' : ' (B peor)';
+                    } else {
+                        clase = 'exp-significant';
+                    }
+                }
+                html += `<tr class="${clase}">` +
                     `<td>${KPI_LABELS[r.kpi] || r.kpi}</td>` +
-                    `<td>${fmt(r.mean_a)}</td><td>${fmt(r.mean_b)}</td>` +
+                    `<td>${r.mean_a == null ? '-' : fmt(r.mean_a * k, dec)}</td>` +
+                    `<td>${r.mean_b == null ? '-' : fmt(r.mean_b * k, dec)}</td>` +
                     `<td>${r.delta_pct == null ? '-' : (r.delta_pct >= 0 ? '+' : '') + fmt(r.delta_pct, 1) + '%'}</td>` +
                     `<td>${r.pvalue == null ? '-' : fmt(r.pvalue, 4)}</td>` +
-                    `<td>${r.verdict || '-'}</td></tr>`;
+                    `<td>${r.verdict || '-'}${flecha}</td></tr>`;
             });
             html += '</tbody></table>';
             html += '<p class="help-text">Veredicto por t-test pareado (α=0.05). "RUIDO" = la ' +
@@ -1051,7 +1079,7 @@ class WebConfigurator {
             labelsEl.textContent = `A: ${labels.a || '-'}  vs  B: ${labels.b || '-'}`;
             progressTextEl.textContent =
                 `${status.completed_replicas || 0} / ${status.total_replicas || 0} réplicas` +
-                (status.current_label ? ` (corriendo ${status.current_label})` : '');
+                (status.current_label && status.running ? ` (corriendo ${status.current_label})` : '');
             if (status.status === 'done' && status.result) {
                 renderResultTable(status.result, labels);
             } else if (status.status === 'error') {
@@ -1147,6 +1175,10 @@ class WebConfigurator {
                     btnStart.disabled = true;
                     btnStop.disabled = false;
                     pollHandle = setInterval(pollStatus, 3000);
+                } else if (status.status === 'done' && status.result) {
+                    // QA-12: al volver a la pagina, el ultimo resultado sigue a la vista.
+                    renderStatus(status);
+                    setBadge('Finalizado', 'badge-success');
                 }
             } catch (err) {
                 console.error('[EXPERIMENT] Error consultando estado inicial:', err);

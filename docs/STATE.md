@@ -66,8 +66,8 @@ python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min
 
 ## QA de la configuracion web
 
-`docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0 a 11.
-**Siguiente: bloque 12 (Experimentos A/B)**; despues las combinadas. El
+`docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0 a 12.
+**Siguiente: pruebas combinadas (seccion 7 del plan)**, la ultima parte. El
 bloque 11 corrigio H-47 (critico: el optimizador corria siempre la misma flota),
 H-49 y H-50; tabla de trials nueva. El bloque 10 corrigio H-44 ("Default" viejo) y H-45 (Abrir Visor). El bloque 6 corrigio H-43 (mapas y Excel
 incompatibles se aceptaban), H-39 y H-41; H-40 y H-42 cerrados con BK-35.

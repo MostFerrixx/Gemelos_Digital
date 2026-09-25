@@ -1906,3 +1906,7 @@ body.ayuda-todo-visible .ayuda-btn { display: none; }
     border-color: var(--color-primary);
     color: #fff;
 }
+
+/* QA-12: el color del A/B dice si B mejora o empeora (no solo "significativo"). */
+.experiment-result-table tr.exp-mejora td { color: var(--color-success); font-weight: 600; }
+.experiment-result-table tr.exp-empeora td { color: var(--color-danger); font-weight: 600; }

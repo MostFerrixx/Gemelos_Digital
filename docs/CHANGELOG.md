@@ -10,6 +10,15 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-25 (cont. 4)
+
+- **QA bloque 12 (Experimentos A/B) cerrado, 3 de 3 con clics reales.** A/B
+  de la replica "Canonico v3" contra el canonico: IDENTICO en todo (valida
+  BK-36). Flota 1+1: tiempo +93,6%, significativo; misma semilla, mismos
+  numeros. H-51: una diferencia significativa salia en verde aunque B fuera
+  peor; ahora verde/rojo con "(B mejor)"/"(B peor)", throughput por hora y
+  nombres legibles. H-52: el ultimo resultado se ve al volver a la pagina.
+
 ## 2026-09-25 (cont. 3)
 
 - **Optimizacion: tabla de trials + Detener corregido (QA-11.3/11.4, con clics

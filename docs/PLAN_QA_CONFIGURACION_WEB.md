@@ -6,8 +6,10 @@
 
 ## 0. Estado actual (se actualiza en cada interacción)
 
-**Objetivo inmediato:** Bloque 12 — Experimentos A/B (despues las pruebas
-combinadas).
+**Objetivo inmediato:** Pruebas combinadas (seccion 7) — ultima parte del plan.
+**Ultimo cerrado:** Bloque 12 — Experimentos A/B (25/09): 3 de 3 con clics
+reales; el A/B de la replica contra el canonico da IDENTICO (valida BK-36).
+Corregidos H-51 (una diferencia mala salia en verde) y H-52.
 **Ultimo cerrado:** Bloque 11 — Optimizacion (25/09): 4 de 4 con clics reales
 tras corregir **H-47** (critico: el optimizador corria siempre la misma flota),
 H-48 (aviso de pocos trials), H-49 (trials cortados "Corriendo" para siempre) y
@@ -569,6 +571,10 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | BK-36 réplica de configuraciones (clics reales) | 25/09 | Guardar "Canonico v3 (referencia)" → réplica con mapa, imagen, base y Excel; mover el muelle 1 a (6,1) desde la web; Cargar → muelle de vuelta en (3,1), formulario con el mapa de la réplica, badge RÉPLICA en la lista | — | **PASA** | H-46 cerrado |
 | Ayuda plegable + tabla pulida (pasada visual) | 24/09 | 55 botones (i), 56 textos plegados, 15 cortos visibles; el (i) dentro de un label no tilda la casilla; "? Ayuda" muestra todo y se recuerda al recargar; el aviso de cross-docking sigue visible; modo oscuro OK. Tabla completa a 1440 px con encabezados legibles. Corregido en la pasada: el (i) al final del encabezado corría los botones al centro | — | **PASA** tras corregir | — |
 | Pasada visual 1 (bloques 6-8 + BK-35) | 24/09 | 17 capturas con clics reales a 1440×900: tabla de stock, columna de equipo, Work Areas, TMX y Excel inválidos, Aplicar, zonas y cupo, liberación de pallets, Outbound, panel de recepción | Todos los controles se ven y responden. **2 detalles corregidos**: la tarjeta "Ubicación de las Zonas" decía "se puede ajustar acá" (con carriles no se puede) y su explicación quedaba apretada en la grilla; "1 puntos" en los mensajes | — | **PASA** tras corregir | — |
+| QA-12.1 | 25/09 | A = Actual, B = réplica "Canonico v3 (referencia)", 5 réplicas, semilla 1000 (clics reales) | **IDÉNTICO en los 6 KPIs** (597 tareas, 7.855,8 s): además prueba que correr desde la réplica de BK-36 da exactamente lo mismo | ✓ | **PASA** | — |
+| QA-12.2 | 25/09 | A = Actual, B = "QA-12.2 flota 1+1" (creada en Flota con clics reales) | Tiempo +93,6%, tareas/hora −48,3%, p < 0,0001: **significativa, B peor** | ✓ | **PASA** | H-51 |
+| QA-12.3 | 25/09 | Repetir 12.2, misma semilla | Resultado idéntico al de 12.2 | ✓ | **PASA** | — |
+| Pasada visual del A/B | 25/09 | Tabla de resultados | Toda diferencia significativa salía en **verde** aunque B fuera peor (H-51); throughput en WO/s con 2 decimales (0,08 vs 0,04); una fila con el nombre técnico `throughput_picks_per_s`; "(corriendo B)" al terminar; al recargar la página se perdía el resultado (H-52). Todo corregido | ✓ | **PASA** tras corregir | H-51, H-52 |
 | QA-11.3 (1.er intento) | 25/09 | 12 trials, Detener con 3 listos (clics reales) | "Detenido", Iniciar habilitado, 0 procesos del motor. Pero los 2 trials cortados quedaban **"Corriendo" para siempre** y el progreso decía **"3 / 5"** (no "3 / 12"). El trial cortado deja una carpeta a medias en `output/` (BK-14) | ✓ | **FALLA** | H-49, H-50 |
 | QA-11.3 (reprueba) | 25/09 | idem | "3 / 12 trials"; los 2 cortados: "Falló o cortado"; 0 procesos; Iniciar habilitado | ✓ | **PASA** | H-49, H-50 cerrados |
 | QA-11.4 | 25/09 | Estudio de 6 trials terminado | Tabla completa: flota pedida = simulada en los 6 (2+2, 8+7, 17+5, 15+2, 13+7, 9+9); tareas/hora de 271 a 886 según la flota. Mejor: 2+2 por eficiencia (ver BK-37) | ✓ | **PASA** | BK-37 |
@@ -577,6 +583,8 @@ Se ejecuta **de a un bloque**, con reporte al Director al cerrar cada uno:
 | QA-11.2 | 25/09 | Montacargas ×20 (1.000 $/h) | Las 3 flotas con 8-9 montacargas quedan debajo de 2+2 (0,099-0,106 vs 0,122). El primer trial de cada estudio es la flota actual (arranque en caliente), el resto es sorteo con < 11 trials → aviso nuevo en la pestaña | — | **PASA** (criterio redefinido) | H-48 |
 | H-49 | MENOR (usabilidad) | QA-11.3 | Al Detener, los trials que se estaban corriendo quedaban **"Corriendo" para siempre** (RUNNING en la base de Optuna) | `stop()` mataba los procesos sin cerrar los trials; la web cortaba el sondeo sin pedir el estado final | **Corregido**: se cierran como FAIL, un RUNNING sin estudio activo se muestra "Cortado", y la web pide un último estado al detener. +1 test | **Cerrado** (reprobado con clics reales) |
 | H-50 | MENOR (usabilidad) | QA-11.3 | El progreso decía "3 / 5 trials" con 12 pedidos (contaba los ya creados) | `status()` | **Corregido**: el estudio guarda `n_trials_pedidos` | **Cerrado** |
+| H-51 | MENOR (usabilidad) | QA-12.2 | En el A/B **toda diferencia significativa se pintaba de verde**, también cuando B era peor (tiempo +93% en verde) | La tabla solo miraba "significativa" | **Corregido**: verde + "(B mejor)" o rojo + "(B peor)" según la dirección buena de cada KPI; throughput por hora; nombres legibles | **Cerrado** (verificado) |
+| H-52 | OBS (usabilidad) | QA-12 | Al recargar la página se perdía el resultado del último A/B (solo se retomaba si seguía corriendo) | `setupExperimentPanel` | **Corregido**: se muestra el último resultado | **Cerrado** |
 | QA-9.1 | 25/09 | Importar (botón real) canónico + `personas`/`equipos` (Ana, Beto: transpaleta; Carla: grúa; Dario: trilateral) \| bloques en la corrida | Aviso visible en Flota ("Flota definida por personas y equipos..."). Agentes = **Ana, Beto, Carla, Dario**; Ana/Beto solo Area_Ground; Area_Special solo Dario (trilateral, como manda el mapa de equipo); el desplegable ofrece y conserva "trilateral". 618/618. Guardada como "QA-9.1" (réplica) | — | **PASA** | — |
 | QA-9.2 | 25/09 | Idem con `perfiles` + `cambio_de_perfil` (umbral 3) + `estacionamientos` (EST-1) \| bloques en la corrida | 1 `cambio_de_equipo`: Pickers-01 deja la transpaleta y toma la grúa en EST-1 (t=3.489, 65 s); sus 20 tareas altas del recorrido se asignaron a t=3.423 pero **ninguna se recogió antes del cambio** (primera a t=3.489). 604/604. Guardada como "QA-9.2" | — | **PASA** | — |
 | QA-9.3 | 25/09 | Importar QA-9.2 → Aplicar | `config.json` conserva `personas`, `equipos`, `perfiles`, `cambio_de_perfil` y `estacionamientos` idénticos. Restaurado | — | **PASA** | — |

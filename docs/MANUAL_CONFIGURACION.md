@@ -726,6 +726,15 @@ Ejemplos de uso: comparar dos estrategias de slotting, "picking primero" contra
 
 ---
 
+
+> **Cómo leer el resultado:** cada fila es un indicador con la media de A y de
+> B, la diferencia y el veredicto. Si la diferencia es real (significativa), la
+> fila sale **verde con "(B mejor)"** o **roja con "(B peor)"** según lo que
+> convenga en ese indicador (más tareas por hora es mejor; más tiempo es peor).
+> Los throughputs se muestran por hora. El último resultado sigue a la vista si
+> volvés a la pestaña. Una configuración guardada corre con su réplica (su mapa
+> y sus datos), así que se puede comparar contra un almacén distinto.
+
 # El Visor de Replay — "Saltar tiempos muertos"
 
 El visor (botón **Abrir Visor**) reproduce una simulación ya corrida. En su
