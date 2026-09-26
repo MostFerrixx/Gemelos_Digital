@@ -9,10 +9,10 @@
 ## Git
 
 - `main` integra por fast-forward. Rama de trabajo: `qa/configuracion-web`.
-- **Baseline vigente: `sha256=0c22f1c7...`, 16.353.897 bytes**, seed 42
-  (`tests/baseline.json`). Cambio intencional del 2026-09-26 (QA H-53: una
-  tarea ya no entra dos veces al mismo recorrido; 653 -> 624 picks, 150,8 ->
-  143,1 min). Anterior: `62c65ebf` (BK-29, 2026-09-23).
+- **Baseline vigente: `sha256=6fe69d88...`, 19.724.749 bytes**, seed 42
+  (`tests/baseline.json`). Cambio intencional del 2026-09-26 (BK-39: perfil
+  Real; 624 tareas en 195,5 min, 191,6 tareas/h). Anteriores del mismo dia:
+  `0c22f1c7` (H-53), y `62c65ebf` (BK-29, 2026-09-23).
 - REGLA pinneada por tests BN-05 e IN-43: la metadata del .jsonl NO puede
   contener valores wall-clock.
 - En Windows `core.autocrlf=true`: `config.json` puede figurar como modificado
@@ -21,13 +21,15 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 404 passed, 1 deselected (~40s)
-python scripts/regression_gate.py  # GATE PASS esperado (baseline 0c22f1c7)
+python -m pytest -q                # 405 passed, 1 deselected (~40s)
+python scripts/regression_gate.py  # GATE PASS esperado (baseline 6fe69d88)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
 
 ## Canonico
 
+- **Perfil de velocidad Real** (BK-39, 2026-09-26): 1 s/celda a pie, montacargas
+  0,5 (2 m/s), horquilla 8 s. "Demo" ya no existe.
 - Configuraciones guardadas = replicas completas en `data/config_presets/`
   (BK-36): "Canonico v3 (referencia)" + las de QA ("QA-<caso> ...", entre
   ellas las 21 `QA-C-nn` de las pruebas combinadas, listas para reusar).
@@ -103,15 +105,13 @@ boca).
 6. **BK-02** FIFO en UI, **INIT-10** modelo de almacen propio.
 7. **BK-37:** que mide el optimizador (hoy eficiencia: gana la flota mas chica)
    o cumplir el turno.
-8. **BK-39:** el canonico y el Default usan el perfil Demo (0,1 s/celda, ~10x
-   mas rapido que la realidad); con el principio de realismo deberia ser Real.
-9. **BK-40:** cupo por pasillo estricto (esperar afuera + no cruzar pasillos
+8. **BK-40:** cupo por pasillo estricto (esperar afuera + no cruzar pasillos
    ajenos); necesita diseno.
-10. **BK-38:** archivar 3 mapas-esqueleto de `layouts/` (poda).
+9. **BK-38:** archivar 3 mapas-esqueleto de `layouts/` (poda).
 
 ## Bugs conocidos (no criticos)
 
-- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-40 (BK-29, BK-35 y BK-36 cerrados).
+- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-40 (BK-29, BK-35, BK-36 y BK-39 cerrados).
 - `warehouse.db` es la copia de trabajo del stock: cada corrida la restaura al
   arrancar desde `inventory_baseline`; "Aplicar Excel" borra esa foto (H-38).
   El respaldo de la base anterior al v3 es `warehouse_pre_v3_backup.db` (sin

@@ -103,11 +103,10 @@ class WebConfigurator {
         const tiemposPreset = document.getElementById('tiempos-preset');
         if (tiemposPreset) {
             tiemposPreset.addEventListener('change', (e) => {
-                if (e.target.value === 'demo') {
-                    document.getElementById('tiempos-time-per-cell').value = 0.1;
-                    document.getElementById('tiempos-speed-forklift').value = 0.8;
-                    document.getElementById('tiempos-lift').value = 2.0;
-                } else if (e.target.value === 'real') {
+                // BK-39: el perfil "Demo" (10x mas rapido que la realidad) se elimino:
+                // aceleraba la FISICA y los KPIs salian ~37% optimistas. Para
+                // presentar rapido esta la velocidad de reproduccion del visor.
+                if (e.target.value === 'real') {
                     document.getElementById('tiempos-time-per-cell').value = 1.0;
                     document.getElementById('tiempos-speed-forklift').value = 0.5;
                     document.getElementById('tiempos-lift').value = 8.0;
@@ -359,11 +358,9 @@ class WebConfigurator {
     _updateTiemposPreset(tpc, sfk, lift) {
         const sel = document.getElementById('tiempos-preset');
         if (!sel) return;
-        const isDemo = Math.abs(tpc - 0.1) < 0.001 && Math.abs(sfk - 0.8) < 0.001
-                       && Math.abs(lift - 2.0) < 0.001;
         const isReal = Math.abs(tpc - 1.0) < 0.001 && Math.abs(sfk - 0.5) < 0.001
                        && Math.abs(lift - 8.0) < 0.001;
-        sel.value = isDemo ? 'demo' : (isReal ? 'real' : 'custom');
+        sel.value = isReal ? 'real' : 'custom';
     }
 
     async handleFileImport(event) {
@@ -1490,11 +1487,11 @@ class WebConfigurator {
         this._renderDestinoStagingRows(config.destino_staging_map || {});
 
         // C5: Tiempos de Operacion — cargar bloque tiempos desde config.
-        // Ausencia del bloque = usar defaults demo (comportamiento actual).
+        // Ausencia del bloque = perfil Real (BK-39; mismos defaults que el motor).
         const t = config.tiempos || {};
-        const tpc  = (t.time_per_cell != null)          ? t.time_per_cell          : 0.1;
-        const sfk  = (t.speed_factor_forklift != null)  ? t.speed_factor_forklift  : 0.8;
-        const lift = (t.tiempo_horquilla != null)        ? t.tiempo_horquilla       : 2.0;
+        const tpc  = (t.time_per_cell != null)          ? t.time_per_cell          : 1.0;
+        const sfk  = (t.speed_factor_forklift != null)  ? t.speed_factor_forklift  : 0.5;
+        const lift = (t.tiempo_horquilla != null)        ? t.tiempo_horquilla       : 8.0;
         const tpcEl  = document.getElementById('tiempos-time-per-cell');
         const sfkEl  = document.getElementById('tiempos-speed-forklift');
         const liftEl = document.getElementById('tiempos-lift');
@@ -1575,13 +1572,13 @@ class WebConfigurator {
                 putaway_load_time: 10.0, slotting_strategy: 'fija_por_sku',
                 putaway_priority: 'picks_first', cross_dock_enabled: false
             },
-            // C5: defaults del bloque tiempos (perfil DEMO = valores actuales del motor)
+            // C5 / BK-39: defaults del bloque tiempos = perfil Real (los del motor)
             tiempos: {
                 cell_size_m: 1.0,
-                time_per_cell: 0.1,
+                time_per_cell: 1.0,
                 speed_factor_ground: 1.0,
-                speed_factor_forklift: 0.8,
-                tiempo_horquilla: 2.0
+                speed_factor_forklift: 0.5,
+                tiempo_horquilla: 8.0
             }
         };
     }
@@ -1706,6 +1703,13 @@ class WebConfigurator {
             && Object.prototype.hasOwnProperty.call(this.currentConfig, 'destino_staging_map'));
         if (Object.keys(destinoMap).length > 0 || destinoExistia) {
             config.destino_staging_map = destinoMap;
+        }
+        // Mismo criterio para `rutas_estocasticas`: apagado y ausente en la config
+        // cargada => no se emite (antes, Aplicar sin cambios lo agregaba).
+        const rutasExistia = !!(this.currentConfig
+            && Object.prototype.hasOwnProperty.call(this.currentConfig, 'rutas_estocasticas'));
+        if (!config.rutas_estocasticas.enabled && !rutasExistia) {
+            delete config.rutas_estocasticas;
         }
 
         // INIT-7 F3: bloque inbound completo (mismo patron base+overrides).

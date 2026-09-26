@@ -25,7 +25,6 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-32 — la pestana Outbound tiene 7 zonas fijas | ABIERTO (2026-09-23) | Media (configurabilidad) | Medio | Ninguno (QA H-32) |
 | BK-37 — objetivo del optimizador: eficiencia vs cumplir el turno | ABIERTO (2026-09-25) | Media (decision de negocio) | Chico una vez decidido | Decision del Director |
 | BK-40 — cupo por pasillo estricto: la espera y el cruce de pasillos ajenos | ABIERTO (2026-09-26) | Media (realismo, solo con cupo) | 1-2 dias | Decision de diseno del Director (QA H-56) |
-| BK-39 — el canonico y el Default usan el perfil Demo (10x mas rapido que la realidad) | ABIERTO (2026-09-26) | Media (realismo) | Chico (cambia el baseline) | Decision del Director (QA-C-10) |
 | BK-38 — tres mapas de ejemplo en `layouts/` son esqueletos vacios | ABIERTO (2026-09-26) | Baja (limpieza) | Chico | Aprobacion del Director (poda) (QA combinadas P-1) |
 | BK-34 — el KPI "distancia de guardado" mezcla la caminata al muelle | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-37) |
 | BK-33 — la ruta de cada pedido no viaja en el replay | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-33) |
@@ -311,14 +310,6 @@ sin terminar); (b) el ruteo usa pasillos ajenos como corredor sin pedir lugar.
 Propuesta: (a) celda de espera FUERA del pasillo reservada antes de soltar;
 (b) el A* evita pasillos que no son destino cuando el cupo esta activo (costo
 alto, no bloqueo). Medir con `ocupacion_pasillos` (posiciones del replay).
-
-### BK-39 — el canonico y el Default usan el perfil Demo (QA-C-10)
-
-`tiempos.time_per_cell` = 0,1 s/celda (unos 10 m/s a pie) en `config.json` y
-`config_default.json`: caminar es el 2% del tiempo en C-01. El manual ya dice
-"para decisiones usa Real" (1 s/celda, montacargas 0,5). Con el principio de
-realismo, el Default deberia ser Real; cambia el baseline y todos los KPIs
-historicos (C-10: 6.664 s -> 12.036 s con outbound). Decision del Director.
 
 ### BK-38 — tres mapas de ejemplo en `layouts/` son esqueletos vacios (QA combinadas P-1)
 

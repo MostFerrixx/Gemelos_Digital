@@ -140,16 +140,16 @@ class BaseOperator:
         # hardcodeados, por lo que configs sin el bloque "tiempos" producen
         # comportamiento IDENTICO (cero cambio observable).
         _tiempos = configuracion.get("tiempos", {}) if configuracion else {}
-        self.time_per_cell = float(_tiempos.get("time_per_cell", 0.1))
+        self.time_per_cell = float(_tiempos.get("time_per_cell", 1.0))   # BK-39: default Real
         self.speed_factor_ground = float(_tiempos.get("speed_factor_ground", 1.0))
-        self.speed_factor_forklift = float(_tiempos.get("speed_factor_forklift", 0.8))
+        self.speed_factor_forklift = float(_tiempos.get("speed_factor_forklift", 0.5))
         # `tiempo_picking_por_linea` (un tiempo fijo de pick, igual para todo
         # producto) fue ELIMINADO el 2026-09-09. Era el modelo previo a INIT-8 y
         # quedaba sin efecto en cuanto pick_time_model tenia base -- el caso
         # normal. Lo que hacia se expresa con la propia formula: base = ese
         # valor y el resto de los factores en 0. Se quito de la UI, del motor y
         # del esquema para no dejar una pieza que nadie puede configurar.
-        self.lift_time = float(_tiempos.get("tiempo_horquilla", 2.0))
+        self.lift_time = float(_tiempos.get("tiempo_horquilla", 8.0))
         # INIT-11 F1: velocidad y horquilla son del EQUIPO. Sin equipo
         # declarado valen lo mismo que el bloque tiempos (equivalencia exacta).
         if equipo:
@@ -1069,7 +1069,7 @@ class BaseOperator:
         return True
 
     def _recorrer_tramo(self, segment_path, speed, on_before=None, on_after=None,
-                        time_per_cell: float = 0.1, goal_dwell: float = 0.0):
+                        time_per_cell: float = 1.0, goal_dwell: float = 0.0):
         """
         Helper compartido (Ground + Forklift) que recorre un tramo celda a celda.
 
@@ -1088,7 +1088,7 @@ class BaseOperator:
             speed: multiplicador de velocidad del agente (Ground 1.0, Forklift 0.8).
             on_before: callable(step_idx, step_position) -> None, ejecutado ANTES del timeout.
             on_after: callable(step_idx, step_position) -> None, ejecutado DESPUES del timeout.
-            time_per_cell: segundos base por celda (default 0.1).
+            time_per_cell: segundos base por celda (default 1.0, perfil Real).
 
         Es un generador SimPy: usar con `yield from self._recorrer_tramo(...)`.
 
@@ -1362,7 +1362,7 @@ class BaseOperator:
                     'current_task': None, 'cargo_volume': self.cargo_volume,
                 })
 
-            # C1: time_per_cell leido de config (self.time_per_cell); default 0.1
+            # C1: time_per_cell leido de config (self.time_per_cell); default 1.0
             yield from self._recorrer_tramo(
                 path, self.default_speed, on_before=_emitir_paso, on_after=None,
                 time_per_cell=self.time_per_cell)
@@ -2357,7 +2357,7 @@ class Forklift(BaseOperator):
         )
 
         # Forklift specific attributes
-        # C1: default_speed leido de config (speed_factor_forklift); default 0.8.
+        # C1: default_speed leido de config (speed_factor_forklift); default 0.5.
         # NOTA: default_speed es multiplicador de TIEMPO (0.8 => 20% mas rapido
         # que Ground, no mas lento). El comentario anterior era incorrecto.
         self.default_speed = self._velocidad_equipo(self.speed_factor_forklift)

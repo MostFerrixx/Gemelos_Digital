@@ -109,10 +109,10 @@
   },
   "tiempos": {
     "cell_size_m": 1,
-    "time_per_cell": 0.1,
+    "time_per_cell": 1,
     "speed_factor_ground": 1,
-    "speed_factor_forklift": 0.8,
-    "tiempo_horquilla": 2,
+    "speed_factor_forklift": 0.5,
+    "tiempo_horquilla": 8,
     "pick_time_model": {
       "base": 10,
       "por_unidad": 2,

@@ -130,3 +130,16 @@ def test_h60_aplicar_reemplaza_y_no_deja_claves_viejas(tmp_path):
     assert 'waves' not in vigente and 'priority_dispatch_enabled' not in vigente
     assert cm.ultimas_quitadas == ['priority_dispatch_enabled', 'waves']
     assert vigente == cfg
+
+
+def test_h60_aplicar_sin_cambios_deja_el_archivo_igual(tmp_path):
+    """Reemplazar no debe reordenar: el orden de claves viaja en la metadata
+    del .jsonl (gate byte-identico) y ensucia los diffs de git."""
+    cm, cfg = _proyecto(tmp_path)
+    ok, err = cm.save_config(cfg)
+    assert ok, err
+    antes = open(tmp_path / 'config.json', 'rb').read()
+    desordenada = dict(reversed(list(cfg.items())))
+    ok, err = cm.save_config(desordenada)
+    assert ok, err
+    assert open(tmp_path / 'config.json', 'rb').read() == antes

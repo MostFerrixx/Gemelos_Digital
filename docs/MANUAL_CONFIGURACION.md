@@ -214,11 +214,15 @@ controlarlo, definí la zona completa (todas sus celdas) en la hoja
 
 | Opción | Qué significa |
 |---|---|
-| **Demo — rápido** | ~10× más rápido que la realidad. Para presentaciones: la simulación "se ve" avanzar. Valores: 0.1 s/celda, factor montacargas 0.8, horquilla 2 s. |
-| **Real — calibrado** | Escala real, 1 celda = 1 metro, con benchmarks de industria (operario 1 m/s, montacargas 2 m/s). Valores: 1.0 s/celda, factor 0.5, picking 15 s/línea, horquilla 8 s. |
+| **Real — calibrado** (default) | Escala real, 1 celda = 1 metro, con benchmarks de industria (operario 1 m/s, montacargas 2 m/s). Valores: 1.0 s/celda, factor 0.5, horquilla 8 s. |
 | **Personalizado** | Se selecciona solo cuando tus valores no coinciden con ninguno de los dos anteriores. |
 
-**Para tomar decisiones de negocio usá "Real".** "Demo" sirve para mostrar.
+El perfil "Demo" (10× más rápido que la realidad) **se eliminó** (2026-09-26,
+BK-39): aceleraba la física de la simulación y los KPIs salían ~37%
+optimistas. Para mostrar una corrida más rápido usá la **velocidad de
+reproducción del visor** (1× a 60×) y "Saltar tiempos muertos": aceleran lo
+que se ve sin cambiar los resultados. Si una configuración vieja trae los
+valores de Demo, el selector la muestra como "Personalizado".
 
 Este bloque afecta al **desplazamiento** por el almacén, no al tiempo de
 levantar productos (eso es la sección siguiente).

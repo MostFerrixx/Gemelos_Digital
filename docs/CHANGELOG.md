@@ -10,6 +10,18 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-26 (cont.)
+
+- **BK-39: el canonico y el Default pasan al perfil Real; "Demo" eliminado**
+  (decision del Director). Demo (0,1 s/celda = 10 m/s a pie) aceleraba la
+  fisica y sobreestimaba la capacidad ~37%: canonico seed 42 143,1 -> 195,5
+  min, 261,6 -> 191,6 tareas/h. Motor, web y `config_default.json` con 1 s/celda,
+  montacargas 0,5, horquilla 8 s; los defaults del motor cuando falta la clave
+  tambien son Real. Para presentar rapido: velocidad del visor. Baseline nuevo
+  `6fe69d88`. De paso: Aplicar conserva el orden de claves del archivo y no
+  agrega `rutas_estocasticas` apagado (Aplicar sin cambios = mismo archivo
+  byte a byte, efecto colateral de H-60). Referencia "Canonico v3" regrabada.
+
 ## 2026-09-26
 
 - **QA de pruebas combinadas y replica (`docs/PLAN_QA_COMBINADAS.md`).** 21

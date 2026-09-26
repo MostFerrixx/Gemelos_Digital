@@ -47,7 +47,7 @@ class SpaceTimePlanner:
     """
 
     def __init__(self, pathfinder: Any, reservation_table: Any,
-                 time_per_cell: float = 0.1,
+                 time_per_cell: float = 1.0,
                  dt_wait: float = 0.1,
                  max_expansions: int = 20000,
                  allow_diagonal: bool = True):

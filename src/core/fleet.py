@@ -155,12 +155,12 @@ def _parametros_tiempo(configuracion: Dict[str, Any], tipo_base: str) -> Dict[st
     que el motor usaba antes de separar persona y equipo (bloque `tiempos`)."""
     tiempos = (configuracion or {}).get('tiempos', {}) or {}
     if tipo_base == 'Forklift':
-        velocidad = tiempos.get('speed_factor_forklift', 0.8)
+        velocidad = tiempos.get('speed_factor_forklift', 0.5)   # BK-39: default Real
     else:
         velocidad = tiempos.get('speed_factor_ground', 1.0)
     return {
         'velocidad': float(velocidad),
-        'horquilla_s': float(tiempos.get('tiempo_horquilla', 2.0)),
+        'horquilla_s': float(tiempos.get('tiempo_horquilla', 8.0)),
     }
 
 

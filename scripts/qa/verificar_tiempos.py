@@ -52,10 +52,10 @@ def main():
     tiempos = cfg.get('tiempos', {}) or {}
     ptm = tiempos.get('pick_time_model', {}) or {}
     clases = tiempos.get('clases_manejo', {}) or {}
-    lift = float(tiempos.get('tiempo_horquilla', 2.0))
-    tpc = float(tiempos.get('time_per_cell', 0.1))
+    lift = float(tiempos.get('tiempo_horquilla', 8.0))
+    tpc = float(tiempos.get('time_per_cell', 1.0))
     f_ground = float(tiempos.get('speed_factor_ground', 1.0))
-    f_fork = float(tiempos.get('speed_factor_forklift', 0.8))
+    f_fork = float(tiempos.get('speed_factor_forklift', 0.5))
     var_on = bool((tiempos.get('variabilidad') or {}).get('enabled', False))
     sku = catalogo()
     wo = {w['id']: w for w in meta.get('initial_work_orders', [])}

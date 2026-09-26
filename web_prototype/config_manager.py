@@ -102,7 +102,11 @@ class WebConfigurationManager:
             # formulario no traia los bloques que no edita (congestion,
             # outbound); desde H-01 el formulario los trae de la config cargada.
             existing = self._load_existing_for_merge()
-            merged = dict(config)
+            # Mismo ORDEN de claves que el archivo vigente (las nuevas al final):
+            # el orden viaja en la metadata del .jsonl; Aplicar sin cambios debe
+            # dejar config.json byte a byte igual (QA-10.3).
+            merged = {k: config[k] for k in existing if k in config}
+            merged.update({k: v for k, v in config.items() if k not in merged})
             self.ultimas_quitadas = sorted(set(existing.keys()) - set(config.keys()))
             if self.ultimas_quitadas:
                 print(f"[CONFIG_MANAGER][WARN] Aplicar quita de config.json claves que la "
