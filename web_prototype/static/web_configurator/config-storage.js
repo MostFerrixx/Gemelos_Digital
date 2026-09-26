@@ -325,6 +325,11 @@ class ConfigurationStorage {
 
             if (result.success) {
                 this.configurator.showNotification('✓ Configuración aplicada a config.json exitosamente', 'success');
+                // QA H-60: config.json queda IGUAL a la pantalla; se avisa que se quito.
+                if ((result.quitadas || []).length) {
+                    this.configurator.showNotification('Se quitaron de config.json (la configuración aplicada no las usa): '
+                        + result.quitadas.join(', '), 'warning');
+                }
             } else {
                 this.configurator.showNotification('Error: ' + (result.errors || ['Error desconocido']).join(', '), 'error');
             }

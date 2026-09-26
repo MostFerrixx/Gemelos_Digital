@@ -43,7 +43,9 @@ def save_config(data: ConfigData):
         success, errors = config_manager.save_config(data.config)
         
         if success:
-            return {"success": True, "message": "Configuration saved successfully"}
+            # QA H-60: que se vea que claves de la config anterior se quitaron.
+            return {"success": True, "message": "Configuration saved successfully",
+                    "quitadas": getattr(config_manager, 'ultimas_quitadas', [])}
         else:
             return {"success": False, "errors": errors}
     except Exception as e:

@@ -113,3 +113,20 @@ def test_no_se_borra_una_replica_en_uso(tmp_path):
     assert m.save_config(config)[0]                 # se aplica: config.json usa la replica
     ok, errores = m.delete_configuration(pid)
     assert not ok and 'usa archivos de esta replica' in errores[0]
+
+
+def test_h60_aplicar_reemplaza_y_no_deja_claves_viejas(tmp_path):
+    """QA H-60: aplicar el canonico despues de otra config dejaba en config.json
+    las claves que el canonico no trae (merge). Caso real: `personas` quedaba y
+    mandaba sobre la flota; la corrida no era la de la pantalla."""
+    cm, cfg = _proyecto(tmp_path)
+    otra = dict(cfg, waves={'enabled': True, 'release_times': {'W1': 0}},
+                priority_dispatch_enabled=True)
+    ok, err = cm.save_config(otra)
+    assert ok, err
+    ok, err = cm.save_config(cfg)
+    assert ok, err
+    vigente = json.load(open(tmp_path / 'config.json', encoding='utf-8'))
+    assert 'waves' not in vigente and 'priority_dispatch_enabled' not in vigente
+    assert cm.ultimas_quitadas == ['priority_dispatch_enabled', 'waves']
+    assert vigente == cfg

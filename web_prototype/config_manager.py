@@ -94,15 +94,19 @@ class WebConfigurationManager:
             if not is_valid:
                 return False, errors
 
-            # MERGE: load existing config and overlay UI keys on top.
-            # Contract: NEVER drop keys the UI does not manage (e.g. blocks
-            # 'congestion' and 'outbound' used by the simulation engine).
+            # QA H-60: "Aplicar" REEMPLAZA config.json por la configuracion de la
+            # pantalla (la misma que usa "Run", BK-11). Antes se mezclaba con la
+            # vigente y sobrevivian claves viejas: aplicar el canonico despues de
+            # una config con `personas` dejaba `personas` (que manda sobre la
+            # flota) y la corrida no era la que se veia. El merge nacio cuando el
+            # formulario no traia los bloques que no edita (congestion,
+            # outbound); desde H-01 el formulario los trae de la config cargada.
             existing = self._load_existing_for_merge()
-            merged = dict(existing)
-            merged.update(config)
-            preserved = sorted(set(existing.keys()) - set(config.keys()))
-            if preserved:
-                print(f"[CONFIG_MANAGER] Merge preserved keys not managed by UI: {preserved}")
+            merged = dict(config)
+            self.ultimas_quitadas = sorted(set(existing.keys()) - set(config.keys()))
+            if self.ultimas_quitadas:
+                print(f"[CONFIG_MANAGER][WARN] Aplicar quita de config.json claves que la "
+                      f"configuracion aplicada no trae: {self.ultimas_quitadas}")
 
             # Backup existing config (before overwriting)
             if os.path.exists(self.config_path):
