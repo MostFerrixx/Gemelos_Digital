@@ -202,7 +202,7 @@ descarga con turno. Faltan:
 - reglas de derecho de paso (el peatón manda sobre el montacargas, según
   [OSHA](https://www.osha.gov/etools/powered-industrial-trucks/workplace/pedestrian-traffic)).
 
-## 5. Plan de integración (propuesta INIT-12 "Realismo calibrable")
+## 5. Plan de integración (propuesta INIT-13 "Realismo calibrable")
 
 Todo configurable desde `config.json` y la web (Ley #3), apagado por defecto
 hasta medirlo (el gate byte-idéntico no se rompe hasta la decisión), y con

@@ -1,4 +1,4 @@
-# Diseño INIT-12 — Realismo calibrable (Fases A y B)
+# Diseño INIT-13 — Realismo calibrable (Fases A y B)
 
 > **Estado:** PROPUESTA para aprobación del Director (2026-09-26).
 > **Origen:** `docs/INVESTIGACION_SIMULADORES_Y_PLAN_REALISMO.md` (investigación
@@ -103,6 +103,7 @@ nuestro formato. Todo lo demás queda igual para todos.
 | `hora_inicio_tarea` | no | Si el WMS la tiene, mejora la medición del viaje |
 | `hora_liberacion_pedido` | no | Cuándo se liberó el pedido al piso. Sin ella se usa la ola o el inicio del turno |
 | `ola`, `destino`, `zona_salida` | no | Como hoy en el modo determinista |
+| `etapa` | no | Para operaciones en varios pasos (pick, traslado, empaque, film, control). Cada etapa es una fila con su propia hora. Queda listo para el Task Path (INIT-11 F3/F4): sin él, los registros de varias etapas se miden, pero todavía no se pueden simular |
 
 *Registro de turnos* (una fila por persona y día): `fecha`, `operario`,
 `equipo`, `entrada`, `salida` y descansos (`inicio`, `duracion`, repetible).
@@ -372,6 +373,18 @@ con un novato ni explicar por qué un turno rindió menos.
 **Total: ~6–7 semanas de trabajo.** Cada entrega cierra con tests, gate
 (PASS o cambio intencional explicado), QA con clics reales en la web y
 documentación (CHANGELOG, STATE, MANUAL).
+
+### Orden acordado con INIT-11 (Task Path), 2026-09-26
+
+El Director aprobó A+B y pidió el Task Path (INIT-11 F3/F4: pasos intermedios,
+pulmones y estaciones con tiempo por pallet) como siguiente prioridad. Orden:
+1. Entregas 1-3 (medir la realidad, turno, reproducir y comparar un día).
+2. **INIT-11 F3 + F4** (Task Path + estaciones de actividad).
+3. Entregas 4-5 (minería de tiempos y calibración). Se calibra **después**
+   del Task Path, para no calibrar dos veces: en un centro de distribución de
+   varias etapas, la calibración no cierra si falta la estructura.
+4. Entregas 6-7 (altura y aceleración): afinan segundos, no cambian la
+   estructura.
 
 ## 8. Riesgos
 
