@@ -89,21 +89,32 @@ nuestro formato. Todo lo demás queda igual para todos.
 
 **Qué es:** dos archivos CSV.
 
-*Registro de operación* (una fila por línea pickeada):
+*Registro de movimientos* (una fila por movimiento confirmado; revisado el
+2026-09-26 con lo que exportan de verdad SAP EWM, Manhattan e Infor, ver
+`docs/PEDIDO_DE_DATOS_CLIENTE.md`):
 
 | Columna | Obligatoria | Uso |
 |---|---|---|
-| `fecha` | sí | Agrupa por día |
-| `pedido`, `linea` | sí | Identidad del pedido y de la línea |
-| `sku`, `cantidad` | sí | Qué y cuánto (cruza con `SkuCatalog`) |
-| `ubicacion` | sí | De dónde se sacó (cruza con `PickingLocations`: id o x,y) |
-| `operario` | sí | Quién |
-| `equipo` | no | Con qué (a pie, transpaleta, reach...). Si falta, se infiere del área |
-| `hora_confirmacion` | sí | Momento del pick (la marca que tienen todos los WMS) |
-| `hora_inicio_tarea` | no | Si el WMS la tiene, mejora la medición del viaje |
-| `hora_liberacion_pedido` | no | Cuándo se liberó el pedido al piso. Sin ella se usa la ola o el inicio del turno |
-| `ola`, `destino`, `zona_salida` | no | Como hoy en el modo determinista |
-| `etapa` | no | Para operaciones en varios pasos (pick, traslado, empaque, film, control). Cada etapa es una fila con su propia hora. Queda listo para el Task Path (INIT-11 F3/F4): sin él, los registros de varias etapas se miden, pero todavía no se pueden simular |
+| `documento` (pedido o entrega), `linea` | sí | Identidad |
+| `producto`, `cantidad` | sí | Qué y cuánto (cruza con el maestro de productos) |
+| `origen`, `destino` | sí | Ubicaciones (cruzan con el maestro de ubicaciones) |
+| `usuario` | sí | Quién |
+| `hora_confirmacion` | sí | La marca que tienen todos los WMS |
+| `hora_inicio` | no | SAP e Infor la tienen. Sin ella se usa la confirmación anterior del mismo usuario ("de escaneo a escaneo") |
+| `ola`, `recurso` o `equipo` | no | Si vienen, se usan |
+
+**Las etapas NO se piden: se deducen.** El tipo de ubicación de origen y de
+destino (maestro de ubicaciones: picking, reserva, pulmón, estación, muelle)
+dice qué fue cada movimiento: rack → pulmón es un pick, pulmón → muelle es un
+traslado. Las tareas "en el lugar" que no generan movimiento (empaque, film)
+no quedan en ningún WMS con hora propia. Se toman de la pregunta 3 del pedido
+de datos (tiempo aproximado) o de la diferencia entre llegada y salida en la
+estación.
+
+**Conversores por sistema.** El export de cada WMS trae sus propios nombres de
+columna (`CONFIRMED_AT_WH`, `EDITDATE`, ...). Hay un conversor por sistema
+(SAP EWM, Infor, Manhattan) que lo traduce al formato de arriba. Se hace una
+vez y sirve para todos los clientes de ese sistema.
 
 *Registro de turnos* (una fila por persona y día): `fecha`, `operario`,
 `equipo`, `entrada`, `salida` y descansos (`inicio`, `duracion`, repetible).
@@ -358,33 +369,26 @@ con un novato ni explicar por qué un turno rindió menos.
 | `config_schema.py`, `MANUAL_CONFIGURACION.md` | Todas |
 | `tests/` | Tests unitarios por feature + prueba de aceptación A6 |
 
-## 7. Orden de entrega y cómo se verifica cada una
+## 7. Plan de ejecución (decidido por Cerebellum, 2026-09-26)
 
-| # | Entrega | Esfuerzo | Verificación |
+El Director delegó el orden. Criterio: **construir primero lo que todo lo
+demás usa y nunca programar dos veces lo mismo.**
+
+| # | Etapa | Qué se construye | Por qué va en este lugar |
 |---|---|---|---|
-| 1 | **A2** KPIs compartidos + **A1** formato e importador (sin cambios de motor) | 4–5 días | Tests; importar un registro de ejemplo por la web |
-| 2 | **B1** turno, descansos, PFD + **B2** preparación y método | 4–5 días | Gate intacto con valores neutros; escenario de QA con descansos visible en el visor |
-| 3 | **A1** motor (liberación, ubicación fija, dotación con horario) + **A3** comparador | 5–6 días | Un día sintético: real y simulado idénticos cuando los parámetros coinciden |
-| 4 | **A4** minería de tiempos + **A6** cliente sintético | 4 días | Recupera los parámetros ocultos |
-| 5 | **A5** calibración | 4–5 días | Cliente sintético: validación en verde en días reservados |
-| 6 | **B3** niveles y altura + **B5** habilidad | 4 días | Tiempos de horquilla contra fórmula; A5 sugiere la habilidad |
-| 7 | **B4** aceleración y giros | 5–7 días | 0 co-ocupaciones en los 21 escenarios; A/B contra el perfil constante |
+| **E1** | Base de medición | Formato "registro de movimientos" + conversor **simulación → registro** + indicadores calculados SOBRE el registro + generador de **cliente sintético** (registro de la simulación + ruido) | Es la pieza que usan todas las demás. Si la simulación produce el mismo formato que el cliente, los indicadores se programan una sola vez y el cliente sintético sale casi gratis. Cuando llegue el Task Path, el conversor solo emite más filas |
+| **E2** | Carga de datos del cliente | Importador + validador + conversores SAP EWM, Infor y Manhattan (probados con archivos sintéticos con sus columnas reales) + **pantalla "Validación con datos reales"** (subir, revisar, indicadores reales por día) | Necesita E1. El formato ya está validado contra lo que exportan los 3 sistemas |
+| **E3** | Reproducir un día | En el motor: hora de liberación por pedido, ubicación fija por línea, **turno único** (dotación con horario + descansos + arranque/cierre + PFD) y **puntos de enganche "antes/después de cada recorrido"** | Descansos y dotación con horario son el mismo objeto "turno": se hacen juntos. Los enganches van **alrededor** del recorrido, no dentro del de picking, así sobreviven al Task Path |
+| **E4** | Comparador | Botón "Simular este día", real contra simulado, curvas, diferencia, informe | Necesita E1-E3 |
+| **E5** | Task Path + estaciones | INIT-11 F3 + F4 (plan revisado contra el mapa v3) + preparación por tipo de paso (B2) usando los enganches de E3 | Antes de calibrar: en un centro de distribución de varias etapas, la calibración no cierra sin la estructura |
+| **E6** | Tiempos reales y calibración | Minería de tiempos (A4) + calibración automática (A5) + prueba de recuperación con el cliente sintético | Con la estructura completa, se calibra una sola vez |
+| **E7** | Altura + ritmo por persona | Nivel por ubicación (horquilla, postura) + habilidad por operario | Afinan segundos; no cambian la estructura |
+| **E8** | Aceleración y giros | Perfil trapezoidal (toca el planificador) | La más delicada, al final, con tests de invariantes |
+| E9 | Tránsito (fase C) | Esperas que no estorban, pasillo con cola afuera, detector de bloqueos | Después, con la base medible de E1 |
 
-**Total: ~6–7 semanas de trabajo.** Cada entrega cierra con tests, gate
-(PASS o cambio intencional explicado), QA con clics reales en la web y
-documentación (CHANGELOG, STATE, MANUAL).
-
-### Orden acordado con INIT-11 (Task Path), 2026-09-26
-
-El Director aprobó A+B y pidió el Task Path (INIT-11 F3/F4: pasos intermedios,
-pulmones y estaciones con tiempo por pallet) como siguiente prioridad. Orden:
-1. Entregas 1-3 (medir la realidad, turno, reproducir y comparar un día).
-2. **INIT-11 F3 + F4** (Task Path + estaciones de actividad).
-3. Entregas 4-5 (minería de tiempos y calibración). Se calibra **después**
-   del Task Path, para no calibrar dos veces: en un centro de distribución de
-   varias etapas, la calibración no cierra si falta la estructura.
-4. Entregas 6-7 (altura y aceleración): afinan segundos, no cambian la
-   estructura.
+**Cada etapa cierra con** tests, gate (PASS o cambio intencional explicado),
+QA con clics reales en la web y documentación. Cada etapa es neutra por
+defecto: sin datos nuevos, el simulador hace lo mismo que antes.
 
 ## 8. Riesgos
 
@@ -403,15 +407,18 @@ pulmones y estaciones con tiempo por pallet) como siguiente prioridad. Orden:
   camión). Se detectan porque la calibración no cierra en ciertos días, y se
   documentan para la fase D.
 
-## 9. Decisiones del Director
+## 9. Decisiones (2026-09-26)
 
-1. **¿Aprobado el alcance y el orden** (sección 7)?
-2. **Datos reales:** ¿hay un cliente o almacén piloto para pedirle 10–20 días
-   de registro de picks y de turnos? Si no, avanzamos con el cliente
-   sintético (A6) y lo validamos con el primero que aparezca.
-3. **Banda de aceptación** a comprometer: propuesta ±5 % en duración y
-   líneas por hora, ±10 % en tiempo por pedido.
-4. **Formato del registro (A1):** ¿aprobado el formato propio con un
-   conversor por cliente?
-5. **Descanso:** ¿el operario termina el recorrido en curso antes de ir al
-   descanso (recomendado) o lo corta?
+1. **Alcance y orden:** aprobados. El Director delegó el orden de ejecución
+   (sección 7).
+2. **Datos reales:** por ahora no hay cliente piloto. Se avanza con el
+   **cliente sintético**, y los conversores de SAP EWM, Infor y Manhattan se
+   prueban con archivos sintéticos que usan sus columnas reales.
+3. **Margen de error:** no se compromete todavía. Primero se reduce el error
+   lo más posible (cliente sintético y primer piloto). Con cada cliente, el
+   margen se fija **antes** de mostrarle sus resultados.
+4. **Formato:** registro de movimientos propio + un conversor por WMS
+   (explicado y aceptado). El pedido de datos para el cliente está en
+   `docs/PEDIDO_DE_DATOS_CLIENTE.md`.
+5. **Descanso:** el operario termina el recorrido en curso y después va al
+   descanso (práctica habitual; queda configurable).
