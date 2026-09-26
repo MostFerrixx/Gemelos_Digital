@@ -24,7 +24,7 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-27 — prioridades muertas sin aviso cuando el mapa cambia de equipo | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-21) |
 | BK-32 — la pestana Outbound tiene 7 zonas fijas | ABIERTO (2026-09-23) | Media (configurabilidad) | Medio | Ninguno (QA H-32) |
 | BK-37 — objetivo del optimizador: eficiencia vs cumplir el turno | ABIERTO (2026-09-25) | Media (decision de negocio) | Chico una vez decidido | Decision del Director |
-| INIT-12 — Realismo calibrable (prueba contra datos reales del cliente + reloj completo + transito) | PROPUESTA (2026-09-26) | **Alta (comercial)** | 6-9 semanas en 4 fases | Decisiones del Director: `docs/INVESTIGACION_SIMULADORES_Y_PLAN_REALISMO.md` seccion 6 |
+| INIT-12 — Realismo calibrable (prueba contra datos reales del cliente + reloj completo + transito) | PROPUESTA (2026-09-26); diseño de A y B listo | **Alta (comercial)** | A+B ~6-7 semanas | Decisiones del Director: `docs/DISENO_INIT12_REALISMO_CALIBRABLE.md` seccion 9 |
 | BK-40 — cupo por pasillo estricto: la espera y el cruce de pasillos ajenos | ABIERTO (2026-09-26) | Media (realismo, solo con cupo) | 1-2 dias | Decision de diseno del Director (QA H-56) |
 | BK-38 — tres mapas de ejemplo en `layouts/` son esqueletos vacios | ABIERTO (2026-09-26) | Baja (limpieza) | Chico | Aprobacion del Director (poda) (QA combinadas P-1) |
 | BK-34 — el KPI "distancia de guardado" mezcla la caminata al muelle | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-37) |
