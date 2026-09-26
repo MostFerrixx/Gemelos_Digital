@@ -147,3 +147,40 @@ def test_cupo_apagado_no_limita():
 def test_cupo_avisa_si_supera_el_ancho():
     g = _gestor_cupo({'pasillos': {'enabled': True, 'capacidad_default': 4}})
     assert any('ancho' in a for a in g.resumen()['avisos'])
+
+
+class _OpCupo:
+    """Operario minimo con los metodos reales de cupo de BaseOperator."""
+
+    def __init__(self, gestor, id_, celda):
+        from subsystems.simulation.operators import BaseOperator
+        self.almacen = types.SimpleNamespace(cupo_pasillos=gestor, congestion_manager=None)
+        self.id = id_
+        self.current_position = celda
+        for nombre in ('_set_pos', '_salir_del_pasillo', '_dejar_pasillo',
+                       '_liberar_pasillos_dejados'):
+            setattr(self, nombre, types.MethodType(getattr(BaseOperator, nombre), self))
+
+
+def test_h56_el_lugar_se_libera_al_salir_caminando_del_pasillo():
+    """QA H-56: con cupo 1, el lugar se soltaba al terminar el ultimo pick y
+    otro entraba mientras este todavia caminaba hacia la boca."""
+    g = _gestor_cupo({'pasillos': {'enabled': True, 'capacidad_default': 1}})
+    a = _OpCupo(g, 'A', (1, 3))
+    assert g.entrar(1, 'A')
+    a._pasillo_actual = 1
+    a._salir_del_pasillo()                 # termino: va a descargar
+    assert not g.entrar(1, 'B')            # sigue adentro: B espera
+    a._set_pos((1, 4))                     # camina dentro del pasillo
+    assert not g.entrar(1, 'B')
+    a._set_pos((1, 6))                     # salio por la boca
+    assert g.entrar(1, 'B')
+
+
+def test_h56_si_ya_esta_afuera_libera_en_el_acto():
+    g = _gestor_cupo({'pasillos': {'enabled': True, 'capacidad_default': 1}})
+    a = _OpCupo(g, 'A', (1, 7))            # fuera del pasillo
+    g.entrar(1, 'A')
+    a._pasillo_actual = 1
+    a._salir_del_pasillo()
+    assert g.entrar(1, 'B')

@@ -1312,6 +1312,41 @@ class WebConfigurator {
         }
     }
 
+    // QA H-55: al importar o cargar una configuracion se perdian el modo de
+    // pedidos, el archivo de pedidos y la politica: volvia a Estocastico y la
+    // corrida no usaba el archivo (tambien el de la replica BK-36).
+    _cargarModoDePedidos(config) {
+        const modo = config.order_generation_mode === 'deterministic' ? 'deterministic' : 'stochastic';
+        const radio = document.querySelector(`input[name="order-generation-mode"][value="${modo}"]`);
+        if (radio) {
+            radio.checked = true;
+            radio.dispatchEvent(new Event('change'));   // muestra/oculta opciones y habilita la politica
+        }
+        const politica = document.getElementById('fulfillment-policy');
+        if (politica) politica.value = config.fulfillment_policy || 'ship_partial';
+
+        this.uploadedOrderFilePath = config.order_file_path || '';
+        const dropzone = document.getElementById('orders-dropzone');
+        const contenido = dropzone?.querySelector('.dropzone-content');
+        if (!dropzone || !contenido) return;
+        if (this.uploadedOrderFilePath) {
+            const nombre = this.uploadedOrderFilePath.split(/[\\/]/).pop();
+            dropzone.classList.add('has-file');
+            contenido.innerHTML = `
+                <span class="dropzone-icon">✅</span>
+                <p><strong>${nombre}</strong></p>
+                <small>Archivo de la configuración cargada. Clic para cambiarlo</small>
+            `;
+        } else {
+            dropzone.classList.remove('has-file');
+            contenido.innerHTML = `
+                <span class="dropzone-icon">📄</span>
+                <p>Arrastra un archivo aquí o <span class="link">haz clic para buscar</span></p>
+                <small>Formatos soportados: .json, .csv</small>
+            `;
+        }
+    }
+
     loadConfigToForm(config) {
         // H-01 (QA 2026-09-18): el formulario recuerda DE QUE configuracion se
         // cargo (la del servidor, un .json importado o un preset). Antes solo se
@@ -1322,6 +1357,7 @@ class WebConfigurator {
 
         // Tab 1: Carga de Trabajo
         document.getElementById('total-ordenes').value = config.total_ordenes || 300;
+        this._cargarModoDePedidos(config);
 
         // AUD8-2: distribucion por CLASE DE MANEJO (5 clases; el campo
         // volumen quedo DEPRECATED -- la fisica vive en la hoja SkuCatalog).

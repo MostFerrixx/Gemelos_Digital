@@ -57,18 +57,44 @@ async def add_no_cache_headers(request, call_next):
     return response
 
 
+def limpiar_uploads(raiz: str) -> list:
+    """Borra de uploads/ los archivos que la configuracion vigente NO usa.
+
+    QA H-57: antes se borraba la carpeta entera al arrancar, y config.json
+    quedaba apuntando a un archivo de pedidos / mapa / Excel subido que ya no
+    existia (el servidor del cliente se reinicia solo: BK-16). Las
+    configuraciones guardadas no dependen de uploads/ (BK-36 copia sus archivos).
+    Devuelve las rutas relativas borradas."""
+    uploads_dir = os.path.join(raiz, "uploads")
+    os.makedirs(uploads_dir, exist_ok=True)
+    try:
+        with open(os.path.join(raiz, "config.json"), "r", encoding="utf-8") as f:
+            vigente = f.read().replace(chr(92) * 2, "/").replace(chr(92), "/")
+    except OSError:
+        vigente = ""
+    borrados = []
+    for carpeta, _, archivos in os.walk(uploads_dir):
+        for nombre in archivos:
+            ruta = os.path.join(carpeta, nombre)
+            rel = os.path.relpath(ruta, raiz).replace(chr(92), "/")
+            if rel in vigente:
+                continue
+            try:
+                os.remove(ruta)
+                borrados.append(rel)
+            except OSError:
+                pass
+    return borrados
+
+
 @app.on_event("startup")
 async def startup_event():
-    """Clean up uploads directory on startup"""
-    uploads_dir = os.path.join(PROJECT_ROOT, "uploads")
-    if os.path.exists(uploads_dir):
-        print(f"Cleaning up uploads directory: {uploads_dir}")
-        try:
-            shutil.rmtree(uploads_dir)
-            os.makedirs(uploads_dir, exist_ok=True)
-            print("Uploads directory cleaned.")
-        except Exception as e:
-            print(f"Error cleaning uploads directory: {e}")
+    """Limpia uploads/ sin tocar lo que usa la configuracion vigente."""
+    try:
+        borrados = limpiar_uploads(PROJECT_ROOT)
+        print("[OK] uploads/: %d archivo(s) sin uso borrado(s)." % len(borrados))
+    except Exception as e:
+        print(f"[WARN] No se pudo limpiar uploads/: {e}")
 
 
 app.include_router(configurator.router)

@@ -25,7 +25,7 @@ import sys
 import time
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from web_prototype.app_state import PROJECT_ROOT
@@ -56,8 +56,12 @@ TABLAS = {
 
 
 class AplicarRequest(BaseModel):
-    """Aplica un Excel ya subido (o el vigente si no se pasa ninguno)."""
+    """Aplica un Excel ya subido (o el vigente si no se pasa ninguno).
+
+    QA H-54: la web manda el Excel y el mapa del FORMULARIO; sin ellos se usan
+    los de `config.json` (compatibilidad)."""
     excel_path: Optional[str] = None
+    tmx_path: Optional[str] = None
 
 
 def _conn():
@@ -167,8 +171,10 @@ def _validar_excel(path: str, tmx_path: Optional[str] = None) -> Dict[str, Any]:
 
 
 @router.post("/api/master-data/upload-excel")
-async def upload_excel(file: UploadFile = File(...)):
-    """Sube el Excel maestro y lo VALIDA. No toca la base todavia."""
+async def upload_excel(file: UploadFile = File(...), tmx_path: Optional[str] = Form(None)):
+    """Sube el Excel maestro y lo VALIDA. No toca la base todavia.
+
+    `tmx_path`: el mapa del formulario (QA H-54); sin el, el de config.json."""
     if not file.filename.lower().endswith((".xlsx", ".xlsm")):
         raise HTTPException(status_code=400, detail="Solo se permiten archivos .xlsx")
 
@@ -177,7 +183,7 @@ async def upload_excel(file: UploadFile = File(...)):
     with open(destino, "wb") as f:
         f.write(await file.read())
 
-    reporte = _validar_excel(destino)
+    reporte = _validar_excel(destino, _ruta_segura(tmx_path) if tmx_path else None)
     reporte["excel_path"] = os.path.relpath(destino, PROJECT_ROOT)
     reporte["nombre"] = os.path.basename(file.filename)
     return reporte
@@ -224,7 +230,8 @@ def aplicar_excel(request: AplicarRequest):
     if not os.path.exists(excel):
         raise HTTPException(status_code=404, detail="No se encontro el Excel: %s" % excel)
 
-    reporte = _validar_excel(excel)
+    tmx = _ruta_segura(request.tmx_path) if request.tmx_path else None
+    reporte = _validar_excel(excel, tmx)
     if not reporte["valido"]:
         return {"success": False, "errors": reporte["errores"]}
 

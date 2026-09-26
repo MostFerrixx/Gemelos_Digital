@@ -675,6 +675,8 @@ class BaseOperator:
         if cm is not None and cm.active:
             cm.move(self.id, self.current_position, new_cell)
         self.current_position = new_cell
+        if getattr(self, '_pasillos_a_liberar', None):
+            self._liberar_pasillos_dejados()
 
     def _claim_spawn(self, cell):
         """
@@ -825,7 +827,14 @@ class BaseOperator:
         if actual == numero:
             return
         if actual is not None:
-            gestor.salir(self.id, actual)
+            if gestor.hay_lugar(numero, self.id):
+                # QA H-56: pasa directo al otro pasillo; el que deja se libera
+                # cuando sale caminando de el, no antes.
+                self._dejar_pasillo(gestor, actual)
+            else:
+                # Tiene que esperar: suelta el suyo (si retuviera los dos, dos
+                # operarios podrian esperarse mutuamente) y espera afuera.
+                gestor.salir(self.id, actual)
             self._pasillo_actual = None
         espera = self._espera_turno_s()
         while not gestor.entrar(numero, self.id):
@@ -834,13 +843,39 @@ class BaseOperator:
         gestor_espera = getattr(self.almacen, 'zonas_espera', None)
         if gestor_espera is not None:
             gestor_espera.liberar(self.id)
+        getattr(self, '_pasillos_a_liberar', set()).discard(numero)   # volvio a este
         self._pasillo_actual = numero
 
+    def _dejar_pasillo(self, gestor, numero):
+        """Suelta el lugar del pasillo `numero`: ya, si esta afuera; al salir
+        caminando, si todavia esta adentro (QA H-56)."""
+        if gestor.pasillo_de(self.current_position) == numero:
+            if not hasattr(self, '_pasillos_a_liberar'):
+                self._pasillos_a_liberar = set()
+            self._pasillos_a_liberar.add(numero)
+        else:
+            gestor.salir(self.id, numero)
+
     def _salir_del_pasillo(self):
+        """Termino su trabajo en el pasillo. QA H-56: si todavia esta ADENTRO,
+        el lugar se libera recien cuando sale caminando (_set_pos); antes se
+        liberaba aca y otro entraba con este aun en el pasillo."""
         gestor = getattr(self.almacen, 'cupo_pasillos', None)
-        if gestor is not None and gestor.activo:
-            gestor.salir(self.id, getattr(self, '_pasillo_actual', None))
+        actual = getattr(self, '_pasillo_actual', None)
+        if gestor is not None and gestor.activo and actual is not None:
+            self._dejar_pasillo(gestor, actual)
         self._pasillo_actual = None
+
+    def _liberar_pasillos_dejados(self):
+        """QA H-56: al cambiar de celda, suelta los pasillos que ya dejo."""
+        gestor = getattr(self.almacen, 'cupo_pasillos', None)
+        if gestor is None or not gestor.activo:
+            self._pasillos_a_liberar = set()
+            return
+        aqui = gestor.pasillo_de(self.current_position)
+        for n in [n for n in self._pasillos_a_liberar if n != aqui]:
+            gestor.salir(self.id, n)
+            self._pasillos_a_liberar.discard(n)
 
     def _reservar_espera_abierta(self, celda):
         """Reserva sin fin la celda donde el agente espera (mismo mecanismo que
@@ -1867,6 +1902,7 @@ class BaseOperator:
 
         # Visitar cada staging en orden
         for idx, (staging_id, staging_wos) in enumerate(ordered_stagings, 1):
+            self._salir_del_pasillo()   # BK-25: al ir a descargar deja el pasillo (QA H-56: tambien con outbound)
             if getattr(self.almacen, 'outbound_enabled', False):
                 # F1.3: descarga realista por carriles (2 por staging, espera fuera,
                 # llenado de atras hacia adelante). Reemplaza la descarga clasica.
@@ -1875,7 +1911,6 @@ class BaseOperator:
             staging_location = staging_locs.get(staging_id, (3, 29))
             # BK-25 F1.c: con la estacion activa, primero se pide TURNO; el
             # destino pasa a ser el puesto asignado (una columna del carril).
-            self._salir_del_pasillo()   # BK-25: al ir a descargar deja el pasillo
             _estacion = self._estacion_de(staging_id)
             _puesto_x = None
             if _estacion is not None:

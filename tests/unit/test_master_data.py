@@ -246,3 +246,21 @@ def test_md14_guardar_y_restaurar_coordenadas():
     finally:
         conn.close()
     assert (fila["x"], fila["y"]) == (ox, oy), "el test dejo la base modificada"
+
+
+def test_md17_aplicar_usa_excel_y_mapa_del_formulario(monkeypatch):
+    """QA H-54: "Aplicar Excel" sin subir archivo aplicaba el Excel de
+    config.json y lo validaba contra el mapa de config.json, aunque en pantalla
+    hubiera otra configuracion (importada o cargada, sin Aplicar)."""
+    visto = {}
+
+    def fake_validar(path, tmx_path=None):
+        visto.update(path=path, tmx=tmx_path)
+        return {"valido": False, "errores": ["stop"], "avisos": [], "resumen": {}}
+
+    monkeypatch.setattr(md, "_validar_excel", fake_validar)
+    r = md.aplicar_excel(md.AplicarRequest(excel_path="layouts/Warehouse_Logic_v2.xlsx",
+                                           tmx_path="layouts/WH1 v2.tmx"))
+    assert r["success"] is False
+    assert visto["path"].endswith("Warehouse_Logic_v2.xlsx")
+    assert visto["tmx"].endswith("WH1 v2.tmx")

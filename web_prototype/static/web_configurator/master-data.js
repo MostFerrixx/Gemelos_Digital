@@ -199,6 +199,9 @@ class MasterDataManager {
         try {
             const fd = new FormData();
             fd.append('file', archivo);
+            // QA H-54: se valida contra el mapa del formulario, no el de config.json.
+            const mapa = document.getElementById('layout-file')?.value;
+            if (mapa) fd.append('tmx_path', mapa);
             const r = await fetch('/api/master-data/upload-excel', { method: 'POST', body: fd });
             const data = await r.json();
 
@@ -262,9 +265,13 @@ class MasterDataManager {
     async aplicar() {
         // El import RECONSTRUYE las tablas: se avisa antes, porque reinicia el
         // stock inicial y pisa lo que se haya editado desde la web.
+        // QA H-54: sin subida se aplica el Excel del formulario (antes: el de
+        // config.json, que no es el que se ve si se importo/cargo otra config).
+        const excelForm = document.getElementById('sequence-file')?.value || null;
+        const mapaForm = document.getElementById('layout-file')?.value || null;
         const detalle = this.excelSubido
             ? 'el archivo que acabás de subir'
-            : 'el Excel configurado arriba';
+            : 'el Excel configurado arriba (' + (excelForm || '?') + ')';
         const ok = confirm(
             'Se va a aplicar ' + detalle + ' a los datos del simulador.\n\n'
             + 'Esto reconstruye las tablas: el stock inicial vuelve al del Excel y se '
@@ -277,7 +284,7 @@ class MasterDataManager {
             const r = await fetch('/api/master-data/apply', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ excel_path: this.excelSubido || null })
+                body: JSON.stringify({ excel_path: this.excelSubido || excelForm, tmx_path: mapaForm })
             });
             const data = await r.json();
             if (!data.success) {
