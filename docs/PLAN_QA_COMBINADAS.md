@@ -9,7 +9,10 @@
 
 ## 0. Estado
 
-**Objetivo inmediato:** ejecutar la Fase 1 (escenarios C-01 a C-21).
+**Ejecutado 2026-09-26.** Fase 1: 21/21 corridos; 19 PASAN, C-14 y C-17 fallan
+por dos hallazgos abiertos (BK-40, H-59). Fase 2 (réplica): 21/21 cargas
+correctas desde otro almacén/estado; mismos resultados que en la Fase 1.
+Hallazgos nuevos: **H-53 a H-59** (5 corregidos, 1 parcial, 1 abierto).
 **Resultados:** sección 6.
 
 ## 1. Método
@@ -49,9 +52,10 @@ teclado, archivos por el selector real):
 | K1 | La corrida termina sin el vigilante de no-progreso ni errores |
 | K2 | Todas las tareas quedan `staged` (o las fallidas/backorders esperables del escenario) |
 | K3 | Cada tarea la hace un equipo que puede atender su área (mapa de equipo por área) |
-| K4 | Con anti-colisión activa: 0 co-ocupaciones (BK-29/BK-25) |
+| K4 | Con anti-colisión activa: 0 co-ocupaciones **fuera de la ventana de arranque** (invariante BK-15; se lee de `congestion_report`) |
 | K5 | Los agentes que corren son exactamente los de la flota configurada |
-| K6 | Las descargas ocurren en celdas de las zonas de salida DEL almacén en uso |
+| K6 | Las descargas ocurren en celdas de las zonas de salida DEL almacén en uso (con outbound, una zona de una celda se agranda a 8: se reconstruye con `build_zone_cells`; el guardado WO-PU descarga en el rack, no cuenta) |
+| K7 | Ninguna tarea aparece dos veces en el mismo recorrido (agregado tras H-53) |
 
 ## 2. Almacenes disponibles
 
@@ -125,9 +129,86 @@ apagados, perfil Demo.
 
 | # | Descripción | Estado |
 |---|---|---|
-| P-1 | Tres mapas de `layouts/` están dañados (Almacen_Grande, Almacen_Pequeño, Layout_Corredor_Central) | A registrar |
-| P-2 | "Aplicar Excel" sin subir archivo usa el `sequence_file` de `config.json`, aunque la pantalla dice "el Excel configurado arriba" (el del formulario) | A verificar en la ejecución |
+| P-1 | Tres mapas de `layouts/` están dañados (Almacen_Grande, Almacen_Pequeño, Layout_Corredor_Central) | Confirmado: son esqueletos de una fila; la web ya los rechaza con un mensaje claro → **BK-38** (poda, con OK del Director) |
+| P-2 | "Aplicar Excel" sin subir archivo usa el `sequence_file` de `config.json`, aunque la pantalla dice "el Excel configurado arriba" (el del formulario) | Confirmado en el código → **H-54, corregido** |
 
 ## 6. Resultados
 
-(se completa durante la ejecución)
+Corridas por la web con clics reales (`scripts/qa/capturas_web.py`), guardadas
+como `QA-C-nn ...` (réplica). Verificación automática sobre el `.jsonl` de cada
+corrida (K1-K7 + criterios propios). Fin = duración simulada (s).
+
+### 6.1 Fase 1 — escenarios
+
+| ID | Resultado | Evidencia principal | Hallazgos |
+|---|---|---|---|
+| C-01 | **PASA** | 624 tareas staged; descargas solo en (3,30)/(4,30); 4 agentes; 0 co-ocupaciones | H-53 (salía en el control: 29 tareas repetidas) |
+| C-02 | **PASA** (tras H-53) | 1.er intento FALLA: 19 pallets despachados dos veces. Tras corregir: 610 despachados = 610 tareas; 88 camiones, ninguno mezcla zonas ni lleva > 8; zonas 1-3 = 31,7 / 24,7 / 43,7 % | **H-53** |
+| C-03 | **PASA** | Cercanía radio 5; montacargas solo High/Special | — |
+| C-04 | **PASA** | 608/608 picks = fórmula exacta (error < 0,05 s) | — |
+| C-05 | **PASA** | Con variabilidad solo 5/618 picks coinciden con la fórmula (los demás varían alrededor de la media) | — |
+| C-06 | **PASA** | Terrestres cargan hasta 300; mediana 0,2 s/paso cargado vs 0,1 vacío | — |
+| C-07 | **PASA** (tras H-55) | 1.er intento: la importación perdió el modo determinista y el archivo. Tras corregir: 70 pedidos, cada tienda en su zona, 26 recorridos de una sola zona | **H-55** |
+| C-08 | **PASA** | 12 pallets guardados; espera pallet→operario 414 s; 2 agentes | — |
+| C-09 | **PASA** | 12.932 instantes con dos agentes en la misma celda (contados desde el replay; el motor no calcula la métrica sin la capa: OBS); control C-01 = 0 | — |
+| C-10 | **PASA** (criterio corregido) | 1,0 s/celda a pie y 0,5 montacargas medidos paso a paso. El "≥ 5× duración" era un error del plan: caminar es el 2 % del tiempo en C-01 (domina el pick) → 6.664 s → 12.036 s | BK-39 |
+| C-11 | **PASA** | Special la hacen terrestres (107); carga máxima 200 / 800, nunca más | — |
+| C-12 | **PASA** | Ana, Beto, Carla, Dario; cada pedido en un carril; 7 carriles. "Ayudar en otras zonas" no se ejercitó: el trabajo a pie se agotó a la par (3.611 / 3.631 s) y lo que queda es de altura | — |
+| C-13 | **PASA** | 1 cambio de equipo en EST-1; todos arrancan junto al estacionamiento. 1 co-ocupación en t = 0 (dentro de la ventana de arranque, OBS) | — |
+| C-14 | **FALLA (parcial)** | Con cupo 1 entraba un segundo operario con el primero adentro. H-56 lo bajó de 85 a 30 entradas; el resto (espera y cruce de pasillos ajenos) necesita diseño | **H-56**, BK-40 |
+| C-15 | **PASA** | 2 `WO-XD`; fill-rate 90,1 → 93,2 %; los pallets de cada camión quedan disponibles juntos. 1.er intento sin archivo de pedidos: el servidor borraba `uploads/` al arrancar | **H-57** |
+| C-16 | **PASA** | Almacén B aplicado por la web; mapa 30×30; descargas en la fila 29 | — |
+| C-17 | **FALLA** | Inbound completo (12 pallets), 585 despachados, 7 zonas. 2 co-ocupaciones al salir de un carril de descarga sobre otro que esperaba en la boca. Zonas de una celda agrandadas a 8 sin aviso | **H-58**, **H-59** |
+| C-18 | **PASA** | 715/715 tareas extra grande; 715/715 picks = fórmula | — |
+| C-19 | **PASA** | 386/386 picks sin multiplicador de clase (GENERAL); `[STOCHASTIC][WARN]` por cada clase sin SKUs | — |
+| C-20 | **PASA** | 0 eventos de inbound; `[INBOUND][WARN] ... sin muelles - inbound se DESACTIVA` | — |
+| C-21 | **PASA** | Todo o nada: ORD-006 (SKU inexistente) descartado entero; 29 pedidos servidos | — |
+
+### 6.2 Fase 2 — réplica (R-01 / R-02)
+
+Cada `QA-C-nn` se cargó con clics reales (Cargar) desde OTRO estado: otro
+almacén en uso (A↔B↔C) u otra configuración en pantalla. Se comprobó:
+parámetros del formulario = los de la corrida de la Fase 1 (sin diferencias);
+mapa, Excel y archivos apuntan a la copia de la réplica con el MISMO contenido
+(sha256); la base en uso = la base de la réplica (tabla por tabla). Luego se
+corrió de nuevo y se re-verificó.
+
+| Resultado | Detalle |
+|---|---|
+| **21/21 cargas correctas** | Parámetros, mapa, datos y archivos (2 a 4 por réplica, incluidos los de pedidos y ASN) |
+| **Mismos criterios que la Fase 1** | 19 PASAN; C-14 y C-17 fallan igual (BK-40, H-59) |
+| **Deterministas: misma duración al segundo** | C-07 1.137 s, C-15 3.664 s, C-21 402 s |
+| Estocásticos | Duración ±5-22 % (la web corre sin semilla fija; la comparación con semilla es la del A/B, R-03/R-04) |
+
+### 6.3 Fase 2 — A/B, borrado y cierre (R-03 a R-06)
+
+| Prueba | Resultado | Evidencia |
+|---|---|---|
+| **R-03** | **PASA** | Cargar QA-C-16 (almacén B) → Aplicar → A/B "Actual" vs "QA-C-16" (3 réplicas, semilla 1000): los 6 KPI **IDENTICO** (503 tareas, 6.507 s, 280,7 tareas/h) |
+| **R-04** | **PASA** | Igual con QA-C-19 (almacén C) y QA-C-12 (personas): **IDENTICO** en todos los KPI |
+| **R-05** | **PASA** | Eliminar la réplica en uso (QA-C-12 aplicada): la web lo impide ("La configuración vigente (config.json) usa archivos de esta réplica...") y no se borra nada |
+| **R-06** | **PASA** (tras H-60) | Cargar "Canonico v3 (referencia)" → Aplicar → datos canónicos; con `config.json` del repo, gate byte-idéntico PASS. En el camino apareció **H-60**: Aplicar mezclaba y dejaba `personas`/`equipos`/`zonas_picking` de C-12 en `config.json`. Corregido y verificado con clics reales |
+
+### 6.4 Hallazgos de estas pruebas
+
+| # | Severidad | Qué | Estado |
+|---|---|---|---|
+| H-53 | CRÍTICO (motor) | La misma tarea entraba dos veces al recorrido (también en el canónico: 29 de 624) | Corregido, baseline nuevo |
+| H-54 | MEDIO | Aplicar Excel usaba el Excel/mapa de `config.json`, no el de la pantalla (P-2) | Corregido |
+| H-55 | ALTO | Importar/cargar perdía el modo de pedidos, el archivo y la política | Corregido |
+| H-56 | MEDIO (realismo) | Cupo por pasillo: el lugar se soltaba antes de salir del pasillo | Parcial (85 → 30); resto BK-40 |
+| H-57 | ALTO | El servidor borraba `uploads/` al arrancar, incluido lo que usa `config.json` | Corregido |
+| H-58 | OBS | Zona de salida de una celda agrandada a 8 sin aviso | Corregido (aviso + manual) |
+| H-59 | MEDIO (realismo) | Salida del carril de descarga sobre otro que espera en la boca (almacén B + outbound) | Abierto → BK-25 F2 / BK-30 |
+| H-60 | ALTO | Aplicar dejaba claves de la configuración anterior en `config.json` | Corregido |
+
+Observaciones sin hallazgo: sin anti-colisión el motor no calcula la métrica
+de co-ocupaciones (C-09, se contó desde el replay); dos operarios registrados
+en la misma celda en t = 0 junto al estacionamiento (C-13, dentro de la
+ventana de arranque); el canónico usa el perfil Demo (BK-39).
+
+**Método — lecciones:** no correr `pytest` durante una tanda por la web (sus
+corridas escriben en `output/` y el arnés tomó una como si fuera de la web);
+los archivos de prueba en `uploads/` se pierden si el servidor se reinicia
+(ahora solo se conservan los que usa `config.json`).
+

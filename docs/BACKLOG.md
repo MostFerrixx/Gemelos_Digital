@@ -191,6 +191,12 @@ ubicacion de la tarea esta ocupada o reservada por otro agente.
 
 ### BK-25 — operarios que se pisan en la zona de descarga (QA H-15, H-27)
 
+**Actualizacion 2026-09-26 (QA H-59):** medicion que pide la F2. Almacen B +
+outbound (zonas de una celda agrandadas sobre el corredor), C-17: 2
+co-ocupaciones en ~21.000 s, las dos al SALIR de un carril de descarga sobre
+un agente que esperaba justo en la boca (celdas (17,27) y (21,27)). En el
+almacen A con outbound (C-02, C-10) no aparece.
+
 **Actualizacion 2026-09-19 (2):** adenda del consultor sobre ceder el paso y
 donde esperar: `docs/PROPUESTA_DISENO_CEDER_EL_PASO.md` (decisiones D-A1 a D-A6).
 

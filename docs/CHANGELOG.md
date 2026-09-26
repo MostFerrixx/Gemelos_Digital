@@ -10,6 +10,25 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-26
+
+- **QA de pruebas combinadas y replica (`docs/PLAN_QA_COMBINADAS.md`).** 21
+  escenarios que cambian todo a la vez (almacen A/B/C = mapa + Excel, carga,
+  flota/personas/perfiles, estrategias, tiempos, inbound/outbound, zonas y
+  cupo), armados y guardados por la web con clics reales como `QA-C-nn`.
+  Fase 1: 19 PASAN; C-14 y C-17 quedan con hallazgos abiertos. Fase 2: las 21
+  replicas se cargan bien desde otro almacen/estado (parametros, mapa, base y
+  archivos por sha256) y repiten los resultados; A/B replica vs aplicada =
+  IDENTICO (B, C y personas); no se puede borrar una replica en uso.
+  Corregidos: **H-53** (una tarea entraba dos veces al recorrido, tambien en el
+  canonico: 653 -> 624 picks, 150,8 -> 143,1 min; baseline nuevo) `4762046`;
+  **H-54** Aplicar Excel usa el Excel/mapa de la pantalla, **H-55** cargar
+  restaura modo/archivo/politica de pedidos, **H-56** cupo por pasillo hasta
+  salir (85 -> 30, resto BK-40), **H-57** el arranque ya no borra lo que usa
+  config.json `7ce89ae`; **H-58** aviso de zona de una celda agrandada
+  `156f219`; **H-60** Aplicar reemplaza config.json en vez de mezclar
+  `3ebda17`. Abiertos: H-59 (-> BK-25 F2), BK-38, BK-39, BK-40.
+
 ## 2026-09-25 (cont. 4)
 
 - **QA bloque 12 (Experimentos A/B) cerrado, 3 de 3 con clics reales.** A/B

@@ -4,16 +4,15 @@
 > presente, nada mas. Historial -> `docs/CHANGELOG.md`. Pendientes ->
 > `docs/BACKLOG.md`. Identidad/reglas/arquitectura -> `CLAUDE.md`.
 
-**Ultima actualizacion:** 2026-09-25
+**Ultima actualizacion:** 2026-09-26
 
 ## Git
 
 - `main` integra por fast-forward. Rama de trabajo: `qa/configuracion-web`.
-- **Baseline vigente: `sha256=62c65ebf...`, 17.302.142 bytes**, seed 42
-  (`tests/baseline.json`). Cambio intencional del 2026-09-23 (BK-29: cada
-  operario empieza el turno en una celda propia; y el que espera turno sin
-  lugar en la fila va de verdad al pulmon). Anteriores del mismo dia:
-  `f9089cba` (QA H-29/H-30), `0c441704`.
+- **Baseline vigente: `sha256=0c22f1c7...`, 16.353.897 bytes**, seed 42
+  (`tests/baseline.json`). Cambio intencional del 2026-09-26 (QA H-53: una
+  tarea ya no entra dos veces al mismo recorrido; 653 -> 624 picks, 150,8 ->
+  143,1 min). Anterior: `62c65ebf` (BK-29, 2026-09-23).
 - REGLA pinneada por tests BN-05 e IN-43: la metadata del .jsonl NO puede
   contener valores wall-clock.
 - En Windows `core.autocrlf=true`: `config.json` puede figurar como modificado
@@ -22,16 +21,19 @@
 ## Red de seguridad
 
 ```
-python -m pytest -q                # 396 passed, 1 deselected (~45s)
-python scripts/regression_gate.py  # GATE PASS esperado (baseline 62c65ebf)
+python -m pytest -q                # 404 passed, 1 deselected (~40s)
+python scripts/regression_gate.py  # GATE PASS esperado (baseline 0c22f1c7)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
 
 ## Canonico
 
 - Configuraciones guardadas = replicas completas en `data/config_presets/`
-  (BK-36): hay una, "Canonico v3 (referencia)". Las pruebas de QA se guardan
-  como "QA-<caso> ...".
+  (BK-36): "Canonico v3 (referencia)" + las de QA ("QA-<caso> ...", entre
+  ellas las 21 `QA-C-nn` de las pruebas combinadas, listas para reusar).
+- "Aplicar" REEMPLAZA `config.json` por la pantalla (H-60) y avisa lo que
+  quita; "Run" usa una copia temporal (BK-11). `uploads/` solo se limpia de lo
+  que `config.json` no usa (H-57).
 
 - `config_default.json` (raiz, versionado) = valores de fabrica del boton
   "Default"; hoy igual a `config.json`. Si el canonico cambia de mapa o Excel,
@@ -66,8 +68,12 @@ python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min
 
 ## QA de la configuracion web
 
-`docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0 a 12.
-**Siguiente: pruebas combinadas (seccion 7 del plan)**, la ultima parte. El
+`docs/PLAN_QA_CONFIGURACION_WEB.md`. Hechos los bloques 0 a 12 **y las
+pruebas combinadas** (`docs/PLAN_QA_COMBINADAS.md`, 2026-09-26): 21
+escenarios + fase de replica; 19 PASAN, C-14 (BK-40) y C-17 (H-59) quedan con
+hallazgos abiertos; replicas 21/21 correctas; A/B replica = IDENTICO.
+Corregidos H-53 a H-58 y H-60 (H-56 parcial). **El QA de la configuracion web
+queda completo.** El
 bloque 11 corrigio H-47 (critico: el optimizador corria siempre la misma flota),
 H-49 y H-50; tabla de trials nueva. El bloque 10 corrigio H-44 ("Default" viejo) y H-45 (Abrir Visor). El bloque 6 corrigio H-43 (mapas y Excel
 incompatibles se aceptaban), H-39 y H-41; H-40 y H-42 cerrados con BK-35.
@@ -81,7 +87,9 @@ El bloque 7 corrigio H-29, H-30 y H-31; abiertos H-32 (BK-32) y H-33
 
 Plan vivo: `docs/PLAN_BK25_ESTACION_DESCARGA.md`. F1 cerrada; el atasco con
 flota grande esta resuelto (8+8 repartido 26.736 -> 2.604 s). **F2 (cesion
-del paso) probablemente innecesaria**: se retoma solo si una medicion la pide.
+del paso): ahora hay una medicion que la pide** (QA H-59, almacen B +
+outbound: 2 co-ocupaciones al salir de un carril sobre otro que espera en la
+boca).
 
 ## Decisiones del Director pendientes
 
@@ -95,10 +103,15 @@ del paso) probablemente innecesaria**: se retoma solo si una medicion la pide.
 6. **BK-02** FIFO en UI, **INIT-10** modelo de almacen propio.
 7. **BK-37:** que mide el optimizador (hoy eficiencia: gana la flota mas chica)
    o cumplir el turno.
+8. **BK-39:** el canonico y el Default usan el perfil Demo (0,1 s/celda, ~10x
+   mas rapido que la realidad); con el principio de realismo deberia ser Real.
+9. **BK-40:** cupo por pasillo estricto (esperar afuera + no cruzar pasillos
+   ajenos); necesita diseno.
+10. **BK-38:** archivar 3 mapas-esqueleto de `layouts/` (poda).
 
 ## Bugs conocidos (no criticos)
 
-- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-37 (BK-29, BK-35 y BK-36 cerrados).
+- Ver `docs/BACKLOG.md`: BK-10, BK-13, BK-14, BK-16 a BK-40 (BK-29, BK-35 y BK-36 cerrados).
 - `warehouse.db` es la copia de trabajo del stock: cada corrida la restaura al
   arrancar desde `inventory_baseline`; "Aplicar Excel" borra esa foto (H-38).
   El respaldo de la base anterior al v3 es `warehouse_pre_v3_backup.db` (sin
