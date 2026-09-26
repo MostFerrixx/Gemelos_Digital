@@ -340,6 +340,12 @@ class AlmacenMejorado:
                     others = (all_anchors - {anchor}) | used
                     zcells = build_zone_cells(anchor, k, _walk, exclude=others,
                                               grid_w=gw, grid_h=gh)
+                    # QA H-58: hacerlo VISIBLE; antes la zona crecia en silencio
+                    # (y puede ocupar celdas de pasillo/corredor).
+                    print(f"[OUTBOUND][WARN] zona {sid}: el Excel la define con UNA celda "
+                          f"{tuple(anchor)}; para {k} pallets se usan {len(zcells)} celdas "
+                          f"alrededor: {zcells}. Si no es lo esperado, defini la zona "
+                          f"completa en la hoja OutboundStaging.")
                 zone = StagingZone(sid, zcells)
                 # F1.3 (modelo de carriles): NO se marca SERVICE. Cada columna es un
                 # carril (1 gruero a la vez) y se llena de atras hacia adelante, asi que

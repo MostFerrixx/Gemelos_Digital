@@ -200,6 +200,14 @@ Al activar outbound aparecen:
 - **Capacidad del camión (pallets)** — cuántos pallets carga un camión por
   viaje, siempre de **una sola zona de staging**. Default: 8.
 
+**Zonas de una sola celda.** Si el Excel define una zona de salida con UNA
+celda (almacenes viejos), con outbound encendido esa celda no alcanza para los
+pallets: el simulador arma la zona con las celdas transitables más cercanas
+(hasta `outbound.zone_capacity_default`, 8), y lo avisa en el log de la corrida
+(`[OUTBOUND][WARN] zona N...`). Esas celdas pueden caer sobre el corredor. Para
+controlarlo, definí la zona completa (todas sus celdas) en la hoja
+*OutboundStaging*.
+
 ## Tiempos de Operación
 
 ### Perfil de velocidad

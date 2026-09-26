@@ -24,6 +24,9 @@ aplicados el 2026-07-12 -> todo en CHANGELOG.)*
 | BK-27 — prioridades muertas sin aviso cuando el mapa cambia de equipo | ABIERTO (2026-09-19) | Baja | Chico | Ninguno (QA H-21) |
 | BK-32 — la pestana Outbound tiene 7 zonas fijas | ABIERTO (2026-09-23) | Media (configurabilidad) | Medio | Ninguno (QA H-32) |
 | BK-37 — objetivo del optimizador: eficiencia vs cumplir el turno | ABIERTO (2026-09-25) | Media (decision de negocio) | Chico una vez decidido | Decision del Director |
+| BK-40 — cupo por pasillo estricto: la espera y el cruce de pasillos ajenos | ABIERTO (2026-09-26) | Media (realismo, solo con cupo) | 1-2 dias | Decision de diseno del Director (QA H-56) |
+| BK-39 — el canonico y el Default usan el perfil Demo (10x mas rapido que la realidad) | ABIERTO (2026-09-26) | Media (realismo) | Chico (cambia el baseline) | Decision del Director (QA-C-10) |
+| BK-38 — tres mapas de ejemplo en `layouts/` son esqueletos vacios | ABIERTO (2026-09-26) | Baja (limpieza) | Chico | Aprobacion del Director (poda) (QA combinadas P-1) |
 | BK-34 — el KPI "distancia de guardado" mezcla la caminata al muelle | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-37) |
 | BK-33 — la ruta de cada pedido no viaja en el replay | ABIERTO (2026-09-23) | Baja | Chico | Ninguno (QA H-33) |
 | BK-25 — estacion de descarga con turno | **F1 CERRADA (2026-09-20)**, sigue F2 (cesion del paso) | Alta (realismo) | F2 3-4 dias | Plan vivo: `docs/PLAN_BK25_ESTACION_DESCARGA.md` |
@@ -290,6 +293,38 @@ cliente es terminar los pedidos del turno a tiempo, el puntaje deberia
 penalizar no llegar (duracion del turno como restriccion, o las
 penalizaciones de SLA con `due_time`). Decision de negocio del Director:
 que pregunta responde el optimizador. Lector: `optimizer.calculate_score`.
+
+### BK-40 — cupo por pasillo estricto: la espera y el cruce de pasillos ajenos (QA H-56)
+
+H-56 hizo que el lugar se suelte al SALIR del pasillo (no al terminar el
+ultimo pick): en C-14 (cupo 1, 4+4, seed 42) las entradas con otro operario
+adentro bajaron de 85 a 30. Las 30 que quedan tienen dos causas:
+(a) si el pasillo siguiente esta lleno, el operario suelta el suyo ANTES de
+salir a esperar (retenerlo hasta salir, probado, traba la operacion: 96 tareas
+sin terminar); (b) el ruteo usa pasillos ajenos como corredor sin pedir lugar.
+Propuesta: (a) celda de espera FUERA del pasillo reservada antes de soltar;
+(b) el A* evita pasillos que no son destino cuando el cupo esta activo (costo
+alto, no bloqueo). Medir con `ocupacion_pasillos` (posiciones del replay).
+
+### BK-39 — el canonico y el Default usan el perfil Demo (QA-C-10)
+
+`tiempos.time_per_cell` = 0,1 s/celda (unos 10 m/s a pie) en `config.json` y
+`config_default.json`: caminar es el 2% del tiempo en C-01. El manual ya dice
+"para decisiones usa Real" (1 s/celda, montacargas 0,5). Con el principio de
+realismo, el Default deberia ser Real; cambia el baseline y todos los KPIs
+historicos (C-10: 6.664 s -> 12.036 s con outbound). Decision del Director.
+
+### BK-38 — tres mapas de ejemplo en `layouts/` son esqueletos vacios (QA combinadas P-1)
+
+`Almacen_Grande.tmx`, `Almacen_Pequeño.tmx` y `Layout_Corredor_Central.tmx`
+declaran 35x25 (o similar) pero su unica capa trae UNA fila de ceros: son
+esqueletos de un generador viejo (checkpoint `7d3e782`), no almacenes. El
+motor no los puede abrir y la web ya lo dice bien al elegirlos ("El mapa esta
+danado o incompleto... Revisalo en Tiled"), asi que no hay riesgo de corrida
+rota; solo confunden a quien busca un ejemplo. Solo los nombra
+`layouts/layouts_personalizados.json`. Propuesta: archivarlos en `_legacy/`
+(con `git mv`, reversible) junto con esa entrada. Requiere OK del Director
+(fase de limpieza).
 
 ### BK-34 — el KPI "distancia de guardado" mezcla la caminata al muelle (QA H-37)
 
