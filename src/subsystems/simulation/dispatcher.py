@@ -1027,7 +1027,9 @@ class DispatcherV11:
         
         # ==================== RASTREO DE ESTADO ====================
         ultimo_seq_agregado = primera_wo.pick_sequence  # Para cambio de área
-        usadas = {primera_wo}  # Set de WOs ya agregadas
+        # QA H-53: incluye las hermanas de BK-23; sin esto el barrido las volvia
+        # a agregar y la misma WO se recogia y despachaba dos veces.
+        usadas = set(tour_wos)  # Set de WOs ya agregadas
         
         # ==================== LOGGING INICIAL ====================
         logger.debug(f"[DISPATCHER] ===== INICIO CONSTRUCCION TOUR =====")
