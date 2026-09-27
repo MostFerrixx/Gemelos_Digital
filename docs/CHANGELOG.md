@@ -10,6 +10,15 @@ Formato por entrada: `YYYY-MM-DD  ITEM — resumen de 1-2 lineas. sha(s). [link 
 
 ---
 
+## 2026-09-27
+
+- **CI de GitHub en verde de nuevo** (fallaba en cada push desde el 19/09:
+  los correos "Run failed: tests"). Dos tests (BK-25 `test_ze07`, BK-35
+  `test_el_importador_registra...`) copiaban el `warehouse.db` local, que la
+  CI no tiene; la base se generaba despues de pytest y el gate ni corria. Ahora
+  la migracion va antes de pytest (405 tests, ninguno salteado; gate PASS en
+  GitHub) y esos tests se saltean sin base. Acciones sin Node 20. `267af8e`.
+
 ## 2026-09-26 (cont.)
 
 - **BK-39: el canonico y el Default pasan al perfil Real; "Demo" eliminado**

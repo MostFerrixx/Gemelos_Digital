@@ -26,6 +26,12 @@ python scripts/regression_gate.py  # GATE PASS esperado (baseline 6fe69d88)
 python scripts/check_equivalencia_personas.py  # INIT-11 F1: EQUIVALENTE (~1 min)
 ```
 
+- **CI de GitHub** (`.github/workflows/tests.yml`): verde desde `267af8e`
+  (estuvo roja del 19/09 al 26/09). Corre en un clon limpio SIN `warehouse.db`:
+  migra primero y despues pytest + gate. Un test que necesite la base local
+  debe saltearse si no existe. Sin `gh` instalado: se consulta con la API
+  publica (`api.github.com/repos/MostFerrixx/Gemelos_Digital/actions/runs`).
+
 ## Canonico
 
 - **Perfil de velocidad Real** (BK-39, 2026-09-26): 1 s/celda a pie, montacargas
