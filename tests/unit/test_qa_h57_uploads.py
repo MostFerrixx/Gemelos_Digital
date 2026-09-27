@@ -11,7 +11,7 @@ def test_arranque_conserva_lo_que_usa_config_json(tmp_path):
     up.mkdir(parents=True)
     (up / "pedidos.csv").write_text("order_id,sku_id,quantity\n")
     (tmp_path / "uploads" / "viejo.xlsx").write_text("x")
-    json.dump({"order_file_path": "uploads\sub\pedidos.csv"},
+    json.dump({"order_file_path": r"uploads\sub\pedidos.csv"},
               open(tmp_path / "config.json", "w", encoding="utf-8"))
     borrados = limpiar_uploads(str(tmp_path))
     assert borrados == ["uploads/viejo.xlsx"]

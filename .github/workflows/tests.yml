@@ -18,9 +18,9 @@ jobs:
       SDL_VIDEODRIVER: dummy
       SDL_AUDIODRIVER: dummy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
           cache: pip
@@ -28,14 +28,17 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      - name: Suite de red de seguridad (unit)
-        run: python -m pytest -q
-
       # warehouse.db NO se versiona (Ley 7): se regenera desde el Excel canonico.
       # Verificado 2026-07-04: una BD recien migrada reproduce el baseline
       # byte-identico (sin ella, el motor cae al fallback Excel y el SHA difiere).
+      # 2026-09-27: va ANTES de pytest. Desde el 19/09 dos tests copiaban la base
+      # y la CI fallaba en cada push (y el gate no llegaba a correr); ademas asi
+      # no se saltean los tests que necesitan la base.
       - name: Migrar Excel -> SQLite (warehouse.db)
         run: python run_migration.py
+
+      - name: Suite de red de seguridad (unit)
+        run: python -m pytest -q
 
       - name: Gate de regresion byte-identico
         run: |

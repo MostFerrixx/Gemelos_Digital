@@ -71,7 +71,8 @@ def test_el_aviso_de_excel_nuevo_usa_la_fecha_de_aplicacion(monkeypatch):
     assert info['actualizada'] > 100.0          # la base se toco despues (una corrida)
 
 
-@pytest.mark.skipif(not os.path.exists(XLSX), reason='sin Excel v3')
+@pytest.mark.skipif(not os.path.exists(XLSX) or not os.path.exists(os.path.join(RAIZ, 'warehouse.db')),
+                    reason='sin Excel v3 o sin warehouse.db')
 def test_el_importador_registra_cuando_se_aplico():
     import shutil
     from subsystems.database.importer import import_warehouse_data

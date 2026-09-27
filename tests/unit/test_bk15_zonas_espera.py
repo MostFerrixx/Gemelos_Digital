@@ -10,6 +10,8 @@ pasillo, ni una celda que corte el paso.
 import os
 import shutil
 
+import pytest
+
 from core.config_schema import validate_config_schema
 from subsystems.simulation.idle_zones import GestorZonasEspera
 
@@ -96,6 +98,8 @@ def test_ze06_esquema_registra_zonas_espera():
     assert not any("'zonas_espera'" in a for a in avisos)
 
 
+@pytest.mark.skipif(not os.path.exists(os.path.join(PROJECT_ROOT, "warehouse.db")),
+                    reason="sin warehouse.db (se genera con run_migration.py)")
 def test_ze07_web_valida_las_zonas_contra_el_mapa_real(tmp_path):
     import json
     from web_prototype.config_manager import WebConfigurationManager
